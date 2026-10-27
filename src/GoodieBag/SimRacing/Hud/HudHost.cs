@@ -26,6 +26,9 @@ internal sealed class HudHost : IDisposable
     private bool _toolbarDirty;
     private bool _active, _holding, _hidden, _editing, _editSimulated, _preview, _overrideRules;
     private string _layoutName = "";
+    private bool _raceSimulated;
+    private readonly TelemetryFrame _warmUpFrame = new();
+    private long _warmUpSequence = long.MinValue / 2;
     private (bool Connected, SessionKind Kind, string? Car, int? Track, int Num) _sessionKey;
     private IReadOnlyList<HudMonitor>? _monitors;
 
@@ -271,6 +274,15 @@ internal sealed class HudHost : IDisposable
     {
         if (!_holding) return;
         var frame = _app.Telemetry.Take();
+        if (frame.Simulated != _raceSimulated)
+        {
+            _raceSimulated = frame.Simulated;
+            if (_raceSimulated)
+            {
+                Race.Restart();
+                DemoTelemetry.WarmUp(Race, _warmUpFrame, ref _warmUpSequence, frame.SessionTime);
+            }
+        }
         Race.Update(frame);
         _tickPalette = CurrentPalette();
         ResolveLayout(force: false);

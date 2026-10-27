@@ -306,6 +306,13 @@ internal sealed class RaceState
         Alerts.Visible(Now);
     }
 
+    public void Restart()
+    {
+        _keysFrom = null;
+        _keysNum = null;
+        _sessionKey = "";
+    }
+
     private void NewSession(TelemetryFrame f)
     {
         Laps.Clear();

@@ -1201,16 +1201,9 @@ internal sealed class PreviewSource
     public PreviewSource(Func<RaceHudSettings> settings)
     {
         Simulated = new RaceState(settings);
-        for (double t = -WarmUp; t < 0; t += 0.5)
-        {
-            _demo.Fill(_frame, t);
-            _frame.Sequence = ++_seq;
-            Simulated.Update(_frame);
-        }
+        DemoTelemetry.WarmUp(Simulated, _frame, ref _seq);
         Advance(null);
     }
-
-    private const double WarmUp = 6 * 110;
 
     public RaceState Simulated { get; }
 

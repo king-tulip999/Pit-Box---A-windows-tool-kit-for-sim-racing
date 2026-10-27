@@ -7,7 +7,8 @@ internal sealed class DemoTelemetry
 {
     private const double TrackKm = 5.2, RaceSeconds = 45 * 60, StartOffset = 14 * 60;
     private const int Player = 12, Cars = 28, FirstLmp2 = 23;
-    private const int TowedCar = 14;
+    private const int TowedCar = 14, SlowLmp2 = 27;
+    private const double WarmUpSeconds = 6 * 110, WarmUpStep = 0.5;
     private const double TowFrom = 820, TowEvery = 30, BackOnTrack = 1, PitEvery = 750;
     private static readonly string[] Names =
     {
@@ -27,6 +28,19 @@ internal sealed class DemoTelemetry
     public DemoTelemetry() => _session = BuildSession();
 
     public void Restart() => _start = Stopwatch.GetTimestamp();
+
+    public static void WarmUp(RaceState race, TelemetryFrame frame, ref long sequence, double? until = null)
+    {
+        var demo = new DemoTelemetry();
+        double end = (until ?? StartOffset) - StartOffset;
+        double start = Math.Max(end - WarmUpSeconds, -StartOffset);
+        for (double t = start; t < end; t += WarmUpStep)
+        {
+            demo.Fill(frame, t);
+            frame.Sequence = ++sequence;
+            race.Update(frame);
+        }
+    }
 
     private static SessionInfo BuildSession()
     {
@@ -93,12 +107,13 @@ internal sealed class DemoTelemetry
         return (h % 2001) / 1000.0 - 1;
     }
 
-    private static double LapTime(int car) => car is >= 1 and <= 8 ? 97.4 + car * 0.05 : car >= FirstLmp2 ? 101.0 + (car - FirstLmp2) * 0.06 : 107.2 + (car - 9) * 0.045;
+    private static double LapTime(int car) => car == SlowLmp2 ? LapTime(Player) + 0.4 : car is >= 1 and <= 8 ? 97.4 + car * 0.05 : car >= FirstLmp2 ? 101.0 + (car - FirstLmp2) * 0.06 : 107.2 + (car - 9) * 0.045;
 
     private static double LapOf(int car, int lap) => LapTime(car) + 0.3 + 0.7 * Noise(car, lap) - 0.035 * Math.Min(lap, 40);
 
     private static double Dist(int car, double t)
     {
+        if (car == SlowLmp2) return Math.Max(0, Dist(Player, t) - 1 + 0.035 * Math.Sin(t / 23));
         double lap = LapTime(car);
         double grid = -(car >= FirstLmp2 ? car - FirstLmp2 + 3 : car - 1) * 0.006;
         double swing = 0.03 * Math.Sin(t / 40 + car * 1.7) + 0.008 * Math.Sin(t / 14 + car * 2.9);
@@ -119,7 +134,7 @@ internal sealed class DemoTelemetry
         return _best[car];
     }
 
-    private static bool InPits(int car, double t) => (t + car * 97) % PitEvery < 40 && t > 60;
+    private static bool InPits(int car, double t) => car != SlowLmp2 && (t + car * 97) % PitEvery < 40 && t > 60;
 
     private static readonly (double At, double Depth, double Width)[] Corners = { (0.08, 42, 0.02), (0.21, 30, 0.025), (0.33, 22, 0.03), (0.47, 48, 0.018), (0.6, 26, 0.03), (0.74, 35, 0.022), (0.9, 30, 0.025) };
 
