@@ -107,7 +107,7 @@ internal sealed class FovSection : StackPanel
         _bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         _bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         _bottom.Margin = new Thickness(0, 13, 0, 0);
-        var iracingCard = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(15, 11, 15, 13), Child = _iracing };
+        var iracingCard = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(15, 11, 15, 13), Child = _iracing, VerticalAlignment = VerticalAlignment.Top };
         Ui.Anchor(iracingCard, "simracing.fov.iracing");
         _bottom.Children.Add(iracingCard);
         var right = new StackPanel();

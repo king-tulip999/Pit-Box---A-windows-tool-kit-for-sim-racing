@@ -89,7 +89,7 @@ internal sealed class CompanionAppSection : Tile
         TextCase.SetVerbatim(where, app.ExePath is not null);
         info.Children.Add(where);
 
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        var actions = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
         var visit = Ui.LabeledButton("I.External", spec.Host, () => Ui.OpenUrl(spec.Site), "GhostButton");
         visit.ToolTip = $"Open {spec.Site}";
         visit.Margin = new Thickness(0, 0, 6, 0);
@@ -133,7 +133,8 @@ internal sealed class CompanionAppSection : Tile
                 actions.Children.Add(stop);
             }
         }
-        _stack.Children.Add(Ui.SplitRow(info, actions, 9.5, stackLeft: true));
+        _stack.Children.Add(info);
+        _stack.Children.Add(actions);
 
         _stack.Children.Add(Hairline.Rule(new Border { Background = Ui.Res<System.Windows.Media.Brush>("Line"), Margin = new Thickness(0, 11, 0, 3) }));
         _stack.Children.Add(Ui.SettingRow("Start with Goodie Bag", "When Goodie Bag starts (skipped if it's already running).",

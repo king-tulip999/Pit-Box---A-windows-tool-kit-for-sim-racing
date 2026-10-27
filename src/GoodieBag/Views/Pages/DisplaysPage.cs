@@ -299,8 +299,9 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
 
         var head = new Grid();
         head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        head.ColumnDefinitions.Add(new ColumnDefinition());
+        head.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1000, GridUnitType.Star), MaxWidth = 420 });
         head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        head.ColumnDefinitions.Add(new ColumnDefinition());
         var number = new Tile
         {
             Width = 28, Height = 28, BorderThickness = new Thickness(1.5), CornerRadius = ThemeManager.Round(6), VerticalAlignment = VerticalAlignment.Center,

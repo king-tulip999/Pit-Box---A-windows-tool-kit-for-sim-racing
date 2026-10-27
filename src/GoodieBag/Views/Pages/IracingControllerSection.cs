@@ -285,7 +285,7 @@ internal sealed class IracingControllerSection : StackPanel
         var layout = _ws.ChangedOnDisk() ? new List<LayoutGuard.Difference>() : LayoutGuard.Differences(Session!, S.SavedLayout);
         int problems = report.Findings.Count + (report.TelemetryLarge ? 1 : 0) + (layout.Count > 0 ? 1 : 0);
 
-        var counts = new System.Windows.Controls.Primitives.UniformGrid { Columns = 3, Margin = new Thickness(-5, 0, -5, 5) };
+        var counts = new System.Windows.Controls.Primitives.UniformGrid { Columns = 3, Margin = new Thickness(-5, 0, -5, 5), MaxWidth = HealthRowMax, HorizontalAlignment = HorizontalAlignment.Left };
         counts.Children.Add(Counter(problems.ToString(CultureInfo.InvariantCulture), problems == 1 ? "thing to look at" : "things to look at", problems == 0 ? "SageSoft" : "WarnSoft", problems == 0 ? "SageDeep" : "Warn"));
         counts.Children.Add(Counter(report.Unusual.Count.ToString(CultureInfo.InvariantCulture), "changed from iRacing's default", "SlateSoft", "SlateDeep"));
         counts.Children.Add(Counter(report.Passed.Count.ToString(CultureInfo.InvariantCulture), "checks passed", "SageSoft", "SageDeep"));
@@ -410,9 +410,11 @@ internal sealed class IracingControllerSection : StackPanel
         return card;
     }
 
-    private Grid UnusualRow(Setting s)
+    private const double HealthRowMax = 720;
+
+    private WideGrid UnusualRow(Setting s)
     {
-        var row = new Grid { Margin = new Thickness(0, 5, 0, 5) };
+        var row = new WideGrid { Margin = new Thickness(0, 5, 0, 5), MaxWidth = HealthRowMax, HorizontalAlignment = HorizontalAlignment.Left };
         row.ColumnDefinitions.Add(new ColumnDefinition());
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var text = new StackPanel();

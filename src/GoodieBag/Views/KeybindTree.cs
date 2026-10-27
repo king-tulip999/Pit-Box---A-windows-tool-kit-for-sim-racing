@@ -13,6 +13,7 @@ namespace GoodieBag.Views;
 internal sealed class KeybindTree : Tile
 {
     private const double RowIndent = 32, RowHeight = 34, KeyWidth = 133, CellWidth = 373, CellGap = 13, GroupWidth = 437;
+    private const int FlatStack = 2;
     private readonly AppServices _app;
     private readonly Action<string>? _navigate;
     private readonly Func<HotkeyEntry, bool> _include;
@@ -185,6 +186,7 @@ internal sealed class KeybindTree : Tile
             else stacks.Add(group);
             last = single ? "" : group[0].Cluster;
         }
+        if (_flat) stacks = stacks.SelectMany(s => s.Chunk(Math.Max(FlatStack, (int)Math.Ceiling(s.Count / 3.0))).Select(c => c.ToList())).ToList();
         var panel = new MasonryPanel { MinColumnWidth = CellWidth, Gap = CellGap, MaxColumns = 6, Margin = new Thickness(RowIndent, 0, 0, 4) };
         foreach (var stack in stacks)
         {

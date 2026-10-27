@@ -982,9 +982,10 @@ internal static class StatsSections
         if (charts.Bests.Count == 0) return Chart("Personal bests", caption, Empty("No clean laps in this range."));
         bool everything = q.From <= 0;
         var table = new Grid();
-        table.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 73 });
-        table.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.3, GridUnitType.Star), MinWidth = 73 });
+        table.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1000, GridUnitType.Star), MinWidth = 73, MaxWidth = 300 });
+        table.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1300, GridUnitType.Star), MinWidth = 73, MaxWidth = 380 });
         for (int c = 0; c < 4; c++) table.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        table.ColumnDefinitions.Add(new ColumnDefinition());
         int row = 0;
         void Cell(FrameworkElement element, int col, bool right = false, bool center = false)
         {
@@ -1009,7 +1010,7 @@ internal static class StatsSections
             var rule = Hairline.Rule(new Border { VerticalAlignment = VerticalAlignment.Top });
             rule.SetResourceReference(Border.BackgroundProperty, "Line");
             Grid.SetRow(rule, row);
-            Grid.SetColumnSpan(rule, 6);
+            Grid.SetColumnSpan(rule, 7);
             table.Children.Add(rule);
             Cell(CarPictures.Beside(Text(pb.Car, "Body"), pb.Car, 18, 6.5), 0);
             var track = Text(pb.Config.Length > 0 ? $"{pb.Track} · {pb.Config}" : pb.Track, "Body");

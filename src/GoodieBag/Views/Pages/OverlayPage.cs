@@ -168,7 +168,7 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         AutomationProperties.SetName(_visible, "Show overlay");
         var right = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { _statusChip, _visible } };
         RefreshStatus();
-        _body.Children.Add(new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, 13), Child = Ui.SplitRow(left, right, 13, stackLeft: true) });
+        _body.Children.Add(new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, 13), Child = Ui.SplitRow(left, right, 24, stackLeft: true, together: 420) });
     }
 
     private void RefreshStatus()

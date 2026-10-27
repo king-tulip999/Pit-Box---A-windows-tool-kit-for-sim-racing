@@ -40,10 +40,12 @@ internal static class StatsSessions
         else
         {
             var table = new Grid();
-            foreach (var w in new[] { GridLength.Auto, GridLength.Auto, new GridLength(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto, GridLength.Auto, GridLength.Auto, GridLength.Auto })
-                table.ColumnDefinitions.Add(new ColumnDefinition { Width = w, MinWidth = w.IsStar ? 97 : 0 });
+            for (int c = 0; c < 8; c++)
+                table.ColumnDefinitions.Add(c == 2 ? new ColumnDefinition { Width = new GridLength(1000, GridUnitType.Star), MinWidth = 97, MaxWidth = CarTrackMax } : new ColumnDefinition { Width = GridLength.Auto });
+            table.ColumnDefinitions.Add(new ColumnDefinition());
             table.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             string[] heads = { "Time", "Session", "Car and track", "Laps", "Best lap", "Incidents", "Result", "" };
+            int span = table.ColumnDefinitions.Count;
             for (int c = 0; c < heads.Length; c++)
                 Cell(table, 0, c, new TextBlock { Text = heads[c], Style = Ui.Res<Style>("Eyebrow") }, c is >= 3 and <= 6);
             int row = 0;
@@ -60,14 +62,14 @@ internal static class StatsSessions
                     var dayText = new TextBlock { Text = Dates.Weekday(local) + " " + Dates.Short(local), Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(8, row == 1 ? 5 : 13, 0, 4) };
                     dayText.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
                     Grid.SetRow(dayText, row);
-                    Grid.SetColumnSpan(dayText, heads.Length);
+                    Grid.SetColumnSpan(dayText, span);
                     table.Children.Add(dayText);
                 }
                 row++;
                 table.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
                 var hit = new Border { Background = Brushes.Transparent, Cursor = Cursors.Hand, ToolTip = "Open this session" };
                 Grid.SetRow(hit, row);
-                Grid.SetColumnSpan(hit, heads.Length);
+                Grid.SetColumnSpan(hit, span);
                 hit.MouseEnter += (_, _) => hit.SetResourceReference(Border.BackgroundProperty, "Hover");
                 hit.MouseLeave += (_, _) => hit.Background = Brushes.Transparent;
                 var session = s;
@@ -75,7 +77,7 @@ internal static class StatsSessions
                 var rule = Hairline.Rule(new Border { VerticalAlignment = VerticalAlignment.Top, IsHitTestVisible = false });
                 rule.SetResourceReference(Border.BackgroundProperty, "Line");
                 Grid.SetRow(rule, row);
-                Grid.SetColumnSpan(rule, heads.Length);
+                Grid.SetColumnSpan(rule, span);
                 table.Children.Add(hit);
                 table.Children.Add(rule);
                 Cell(table, row, 0, Caption(Dates.Time(local)));
@@ -109,6 +111,8 @@ internal static class StatsSessions
         Ui.Anchor(card, "stats.sessions");
         return card;
     }
+
+    private const double CarTrackMax = 440;
 
     internal static string NoTraceReason(SessionSummary s, Config.SessionStatsSettings settings, DateTime nowUtc)
     {

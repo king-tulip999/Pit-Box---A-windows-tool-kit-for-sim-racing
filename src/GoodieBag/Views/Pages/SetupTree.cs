@@ -14,7 +14,7 @@ namespace GoodieBag.Views.Pages;
 internal sealed class SetupTree : Grid
 {
     public const double RowHeight = 24, Indent = 16, GapHeight = 11;
-    private const double Threshold = 6;
+    private const double Threshold = 6, NameMax = 460;
 
     private readonly StackPanel _rows = new();
     private readonly Canvas _overlay = new() { IsHitTestVisible = false };
@@ -77,8 +77,9 @@ internal sealed class SetupTree : Grid
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(depth * Indent + 4) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(19) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(19) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1000, GridUnitType.Star), MaxWidth = NameMax });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
 
         if (node.IsFolder)
         {

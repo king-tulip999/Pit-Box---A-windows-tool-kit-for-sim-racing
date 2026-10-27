@@ -334,6 +334,8 @@ internal static class Ui
 
     public const double PanelSpacing = 19;
 
+    public const double TwoCardsFrom = 1120;
+
     public const double InlineGap = 3, ButtonGap = 6, GroupGap = 13;
 
     public static Thickness DialogPadding => new(21, 18, 21, 16);
@@ -718,14 +720,15 @@ internal static class Ui
         return panel;
     }
 
-    public static Grid SplitRow(FrameworkElement left, FrameworkElement right, double gap = 13, bool stackLeft = false)
+    public static Grid SplitRow(FrameworkElement left, FrameworkElement right, double gap = 13, bool stackLeft = false, double? together = null)
     {
-        var row = new Grid();
-        row.ColumnDefinitions.Add(new ColumnDefinition());
+        var row = new WideGrid();
+        row.ColumnDefinitions.Add(together is { } leftMax ? new ColumnDefinition { Width = GridLength.Auto, MaxWidth = leftMax } : new ColumnDefinition());
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        if (together is not null) row.ColumnDefinitions.Add(new ColumnDefinition());
         row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        right.HorizontalAlignment = HorizontalAlignment.Right;
+        right.HorizontalAlignment = together is null ? HorizontalAlignment.Right : HorizontalAlignment.Left;
         row.Children.Add(left);
         row.Children.Add(right);
         var margin = right.Margin;
@@ -743,8 +746,8 @@ internal static class Ui
             stacked = stack;
             Grid.SetRow(right, stack ? 1 : 0);
             Grid.SetColumn(right, stack ? 0 : 1);
-            Grid.SetColumnSpan(right, stack ? 2 : 1);
-            if (stackLeft) right.HorizontalAlignment = stack ? HorizontalAlignment.Left : HorizontalAlignment.Right;
+            Grid.SetColumnSpan(right, stack ? row.ColumnDefinitions.Count : 1);
+            if (stackLeft && together is null) right.HorizontalAlignment = stack ? HorizontalAlignment.Left : HorizontalAlignment.Right;
             right.Margin = stack ? new Thickness(margin.Left, margin.Top + 8, margin.Right, margin.Bottom) : beside;
         }
         right.Margin = beside;
@@ -947,14 +950,17 @@ internal static class Ui
 
     private const double SettingTextMin = 146;
 
+    public const double SettingLabelMax = 260;
+
     public sealed record SettingDefault(Func<bool> IsDefault, Action Reset, string Default);
 
     public static Grid SettingRow(string title, string? description, UIElement control, SettingDefault? fallback = null, string? more = null)
     {
         var grid = new SettingRowGrid { Margin = new Thickness(0, 8, 0, 8) };
         NameFor(control, title);
-        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1000, GridUnitType.Star), MaxWidth = SettingLabelMax });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         var text = new StackPanel { Margin = new Thickness(0, 0, 15, 0), VerticalAlignment = VerticalAlignment.Center };
@@ -1000,6 +1006,7 @@ internal static class Ui
             stacked = stack;
             Grid.SetRow(fe, stack ? 1 : 0);
             Grid.SetColumn(fe, stack ? 0 : 1);
+            Grid.SetColumnSpan(fe, stack ? 3 : 1);
             fe.HorizontalAlignment = stack ? HorizontalAlignment.Left : align;
             fe.Margin = stack ? new Thickness(margin.Left, margin.Top + 8, margin.Right, margin.Bottom) : margin;
             if (fe is ResetBox resetBox) resetBox.Trailing = stack;

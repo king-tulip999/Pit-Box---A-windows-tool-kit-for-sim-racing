@@ -21,7 +21,7 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
     private readonly FovSection _fov;
     private IracingControllerSection? _controller;
     private CompanionAppSection? _tradingPaints, _garage61;
-    private readonly StackPanel _companions = new();
+    private readonly System.Windows.Controls.Primitives.UniformGrid _companions = new() { Columns = 1, VerticalAlignment = VerticalAlignment.Top };
     private SetupManagerSection? _setups;
     private RaceHudSection? _hud;
     private readonly ScrollViewer _scroll;
@@ -74,6 +74,7 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
         _garage61.Margin = new Thickness(0, Ui.PanelSpacing, 0, 0);
         Ui.Anchor(_garage61, "simracing.garage61");
         FillCompanions();
+        _companions.SizeChanged += (_, e) => { if ((e.PreviousSize.Width >= Ui.TwoCardsFrom) != (e.NewSize.Width >= Ui.TwoCardsFrom)) LayCompanions(); };
         return _companions;
     }
 
@@ -84,7 +85,16 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
         bool paints = !S.IsPanelHidden("tradingpaints"), laps = !S.IsPanelHidden("garage61");
         if (paints) _companions.Children.Add(_tradingPaints);
         if (laps) _companions.Children.Add(_garage61);
-        _garage61.Margin = new Thickness(0, paints ? Ui.PanelSpacing : 0, 0, 0);
+        LayCompanions();
+    }
+
+    private void LayCompanions()
+    {
+        if (_garage61 is null) return;
+        bool both = _companions.Children.Count == 2, side = both && _companions.ActualWidth >= Ui.TwoCardsFrom;
+        _companions.Columns = side ? 2 : 1;
+        _garage61.Margin = !both ? new Thickness(0) : side ? new Thickness(Ui.PanelSpacing / 2, 0, 0, 0) : new Thickness(0, Ui.PanelSpacing, 0, 0);
+        if (_tradingPaints is not null) _tradingPaints.Margin = side ? new Thickness(0, 0, Ui.PanelSpacing / 2, 0) : new Thickness(0);
     }
 
     private void ShowCompanions()

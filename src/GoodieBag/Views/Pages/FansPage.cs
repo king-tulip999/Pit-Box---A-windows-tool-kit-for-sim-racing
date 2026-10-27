@@ -69,7 +69,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
     {
         _app = app;
         _window = window;
-        _fanGrid = new PanelGrid(_app.Config.Fans.Layout, _app.Save) { Margin = new Thickness(0, 0, 0, 3), RowHeight = 1, Gap = 0, PanelSpacing = Ui.PanelSpacing };
+        _fanGrid = new PanelGrid(_app.Config.Fans.Layout, _app.Save) { Margin = new Thickness(0, 0, 0, 3), RowHeight = 1, Gap = 0, PanelSpacing = Ui.PanelSpacing, TwoColumnsFrom = Ui.TwoCardsFrom, ColumnGap = Ui.PanelSpacing };
         Grid.SetIsSharedSizeScope(_fanGrid, true);
         _master = Ui.Switch(_app.Config.Fans.Enabled, on => _app.SetFanControlEnabled(on));
         Content = new ScrollViewer { Style = Ui.Res<Style>("PageScroll"), Content = Ui.PageFrame(_body) };
@@ -434,7 +434,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         for (int i = 0; i < visible.Count; i++)
         {
             var f = visible[i];
-            _fanGrid.Add(new PanelDef(f.ControlId, _app.FanName(f), _ => FanCard(f)) { FullWidth = true, Order = order[i] });
+            _fanGrid.Add(new PanelDef(f.ControlId, _app.FanName(f), _ => FanCard(f)) { FullWidthWhen = () => _expanded.Contains(f.ControlId), Order = order[i] });
         }
     }
 
@@ -466,10 +466,9 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
 
         var left = new Grid { VerticalAlignment = VerticalAlignment.Center };
         left.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        left.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(256) });
-        left.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 130, MaxWidth = 259 });
-        left.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(68) });
-        left.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(122) });
+        left.ColumnDefinitions.Add(new ColumnDefinition());
+        left.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        left.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
         var spinner = hw.IsPump
             ? FanSpinner.Pump(Ui.Res<Brush>("AccentText"), Ui.Res<Brush>("TextFaint"), 28)
             : new FanSpinner(Ui.Res<Geometry>("I.Fan"), Ui.Res<Brush>("AccentText"), 28);
@@ -480,14 +479,12 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         names.Children.Add(new TextBlock { Text = about, ToolTip = about, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 2, 0, 0), TextWrapping = TextWrapping.NoWrap, TextTrimming = TextTrimming.CharacterEllipsis });
         Grid.SetColumn(names, 1);
         left.Children.Add(names);
-        var bar = new Meter { Fill = Ui.Res<Brush>("LineStrong"), Height = 10, VerticalAlignment = VerticalAlignment.Center };
-        Grid.SetColumn(bar, 2);
-        left.Children.Add(bar);
+        var bar = new Meter { Fill = Ui.Res<Brush>("LineStrong"), Height = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(57, 0, 16, 0) };
         var output = new TextBlock { Text = "–", Style = Ui.Res<Style>("BigValue"), FontSize = 21, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
-        Grid.SetColumn(output, 3);
+        Grid.SetColumn(output, 2);
         left.Children.Add(output);
         var rpm = new TextBlock { Text = "–", Foreground = Ui.Res<Brush>("TextMuted"), FontSize = 12.5, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 0, 0, 0) };
-        Grid.SetColumn(rpm, 4);
+        Grid.SetColumn(rpm, 3);
         left.Children.Add(rpm);
         _cards[fan.ControlId] = new FanCardParts { Spinner = spinner, Rpm = rpm, Output = output, Bar = bar };
 
@@ -534,6 +531,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
             void ShowCurve()
             {
                 expandHost.Content = null;
+                _fanGrid.InvalidateMeasure();
                 if (_cards.TryGetValue(fan.ControlId, out var parts)) parts.Curve = null;
                 if (!_expanded.Contains(fan.ControlId)) return;
                 var line = Hairline.Rule(new Border { Margin = new Thickness(0, 11, 0, 11) });
@@ -625,11 +623,10 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         right.Children.Add(more);
         if (chevron is not null) right.Children.Add(chevron);
 
+        root.Children.Add(left);
         right.HorizontalAlignment = HorizontalAlignment.Right;
-        var controls = new Grid();
-        controls.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, SharedSizeGroup = "FanControls" });
-        controls.Children.Add(right);
-        root.Children.Add(Ui.SplitRow(left, controls, 16, stackLeft: true));
+        root.Children.Add(Ui.SplitRow(bar, right, 0, stackLeft: true));
+        ((FrameworkElement)root.Children[^1]).Margin = new Thickness(0, 12, 0, 0);
         root.Children.Add(expandHost);
         return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(16, 16, 13, 16), Child = root };
     }

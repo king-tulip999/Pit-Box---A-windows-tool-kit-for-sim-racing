@@ -598,7 +598,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
             Text = "Tools for troubleshooting hardware and app problems. Reports leave out personal details (user and PC names, folders, IP addresses).",
             Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 8),
         });
-        var buttons = new System.Windows.Controls.Primitives.UniformGrid { Columns = 2 };
+        var buttons = new WrapPanel();
         var rescan = Ui.LabeledButton("I.Search", "Rescan hardware", Rescan);
         rescan.ToolTip = "Closes the sensor drivers and opens them again, so new or missing temperature sensors, fans and fan controllers are detected. Fans follow the BIOS for a moment meanwhile.";
         Ui.Anchor(rescan, "settings.rescan");

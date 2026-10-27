@@ -100,7 +100,7 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
             _body.Children.Add(empty);
             return;
         }
-        _body.Children.Add(SettingsCard());
+        header.Children.Add(AutoApplySwitch());
         var newGroup = Ui.LabeledButton("I.Folder", "New group", () => _ = EditGroupAsync(new WindowGroup(), isNew: true), "GhostButton");
         newGroup.Margin = new Thickness(0, 0, 6, 0);
         var create = Ui.LabeledButton("I.Plus", "New profile", () => _ = EditAsync(new WindowProfile(), isNew: true), "PrimaryButton");
@@ -108,32 +108,38 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
         _body.Children.Add(Ui.SectionHeader("Your profiles", RaceFormatCount(n) + (S.Layout.Count > 1 ? " · drag to arrange" : ""), newGroup, create));
         _screens = Screens();
 
-        var grid = new PanelGrid(S.Layout, _app.Save) { LiveEdit = true, RowHeight = 1, Gap = 0, PanelSpacing = Ui.PanelSpacing };
+        var grid = new PanelGrid(S.Layout, _app.Save) { LiveEdit = true, RowHeight = 1, Gap = 0, PanelSpacing = Ui.PanelSpacing, TwoColumnsFrom = Ui.TwoCardsFrom, ColumnGap = Ui.PanelSpacing };
         int order = 0;
         foreach (var slot in S.Layout.ToList())
         {
             if (S.Groups.FirstOrDefault(g => WindowProfileSettings.KeyOf(g) == slot.Id) is { } group)
             {
                 var g = group;
-                grid.Add(new PanelDef(slot.Id, g.Name, _ => GroupCard(g)) { FullWidth = true, Order = order++, VeilClick = () => _ = EditGroupAsync(g, isNew: false) });
+                grid.Add(new PanelDef(slot.Id, g.Name, _ => GroupCard(g)) { Order = order++, VeilClick = () => _ = EditGroupAsync(g, isNew: false) });
             }
             else if (S.Profiles.FirstOrDefault(p => WindowProfileSettings.KeyOf(p) == slot.Id) is { } profile)
             {
                 var p = profile;
-                grid.Add(new PanelDef(slot.Id, p.Name, _ => ProfileCard(p)) { FullWidth = true, Order = order++, VeilClick = () => _ = EditAsync(p, isNew: false) });
+                grid.Add(new PanelDef(slot.Id, p.Name, _ => ProfileCard(p)) { Order = order++, VeilClick = () => _ = EditAsync(p, isNew: false) });
             }
         }
         _body.Children.Add(grid);
     }
 
-    private Tile SettingsCard()
+    private StackPanel AutoApplySwitch()
     {
-        var flow = new SettingsFlow();
-        var auto = Ui.SettingRow("Apply automatically", S.AutoApply ? "Each profile set to apply when its program starts does so." : "Off: profiles apply only with Apply, their keybind or the tray.",
-            Ui.Switch(S.AutoApply, v => { S.AutoApply = v; _app.WindowProfiles.RaiseChanged(); }));
-        Ui.Anchor(auto, AutoAnchor);
-        flow.Children.Add(auto);
-        return new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, 15), Padding = new Thickness(16, 6, 16, 6), Child = flow };
+        var label = new TextBlock { Text = "Apply automatically", Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+        var toggle = Ui.Switch(S.AutoApply, v => { S.AutoApply = v; _app.WindowProfiles.RaiseChanged(); });
+        toggle.VerticalAlignment = VerticalAlignment.Center;
+        System.Windows.Automation.AutomationProperties.SetName(toggle, "Apply automatically");
+        var row = new StackPanel
+        {
+            Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center,
+            ToolTip = S.AutoApply ? "Each profile set to apply when its program starts does so." : "Off: profiles apply only with Apply, their keybind or the tray.",
+            Children = { label, toggle },
+        };
+        Ui.Anchor(row, AutoAnchor);
+        return row;
     }
 
     private Tile EmptyState()
@@ -159,14 +165,17 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
     private Tile ProfileCard(WindowProfile p) =>
         new() { Style = Ui.Res<Style>("Card"), Padding = new Thickness(15, 10, 15, 10), Child = ProfileRow(p), Cursor = System.Windows.Input.Cursors.Hand, ToolTip = "Click to edit, drag to arrange" };
 
+    private const double ProfileTextMax = 520;
+
     private Grid ProfileRow(WindowProfile p)
     {
         bool running = Running(p);
         var row = new Grid();
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1000, GridUnitType.Star), MaxWidth = ProfileTextMax });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(new ColumnDefinition());
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var badge = Ui.Badge("I.AppWindow", running ? "AccentSoft" : "SurfaceAlt", running ? "AccentText" : "TextMuted", 32, 0, 16);
         badge.VerticalAlignment = VerticalAlignment.Center;
         row.Children.Add(badge);
@@ -176,10 +185,11 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
         title.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = p.Name, Style = Ui.Res<Style>("H3"), FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) }));
         names.Children.Add(title);
         var line = new TrimRow { Margin = new Thickness(0, 2, 0, 0) };
-        var exe = TextFit.TipWhenTrimmed(new TextBlock { Text = p.ProcessName.Length > 0 ? p.ProcessName : "No program picked", Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 8, 0) });
-        TextCase.Verbatim(exe);
-        line.Children.Add(exe);
-        line.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = Summary(p), Style = Ui.Res<Style>("Caption"), TextTrimming = TextTrimming.CharacterEllipsis }));
+        var detail = TextFit.TipWhenTrimmed(new TextBlock { Style = Ui.Res<Style>("Caption"), TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap });
+        detail.Inlines.Add(new System.Windows.Documents.Run(p.ProcessName.Length > 0 ? p.ProcessName : "No program picked") { FontWeight = FontWeights.SemiBold });
+        detail.Inlines.Add(new System.Windows.Documents.Run("   " + Summary(p)));
+        TextCase.Verbatim(detail);
+        line.Children.Add(detail);
         names.Children.Add(line);
         if (running)
         {

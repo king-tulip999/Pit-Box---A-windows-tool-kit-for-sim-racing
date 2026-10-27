@@ -1286,24 +1286,19 @@ internal sealed class DashboardGrid : Panel
     protected override Size MeasureOverride(Size available)
     {
         double width = double.IsInfinity(available.Width) ? MaxColumns * (MinCellWidth + Gap) - Gap : available.Width;
-        int n = InternalChildren.Count, cols = Columns(width);
+        int n = InternalChildren.Count, cols = Math.Max(1, Math.Min(Columns(width), n));
         _rects.Clear();
-        double y = 0;
-        for (int start = 0; start < n; start += cols)
+        double cell = CellWidth(width, cols);
+        var bottoms = new double[cols];
+        for (int i = 0; i < n; i++)
         {
-            int inRow = Math.Min(cols, n - start);
-            double cell = CellWidth(width, inRow), height = 0;
-            for (int k = 0; k < inRow; k++)
-            {
-                var child = InternalChildren[start + k];
-                child.Measure(new Size(cell, double.PositiveInfinity));
-                height = Math.Max(height, child.DesiredSize.Height);
-            }
-            for (int k = 0; k < inRow; k++)
-                _rects.Add(new Rect(k * (cell + Gap), y, cell, height));
-            y += height + Gap;
+            var child = InternalChildren[i];
+            child.Measure(new Size(cell, double.PositiveInfinity));
+            int c = Array.IndexOf(bottoms, bottoms.Min());
+            _rects.Add(new Rect(c * (cell + Gap), bottoms[c], cell, child.DesiredSize.Height));
+            bottoms[c] += child.DesiredSize.Height + Gap;
         }
-        return new Size(width, Math.Max(0, y - Gap));
+        return new Size(width, Math.Max(0, (n == 0 ? 0 : bottoms.Max()) - Gap));
     }
 
     protected override Size ArrangeOverride(Size final)

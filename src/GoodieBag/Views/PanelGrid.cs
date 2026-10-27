@@ -25,6 +25,10 @@ internal sealed record PanelDef(string Id, string Label, Func<PanelSize, Framewo
 
     public bool FullWidth { get; init; }
 
+    public Func<bool>? FullWidthWhen { get; init; }
+
+    public bool IsFull => FullWidth || FullWidthWhen?.Invoke() == true;
+
     public Action<double>? Fit { get; init; }
 
     public int Order { get; init; } = int.MaxValue;
@@ -48,6 +52,16 @@ internal sealed class PanelGrid : Panel
     public double RowHeight { get; init; } = 9.72;
     public double Gap { get; init; } = 13;
     public int MinColumns { get; init; } = 2;
+
+    public double TwoColumnsFrom { get; init; }
+
+    public double ColumnGap { get; init; } = -1;
+
+    private bool Halves => TwoColumnsFrom > 0;
+
+    private double HGap => ColumnGap >= 0 ? ColumnGap : Gap;
+
+    private bool CanResize(PanelDef def) => def.Resizable && !Halves;
 
     public double PanelSpacing { get; init; }
 
@@ -101,7 +115,7 @@ internal sealed class PanelGrid : Panel
     private Size _resizeFrom;
     private (int? Cols, int? Rows) _resizeUndo;
 
-    private double ColStep => _columnWidth + Gap;
+    private double ColStep => _columnWidth + HGap;
     private double RowStep => RowHeight + Gap;
 
     private static bool _liveResize;
@@ -151,7 +165,7 @@ internal sealed class PanelGrid : Panel
 
     public void Resize(string id, double width)
     {
-        if (_items.FirstOrDefault(i => i.Def.Id == id && i.Def.Resizable) is not { } item) return;
+        if (_items.FirstOrDefault(i => i.Def.Id == id && CanResize(i.Def)) is not { } item) return;
         var (min, max) = ColumnRange(item.Def);
         item.Slot.Cols = Math.Clamp(ColumnsFor(width), min, max);
         item.Slot.Rows = null;
@@ -241,18 +255,19 @@ internal sealed class PanelGrid : Panel
         item.Host.Children.Insert(0, content);
     }
 
-    private double ColumnsWidth(int cols) => cols * _columnWidth + (cols - 1) * Gap;
+    private double ColumnsWidth(int cols) => cols * _columnWidth + (cols - 1) * HGap;
 
     private int ColumnsFor(double width, int round = 0)
     {
-        double exact = (width + Gap) / ColStep;
+        double exact = (width + HGap) / ColStep;
         int cols = round < 0 ? (int)Math.Floor(exact + 0.001) : round > 0 ? (int)Math.Ceiling(exact - 0.001) : (int)Math.Round(exact);
         return Math.Clamp(cols, 1, _columns);
     }
 
     private (int Min, int Max) ColumnRange(PanelDef def)
     {
-        if (def.FullWidth) return (_columns, _columns);
+        if (def.IsFull) return (_columns, _columns);
+        if (Halves) return (1, 1);
         int min = ColumnsFor(def.MinWidth, +1);
         return (min, Math.Max(min, ColumnsFor(def.MaxWidthFor?.Invoke() ?? def.MaxWidth, -1)));
     }
@@ -280,7 +295,7 @@ internal sealed class PanelGrid : Panel
             CardOutline = true,
             Margin = new Thickness(0, 0, 0, PanelSpacing),
             BorderBrush = Ui.Res<Brush>("Accent"), BorderThickness = new Thickness(1.5), CornerRadius = ThemeManager.CardCorner,
-            ToolTip = $"Drag {def.Label} to move it in the order" + (def.Resizable ? "; drag its corner to resize" : "")
+            ToolTip = $"Drag {def.Label} to move it in the order" + (CanResize(def) ? "; drag its corner to resize" : "")
                 + (def.VeilClick is not null && def.VeilClickTip is { } tip ? "; click to " + tip : ""),
         };
         var surface = ((SolidColorBrush)Ui.Res<Brush>("Surface")).Color;
@@ -295,7 +310,7 @@ internal sealed class PanelGrid : Panel
             Background = Ui.Res<Brush>("AccentSoft"), BorderBrush = Ui.Res<Brush>("Accent"), BorderThickness = Hairline.Edges(), CornerRadius = ThemeManager.Round(12),
             Padding = new Thickness(10, 3, 3, 3), Margin = new Thickness(6), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Child = tag,
         });
-        if (def.Resizable)
+        if (CanResize(def))
             layers.Children.Add(Grip(item));
         veil.Child = layers;
         return veil;
@@ -422,7 +437,7 @@ internal sealed class PanelGrid : Panel
     private void HookLive(Item item)
     {
         var host = item.Host;
-        if (item.Def.Resizable)
+        if (CanResize(item.Def))
         {
             var grip = Grip(item);
             grip.Opacity = 0;
@@ -536,7 +551,7 @@ internal sealed class PanelGrid : Panel
         if (_drag is not { } item) return;
         item.Shift.BeginAnimation(TranslateTransform.XProperty, null);
         item.Shift.BeginAnimation(TranslateTransform.YProperty, null);
-        item.Shift.X = item.Def.FullWidth ? 0 : pointer.X - _grab.X - _dragFrom.X;
+        item.Shift.X = item.Def.IsFull ? 0 : pointer.X - _grab.X - _dragFrom.X;
         item.Shift.Y = pointer.Y - _grab.Y - _dragFrom.Y;
 
         int col = (int)Math.Round((pointer.X - _grab.X - _offsetX) / ColStep);
@@ -610,7 +625,7 @@ internal sealed class PanelGrid : Panel
         var places = _slots.Select((slot, index) => (slot, index)).Where(x => mine.Contains(x.slot)).Select(x => x.index).ToList();
         for (int k = 0; k < places.Count && k < mine.Count; k++) _slots[places[k]] = mine[k];
         foreach (var item in order)
-            if (!item.Def.Resizable) item.Slot.Cols = item.Slot.Rows = null;
+            if (!CanResize(item.Def)) item.Slot.Cols = item.Slot.Rows = null;
         _save();
         InvalidateMeasure();
     }
@@ -618,14 +633,22 @@ internal sealed class PanelGrid : Panel
     protected override Size MeasureOverride(Size available)
     {
         double width = double.IsInfinity(available.Width) ? 1000 : available.Width;
-        _columns = Math.Max(MinColumns, (int)((width + Gap) / (MinColumnWidth + Gap)));
-        _columnWidth = Math.Min(MinColumnWidth, Math.Max(1, (width - (_columns - 1) * Gap) / _columns));
+        if (Halves)
+        {
+            _columns = width >= TwoColumnsFrom ? 2 : 1;
+            _columnWidth = Math.Max(1, (width - (_columns - 1) * HGap) / _columns);
+        }
+        else
+        {
+            _columns = Math.Max(MinColumns, (int)((width + Gap) / (MinColumnWidth + Gap)));
+            _columnWidth = Math.Min(MinColumnWidth, Math.Max(1, (width - (_columns - 1) * Gap) / _columns));
+        }
         _width = width;
 
         foreach (var item in _items)
         {
             int cols = ColumnsOf(item);
-            double w = item.Def.FullWidth ? width : ColumnsWidth(cols);
+            double w = item.Def.IsFull ? width : ColumnsWidth(cols);
             var tier = TierFor(item.Def, w, item.Slot.Rows is { } r ? r * RowStep - Gap : null);
             if (item.Tier != tier && (item.Tier is null || !LiveResize)) SetContent(item, tier);
             item.Def.Fit?.Invoke(w);
@@ -644,12 +667,12 @@ internal sealed class PanelGrid : Panel
 
     protected override Size ArrangeOverride(Size final)
     {
-        double used = _items.Count == 0 ? 0 : _items.Max(i => i.Def.FullWidth ? _width : (i.Box.Col + i.Box.Cols) * ColStep - Gap);
+        double used = _items.Count == 0 ? 0 : _items.Max(i => i.Def.IsFull ? _width : (i.Box.Col + i.Box.Cols) * ColStep - HGap);
         _offsetX = _centered ? Math.Max(0, (_width - used) / 2) : 0;
         foreach (var item in _items)
         {
             var b = item.Box;
-            var rect = new Rect(b.Col * ColStep + (item.Def.FullWidth ? 0 : _offsetX), b.Row * RowStep, item.Def.FullWidth ? _width : ColumnsWidth(b.Cols), b.Rows * RowStep - Gap);
+            var rect = new Rect(b.Col * ColStep + (item.Def.IsFull ? 0 : _offsetX), b.Row * RowStep, item.Def.IsFull ? _width : ColumnsWidth(b.Cols), b.Rows * RowStep - Gap);
             if (item == _drag)
             {
                 item.Host.Arrange(new Rect(_dragFrom.Location, rect.Size));

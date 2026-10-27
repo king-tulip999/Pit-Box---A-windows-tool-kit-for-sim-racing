@@ -140,7 +140,7 @@ internal sealed class DisplayProfilesView : Tile
         return new Tile
         {
             Style = Ui.Res<Style>("Inset"), Padding = new Thickness(11, 10, 11, 5), Child = card, Margin = new Thickness(0, 0, CardGap, CardGap),
-            BorderBrush = Ui.Res<Brush>(isActive ? "Sage" : "Line"),
+            BorderBrush = Ui.Res<Brush>(isActive ? "Sage" : "Line"), VerticalAlignment = VerticalAlignment.Top,
         };
     }
 

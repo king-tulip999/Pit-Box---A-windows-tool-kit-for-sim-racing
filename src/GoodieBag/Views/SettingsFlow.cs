@@ -4,7 +4,16 @@ using System.Windows.Media;
 
 namespace GoodieBag.Views;
 
-internal sealed class SettingRowGrid : Grid;
+internal class WideGrid : Grid
+{
+    protected override Size MeasureOverride(Size constraint)
+    {
+        var size = base.MeasureOverride(constraint);
+        return double.IsInfinity(constraint.Width) ? size : new Size(Math.Max(size.Width, constraint.Width), size.Height);
+    }
+}
+
+internal sealed class SettingRowGrid : WideGrid;
 
 internal sealed class SettingDivider : Border;
 
@@ -62,7 +71,7 @@ internal sealed class SettingsFlow : StackPanel
                 if (r > 0)
                 {
                     for (int c = 0; c < line.Count; c++)
-                        _rules.Add(new Rect(c * (cell + ColumnGap), y + 2, cell, 1));
+                        _rules.Add(new Rect(c * (cell + ColumnGap), y + 2, line[c] is FrameworkElement { MaxWidth: < double.PositiveInfinity } capped ? Math.Min(cell, capped.MaxWidth) : cell, 1));
                     y += RuleSpace;
                 }
                 double height = 0;

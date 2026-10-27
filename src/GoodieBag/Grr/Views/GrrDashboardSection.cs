@@ -191,6 +191,7 @@ internal sealed class GrrDashboardSection : StackPanel
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Gap) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(rightShare, GridUnitType.Star) });
         left.Margin = right.Margin = new Thickness(0);
+        left.VerticalAlignment = right.VerticalAlignment = VerticalAlignment.Top;
         grid.Children.Add(left);
         Grid.SetColumn(right, 2);
         grid.Children.Add(right);
