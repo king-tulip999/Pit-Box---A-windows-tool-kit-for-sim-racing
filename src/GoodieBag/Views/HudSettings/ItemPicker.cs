@@ -1,14 +1,12 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Shapes;
 using GoodieBag.Controls;
 using GoodieBag.SimRacing.Hud;
 using GoodieBag.SimRacing.Hud.Editors;
-using GoodieBag.Theme;
+using GoodieBag.SimRacing.Race;
 
 namespace GoodieBag.Views.HudSettings;
 
@@ -16,27 +14,15 @@ internal sealed record PickerLane(string Key, string? Name, string Value, string
 
 internal sealed class ItemPicker : StackPanel
 {
-    private const double DragStart = 5;
-
     private readonly IReadOnlyList<HudCategory> _categories;
     private readonly IReadOnlyList<PickerLane> _lanes;
     private readonly Action<IReadOnlyList<string>> _save;
     private readonly ItemPickerModel _model;
-    private readonly Grid _body = new() { Background = Brushes.Transparent };
-    private readonly StackPanel _lanesHost = new();
-    private readonly Canvas _overlay = new() { IsHitTestVisible = false };
-    private readonly List<WrapPanel> _lanePanels = new();
     private readonly Dictionary<string, (IReadOnlySet<string> Hidden, IReadOnlySet<string> Blocked)> _marks = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Button _add;
+    private readonly List<TextBlock> _summaries = new();
+    private readonly List<Button> _adds = new();
+    private readonly List<Button> _removes = new();
     private readonly string _title;
-    private int _addLane;
-
-    private (int Lane, string Id, FrameworkElement Chip, Point At)? _press;
-    private bool _dragging;
-    private Border? _ghost;
-    private Rectangle? _marker;
-    private (int Lane, int Index)? _target;
-    private (int Lane, string Id)? _refocus;
 
     public ItemPicker(string title, string? help, IReadOnlyList<HudChoice> choices, IReadOnlyList<HudCategory> categories, IReadOnlyList<PickerLane> lanes, Action<IReadOnlyList<string>> save, bool showTitle = true)
     {
@@ -47,44 +33,57 @@ internal sealed class ItemPicker : StackPanel
         _model = new ItemPickerModel(choices, lanes.Select(l => ItemPickerModel.Split(l.Value)));
         Margin = new Thickness(0, 3, 0, 8);
 
-        var head = new DockPanel { LastChildFill = true, Margin = new Thickness(0, 0, 0, 6) };
-        var tools = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        _add = Ui.LabeledButton("I.Plus", "Add", () => { }, "SoftButton");
-        _add.Click += (_, _) => OpenAdd();
-        System.Windows.Automation.AutomationProperties.SetName(_add, "Add to " + title);
-        var more = Ui.IconButton("I.More", "All, none or default", () => { });
-        more.Click += (_, _) => OpenMore(more);
-        more.Margin = new Thickness(5, 0, 0, 0);
-        if (help is not null && !showTitle)
+        if (showTitle)
         {
-            var tip = HelpTip.For(help, title);
-            tip.Margin = new Thickness(0, 0, 10, 0);
-            tools.Children.Add(tip);
+            var titleRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
+            titleRow.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
+            if (help is not null) titleRow.Children.Add(HelpTip.For(help, title));
+            Children.Add(titleRow);
         }
-        tools.Children.Add(_add);
-        tools.Children.Add(more);
-        DockPanel.SetDock(tools, Dock.Right);
-        head.Children.Add(tools);
-        var name = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        if (showTitle) name.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
-        if (help is not null && showTitle) name.Children.Add(HelpTip.For(help, title));
-        head.Children.Add(name);
-        Children.Add(head);
 
-        _body.Children.Add(_lanesHost);
-        _body.Children.Add(_overlay);
-        _body.PreviewMouseMove += OnMove;
-        _body.PreviewMouseLeftButtonUp += (_, e) =>
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(SettingRows.LabelWidth) });
+        for (int i = 0; i < 2; i++) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        for (int lane = 0; lane < lanes.Count; lane++)
         {
-            if (_dragging) { DropChip(); e.Handled = true; }
-            _press = null;
-        };
-        _body.LostMouseCapture += (_, _) => { if (_dragging) EndDrag(); };
-        Children.Add(_body);
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            double top = lane == 0 ? 0 : 6;
+            void Place(FrameworkElement e, int column)
+            {
+                Grid.SetRow(e, lane);
+                Grid.SetColumn(e, column);
+                if (e.Margin.Top == 0) e.Margin = new Thickness(e.Margin.Left, top, e.Margin.Right, e.Margin.Bottom);
+                e.VerticalAlignment = VerticalAlignment.Center;
+                grid.Children.Add(e);
+            }
+            string where = lanes.Count > 1 ? $"{title} ({lanes[lane].Name})" : title;
+            var label = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 10, 0) };
+            label.Children.Add(new TextBlock { Text = lanes.Count > 1 ? lanes[lane].Name : "Shows", Style = Ui.Res<Style>("Body"), VerticalAlignment = VerticalAlignment.Center });
+            if (lane == 0 && help is not null && !showTitle) label.Children.Add(HelpTip.For(help, title));
+            Place(label, 0);
+            int at = lane;
+            var add = Ui.LabeledButton("I.Plus", "Add", () => { }, "SoftButton");
+            add.Click += (_, _) => OpenAdd(at);
+            System.Windows.Automation.AutomationProperties.SetName(add, "Add to " + where);
+            _adds.Add(add);
+            Place(add, 1);
+            var remove = Ui.LabeledButton("I.Minus", "Remove", () => { }, "GhostButton");
+            remove.Click += (_, _) => OpenRemove(at);
+            remove.Margin = new Thickness(5, 0, 0, 0);
+            System.Windows.Automation.AutomationProperties.SetName(remove, "Remove from " + where);
+            _removes.Add(remove);
+            Place(remove, 2);
+            var summary = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(12, 0, 0, 0) };
+            summary.Style = Ui.Res<Style>("Caption");
+            _summaries.Add(summary);
+            Place(summary, 3);
+        }
+        Children.Add(grid);
         Rebuild();
     }
 
-    public void ShowAdd() => OpenAdd();
+    public void ShowAdd(string? key = null) => OpenAdd(Math.Max(0, _lanes.ToList().FindIndex(l => string.Equals(l.Key, key, StringComparison.OrdinalIgnoreCase))));
 
     public void Reload(IReadOnlyList<string> values)
     {
@@ -110,207 +109,88 @@ internal sealed class ItemPicker : StackPanel
 
     private void Rebuild()
     {
-        _lanesHost.Children.Clear();
-        _lanePanels.Clear();
         for (int lane = 0; lane < _lanes.Count; lane++)
         {
-            if (_lanes.Count > 1)
-                _lanesHost.Children.Add(new TextBlock { Text = _lanes[lane].Name, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, lane == 0 ? 0 : 8, 0, 4) });
-            var panel = new WrapPanel { Tag = lane, MinHeight = 26 };
-            foreach (var id in _model.Lanes[lane]) panel.Children.Add(Chip(lane, id));
-            if (_model.Lanes[lane].Count == 0)
+            int count = _model.Lanes[lane].Count;
+            string counted = count == 0 ? "Nothing shown: Add some" : RaceFormat.Count(count, "item");
+            string text = counted;
+            var hidden = _model.Lanes[lane].Where(id => Hidden(lane, id)).Select(id => _model.Choice(id).Label).ToList();
+            if (hidden.Count is 1 or 2) text += $" · {string.Join(" and ", hidden)} {(hidden.Count == 1 ? "doesn't" : "don't")} fit";
+            else if (hidden.Count > 2) text += $" · {hidden.Count} don't fit";
+            _summaries[lane].Text = text;
+            _summaries[lane].ToolTip = hidden.Count > 0 ? "Doesn't fit at this width, so not drawn: " + string.Join(", ", hidden) + ". Widen the widget or remove some." : null;
+            _removes[lane].IsEnabled = count > 0;
+        }
+    }
+
+    private static Popup PopupBelow(Button anchor, FrameworkElement card)
+    {
+        var popup = new Popup
+        {
+            PlacementTarget = anchor, Placement = PlacementMode.Custom, StaysOpen = false, AllowsTransparency = true,
+            CustomPopupPlacementCallback = (size, target, _) => new[] { new CustomPopupPlacement(new Point(target.Width - size.Width, target.Height), PopupPrimaryAxis.Horizontal) },
+            Child = new Tile { Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(8), Margin = new Thickness(0, 3, 0, 0), Child = card, MaxWidth = 308 },
+        };
+        RenderOptions.SetClearTypeHint(popup.Child, ClearTypeHint.Enabled);
+        Ui.FollowTarget(popup);
+        popup.Child.PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key != Key.Escape) return;
+            popup.IsOpen = false;
+            anchor.Focus();
+            e.Handled = true;
+        };
+        return popup;
+    }
+
+    private void OpenRemove(int lane)
+    {
+        var list = new StackPanel();
+        KeyboardNavigation.SetDirectionalNavigation(list, KeyboardNavigationMode.Contained);
+        var card = new ScrollViewer { MaxHeight = 300, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = list, Focusable = false, MinWidth = 227 };
+        var popup = PopupBelow(_removes[lane], card);
+
+        void Fill()
+        {
+            list.Children.Clear();
+            foreach (var id in _model.Lanes[lane]) list.Children.Add(Option(id));
+            if (list.Children.Count == 0) popup.IsOpen = false;
+        }
+
+        Button Option(string id)
+        {
+            var choice = _model.Choice(id);
+            var line = new DockPanel { LastChildFill = true };
+            var x = new Icon { Data = Ui.Res<Geometry>("I.X"), Width = 9, Height = 9, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
+            x.SetResourceReference(Control.ForegroundProperty, "TextMuted");
+            DockPanel.SetDock(x, Dock.Right);
+            line.Children.Add(x);
+            if (Hidden(lane, id))
             {
-                var empty = Hairline.Frame(new Border { Padding = new Thickness(8, 5, 8, 5), Margin = new Thickness(0, 0, 0, 5), Tag = "empty" });
-                empty.SetResourceReference(Border.BorderBrushProperty, "Line");
-                empty.Child = new TextBlock { Text = _lanes.Count > 1 ? "Empty: drag items here, or Add" : "Nothing shown: Add some", Style = Ui.Res<Style>("Caption") };
-                panel.Children.Add(empty);
+                var tag = new TextBlock { Text = "doesn't fit", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
+                DockPanel.SetDock(tag, Dock.Right);
+                line.Children.Add(tag);
             }
-            _lanePanels.Add(panel);
-            _lanesHost.Children.Add(panel);
+            var label = new TextBlock { Text = choice.Label, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
+            label.SetResourceReference(TextBlock.ForegroundProperty, "Text");
+            line.Children.Add(label);
+            var b = new Button { Style = Ui.Res<Style>("QuietButton"), Content = line, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(6, 5, 6, 5), ToolTip = choice.Help };
+            System.Windows.Automation.AutomationProperties.SetName(b, "Take out " + choice.Label);
+            b.Click += (_, _) =>
+            {
+                if (_model.Remove(lane, id)) Save();
+                Fill();
+                list.Children.OfType<Button>().FirstOrDefault()?.Focus();
+            };
+            return b;
         }
-        if (_refocus is { } r)
-        {
-            _refocus = null;
-            var chip = _lanePanels.ElementAtOrDefault(r.Lane)?.Children.OfType<FrameworkElement>().FirstOrDefault(c => c.Tag as string == r.Id);
-            if (chip is not null) Dispatcher.BeginInvoke(() => chip.Focus(), System.Windows.Threading.DispatcherPriority.Input);
-        }
+
+        Fill();
+        popup.IsOpen = true;
+        Dispatcher.BeginInvoke(() => list.Children.OfType<Button>().FirstOrDefault()?.Focus(), System.Windows.Threading.DispatcherPriority.Input);
     }
 
-    private FrameworkElement Chip(int lane, string id)
-    {
-        var choice = _model.Choice(id);
-        bool hidden = Hidden(lane, id);
-        var grip = new Icon { Data = Ui.Res<Geometry>("I.Grip"), Width = 10, Height = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 3, 0), Opacity = 0.7 };
-        grip.SetResourceReference(Control.ForegroundProperty, "AccentText");
-        var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        row.Children.Add(grip);
-        row.Children.Add(new TextBlock { Text = choice.Label, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 3, 0) });
-        if (hidden) row.Children.Add(new TextBlock { Text = "doesn't fit", FontStyle = FontStyles.Italic, Opacity = 0.85, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 3, 0) });
-        var x = new Button { Style = Ui.Res<Style>("QuietButton"), Padding = new Thickness(3), ToolTip = "Take out", Focusable = false, Content = new Icon { Data = Ui.Res<Geometry>("I.X"), Width = 8, Height = 8 } };
-        System.Windows.Automation.AutomationProperties.SetName(x, "Take out " + choice.Label);
-        x.Click += (_, _) => { _model.Remove(lane, id); Save(); };
-        row.Children.Add(x);
-        var chip = new Tile
-        {
-            Style = Ui.Res<Style>("Chip"), Child = row, Tag = id, Margin = new Thickness(0, 0, 5, 5), Padding = new Thickness(5, 0, 2, 0), MinHeight = 24,
-            Cursor = Cursors.SizeAll, Focusable = true, FocusVisualStyle = Ui.Res<Style>("FocusRing"), Opacity = hidden ? 0.6 : 1,
-            ToolTip = hidden ? "Doesn't fit at this width: widen the widget, or drag it earlier" : choice.Help,
-        };
-        chip.SetValue(TextElement.FontSizeProperty, 10.0);
-        chip.SetResourceReference(Border.BackgroundProperty, "AccentSoft");
-        chip.SetResourceReference(TextElement.ForegroundProperty, "AccentText");
-        System.Windows.Automation.AutomationProperties.SetName(chip, choice.Label + (_lanes.Count > 1 ? $" ({_lanes[lane].Name})" : "") + ". Drag, or Ctrl+arrows to move; Delete to take out");
-        chip.PreviewMouseLeftButtonDown += (_, e) =>
-        {
-            if (e.OriginalSource is DependencyObject d && IsInside(d, x)) return;
-            _press = (lane, id, chip, e.GetPosition(_body));
-            chip.Focus();
-        };
-        chip.KeyDown += (_, e) => ChipKey(lane, id, e);
-        return chip;
-    }
-
-    private static bool IsInside(DependencyObject d, DependencyObject ancestor)
-    {
-        for (var at = d; at is not null; at = at is Visual ? VisualTreeHelper.GetParent(at) : LogicalTreeHelper.GetParent(at))
-            if (ReferenceEquals(at, ancestor)) return true;
-        return false;
-    }
-
-    private void ChipKey(int lane, string id, KeyEventArgs e)
-    {
-        bool ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
-        int at = _model.Lanes[lane].IndexOf(id);
-        switch (e.Key)
-        {
-            case Key.Delete or Key.Back:
-                _model.Remove(lane, id);
-                Save();
-                e.Handled = true;
-                break;
-            case Key.Left when ctrl:
-            case Key.Right when ctrl:
-                int to = e.Key == Key.Left ? at - 1 : at + 2;
-                if (to >= 0 && _model.Move(lane, id, lane, to)) { _refocus = (lane, id); Save(); }
-                e.Handled = true;
-                break;
-            case Key.Up when ctrl && lane > 0:
-            case Key.Down when ctrl && lane < _lanes.Count - 1:
-                int other = e.Key == Key.Up ? lane - 1 : lane + 1;
-                if (_model.Move(lane, id, other, _model.Lanes[other].Count)) { _refocus = (other, id); Save(); }
-                e.Handled = true;
-                break;
-        }
-    }
-
-    private void OnMove(object sender, MouseEventArgs e)
-    {
-        if (_press is not { } press) return;
-        if (e.LeftButton != MouseButtonState.Pressed) { _press = null; return; }
-        var at = e.GetPosition(_body);
-        if (!_dragging)
-        {
-            if ((at - press.At).Length < DragStart) return;
-            _dragging = true;
-            press.Chip.Opacity = 0.35;
-            _ghost = new Border { Padding = new Thickness(8, 4, 8, 4), BorderThickness = new Thickness(1.5), Child = new TextBlock { Text = _model.Choice(press.Id).Label, FontSize = 10 } };
-            _ghost.SetResourceReference(Border.BackgroundProperty, "AccentSoft");
-            _ghost.SetResourceReference(Border.BorderBrushProperty, "AccentText");
-            _ghost.SetResourceReference(TextElement.ForegroundProperty, "AccentText");
-            _marker = new Rectangle { Width = 2, Height = 23 };
-            _marker.SetResourceReference(Shape.FillProperty, "AccentText");
-            _overlay.Children.Add(_marker);
-            _overlay.Children.Add(_ghost);
-            _body.CaptureMouse();
-        }
-        Canvas.SetLeft(_ghost!, at.X + 8);
-        Canvas.SetTop(_ghost!, at.Y - 14);
-        _target = Target(at);
-        PlaceMarker();
-    }
-
-    private (int Lane, int Index) Target(Point at)
-    {
-        int best = 0;
-        double bestDistance = double.MaxValue;
-        for (int i = 0; i < _lanePanels.Count; i++)
-        {
-            var r = Bounds(_lanePanels[i]);
-            double distance = at.Y < r.Top ? r.Top - at.Y : at.Y > r.Bottom ? at.Y - r.Bottom : 0;
-            if (distance < bestDistance) { bestDistance = distance; best = i; }
-        }
-        int index = 0;
-        foreach (var chip in Chips(best))
-        {
-            var r = Bounds(chip);
-            bool before = r.Bottom < at.Y || (at.Y >= r.Top && at.Y <= r.Bottom && r.Left + r.Width / 2 < at.X);
-            if (before) index++;
-        }
-        return (best, index);
-    }
-
-    private IEnumerable<FrameworkElement> Chips(int lane) =>
-        _lanePanels[lane].Children.OfType<FrameworkElement>().Where(c => c.Tag is string id && id != "empty");
-
-    private Rect Bounds(FrameworkElement e) => e.TransformToAncestor(_body).TransformBounds(new Rect(0, 0, e.ActualWidth, e.ActualHeight));
-
-    private void PlaceMarker()
-    {
-        if (_marker is null || _target is not { } t) return;
-        var chips = Chips(t.Lane).ToList();
-        Rect r;
-        if (chips.Count == 0) { r = Bounds(_lanePanels[t.Lane]); Canvas.SetLeft(_marker, r.Left); }
-        else if (t.Index < chips.Count) { r = Bounds(chips[t.Index]); Canvas.SetLeft(_marker, r.Left - 4); }
-        else { r = Bounds(chips[^1]); Canvas.SetLeft(_marker, r.Right - 4); }
-        Canvas.SetTop(_marker, r.Top);
-        _marker.Height = Math.Max(20, Math.Min(r.Height, 30));
-    }
-
-    private void DropChip()
-    {
-        var press = _press;
-        var target = _target;
-        EndDrag();
-        if (press is { } p && target is { } t && _model.Move(p.Lane, p.Id, t.Lane, t.Index))
-        {
-            _refocus = (t.Lane, p.Id);
-            Save();
-        }
-        else Rebuild();
-    }
-
-    private void EndDrag()
-    {
-        _dragging = false;
-        _press = null;
-        _target = null;
-        _overlay.Children.Clear();
-        _ghost = null;
-        _marker = null;
-        if (_body.IsMouseCaptured) _body.ReleaseMouseCapture();
-        foreach (var panel in _lanePanels)
-            foreach (var chip in panel.Children.OfType<FrameworkElement>()) if (chip.Opacity < 0.5) chip.Opacity = 1;
-    }
-
-    private void OpenMore(Button anchor)
-    {
-        bool full = _marks.Values.Any(m => m.Hidden.Count > 0 || m.Blocked.Count > 0);
-        var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom };
-        Ui.DropBelow(menu);
-        void Item(string header, string tip, Action act, bool enabled = true)
-        {
-            var item = new MenuItem { Header = header, ToolTip = tip, IsEnabled = enabled };
-            ToolTipService.SetShowOnDisabled(item, true);
-            item.Click += (_, _) => act();
-            menu.Items.Add(item);
-        }
-        Item("All", full ? "No room: widen the widget first" : "Add every one (the ones shown keep their order)", () => { _model.AddAll(); Save(); }, !full);
-        Item("None", "Take every one out", () => { _model.Clear(); Save(); });
-        Item("Default", "As the widget starts", () => { _model.Reset(_lanes.Select(l => l.Default).ToList()); Save(); });
-        menu.IsOpen = true;
-    }
-
-    private void OpenAdd()
+    private void OpenAdd(int lane)
     {
         var search = new TextBox { Tag = "Search…", Padding = new Thickness(23, 5, 6, 5), MinWidth = 227 };
         System.Windows.Automation.AutomationProperties.SetName(search, "Search " + _title);
@@ -318,23 +198,10 @@ internal sealed class ItemPicker : StackPanel
         searchIcon.SetResourceReference(Control.ForegroundProperty, "TextFaint");
         var card = new StackPanel();
         card.Children.Add(new Grid { Children = { search, searchIcon } });
-        if (_lanes.Count > 1)
-        {
-            var lane = Ui.Segmented(_lanes.Select(l => "Add to " + l.Name).ToList(), _addLane, i => _addLane = i, "addlane");
-            lane.Margin = new Thickness(0, 6, 0, 0);
-            card.Children.Add(lane);
-        }
         var list = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
         KeyboardNavigation.SetDirectionalNavigation(list, KeyboardNavigationMode.Contained);
         card.Children.Add(new ScrollViewer { MaxHeight = 275, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = list, Focusable = false });
-        var popup = new Popup
-        {
-            PlacementTarget = _add, Placement = PlacementMode.Custom, StaysOpen = false, AllowsTransparency = true,
-            CustomPopupPlacementCallback = (size, target, _) => new[] { new CustomPopupPlacement(new Point(target.Width - size.Width + 40, target.Height), PopupPrimaryAxis.Horizontal) },
-            Child = new Tile { Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(8), Margin = new Thickness(0, 3, 0, 0), Child = card, MaxWidth = 308 },
-        };
-        RenderOptions.SetClearTypeHint(popup.Child, ClearTypeHint.Enabled);
-        Ui.FollowTarget(popup);
+        var popup = PopupBelow(_adds[lane], card);
 
         void Fill()
         {
@@ -351,11 +218,11 @@ internal sealed class ItemPicker : StackPanel
 
         Button Option(HudChoice c)
         {
-            bool added = _model.IsAdded(c.Id), blocked = !added && Blocked(_addLane, c.Id);
+            bool added = _model.IsAdded(c.Id), blocked = !added && Blocked(lane, c.Id);
             var line = new DockPanel { LastChildFill = true };
-            if (added)
+            if (added || blocked)
             {
-                var tag = new TextBlock { Text = "Added", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
+                var tag = new TextBlock { Text = added ? "Added" : "Doesn't fit", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
                 DockPanel.SetDock(tag, Dock.Right);
                 line.Children.Add(tag);
             }
@@ -371,7 +238,7 @@ internal sealed class ItemPicker : StackPanel
             ToolTipService.SetShowOnDisabled(b, true);
             b.Click += (_, _) =>
             {
-                if (_model.Add(c.Id, _addLane)) Save();
+                if (_model.Add(c.Id, lane)) Save();
                 Fill();
                 search.Focus();
             };
@@ -384,13 +251,6 @@ internal sealed class ItemPicker : StackPanel
             var first = list.Children.OfType<Button>().FirstOrDefault(b => b.IsEnabled);
             if (e.Key == Key.Down && first is not null) { first.Focus(); e.Handled = true; }
             else if (e.Key == Key.Enter && first is not null && search.Text.Trim().Length > 0) { first.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); e.Handled = true; }
-        };
-        popup.Child.PreviewKeyDown += (_, e) =>
-        {
-            if (e.Key != Key.Escape) return;
-            popup.IsOpen = false;
-            _add.Focus();
-            e.Handled = true;
         };
         Fill();
         popup.IsOpen = true;

@@ -167,7 +167,7 @@ internal sealed class RaceHudWidgets
     internal void OpenPicker(string kind, string key)
     {
         ShowTab(kind, ContentTab);
-        _list.Dispatcher.BeginInvoke(() => { if (_context?.Pickers.TryGetValue(key, out var picker) == true) picker.ShowAdd(); }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+        _list.Dispatcher.BeginInvoke(() => { if (_context?.Pickers.TryGetValue(key, out var picker) == true) picker.ShowAdd(key); }, System.Windows.Threading.DispatcherPriority.ContextIdle);
     }
 
     public void Select(string kind)
@@ -342,36 +342,16 @@ internal sealed class RaceHudWidgets
         previewColumn.Children.Add(new DockPanel { Margin = new Thickness(0, 3, 0, 6), Children = { title, hint } });
         previewColumn.Children.Add(PreviewBlock(w));
         var tabs = Settings(w, def);
+        tabs.Margin = new Thickness(0, 16, 0, 0);
         var body = new Grid();
-        body.ColumnDefinitions.Add(new ColumnDefinition());
-        body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0) });
         body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         body.Children.Add(previewColumn);
+        Grid.SetRow(tabs, 1);
         body.Children.Add(tabs);
-        bool? wide = null;
-        bool Stick() => wide == true || (PageOf(body) is { } page && previewColumn.ActualHeight < page.ViewportHeight * 0.45);
-        var follow = Sticky.Install(previewColumn, body, Stick);
-        void Arrange(double width)
-        {
-            bool two = width >= TwoColumnsFrom;
-            if (wide == two) return;
-            wide = two;
-            body.ColumnDefinitions[0].Width = two ? new GridLength(4, GridUnitType.Star) : new GridLength(1, GridUnitType.Star);
-            body.ColumnDefinitions[1].Width = two ? new GridLength(5, GridUnitType.Star) : new GridLength(0);
-            Grid.SetColumn(tabs, two ? 1 : 0);
-            Grid.SetRow(tabs, two ? 0 : 1);
-            tabs.Margin = new Thickness(two ? 19 : 0, two ? 0 : 13, 0, 0);
-            _previewMaxHeight = two ? 389 : 324;
-            DrawPreview(w);
-            follow();
-        }
-        Arrange(0);
-        body.SizeChanged += (_, e) => Arrange(e.NewSize.Width);
+        Sticky.Install(previewColumn, body, () => PageOf(body) is { } page && previewColumn.ActualHeight < page.ViewportHeight * 0.45)();
         return body;
     }
-
-    private const double TwoColumnsFrom = 761;
 
     private FrameworkElement PreviewBlock(HudWidgetConfig w)
     {
@@ -584,13 +564,7 @@ internal sealed class RaceHudWidgets
         };
         foreach (var group in editor.Groups.Where(g => g.Tab == tab))
         {
-            string fold = HudEditorDef.GroupFoldId(def.Kind, group.Id);
-            var box = new SettingGroup(group.Title, group.Open != S.EditorSectionsToggled.Contains(fold, StringComparer.OrdinalIgnoreCase), open =>
-            {
-                S.EditorSectionsToggled.RemoveAll(x => string.Equals(x, fold, StringComparison.OrdinalIgnoreCase));
-                if (open != group.Open) S.EditorSectionsToggled.Add(fold);
-                _app.Save();
-            });
+            var box = new SettingGroup(group.Title, true, null, foldable: false);
             foreach (var setting in group.Settings)
             {
                 var row = Linked(setting, SettingRows.Build(setting, _context, group.Title));
@@ -650,14 +624,6 @@ internal sealed class RaceHudWidgets
         var editor = def.EditorDef;
         if (editor.GroupOf(settingId) is not { } group) return;
         _tab = group.Tab == HudTab.Content ? ContentTab : LayoutTab;
-        string fold = HudEditorDef.GroupFoldId(def.Kind, group.Id);
-        bool open = group.Open != S.EditorSectionsToggled.Contains(fold, StringComparer.OrdinalIgnoreCase);
-        if (!open)
-        {
-            S.EditorSectionsToggled.RemoveAll(x => string.Equals(x, fold, StringComparison.OrdinalIgnoreCase));
-            if (!group.Open) S.EditorSectionsToggled.Add(fold);
-            _app.Save();
-        }
         _reveal = settingId;
         Fill();
     }
@@ -713,7 +679,7 @@ internal sealed class RaceHudWidgets
 
     private const double MaxPreviewScale = 1.5;
 
-    private double _previewMaxHeight = 389;
+    private const double PreviewMaxHeight = 460;
 
     private void DrawPreview(HudWidgetConfig w)
     {
@@ -723,7 +689,7 @@ internal sealed class RaceHudWidgets
         try
         {
             double room = _previewWell is { ActualWidth: > 40 } well ? well.ActualWidth - well.Padding.Left - well.Padding.Right - 2 : 560;
-            double byHeight = _previewMaxHeight / Math.Max(1, w.H);
+            double byHeight = PreviewMaxHeight / Math.Max(1, w.H);
             double fit = Math.Min(room / Math.Max(1, w.W), byHeight);
             float scale = (float)Math.Clamp(fit, 0.2, MaxPreviewScale);
             AlignPreview();
@@ -840,8 +806,12 @@ internal sealed class RaceHudWidgets
         return null;
     }
 
+    private bool HasMovableItems() =>
+        (_painter.Items ?? new()).GroupBy(i => i.Key).Any(g => g.Count() > 1);
+
     private string? SettingAt(HudEditorDef editor, Point at)
     {
+        if (HasMovableItems()) return ItemAt(at) is { } item ? editor.SettingForRegion(item.Key) : null;
         var p = PainterPoint(at);
         string? best = null;
         float bestArea = float.MaxValue;
@@ -857,10 +827,13 @@ internal sealed class RaceHudWidgets
         return best;
     }
 
-    private void Highlight(string? settingId)
+    private (string Key, string Id)? _hoverItem;
+
+    private void Highlight(string? settingId, (string Key, string Id)? item = null)
     {
-        if (_hoverSetting == settingId) return;
+        if (_hoverSetting == settingId && _hoverItem == item) return;
         _hoverSetting = settingId;
+        _hoverItem = item;
         _highlightBoxes.Clear();
         DrawHighlight();
     }
@@ -883,10 +856,16 @@ internal sealed class RaceHudWidgets
             _highlightWidget = w;
             _highlightBoxes.Clear();
         }
-        var names = def.EditorDef.RegionsOf(id).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var boxes = (_painter.Regions ?? new()).Where(r => names.Contains(r.Id)).Select(r => r.Box).ToList();
-        foreach (var group in (_painter.Items ?? new()).Where(i => names.Contains(i.Key)).GroupBy(i => i.Key))
-            boxes.Add(group.Select(i => i.Box).Aggregate(System.Drawing.RectangleF.Union));
+        List<System.Drawing.RectangleF> boxes;
+        if (_hoverItem is { } item)
+            boxes = (_painter.Items ?? new()).Where(i => i.Key == item.Key && i.Id == item.Id).Select(i => i.Box).ToList();
+        else
+        {
+            var names = def.EditorDef.RegionsOf(id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            boxes = (_painter.Regions ?? new()).Where(r => names.Contains(r.Id)).Select(r => r.Box).ToList();
+            foreach (var group in (_painter.Items ?? new()).Where(i => names.Contains(i.Key)).GroupBy(i => i.Key))
+                boxes.Add(group.Select(i => i.Box).Aggregate(System.Drawing.RectangleF.Union));
+        }
         if (boxes.Count > 0)
         {
             _highlightBoxes.Clear();
@@ -931,8 +910,9 @@ internal sealed class RaceHudWidgets
                 if (_lastHover is { } last && (at - last).Length < 0.5) return;
                 _lastHover = at;
                 var hover = SettingAt(editor, at);
-                host.Cursor = hover is null ? null : ItemAt(at) is not null ? Cursors.SizeAll : Cursors.Hand;
-                Highlight(hover);
+                var item = ItemAt(at);
+                host.Cursor = hover is null ? null : item is not null ? Cursors.SizeAll : Cursors.Hand;
+                Highlight(hover, hover is null ? null : item);
                 return;
             }
             if (!_dragging && (at - press.From).Length < 4) return;
@@ -1019,8 +999,19 @@ internal sealed class RaceHudWidgets
         if (_previewMarks is null) return;
         _previewMarks.Children.Clear();
         double s = _previewScale;
-        var (_, box) = Drawn(key).FirstOrDefault(d => d.Id == id);
+        var drawn = Drawn(key);
+        var (_, box) = drawn.FirstOrDefault(d => d.Id == id);
         if (box.Width <= 0) return;
+        foreach (var (otherId, other) in drawn)
+        {
+            if (otherId == id) continue;
+            var outline = Hairline.Frame(new Border { Width = other.Width * s, Height = other.Height * s, CornerRadius = ThemeManager.Round(4), SnapsToDevicePixels = true });
+            outline.SetResourceReference(Border.BorderBrushProperty, "AccentText");
+            outline.Opacity = 0.6;
+            Canvas.SetLeft(outline, other.X * s);
+            Canvas.SetTop(outline, other.Y * s);
+            _previewMarks.Children.Add(outline);
+        }
         var slot = new Border { Width = box.Width * s, Height = box.Height * s, BorderThickness = new Thickness(1.5), CornerRadius = ThemeManager.Round(4) };
         slot.SetResourceReference(Border.BorderBrushProperty, "AccentText");
         slot.SetResourceReference(Border.BackgroundProperty, "AccentSoft");

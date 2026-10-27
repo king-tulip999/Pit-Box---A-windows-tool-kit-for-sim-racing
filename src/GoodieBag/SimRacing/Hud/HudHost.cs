@@ -537,6 +537,7 @@ internal sealed class HudHost : IDisposable
         }
         foreach (var s in _slots.Values) s.Dirty = true;
         Refresh();
+        SyncGrid();
     }
 
     public void EndEdit(bool keep)
@@ -555,6 +556,7 @@ internal sealed class HudHost : IDisposable
         Save();
         foreach (var s in _slots.Values) s.Dirty = true;
         Refresh();
+        SyncGrid();
     }
 
     public void Pick(string? id)
@@ -579,6 +581,7 @@ internal sealed class HudHost : IDisposable
         }
         Save();
         _toolbarDirty = true;
+        SyncGrid();
         Changed?.Invoke();
     }
 
@@ -722,9 +725,32 @@ internal sealed class HudHost : IDisposable
     private readonly List<HudWindow> _gridWindows = new();
     private System.Windows.Threading.DispatcherTimer? _gridTimer;
 
+    private bool GridHeld => _editing && Settings.Snap && _active && !_app.Demo;
+
+    private void SyncGrid()
+    {
+        if (GridHeld) ShowGrid();
+        else if (_gridWindows.Count > 0) HideGrid();
+    }
+
     public void ShowGrid()
     {
         if (_app.Demo || !_active) return;
+        DrawGridWindows(label: !GridHeld);
+        foreach (var s in _slots.Values) if (s.Window?.Visible == true) s.Window.KeepOnTop();
+        _toolbarDirty = true;
+        if (GridHeld) { _gridTimer?.Stop(); return; }
+        if (_gridTimer is null)
+        {
+            _gridTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
+            _gridTimer.Tick += (_, _) => { if (GridHeld) _gridTimer.Stop(); else HideGrid(); };
+        }
+        _gridTimer.Stop();
+        _gridTimer.Start();
+    }
+
+    private void DrawGridWindows(bool label)
+    {
         var monitors = ReadMonitors();
         while (_gridWindows.Count < monitors.Count) _gridWindows.Add(new HudWindow("Goodie Bag · grid"));
         var palette = Palette;
@@ -739,23 +765,16 @@ internal sealed class HudHost : IDisposable
             try
             {
                 var g = w.Surface(size);
-                DrawGrid(g, size, Settings.GridSize * m.Scale, Settings.GridSize, palette, accent);
+                DrawGrid(g, size, Settings.GridSize * m.Scale, Settings.GridSize, palette, accent, label);
                 if (!w.Visible) w.Show();
                 w.Present(new Point((int)m.Bounds.X, (int)m.Bounds.Y));
                 w.KeepOnTop();
             }
             catch (Exception ex) { LogOnce("grid", ex); }
         }
-        if (_gridTimer is null)
-        {
-            _gridTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
-            _gridTimer.Tick += (_, _) => HideGrid();
-        }
-        _gridTimer.Stop();
-        _gridTimer.Start();
     }
 
-    private static void DrawGrid(Graphics g, Size size, float step, int setting, HudPalette p, Color accent)
+    private static void DrawGrid(Graphics g, Size size, float step, int setting, HudPalette p, Color accent, bool label)
     {
         g.ResetTransform();
         g.Clear(Color.FromArgb(70, 0, 0, 0));
@@ -766,6 +785,7 @@ internal sealed class HudHost : IDisposable
         for (float x = 0; x < size.Width; x += step, n++) g.DrawLine(n % 4 == 0 ? major : minor, x, 0, x, size.Height);
         n = 0;
         for (float y = 0; y < size.Height; y += step, n++) g.DrawLine(n % 4 == 0 ? major : minor, 0, y, size.Width, y);
+        if (!label) return;
         string text = $"Snap grid · {setting} px";
         using var font = new Font(GoodieBag.Overlay.SharpText.Family + " SemiBold", 26, FontStyle.Regular, GraphicsUnit.Pixel);
         var box = g.MeasureString(text, font);

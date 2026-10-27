@@ -141,13 +141,13 @@ internal sealed class AlertsWidget : HudWidget
         {
             p.Text("RECENT", p.Tiny, p.P.Faint, area.Top(p.LineHeight(p.Tiny) + 2, out area), HAlign.Left);
             var h = v.Race.Alerts.History;
-            for (int i = h.Count - 1, n = 0; i >= 0 && n < max; i--, n++)
+            for (int i = h.Count - 1, n = 0; i >= 0 && n < max && area.Height >= rowH; i--, n++)
                 Row(p, area.Top(rowH, out area), h[i], title, dim: true);
             return;
         }
         for (int i = 0; i < Math.Min(max, list.Count); i++)
         {
-            if (area.Height < rowH * 0.6f) break;
+            if (area.Height < rowH) break;
             Row(p, area.Top(rowH, out area), list[i], title, dim: false);
             area = new RectangleF(area.X, area.Y + 4, area.Width, area.Height - 4);
         }

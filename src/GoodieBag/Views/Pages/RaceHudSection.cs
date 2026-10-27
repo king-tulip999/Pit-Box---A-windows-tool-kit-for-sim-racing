@@ -760,24 +760,70 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         into.Children.Add(reset);
     }
 
-    private ArrangeList? _alertGroups;
+    private Grid? _alertGroups;
+    private int _alertColumns;
     private Action? _alertFoldChanged;
+
+    private void FillAlertGroups()
+    {
+        if (_alertGroups is null) return;
+        _alertGroups.Children.Clear();
+        _alertGroups.ColumnDefinitions.Clear();
+        var order = S.AlertGroupOrder;
+        var groups = AlertCatalog.Groups.OrderBy(g => order.FindIndex(id => string.Equals(id, g.Id, StringComparison.OrdinalIgnoreCase)) is var i and >= 0 ? i : int.MaxValue).ToList();
+        var weights = groups.Select(g => S.AlertGroupsFolded.Contains(g.Id, StringComparer.OrdinalIgnoreCase) ? 1.0 : 1.0 + g.Alerts.Length).ToList();
+        var placed = AlertColumnOf(weights, _alertColumns);
+        int columns = placed.Count == 0 ? 1 : placed.Max() + 1;
+        for (int c = 0; c < columns; c++)
+        {
+            _alertGroups.ColumnDefinitions.Add(new ColumnDefinition());
+            var column = new StackPanel { Margin = new Thickness(0, -1, 0, 0) };
+            for (int i = 0; i < groups.Count; i++) if (placed[i] == c) column.Children.Add(AlertGroup(groups[i]));
+            var cell = new Border { Child = column, ClipToBounds = true };
+            if (c > 0)
+            {
+                Hairline.Frame(cell, Sides.Left);
+                cell.SetResourceReference(Border.BorderBrushProperty, "Line");
+            }
+            Grid.SetColumn(cell, c);
+            _alertGroups.Children.Add(cell);
+        }
+    }
+
+    internal static List<int> AlertColumnOf(IReadOnlyList<double> weights, int columns)
+    {
+        var heights = new double[Math.Clamp(columns, 1, Math.Max(1, weights.Count))];
+        var placed = new List<int>();
+        foreach (var weight in weights)
+        {
+            int shortest = Array.IndexOf(heights, heights.Min());
+            heights[shortest] += weight;
+            placed.Add(shortest);
+        }
+        return placed;
+    }
+
+    private const double AlertColumnWidth = 560;
 
     private StackPanel AlertsTab()
     {
         var root = new StackPanel();
-        _alertGroups = new ArrangeList(
-            () => AlertCatalog.Groups.Select(g => (g.Id, g.Title, (Func<FrameworkElement>)(() => AlertGroup(g)))).ToList(),
-            () => S.AlertGroupOrder,
-            order => { S.AlertGroupOrder = order; Changed(); },
-            "Arrange", "Drag the groups into the order you want them here");
+        _alertColumns = 1;
+        _alertGroups = new Grid();
+        _alertGroups.SizeChanged += (_, e) =>
+        {
+            int columns = Math.Clamp((int)(e.NewSize.Width / AlertColumnWidth), 1, 3);
+            if (columns == _alertColumns) return;
+            _alertColumns = columns;
+            FillAlertGroups();
+        };
         var foldAll = new CollapseAllButton { Margin = new Thickness(0, 0, 6, 0) };
         void CountOpen() => foldAll.SetOpen(AlertCatalog.Groups.Count(g => !S.AlertGroupsFolded.Contains(g.Id, StringComparer.OrdinalIgnoreCase)), AlertCatalog.Groups.Count());
         foldAll.Requested += fold =>
         {
             S.AlertGroupsFolded = fold ? AlertCatalog.Groups.Select(g => g.Id).ToList() : new List<string>();
             _app.Save();
-            _alertGroups?.Fill();
+            FillAlertGroups();
             CountOpen();
         };
         _alertFoldChanged = CountOpen;
@@ -787,11 +833,11 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         about.VerticalAlignment = VerticalAlignment.Center;
         about.Margin = new Thickness(0, 0, 10, 0);
         buttons.Children.Add(about);
+        foldAll.Margin = new Thickness(0);
         buttons.Children.Add(foldAll);
-        buttons.Children.Add(_alertGroups.Button);
         root.Children.Add(buttons);
-        _alertGroups.Fill();
-        root.Children.Add(_alertGroups.View);
+        FillAlertGroups();
+        root.Children.Add(new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), ClipToBounds = true, Child = _alertGroups });
         return root;
     }
 
@@ -802,28 +848,14 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         var count = new TextBlock { Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
         void Count() => count.Text = $"{defs.Count(d => RaceState.ChoiceFor(S, d).Enabled)} of {defs.Count} on";
         Count();
-        var rows = new UniformGrid { Columns = 1, Margin = new Thickness(8, 0, 11, 8), Visibility = folded ? Visibility.Collapsed : Visibility.Visible };
-        var cells = defs.Select(d => new Border { Child = AlertRow(d, Count), Padding = new Thickness(0, 2, 0, 2) }).ToList();
-        foreach (var cell in cells)
+        var rows = new StackPanel { Margin = new Thickness(8, 0, 11, 6), Visibility = folded ? Visibility.Collapsed : Visibility.Visible };
+        for (int i = 0; i < defs.Count; i++)
         {
+            var cell = new Border { Child = AlertRow(defs[i], Count) };
+            if (i > 0) Hairline.Frame(cell, Sides.Top);
             cell.SetResourceReference(Border.BorderBrushProperty, "Line");
             rows.Children.Add(cell);
         }
-        void Lay(int columns)
-        {
-            rows.Columns = columns;
-            for (int i = 0; i < cells.Count; i++)
-            {
-                cells[i].BorderThickness = new Thickness(0, i >= columns ? 1 : 0, 0, 0);
-                cells[i].Margin = columns == 1 ? new Thickness(0) : i % 2 == 0 ? new Thickness(0, 0, 10, 0) : new Thickness(10, 0, 0, 0);
-            }
-        }
-        Lay(1);
-        rows.SizeChanged += (_, e) =>
-        {
-            int columns = e.NewSize.Width >= AlertTwoColumnsFrom ? 2 : 1;
-            if (columns != rows.Columns) Lay(columns);
-        };
         var chevron = new Icon { Data = Ui.Res<Geometry>(folded ? "I.ChevronRight" : "I.ChevronDown"), Width = 12, Height = 12, Foreground = Ui.Res<Brush>("TextMuted"), VerticalAlignment = VerticalAlignment.Center };
         var header = new DockPanel { LastChildFill = true };
         header.Children.Add(chevron);
@@ -833,7 +865,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         DockPanel.SetDock(count, Dock.Right);
         header.Children.Add(count);
         header.Children.Add(new TextBlock { Text = ThemeManager.Case(group.Title), Style = Ui.Res<Style>("H3"), VerticalAlignment = VerticalAlignment.Center });
-        var bar = new Button { Style = Ui.Res<Style>("QuietButton"), Content = header, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(13, 11, 18, 11) };
+        var bar = new Button { Style = Ui.Res<Style>("QuietButton"), Content = header, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(13, 8, 18, 6) };
         Controls.ClickGuard.SetAllowRepeat(bar, true);
         System.Windows.Automation.AutomationProperties.SetName(bar, group.Title);
         bar.Click += (_, _) =>
@@ -849,16 +881,19 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         var stack = new StackPanel();
         stack.Children.Add(bar);
         stack.Children.Add(rows);
-        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Child = stack };
+        var section = Hairline.Frame(new Border { Child = stack }, Sides.Top);
+        section.SetResourceReference(Border.BackgroundProperty, "Surface");
+        section.SetResourceReference(Border.BorderBrushProperty, "Line");
+        return section;
     }
 
-    private const double ThresholdColumn = 170, SwitchColumn = 45, AlertTwoColumnsFrom = 810;
+    private const double ThresholdColumn = 170, SwitchColumn = 45;
 
     private FrameworkElement AlertRow(AlertDef def, Action changed)
     {
         var choice = RaceState.ChoiceFor(S, def);
         HudAlertSetting Mine() => S.Alerts.TryGetValue(def.Id, out var x) ? x : S.Alerts[def.Id] = new HudAlertSetting();
-        var grid = new Grid { Margin = new Thickness(24, 5, 0, 5) };
+        var grid = new Grid { Margin = new Thickness(24, 6, 0, 6) };
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(ThresholdColumn) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(SwitchColumn) });
@@ -1152,8 +1187,6 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         yield return ("hud-quick-editor-settings", () => { quick?.ShowTab(null); return Task.CompletedTask; });
         yield return ("hud-quick-editor-done", () => { if (quickBox is not null) Children.Remove(quickBox); return Task.CompletedTask; });
         yield return ("hud-alerts", () => { SelectTab(AlertsTabIndex); return Task.CompletedTask; });
-        yield return ("hud-alerts-arrange", () => { _alertGroups?.SetEditing(true); return Task.CompletedTask; });
-        yield return ("hud-alerts-done", () => { _alertGroups?.SetEditing(false); return Task.CompletedTask; });
         yield return ("hud-fuel", () => { SelectTab(FuelTabIndex); return Task.CompletedTask; });
         yield return ("hud-settings", () => { SelectTab(SettingsTab); return Task.CompletedTask; });
         yield return ("hud-settings-custom", () =>
@@ -1165,7 +1198,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         yield return ("hud-settings-back", () => { S.Appearance.Colors = HudColors.Default; SelectTab(WidgetsTab); return Task.CompletedTask; });
     }
 
-    public bool CancelEdit() => _rules?.Cancel() == true || _alertGroups?.Cancel() == true;
+    public bool CancelEdit() => _rules?.Cancel() == true;
 
     private void SelectTab(int tab)
     {

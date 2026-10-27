@@ -12,11 +12,16 @@ internal sealed class SettingGroup : StackPanel
     private readonly Icon? _chevron;
     private readonly Action<bool>? _toggled;
 
-    public SettingGroup(string? title, bool open, Action<bool>? toggled)
+    public SettingGroup(string? title, bool open, Action<bool>? toggled, bool foldable = true)
     {
         _toggled = toggled;
         _body.Child = _rows;
-        if (title is not null)
+        if (title is not null && !foldable)
+        {
+            Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(5, 9, 0, 6) });
+            open = true;
+        }
+        else if (title is not null)
         {
             _chevron = new Icon { Width = 11, Height = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
             _chevron.SetResourceReference(Control.ForegroundProperty, "TextMuted");

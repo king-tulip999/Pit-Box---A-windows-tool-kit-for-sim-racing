@@ -114,8 +114,6 @@ internal sealed class HudEditorDef
         if (Setting(settingId) is { } s) foreach (var k in s.Keys) yield return k;
     }
 
-    public static string GroupFoldId(string kind, string group) => kind + ":" + group;
-
     private static HudWidgetConfig WithPreset(HudWidgetDef def, HudWidgetConfig w, HudPreset preset, IReadOnlyList<string> keeps)
     {
         var copy = w.Copy();
