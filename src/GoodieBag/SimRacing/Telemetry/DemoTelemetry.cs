@@ -8,7 +8,7 @@ internal sealed class DemoTelemetry
     private const double TrackKm = 5.2, RaceSeconds = 45 * 60, StartOffset = 14 * 60;
     private const int Player = 12, Cars = 28, FirstLmp2 = 23;
     private const int TowedCar = 14;
-    private const double TowFrom = 810, TowTo = 900;
+    private const double TowFrom = 820, TowEvery = 30, BackOnTrack = 1, PitEvery = 750;
     private static readonly string[] Names =
     {
         "Pace Car", "Daniel Morales", "Chris Walker", "Lucía Fernández", "Mike Turner", "José García", "Sarah Collins", "Pablo Ruiz",
@@ -103,7 +103,7 @@ internal sealed class DemoTelemetry
         double grid = -(car >= FirstLmp2 ? car - FirstLmp2 + 3 : car - 1) * 0.006;
         double swing = 0.03 * Math.Sin(t / 40 + car * 1.7) + 0.008 * Math.Sin(t / 14 + car * 2.9);
         double cycle = t + car * 97;
-        double stopped = Math.Floor(cycle / 1500) * 40 + Math.Clamp(cycle % 1500, 0, 40) - Math.Clamp(car * 97 % 1500, 0, 40);
+        double stopped = Math.Floor(cycle / PitEvery) * 40 + Math.Clamp(cycle % PitEvery, 0, 40) - Math.Clamp(car * 97 % PitEvery, 0, 40);
         return Math.Max(0, (t - stopped) / lap + grid + swing);
     }
 
@@ -119,7 +119,7 @@ internal sealed class DemoTelemetry
         return _best[car];
     }
 
-    private static bool InPits(int car, double t) => (t + car * 97) % 1500 < 40 && t > 60;
+    private static bool InPits(int car, double t) => (t + car * 97) % PitEvery < 40 && t > 60;
 
     private static readonly (double At, double Depth, double Width)[] Corners = { (0.08, 42, 0.02), (0.21, 30, 0.025), (0.33, 22, 0.03), (0.47, 48, 0.018), (0.6, 26, 0.03), (0.74, 35, 0.022), (0.9, 30, 0.025) };
 
@@ -196,23 +196,24 @@ internal sealed class DemoTelemetry
         }
         f.CarSurface[22] = TrackSurface.NotInWorld;
         f.CarLapDistPct[22] = -1;
-        if (raceT is >= TowFrom and < TowTo)
+        double towT = ((raceT - TowFrom) % TowEvery + TowEvery) % TowEvery;
+        if (towT >= BackOnTrack)
         {
             f.CarSurface[TowedCar] = TrackSurface.NotInWorld;
             f.CarLapDistPct[TowedCar] = -1;
             f.CarOnPitRoad[TowedCar] = false;
         }
-        else if (raceT is >= TowTo and < TowTo + 25)
+        else
         {
-            f.CarSurface[TowedCar] = TrackSurface.InPitStall;
-            f.CarOnPitRoad[TowedCar] = true;
+            f.CarSurface[TowedCar] = TrackSurface.OnTrack;
+            f.CarOnPitRoad[TowedCar] = false;
         }
 
         double pd = dist[Player], ppct = pd - Math.Floor(pd);
         double v = SpeedAt(ppct), ahead = SpeedAt(ppct + 0.004);
         f.Speed = f.CarOnPitRoad[Player] ? 16.4 : v;
         f.OnPitRoad = f.CarOnPitRoad[Player];
-        f.InPitStall = f.OnPitRoad && (raceT + Player * 97) % 1500 is > 12 and < 32;
+        f.InPitStall = f.OnPitRoad && (raceT + Player * 97) % PitEvery is > 12 and < 32;
         f.PlayerSurface = f.OnPitRoad ? TrackSurface.InPitStall : TrackSurface.OnTrack;
         double accel = ahead - v;
         f.Throttle = f.OnPitRoad ? 0.3 : accel > -0.2 ? Math.Clamp(0.55 + accel / 3, 0, 1) : 0;
