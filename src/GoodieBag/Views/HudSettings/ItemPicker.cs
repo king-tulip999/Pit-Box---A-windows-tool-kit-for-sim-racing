@@ -212,7 +212,6 @@ internal sealed class ItemPicker : StackPanel
         {
             if ((at - press.At).Length < DragStart) return;
             _dragging = true;
-            _body.CaptureMouse();
             press.Chip.Opacity = 0.35;
             _ghost = new Border { Padding = new Thickness(8, 4, 8, 4), BorderThickness = new Thickness(1.5), Child = new TextBlock { Text = _model.Choice(press.Id).Label, FontSize = 10 } };
             _ghost.SetResourceReference(Border.BackgroundProperty, "AccentSoft");
@@ -222,6 +221,7 @@ internal sealed class ItemPicker : StackPanel
             _marker.SetResourceReference(Shape.FillProperty, "AccentText");
             _overlay.Children.Add(_marker);
             _overlay.Children.Add(_ghost);
+            _body.CaptureMouse();
         }
         Canvas.SetLeft(_ghost!, at.X + 8);
         Canvas.SetTop(_ghost!, at.Y - 14);

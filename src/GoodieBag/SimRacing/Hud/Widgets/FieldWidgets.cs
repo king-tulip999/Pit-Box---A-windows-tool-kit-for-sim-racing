@@ -442,7 +442,7 @@ internal sealed class RelativeWidget : HudWidget
     {
         HudOption.Int("ahead", "Cars ahead", 4, 0, 10),
         HudOption.Int("behind", "Cars behind", 4, 0, 10),
-        HudOption.Columns("columns", "Columns", "cpos,num,name,pit,badge,gap",
+        HudOption.Columns("columns", "Columns", "cpos,num,badge,name,out,last,gap",
             FieldColumns.Pos, FieldColumns.ClassPos, FieldColumns.Change, FieldColumns.Number, FieldColumns.Name, FieldColumns.Team,
             FieldColumns.Badge, FieldColumns.IRatingChange, FieldColumns.Last, FieldColumns.Best, FieldColumns.AvgLap,
             FieldColumns.PaceDelta, FieldColumns.Laps, FieldColumns.LapsDone, FieldColumns.Pit, FieldColumns.OutLap, FieldColumns.Stint, FieldColumns.Incidents, FieldColumns.Trend,
@@ -451,16 +451,16 @@ internal sealed class RelativeWidget : HudWidget
         Editors.HudClassFilter.List,
         HudOption.Choice("hidePits", "Cars in the pits", "false", new HudChoice("false", "Show them"),
             new HudChoice("stall", "Hide cars parked in their pit stall", "Cars driving down the pit lane still show"), new HudChoice("true", "Hide every car in the pit lane")),
-        HudOption.Number("close", "Close gap", 1.0, 0, 5, 0.1, Units.S, "Same-class cars within this gap are highlighted (battles)."),
+        HudOption.Number("close", "Close gap", 1.2, 0, 5, 0.1, Units.S, "Same-class cars within this gap are highlighted (battles)."),
         HudOption.Bool("lapColors", "Lap colors", true, "Red: lapping you. Blue: a lap or more behind you"),
         FieldColumns.MarksOption,
-        HudOption.Columns("header", "Header", "session,remain,inc,bias", Strips.Header),
-        HudOption.Columns("footer", "Footer", "lap,clock,wetness,air,track", Strips.Footer),
-        HudOption.Bool("showHeader", "Column headings", false),
+        HudOption.Columns("header", "Header", "session,classpos,lap,remain,lapsleft,sof", Strips.Header),
+        HudOption.Columns("footer", "Footer", "clock,track,air,wind,cars,inc", Strips.Footer),
+        HudOption.Bool("showHeader", "Column headings", true),
         HudOption.Bool("highlightMe", "Highlight my row", true, "Your row tinted in the accent color, your position in a block"),
         HudOption.Bool("stripes", "Row shading", true, "Every other row a shade darker"),
         HudFlags.BannerOption,
-    }.Concat(FieldColumns.Shared).ToArray();
+    }.Concat(FieldColumns.Shared).Select(o => o.Key == "posBlock" ? o with { Default = "false" } : o).ToArray();
 
     private PointF _inset;
 
@@ -601,29 +601,29 @@ internal sealed class StandingsWidget : HudWidget
 
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
-        HudOption.Columns("columns", "Columns", "pos,num,name,pit,badge,irchange,gap,best,last",
+        HudOption.Columns("columns", "Columns", "cpos,badge,num,name,pit,change,last,int,gap",
             FieldColumns.Pos, FieldColumns.ClassPos, FieldColumns.Change, FieldColumns.Number, FieldColumns.Name, FieldColumns.Team,
             FieldColumns.Badge, FieldColumns.IRatingChange, new HudChoice("gap", "Gap"), new HudChoice("int", "Interval (car ahead)"),
             new HudChoice("gapme", "Gap to you"), FieldColumns.LapsDone, FieldColumns.Last, FieldColumns.Best, FieldColumns.AvgLap, FieldColumns.PaceDelta,
             FieldColumns.Pit, FieldColumns.OutLap, FieldColumns.Stint, FieldColumns.Incidents),
         HudOption.Bool("group", "Group by class", true, "Multiclass: one block per class, positions within the class."),
         HudOption.Choice("classOrder", "Class order", "fastest", new HudChoice("position", "By their leader's position"), new HudChoice("fastest", "Fastest class first")),
-        HudOption.Set("classInfo", "Class headings", "cars,sof", null,
+        HudOption.Set("classInfo", "Class headings", "cars,sof,laps", null,
             new HudChoice("cars", "Cars in the class"), new HudChoice("sof", "Strength of field"), new HudChoice("laps", "Laps the leader will do", "Timed races: from the class leader's recent pace")),
-        HudOption.Choice("divider", "Break in the list", "line", new HudChoice("line", "A line"), new HudChoice("accent", "An accent line"), new HudChoice("none", "Nothing"))
+        HudOption.Choice("divider", "Break in the list", "accent", new HudChoice("line", "A line"), new HudChoice("accent", "An accent line"), new HudChoice("none", "Nothing"))
             with { Help = "Where cars are left out (the list doesn't fit): between the leaders and the cars around you" },
         HudOption.Bool("title", "Title row", true, "Session name and time or laps left"),
-        HudOption.Bool("progress", "Session progress bar", false, "Under the title row"),
+        HudOption.Bool("progress", "Session progress bar", true, "Under the title row"),
         HudOption.Choice("gapTo", "Gap to", "leader", new HudChoice("leader", "Leader (class leader when grouped)"), new HudChoice("interval", "Car ahead"), new HudChoice("player", "You")),
         Editors.HudClassFilter.Scope,
         Editors.HudClassFilter.List,
-        HudOption.Int("top", "Leaders kept", 3, 1, 20, help: "When the list doesn't fit: this many from the top of each class, then the cars around you."),
+        HudOption.Int("top", "Leaders kept", 5, 1, 20, help: "When the list doesn't fit: this many from the top of each class, then the cars around you."),
         HudOption.Int("otherRows", "Cars per other class", 0, 0, 30, help: "Multiclass: at most this many cars of each class but yours (0 = as many as fit)."),
         FieldColumns.MarksOption,
         HudOption.Bool("retired", "Show cars that left", true, "Cars no longer in the session stay in the list, dimmed."),
         HudOption.Bool("showHeader", "Column headings", true),
-        HudOption.Columns("header", "Header", "", Strips.Header),
-        HudOption.Columns("footer", "Footer", "inc,sof,fastest", Strips.Footer),
+        HudOption.Columns("header", "Header", "session,csof,cars,pos,lapsleft,lap", Strips.Header),
+        HudOption.Columns("footer", "Footer", "remain,classFastest,best,last", Strips.Footer),
         HudOption.Bool("highlightMe", "Highlight my row", true, "Your row tinted in the accent color, your position in a block"),
         HudOption.Bool("stripes", "Row shading", true, "Every other row a shade darker"),
     }.Concat(FieldColumns.Shared).ToArray();

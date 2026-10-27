@@ -10,7 +10,7 @@ internal sealed class SessionWidget : HudWidget
 {
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
-        HudOption.Columns("fields", "Shows", "remain,lapsleft,lap,pos,cpos",
+        HudOption.Columns("fields", "Shows", "remain,lapsleft,lap,cpos",
             new HudChoice("remain", "Time left"), new HudChoice("lapsleft", "Laps left", "Timed races: estimated from the pace"), new HudChoice("elapsed", "Time elapsed"),
             new HudChoice("lap", "Lap"), new HudChoice("pos", "Position"), new HudChoice("cpos", "Position in class"), new HudChoice("phase", "Phase"), new HudChoice("track", "Track"),
             new HudChoice("temps", "Air / track temperature"), new HudChoice("inc", "Incidents"), new HudChoice("clock", "Time of day"),
@@ -60,7 +60,7 @@ internal sealed class SessionWidget : HudWidget
             if (cells.Count > before) ids.Add(id);
         }
         bool progress = v.Options.Bool("progress");
-        float barH = progress ? 6 * p.Density + 6 : 0;
+        float barH = progress ? 6 * p.Density : 0;
         var body = new RectangleF(area.X, area.Y, area.Width, area.Height - barH);
         if (cells.Count > 0)
         {
@@ -99,7 +99,7 @@ internal sealed class SessionWidget : HudWidget
             p.Region("progress", new RectangleF(area.X, area.Bottom - barH, area.Width, barH));
             double? done = session?.Laps is > 0 and var total2 && f.LapCompleted is { } lc ? (lc + (f.LapDistPct ?? 0)) / total2
                 : f.SessionTimeTotal is > 0 && f.SessionTimeRemain is { } rem ? 1 - rem / f.SessionTimeTotal.Value : null;
-            if (done is { } d) p.Bar(new RectangleF(area.X, area.Bottom - barH + 4, area.Width, barH - 4), d, p.P.Accent, p.Solid(p.Raised(0.10), 130));
+            if (done is { } d) p.Bar(new RectangleF(area.X, area.Bottom - 3 * p.Density, area.Width, 3 * p.Density), d, p.P.Accent, p.Solid(p.Raised(0.10), 130));
         }
     }
 }
@@ -109,7 +109,7 @@ internal sealed class AlertsWidget : HudWidget
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
         HudOption.Int("max", "Alerts at once", 3, 1, 8),
-        HudOption.Bool("big", "Large text", false),
+        HudOption.Bool("big", "Large text", true),
         HudOption.Bool("history", "Recent when quiet", false),
     };
 
@@ -120,7 +120,15 @@ internal sealed class AlertsWidget : HudWidget
     {
         var list = v.Race.Alerts.Visible(v.Now);
         bool history = list.Count == 0 && v.Options.Bool("history") && v.Race.Alerts.History.Count > 0;
-        if (list.Count == 0 && !history) return;
+        if (list.Count == 0 && !history)
+        {
+            if (p.IsPreview)
+            {
+                p.Panel();
+                p.Text("No alerts right now", p.Small, p.P.Faint, p.Bounds, HAlign.Center, VAlign.Center);
+            }
+            return;
+        }
         p.Panel();
         var b = p.Bounds;
         float pad = 6 * p.Density;
@@ -451,7 +459,7 @@ internal sealed class WindWidget : HudWidget
         HudOption.Bool("turn", "Turns with the car", true, "On: the pointer shows where the wind blows as you drive (down = a headwind). Off: up = north."),
         HudOption.Choice("colors", "Colors", "headtail", new HudChoice("headtail", "By headwind / crosswind / tailwind", "Red at the nose, amber across, green behind"), new HudChoice("accent", "The accent color")),
         HudOption.Choice("speedUnit", "Speed in", "units", new HudChoice("units", "Overlay units"), new HudChoice("kmh", Units.Kmh), new HudChoice("mph", Units.Mph), new HudChoice("ms", Units.MetresPerSecond)),
-        HudOption.Bool("unit", "Unit label", false),
+        HudOption.Bool("unit", "Unit label", true),
         HudOption.Bool("title", "Title", false, "“Wind” over the dial"),
     };
 
@@ -473,7 +481,7 @@ internal sealed class LapsWidget : HudWidget
 {
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
-        HudOption.Int("count", "Laps listed", 8, 3, 30),
+        HudOption.Int("count", "Laps listed", 10, 3, 30),
         HudOption.Int("window", "Laps in the statistics", 10, 3, 50),
         HudOption.Bool("fuel", "Fuel used", true),
         HudOption.Bool("stats", "Statistics", true),

@@ -10,10 +10,10 @@ internal sealed class TimingWidget : HudWidget
 {
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
-        HudOption.Choice("reference", "Delta to", "best", new HudChoice("best", "My best lap"), new HudChoice("session", "Session best"), new HudChoice("optimal", "My optimal lap", "Best sectors combined")),
+        HudOption.Choice("reference", "Delta to", "optimal", new HudChoice("best", "My best lap"), new HudChoice("session", "Session best"), new HudChoice("optimal", "My optimal lap", "Best sectors combined")),
         HudOption.Bool("bar", "Delta bar", true),
         HudOption.Number("range", "Bar range", 1.0, 0.2, 5, 0.1, Units.S),
-        HudOption.Columns("fields", "Times", "current,last,best,predicted",
+        HudOption.Columns("fields", "Times", "last,current,best,predicted",
             new HudChoice("current", "Current lap"), new HudChoice("last", "Last lap"), new HudChoice("best", "My best"), new HudChoice("predicted", "Predicted lap"),
             new HudChoice("sessionBest", "Session best (all)"), new HudChoice("classBest", "Best in my class"), new HudChoice("theoretical", "Optimal lap (best sectors)")),
         HudOption.Bool("sectors", "Sectors", true),
@@ -175,23 +175,23 @@ internal sealed class FuelWidget : HudWidget
 
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
-        HudOption.Columns("parts", "Sections", "header,gauge,grid", Parts)
+        HudOption.Columns("parts", "Sections", "header,gauge,grid,plan,figures", Parts)
             with { Help = "The blocks the widget is built of, top to bottom; each one's figures are picked below it" },
-        HudOption.Columns("head", "Header", "togo,nextpit,stops",
+        HudOption.Columns("head", "Header", "togo,nextpit,stops,pitby,add,level",
             new HudChoice("togo", "Laps to go", "Colored by how sure the estimate is"), new HudChoice("nextpit", "Next pit lap", "The lap the pit window opens (one stop then reaches the flag)"),
             new HudChoice("pitby", "Pit by lap", "The last lap before the tank runs dry"), new HudChoice("stops", "Stops left"),
             new HudChoice("add", "Add at the next stop"), new HudChoice("level", "Fuel in the tank")),
-        HudOption.Columns("gridRows", "Grid rows", "curr,avg,max,min",
+        HudOption.Columns("gridRows", "Grid rows", "curr,avg,max,min,last",
             new HudChoice("curr", "This lap", "Projected from what this lap has used so far"), new HudChoice("avg", "Average", "The rate the plan uses (clean, green laps)"),
             new HudChoice("avgN", "Average of the last laps", "Plain average of your last clean laps (Laps in the average)"),
             new HudChoice("max", "Most on one lap"), new HudChoice("min", "Least on one lap"), new HudChoice("last", "Last lap")),
-        HudOption.Columns("gridCols", "Grid columns", "use,laps,refuel",
+        HudOption.Columns("gridCols", "Grid columns", "use,laps,refuel,finish",
             new HudChoice("use", "Per lap"), new HudChoice("laps", "Laps it lasts"), new HudChoice("refuel", "Refuel to the flag", "What to add, in total, to reach the flag at that rate (with the plan's reserve)"),
             new HudChoice("finish", "Left at the flag", "Fuel in the tank at the flag at that rate, without stopping (negative = short)")),
         HudOption.Int("avgLaps", "Laps in the average", 5, 3, 10),
-        HudOption.Bool("statusEdge", "Status border", true, "Green: enough to the flag. Amber: a stop to come. Red: under the low-fuel alert's laps"),
+        HudOption.Bool("statusEdge", "Status border", false, "Green: enough to the flag. Amber: a stop to come. Red: under the low-fuel alert's laps"),
         HudOption.Bool("title", "Title row", false, "“Fuel” with how many clean laps the estimate has"),
-        HudOption.Columns("top", "Big figures", "level,laps,togo", Figures),
+        HudOption.Columns("top", "Big figures", "level,laps,togo,perlap", Figures),
         HudOption.Columns("cols", "Table columns", "last,avg,max",
             new HudChoice("last", "Last lap"), new HudChoice("avg", "Average", "The rate the plan uses (clean, green laps)"), new HudChoice("max", "Most on one lap")),
         HudOption.Columns("rows", "Table rows", "perlap,laps,refuel",

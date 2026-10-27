@@ -29,7 +29,7 @@ public sealed class RaceHudSettings
 
     public string ActiveLayout { get; set; } = SimRacing.Hud.HudPresets.DefaultName;
 
-    public bool AutoSwitch { get; set; } = true;
+    public bool AutoSwitch { get; set; } = false;
 
     public List<HudLayout> Layouts { get; set; } = new();
 
@@ -39,7 +39,7 @@ public sealed class RaceHudSettings
 
     public HudUnits Units { get; set; } = HudUnits.Metric;
 
-    public int GridSize { get; set; } = 8;
+    public int GridSize { get; set; } = 12;
 
     public bool Snap { get; set; } = true;
 
@@ -359,7 +359,7 @@ public sealed class HudAppearance
 
     public HudCustomColors Custom { get; set; } = new();
 
-    public int Background { get; set; } = 82;
+    public int Background { get; set; } = 75;
 
     public int FontScale { get; set; } = 100;
 
@@ -369,7 +369,7 @@ public sealed class HudAppearance
 
     public bool ReducedMotion { get; set; }
 
-    public bool Outline { get; set; } = true;
+    public bool Outline { get; set; } = false;
 
     public void Clamp()
     {
@@ -387,7 +387,7 @@ public enum FuelSafety { Aggressive, Balanced, Conservative }
 
 public sealed class HudFuelSettings
 {
-    public int Window { get; set; } = 10;
+    public int Window { get; set; } = 5;
 
     public FuelSafety Safety { get; set; } = FuelSafety.Balanced;
 

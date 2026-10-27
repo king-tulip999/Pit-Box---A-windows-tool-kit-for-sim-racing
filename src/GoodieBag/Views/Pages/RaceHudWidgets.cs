@@ -711,7 +711,7 @@ internal sealed class RaceHudWidgets
         return remove;
     }
 
-    private const double MaxPreviewScale = 1.5, MinReadableScale = 0.6;
+    private const double MaxPreviewScale = 1.5;
 
     private double _previewMaxHeight = 389;
 
@@ -725,7 +725,7 @@ internal sealed class RaceHudWidgets
             double room = _previewWell is { ActualWidth: > 40 } well ? well.ActualWidth - well.Padding.Left - well.Padding.Right - 2 : 560;
             double byHeight = _previewMaxHeight / Math.Max(1, w.H);
             double fit = Math.Min(room / Math.Max(1, w.W), byHeight);
-            float scale = (float)Math.Clamp(Math.Max(fit, Math.Min(MinReadableScale, byHeight)), 0.2, MaxPreviewScale);
+            float scale = (float)Math.Clamp(fit, 0.2, MaxPreviewScale);
             AlignPreview();
             double k = _previewPixels;
             host.RenderPreview(w, race, _painter, (float)(scale * k), ref _previewBitmap);

@@ -384,9 +384,12 @@ internal sealed class HudHost : IDisposable
             painter.Begin(g, scale, new SizeF((float)s.Config.W, (float)s.Config.H), Palette, Settings.Appearance);
             painter.Background = s.Config.Background;
             var view = new HudView { Frame = frame, Race = Race, Settings = Settings, Config = s.Config, Options = s.Options, Def = s.Def };
+            float band = _editing ? EditBand(painter) : 0;
+            painter.Inset(0, band, 0, 0);
             s.Widget.Draw(painter, view);
+            painter.EndInset();
             painter.FinishPanels();
-            if (_editing) EditFrame(painter, s, _picked == s.Config.Id);
+            if (_editing) EditFrame(painter, s, _picked == s.Config.Id, band);
             painter.End(window.SurfaceDc, size);
             if (!window.Visible) window.Show();
             window.Present(new Point((int)Math.Round(rect.X), (int)Math.Round(rect.Y)), (byte)Math.Round(s.Config.Opacity * 2.55));
@@ -414,14 +417,16 @@ internal sealed class HudHost : IDisposable
         if (_logged.Add(kind)) App.LogError(ex);
     }
 
-    private static void EditFrame(HudPainter p, Slot s, bool picked)
+    private static float EditBand(HudPainter p) => p.LineHeight(p.SmallBold) + 10;
+
+    private static void EditFrame(HudPainter p, Slot s, bool picked, float band)
     {
         var b = p.Bounds;
         p.Fill(b, HudPalette.Alpha(p.P.AccentSoft, 70));
         p.Outline(new RectangleF(b.X + 1, b.Y + 1, b.Width - 2, b.Height - 2), picked ? p.P.Accent : p.P.AccentText, picked ? 3 : 1.5f, p.Look.Corner);
         string label = s.Def.Name + (s.Config.Locked ? " · locked" : "");
         float w = Math.Min(b.Width - 8, p.Measure(label, p.SmallBold) + 14);
-        var tag = new RectangleF(4, 4, w, p.LineHeight(p.SmallBold) + 6);
+        var tag = new RectangleF(4, 4, w, band - 6);
         p.Fill(tag, p.P.Accent, 4);
         p.Text(label, p.SmallBold, p.P.OnAccent, tag, HAlign.Center, VAlign.Center);
         if (!s.Config.Locked)

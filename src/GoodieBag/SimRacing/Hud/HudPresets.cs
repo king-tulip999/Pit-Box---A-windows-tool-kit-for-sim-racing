@@ -20,10 +20,10 @@ internal static class HudPresets
             Name = DefaultName,
             Widgets =
             {
-                W("standings", HudAnchor.TopLeft, 0, 20, 560, 540, options: new[] { ("columns", "cpos,badge,avglap,change,num,name"), ("footer", "remain,classFastest,sof,lap"), ("header", "session,pos,classFastest,csof"), ("classInfo", "cars,sof,laps"), ("classOrder", "fastest") }),
-                W("timing", HudAnchor.BottomRight, -452, -8, 380, 140, options: new[] { ("fields", "last,current,best,predicted") }),
-                W("fuel", HudAnchor.BottomRight, 0, -8, 440, 280, options: new[] { ("statusEdge", "false"), ("parts", "header,gauge,grid,plan,figures"), ("head", "togo,nextpit,stops,pitby,add"), ("gridCols", "use,laps,refuel,finish"), ("top", "level,laps,togo,perlap") }),
-                W("relative", HudAnchor.BottomLeft, 20, -28, 500, 300, options: new[] { ("columns", "cpos,pos,gap,name,out,num"), ("header", "session,remain,pos,last,best"), ("footer", "lap,clock,wetness,track,air") }),
+                W("standings", HudAnchor.TopLeft, 0, 20, 560, 540),
+                W("timing", HudAnchor.BottomRight, -452, -8, 380, 140),
+                W("fuel", HudAnchor.BottomRight, 0, -8, 440, 280),
+                W("relative", HudAnchor.BottomLeft, 20, -28, 500, 300),
             },
         },
     };
