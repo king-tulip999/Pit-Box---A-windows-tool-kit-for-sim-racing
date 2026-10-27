@@ -17,11 +17,25 @@ internal static class FovExchange
             ("MonitorWidth", Mm(r.Centre.WidthCm * 10 + Math.Max(0, setup.BezelMm))),
             ("ViewingDist", Mm(setup.DistanceCm * 10)),
         };
-        if (setup.Triple) values.Add(("ScreenAngles", Math.Round(Math.Clamp(r.SideAngle, 10, 65)).ToString(CultureInfo.InvariantCulture)));
+        if (setup.Triple) values.Add(("ScreenAngles", Math.Round(Math.Clamp(r.SideAngle, MinSideAngle, MaxSideAngle)).ToString(CultureInfo.InvariantCulture)));
         bool curved = r.Centre.RadiusCm is not null;
         values.Add(("MonitorType", curved ? "1" : "0"));
         if (curved) values.Add(("RadiusOfCurvature", Mm(setup.Centre.RadiusMm)));
         return values;
+    }
+
+    public const double MinSideAngle = 10, MaxSideAngle = 65;
+
+    public static List<string> Approximations(FovSetup setup, FovResult r)
+    {
+        var notes = new List<string>();
+        if (setup.Triple && (r.SideAngle < MinSideAngle - 0.5 || r.SideAngle > MaxSideAngle + 0.5))
+            notes.Add($"iRacing takes side angles from {MinSideAngle:0}° to {MaxSideAngle:0}°, so it gets {Math.Clamp(r.SideAngle, MinSideAngle, MaxSideAngle):0}° instead of {r.SideAngle:0}°.");
+        if (setup.BezelMm < 0)
+            notes.Add("iRacing has no negative bezel, so it gets 0 mm.");
+        if (setup.Triple && setup.MixedSides)
+            notes.Add("iRacing has one size for all three screens, so it gets the centre screen's.");
+        return notes;
     }
 
     public static string? IracingFolder() =>

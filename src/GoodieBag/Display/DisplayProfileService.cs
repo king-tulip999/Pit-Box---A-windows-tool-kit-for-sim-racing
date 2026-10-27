@@ -191,14 +191,14 @@ internal sealed class DisplayProfileService
             if (cur is null)
             {
                 changes.Add(new ProfileChange("Display", all.Any(m => m.Key == t.Key)
-                    ? $"Turn on {name} at {t.Width}×{t.Height}, {t.Hz} Hz"
+                    ? $"Turn on {name} at {t.Width}×{t.Height}, {t.Hz} {Units.Hz}"
                     : $"{name} isn't connected; the profile can't be applied until it is"));
                 continue;
             }
             if (cur.Width != t.Width || cur.Height != t.Height)
                 changes.Add(new ProfileChange("Display", $"{name}: {cur.Width}×{cur.Height} → {t.Width}×{t.Height}"));
             if (cur.Hz != t.Hz && t.Hz > 0)
-                changes.Add(new ProfileChange("Display", $"{name}: {cur.Hz} Hz → {t.Hz} Hz"));
+                changes.Add(new ProfileChange("Display", $"{name}: {cur.Hz} {Units.Hz} → {t.Hz} {Units.Hz}"));
             if (cur.Rotation != t.Rotation)
                 changes.Add(new ProfileChange("Display", $"{name}: rotate to {RotationName(t.Rotation)}"));
             if (t.Primary && !cur.Primary)
@@ -227,7 +227,9 @@ internal sealed class DisplayProfileService
             return;
         }
         profile.Wallpapers = Wallpapers.Current();
+        bool forCalls = profile.Audio?.SetCommunications ?? true;
         try { profile.Audio = AudioManager.Capture(); } catch { }
+        if (profile.Audio is { } audio) audio.SetCommunications = forCalls;
     }
 
     public string? Validate(string name, string? hotkey, DisplayProfile? self)

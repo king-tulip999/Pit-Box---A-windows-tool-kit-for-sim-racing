@@ -12,7 +12,7 @@ namespace GoodieBag.Views;
 
 internal sealed class KeybindTree : Tile
 {
-    private const double RowIndent = 40, RowHeight = 42, KeyWidth = 164, CellWidth = 460, CellGap = 16, GroupWidth = 540;
+    private const double RowIndent = 32, RowHeight = 34, KeyWidth = 133, CellWidth = 373, CellGap = 13, GroupWidth = 437;
     private readonly AppServices _app;
     private readonly Action<string>? _navigate;
     private readonly Func<HotkeyEntry, bool> _include;
@@ -32,7 +32,7 @@ internal sealed class KeybindTree : Tile
         _navigate = navigate;
         _label = label ?? (l => l);
         Style = Ui.Res<Style>("Card");
-        Padding = new Thickness(14, 8, 14, 10);
+        Padding = new Thickness(11, 6, 11, 8);
         Child = _root;
         Rebuild();
     }
@@ -123,7 +123,7 @@ internal sealed class KeybindTree : Tile
         if (Searching) entries = entries.Where(e => Matches(e, _query)).ToList();
         if (entries.Count == 0)
         {
-            _root.Children.Add(new TextBlock { Text = $"No keybinds match “{_query}”.", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(6, 6, 0, 6) });
+            _root.Children.Add(new TextBlock { Text = $"No keybinds match “{_query}”.", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(5, 5, 0, 5) });
             return;
         }
         _root.Children.Add(Level(entries, _skip, prefix, Hues.Accent));
@@ -192,10 +192,10 @@ internal sealed class KeybindTree : Tile
             foreach (var e in stack)
             {
                 var row = Row(e, hue);
-                row.Height = RowHeight;
+                row.MinHeight = RowHeight;
                 column.Children.Add(row);
             }
-            var holder = new Border { BorderThickness = new Thickness(2, 0, 0, 0), Padding = new Thickness(8, 0, 0, 0), Child = column };
+            var holder = new Border { BorderThickness = new Thickness(2, 0, 0, 0), Padding = new Thickness(6, 0, 0, 0), Child = column };
             holder.SetResourceReference(Border.BorderBrushProperty, hue.Soft);
             var cell = new Grid();
             cell.ColumnDefinitions.Add(new ColumnDefinition { MaxWidth = CellWidth + CellGap });
@@ -222,40 +222,31 @@ internal sealed class KeybindTree : Tile
         if (hue is { } h && icon is not null)
         {
             var glyph = Ui.Glyph(icon);
-            glyph.Width = glyph.Height = level == 0 ? 14 : 13;
+            glyph.Width = glyph.Height = level == 0 ? 11 : 11;
             glyph.SetResourceReference(Control.ForegroundProperty, h.Deep);
             if (level == 0)
             {
-                var badge = new Tile { Width = 24, Height = 24, CornerRadius = ThemeManager.Round(7), Margin = new Thickness(6, 0, 0, 0), Child = glyph };
+                var badge = new Tile { Width = 19, Height = 19, CornerRadius = ThemeManager.Round(7), Margin = new Thickness(5, 0, 0, 0), Child = glyph };
                 badge.SetResourceReference(Border.BackgroundProperty, h.Soft);
                 head.Children.Add(badge);
             }
             else
             {
-                glyph.Margin = new Thickness(6, 0, 0, 0);
+                glyph.Margin = new Thickness(5, 0, 0, 0);
                 glyph.VerticalAlignment = VerticalAlignment.Center;
                 head.Children.Add(glyph);
             }
         }
         var title = new TextBlock
         {
-            Text = name, FontWeight = FontWeights.SemiBold, FontSize = level == 0 ? 15 : 13.5,
-            Margin = new Thickness(8, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center,
+            Text = name, FontWeight = FontWeights.SemiBold, FontSize = level == 0 ? 12 : 11,
+            Margin = new Thickness(6, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center,
         };
         if (level > 0 && hue is { } sub) title.SetResourceReference(TextBlock.ForegroundProperty, sub.Deep);
         head.Children.Add(title);
         int set = entries.Count(e => !string.IsNullOrWhiteSpace(e.Get()));
         count = new TextBlock { Text = $"{set} of {entries.Count} set", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center };
-        if (level == 0 && hue is { } top)
-        {
-            count.Margin = new Thickness(0);
-            count.FontSize = 11.5;
-            count.SetResourceReference(TextBlock.ForegroundProperty, top.Deep);
-            var chip = new Tile { CornerRadius = ThemeManager.Round(8), Chamfer = true, Padding = new Thickness(7, 1, 7, 2), VerticalAlignment = VerticalAlignment.Center, Child = count };
-            chip.SetResourceReference(Border.BackgroundProperty, top.Soft);
-            head.Children.Add(chip);
-        }
-        else head.Children.Add(count);
+        head.Children.Add(count);
         return head;
     }
 
@@ -265,22 +256,22 @@ internal sealed class KeybindTree : Tile
         var panel = new StackPanel { Margin = new Thickness(0, level == 0 ? 2 : 0, 0, 0) };
         if (level == 0 && !first)
         {
-            var rule = new Border { Height = 1, Margin = new Thickness(6, 6, 6, 8) };
+            var rule = Hairline.Rule(new Border { Margin = new Thickness(5, 5, 5, 6) });
             rule.SetResourceReference(Border.BackgroundProperty, "Line");
             panel.Children.Add(rule);
         }
         _groups[key] = panel;
         bool folded = !Searching && IsFolded(key);
-        var chevron = new Icon { Data = Ui.Res<Geometry>(folded ? "I.ChevronRight" : "I.ChevronDown"), Width = 14, Height = 14, VerticalAlignment = VerticalAlignment.Center };
+        var chevron = new Icon { Data = Ui.Res<Geometry>(folded ? "I.ChevronRight" : "I.ChevronDown"), Width = 11, Height = 11, VerticalAlignment = VerticalAlignment.Center };
         var head = GroupTitle(name, level, entries, out var count, hue, IconOf(name, entries, level));
         _counts.Add((count, entries));
         chevron.SetResourceReference(Control.ForegroundProperty, level == 0 ? "TextMuted" : hue.Deep);
         head.Children.Insert(0, chevron);
-        var header = new Button { Style = Ui.Res<Style>("QuietButton"), Content = head, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left, Padding = new Thickness(6, 3, 10, 3), Margin = new Thickness(level * 16, 0, 0, 0) };
+        var header = new Button { Style = Ui.Res<Style>("QuietButton"), Content = head, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left, Padding = new Thickness(5, 2, 8, 2), Margin = new Thickness(level * 16, 0, 0, 0) };
         AutomationProperties.SetName(header, name);
         panel.Children.Add(header);
 
-        var body = new Border { Margin = new Thickness(0, 0, 0, level == 0 ? 6 : 2), Visibility = folded ? Visibility.Collapsed : Visibility.Visible };
+        var body = new Border { Margin = new Thickness(0, 0, 0, level == 0 ? 5 : 2), Visibility = folded ? Visibility.Collapsed : Visibility.Visible };
         if (!folded)
             body.Child = Body(entries, depth, key, hue);
         panel.Children.Add(body);
@@ -311,33 +302,33 @@ internal sealed class KeybindTree : Tile
 
     private FrameworkElement Row(HotkeyEntry entry, (string Soft, string Deep) hue)
     {
-        var grid = new Grid { Margin = new Thickness(6, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
+        var grid = new Grid { Margin = new Thickness(5, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(KeyWidth) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(_navigate is null ? 0 : 30) });
-        var names = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
-        names.Children.Add(new TextBlock { Text = _label(entry.Label), TextTrimming = TextTrimming.CharacterEllipsis, ToolTip = entry.Label });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(_navigate is null ? 0 : 24) });
+        var names = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 3, 8, 3) };
+        names.Children.Add(new TextBlock { Text = _label(entry.Label), TextWrapping = TextWrapping.Wrap });
         if (entry.Note is { } note)
-            names.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = note, Style = Ui.Res<Style>("Caption"), TextTrimming = TextTrimming.CharacterEllipsis }));
+            names.Children.Add(new TextBlock { Text = note, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap });
         grid.Children.Add(names);
 
         var reset = Ui.IconButton("I.Undo", "Back to the default: " + entry.Default, () => { }, "QuietIconButton");
         if (reset.Content is Icon undo) undo.SetResourceReference(Control.ForegroundProperty, hue.Deep);
-        reset.Width = reset.Height = 28;
+        reset.Width = reset.Height = 23;
         reset.Margin = new Thickness(2, 0, 0, 0);
         Grid.SetColumn(reset, 2);
 
         if (entry.Locked is { } locked)
         {
             var lockedText = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-            var pad = new Icon { Data = Ui.Res<Geometry>("I.Gamepad"), Width = 13, Height = 13, Margin = new Thickness(0, 0, 7, 0), VerticalAlignment = VerticalAlignment.Center };
+            var pad = new Icon { Data = Ui.Res<Geometry>("I.Gamepad"), Width = 11, Height = 11, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center };
             pad.SetResourceReference(Control.ForegroundProperty, "TextFaint");
             lockedText.Children.Add(pad);
             lockedText.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = GoodieBag.Hotkeys.Hotkey.Display(entry.Get()), Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis }));
             var fixedKey = new Border
             {
-                Style = Ui.Res<Style>("Inset"), Height = 30, Padding = new Thickness(10, 0, 10, 0), ToolTip = locked, Child = lockedText,
+                Style = Ui.Res<Style>("Inset"), Height = 24, Padding = new Thickness(8, 0, 8, 0), ToolTip = locked, Child = lockedText,
             };
             Grid.SetColumn(fixedKey, 1);
             grid.Children.Add(fixedKey);
@@ -378,7 +369,7 @@ internal sealed class KeybindTree : Tile
         if (_navigate is not null && entry.Page != "settings")
         {
             var open = Ui.IconButton("I.ChevronRight", $"Open where it's set up ({entry.Path[0]})", () => _navigate(entry.Page), "QuietIconButton");
-            open.Width = open.Height = 28;
+            open.Width = open.Height = 23;
             open.Margin = new Thickness(2, 0, 0, 0);
             Grid.SetColumn(open, 3);
             grid.Children.Add(open);
@@ -400,18 +391,18 @@ internal sealed class KeybindTree : Tile
         _root.Children.Add(new TextBlock
         {
             Text = "Drag the categories into the order you want. The keybinds inside each one keep their default order.",
-            Style = Ui.Res<Style>("Caption"), Foreground = Ui.Res<Brush>("AccentText"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(4, 2, 0, 8),
+            Style = Ui.Res<Style>("Caption"), Foreground = Ui.Res<Brush>("AccentText"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(3, 2, 0, 6),
         });
         var groups = GroupNames(entries, depth);
-        var list = new ReorderGrid { MaxColumns = 1, Gap = 4, Margin = new Thickness(0, 0, 0, 4) };
+        var list = new ReorderGrid { MaxColumns = 1, Gap = 3, Margin = new Thickness(0, 0, 0, 3) };
         foreach (var name in groups)
         {
             var inside = entries.Where(e => e.Path.Count > depth && e.Path[depth] == name).ToList();
             var head = GroupTitle(name, 0, inside, out _, HueOf(name, 0, inside, Hues.Accent), IconOf(name, inside, 0));
-            head.Margin = new Thickness(4, 7, 8, 7);
+            head.Margin = new Thickness(3, 6, 6, 6);
             var cell = new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(0), Child = head, Background = Ui.Res<Brush>("Surface"), ToolTip = $"Drag {name} to move it" };
             cell.SetResourceReference(Border.BorderBrushProperty, "BtnOutline");
-            cell.BorderThickness = new Thickness(1);
+            Hairline.Frame(cell);
             if (Searching && !inside.Any(e => Matches(e, _query))) cell.Opacity = 0.4;
             AutomationProperties.SetName(cell, name);
             list.Children.Add(cell);

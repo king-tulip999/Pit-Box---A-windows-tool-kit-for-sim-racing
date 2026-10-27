@@ -78,11 +78,12 @@ internal sealed class HotkeyService : IDisposable
         string shown = Hotkey.Display(hotkey);
         if (config.Displays.Profiles.FirstOrDefault(p => !ReferenceEquals(p, except) && Hotkey.SameKey(p.Hotkey, hotkey)) is { } profile)
             return $"{shown} is already used by the display profile “{profile.Name}”.";
-        foreach (var plugin in PluginHotkeys())
-        {
-            if (!Equals(except, plugin.Id) && Hotkey.SameKey(hotkey, plugin.Get()))
-                return $"{shown} is already used for “{plugin.Label}”.";
-        }
+        foreach (var owner in _app.Plugins.All)
+            foreach (var plugin in owner.Hotkeys(_app))
+            {
+                if (!Equals(except, plugin.Id) && Hotkey.SameKey(hotkey, plugin.Get()))
+                    return owner.IsActive ? $"{shown} is already used for “{plugin.Label}”." : $"{shown} is already used for “{plugin.Label}” ({owner.Name}, now off).";
+            }
         if (except is not Config.WindowProfile and not Config.WindowGroup)
         {
             var w = config.WindowProfiles;

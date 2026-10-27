@@ -1,3 +1,5 @@
+using Units = GoodieBag.Services.CapsUnits;
+
 namespace GoodieBag.SimRacing.Race;
 
 internal enum AlertLevel { Info, Good, Warning, Critical }
@@ -25,10 +27,10 @@ internal static class AlertCatalog
         new("fuel.short", "Not enough fuel to finish", "The fuel on board won't reach the flag at the recent rate (an estimate).", AlertLevel.Warning, true, DefaultCooldown: 120),
         new("fuel.low", "Fuel low", "Fuel left for fewer laps than the threshold.", AlertLevel.Critical, true, 2, "laps", 60, Sticky: true),
         new("pit.window", "Pit window open", "One more stop is now enough to finish.", AlertLevel.Info, true, DefaultCooldown: 600),
-        new("pit.speed", "Pit speed limit exceeded", "Faster than the pit lane limit (plus the tolerance) on pit road.", AlertLevel.Critical, true, 0.5, "km/h", 2, Sticky: true),
+        new("pit.speed", "Pit speed limit exceeded", "Faster than the pit lane limit (plus the tolerance) on pit road.", AlertLevel.Critical, true, 0.5, Units.Kmh, 2, Sticky: true),
         new("pit.limiter", "Pit limiter off", "On pit road without the pit limiter (only cars that report it).", AlertLevel.Warning, true, DefaultCooldown: 10, Sticky: true),
-        new("traffic.faster", "Faster class approaching", "A car of a faster class is closer behind than the threshold and closing.", AlertLevel.Info, true, 2.0, "s", 25),
-        new("traffic.slower", "Slower class ahead", "Catching a car of a slower class (seconds until you reach it).", AlertLevel.Info, false, 3.0, "s", 25),
+        new("traffic.faster", "Faster class approaching", "A car of a faster class is closer behind than the threshold and closing.", AlertLevel.Info, true, 2.0, Units.S, 25),
+        new("traffic.slower", "Slower class ahead", "Catching a car of a slower class (seconds until you reach it).", AlertLevel.Info, false, 3.0, Units.S, 25),
         new("side.car", "Car alongside", "A call for every car alongside, from iRacing's spotter signal.", AlertLevel.Warning, false, DefaultCooldown: 0),
         new("flag.yellow", "Yellow / caution", "Local yellows and full-course cautions.", AlertLevel.Warning, true, DefaultCooldown: 15, Sticky: true),
         new("flag.blue", "Blue flag", "A faster car wants to lap you.", AlertLevel.Info, true, DefaultCooldown: 30),
@@ -53,13 +55,13 @@ internal static class AlertCatalog
 
     public static readonly (string Id, string Title, string Icon, string[] Alerts)[] Groups =
     {
-        ("fuel", "Fuel & strategy", "I.Gauge", new[] { "fuel.low", "fuel.short" }),
-        ("pit", "Pit & stint", "I.Clock", new[] { "pit.window", "pit.speed", "pit.limiter", "stint.limit" }),
-        ("traffic", "Traffic & spotter", "I.Target", new[] { "traffic.faster", "traffic.slower", "side.car" }),
-        ("flags", "Flags & penalties", "I.Flag", new[] { "flag.yellow", "flag.blue", "flag.white", "flag.penalty", "incidents.limit", "incident.new" }),
-        ("laps", "Laps & position", "I.Trophy", new[] { "lap.pb", "lap.unclean", "pace.drop", "position.change" }),
+        ("fuel", "Fuel and strategy", "I.Gauge", new[] { "fuel.low", "fuel.short" }),
+        ("pit", "Pit and stint", "I.Clock", new[] { "pit.window", "pit.speed", "pit.limiter", "stint.limit" }),
+        ("traffic", "Traffic and spotter", "I.Target", new[] { "traffic.faster", "traffic.slower", "side.car" }),
+        ("flags", "Flags and penalties", "I.Flag", new[] { "flag.yellow", "flag.blue", "flag.white", "flag.penalty", "incidents.limit", "incident.new" }),
+        ("laps", "Laps and position", "I.Trophy", new[] { "lap.pb", "lap.unclean", "pace.drop", "position.change" }),
         ("weather", "Weather", "I.Sun", new[] { "weather.rain", "weather.wet" }),
-        ("car", "Car & telemetry", "I.Alert", new[] { "engine.warning", "telemetry.lost" }),
+        ("car", "Car and telemetry", "I.Alert", new[] { "engine.warning", "telemetry.lost" }),
     };
 }
 

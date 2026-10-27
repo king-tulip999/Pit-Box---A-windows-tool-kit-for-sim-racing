@@ -27,8 +27,8 @@ internal sealed class HudSettingContext
 
 internal static class SettingRows
 {
-    public const double LabelWidth = 180;
-    private const double ComboWidth = 240;
+    public const double LabelWidth = 172;
+    private const double ComboWidth = 194;
 
     public static FrameworkElement Build(HudSetting s, HudSettingContext c, string? groupTitle = null) => s switch
     {
@@ -43,15 +43,15 @@ internal static class SettingRows
 
     public static Grid Row(string label, string? help, bool inlineHelp, FrameworkElement control)
     {
-        var grid = new Grid { Margin = new Thickness(0, 3, 0, 3) };
+        var grid = new Grid { Margin = new Thickness(0, 2, 0, 2) };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(LabelWidth) });
         grid.ColumnDefinitions.Add(new ColumnDefinition());
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto, MinHeight = 34 });
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto, MinHeight = 28 });
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        var name = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0) };
+        var name = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
         name.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Body"), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, MaxWidth = LabelWidth - 34 });
         if (help is not null && !inlineHelp) name.Children.Add(HelpTip.For(help, label));
-        grid.Children.Add(new Border { MinHeight = 34, VerticalAlignment = VerticalAlignment.Top, Child = name });
+        grid.Children.Add(new Border { MinHeight = 28, VerticalAlignment = VerticalAlignment.Top, Child = name });
         control.HorizontalAlignment = HorizontalAlignment.Left;
         control.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(control, 1);
@@ -88,7 +88,7 @@ internal static class SettingRows
             case HudOptionKind.Number:
                 double.TryParse(current, NumberStyles.Float, CultureInfo.InvariantCulture, out var num);
                 bool whole = o.Kind == HudOptionKind.Int;
-                var box = new NumberBox(num, o.Unit ?? "", 64) { Minimum = o.Min, Maximum = o.Max, Step = whole ? 1 : o.Step, Decimals = whole ? 0 : o.Step < 0.1 ? 2 : o.Step < 1 ? 1 : 0 };
+                var box = new NumberBox(num, o.Unit ?? "", 52) { Minimum = o.Min, Maximum = o.Max, Step = whole ? 1 : o.Step, Decimals = whole ? 0 : o.Step < 0.1 ? 2 : o.Step < 1 ? 1 : 0 };
                 box.ValueChanged += x => c.SetOne(s.Key, x.ToString(whole ? "0" : "0.###", CultureInfo.InvariantCulture));
                 System.Windows.Automation.AutomationProperties.SetName(box, label);
                 return Row(label, o.Help, s.InlineHelp, box);
@@ -119,10 +119,10 @@ internal static class SettingRows
 
     public static Tile TickChip(CheckBox box)
     {
-        box.Margin = new Thickness(4, 0, 6, 0);
+        box.Margin = new Thickness(3, 0, 5, 0);
         box.VerticalAlignment = VerticalAlignment.Center;
-        var chip = new Tile { Style = Ui.Res<Style>("Chip"), Child = box, MinHeight = 30, Padding = new Thickness(6, 0, 6, 0), Margin = new Thickness(0, 0, 6, 6) };
-        chip.SetValue(TextElement.FontSizeProperty, 12.5);
+        var chip = new Tile { Style = Ui.Res<Style>("Chip"), Child = box, MinHeight = 24, Padding = new Thickness(5, 0, 5, 0), Margin = new Thickness(0, 0, 5, 5) };
+        chip.SetValue(TextElement.FontSizeProperty, 10.0);
         return chip;
     }
 
@@ -179,8 +179,8 @@ internal static class SettingRows
         var known = SessionNames.Merge(null, c.KnownClasses, SessionNames.Classes).Where(k => !session.Contains(k, StringComparer.OrdinalIgnoreCase)).ToList();
         var others = shown.Where(k => !session.Contains(k, StringComparer.OrdinalIgnoreCase) && !known.Contains(k, StringComparer.OrdinalIgnoreCase)).Concat(known).ToList();
 
-        var pick = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
-        var empty = new TextBlock { Text = "Nothing ticked: no cars show.", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 0, 0, 6) };
+        var pick = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
+        var empty = new TextBlock { Text = "Nothing ticked: no cars show.", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 0, 0, 5) };
         void Save()
         {
             empty.Visibility = shown.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -199,7 +199,7 @@ internal static class SettingRows
         pick.Children.Add(empty);
         if (session.Count > 0)
         {
-            pick.Children.Add(new TextBlock { Text = c.Frame.Simulated ? "In the simulated session" : "In this session", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 0, 0, 6) });
+            pick.Children.Add(new TextBlock { Text = c.Frame.Simulated ? "In the simulated session" : "In this session", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 0, 0, 5) });
             pick.Children.Add(Chips(session));
         }
         if (others.Count > 0)

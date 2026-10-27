@@ -107,10 +107,21 @@ internal static class LayoutGuard
     public static Dictionary<string, string> Capture(SettingsSession s) =>
         Settings(s).ToDictionary(x => x.Section + "|" + x.Key, x => x.Applied, StringComparer.OrdinalIgnoreCase);
 
+    public static bool CaptureIfEmpty(SettingsSession s, Dictionary<string, string> saved)
+    {
+        if (saved.Count > 0) return false;
+        foreach (var (key, value) in Capture(s)) saved[key] = value;
+        return saved.Count > 0;
+    }
+
     public static List<Difference> Differences(SettingsSession s, IReadOnlyDictionary<string, string> saved) =>
         saved.Count == 0 ? new()
-            : Settings(s).Where(x => saved.TryGetValue(x.Section + "|" + x.Key, out var want) && !Setting.SameValue(want, x.Applied))
+            : Settings(s).Where(x => Guarded(x.Section, saved) && saved.TryGetValue(x.Section + "|" + x.Key, out var want) && !Setting.SameValue(want, x.Applied))
                 .Select(x => new Difference(x, saved[x.Section + "|" + x.Key])).ToList();
+
+    internal static bool Guarded(string section, IReadOnlyDictionary<string, string> saved) =>
+        !section.Equals("Display", StringComparison.OrdinalIgnoreCase)
+        || saved.TryGetValue("MonitorSetup|NumMonitors", out var screens) && screens.Trim() == "3";
 
     public static void Adopt(SettingsSession s, Dictionary<string, string> saved, IEnumerable<string>? keys = null)
     {

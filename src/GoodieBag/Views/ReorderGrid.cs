@@ -12,8 +12,8 @@ internal sealed class ReorderGrid : Panel
 {
     private const double Threshold = 6;
 
-    public double MinCellWidth { get; init; } = 160;
-    public double Gap { get; init; } = 8;
+    public double MinCellWidth { get; init; } = 130;
+    public double Gap { get; init; } = 6;
     public int MaxColumns { get; init; } = int.MaxValue;
 
     public bool Swap { get; init; }
@@ -155,10 +155,11 @@ internal sealed class ReorderGrid : Panel
     {
         base.OnRender(dc);
         if (_drag is null) return;
-        var pen = new Pen(Ui.Res<Brush>("LineStrong"), 1) { DashStyle = new DashStyle(new double[] { 2, 3 }, 0) };
+        double px = Hairline.ScaleOf(this);
+        var pen = new Pen(Ui.Res<Brush>("LineStrong"), Hairline.Pixels(1, px)) { DashStyle = new DashStyle(new double[] { 2, 3 }, 0) };
         pen.Freeze();
         for (int i = 0; i < InternalChildren.Count; i++)
-            dc.DrawGeometry(null, pen, Tile.Shape(new Rect(Slot(i), CellSize(i)), ThemeManager.Round(8)));
+            dc.DrawGeometry(null, pen, Tile.Shape(Hairline.SnapBox(new Rect(Slot(i), CellSize(i)), px), ThemeManager.Round(8)));
     }
 
     private void OnPress(object sender, MouseButtonEventArgs e)

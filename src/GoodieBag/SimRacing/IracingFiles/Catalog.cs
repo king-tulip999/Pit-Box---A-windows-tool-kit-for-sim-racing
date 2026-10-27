@@ -3,6 +3,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using GoodieBag.Services;
 
 namespace GoodieBag.SimRacing.IracingFiles;
 
@@ -272,7 +273,7 @@ internal static class CommentInference
             if (range.Success) { d.Min = Num(range.Groups[1].Value); d.Max = Num(range.Groups[2].Value); }
             if (!isInt) d.Step = Math.Abs(n) < 5 ? 0.05 : 0.5;
             if (comment.Contains("dB") || key.EndsWith("_db", StringComparison.OrdinalIgnoreCase) || key.StartsWith("loudness", StringComparison.Ordinal)) d.Unit = "dB";
-            else if (comment.Contains("(mm)")) d.Unit = "mm";
+            else if (comment.Contains("(mm)")) d.Unit = Units.Mm;
             else if (comment.Contains("(MB)") || comment.Contains(" MB")) d.Unit = "MB";
         }
         return d;

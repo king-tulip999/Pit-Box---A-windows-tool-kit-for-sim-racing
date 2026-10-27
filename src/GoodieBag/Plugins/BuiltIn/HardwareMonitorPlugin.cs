@@ -10,7 +10,7 @@ internal sealed class HardwareMonitorPlugin : Plugin
 
     public override string Id => PluginIds.HardwareMonitor;
     public override string Name => "Hardware Monitor";
-    public override string Description => "Performance panels (live readings, two-minute history, FPS and frame times) and every sensor your PC exposes with min / max.";
+    public override string Description => "Live temperatures, load, FPS and frame times, and an in-game performance overlay.";
     public override string Icon => "I.HeartPulse";
     public override (string Soft, string Deep) Colors => ("SlateSoft", "SlateDeep");
     public override int Order => 50;

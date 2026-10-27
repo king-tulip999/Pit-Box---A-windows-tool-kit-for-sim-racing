@@ -33,7 +33,7 @@ internal sealed class TelemetryFilesCard : ContentControl
         int version = ++_version;
         var store = _stats.Store;
         TelemetryReport? report;
-        try { report = await Task.Run(() => TelemetryFiles.Read(name => store?.Imported(name) == true)); }
+        try { report = await Task.Run(() => TelemetryFiles.Read(name => store?.ReadInFull(name) == true)); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { report = null; }
         if (version != _version) return;
         Show(report);
@@ -45,10 +45,10 @@ internal sealed class TelemetryFilesCard : ContentControl
         var flow = new SettingsFlow();
         var recording = Ui.Switch(r?.Recording == true, on => _ = SetRecordingAsync(on));
         recording.IsEnabled = r?.Recording is not null && !_app.Demo;
+        if (_app.Demo) recording.ToolTip = "Not with demo data";
         flow.Children.Add(Ui.SettingRow("Record telemetry to disk",
-            "iRacing saves an .ibt file of every session you drive (its own setting, saved in app.ini; it takes effect the next time iRacing starts). "
-            + "Laps from those files get their exact GPS line in the lap analysis and replay; laps only recorded live are worked out from speed and heading and can sit 2–6 m off.",
-            recording));
+            "iRacing saves an .ibt file of every session you drive, from its next start. Laps from those files get their exact line in the lap analysis and replay.",
+            recording, more: "It's iRacing's own setting, saved in app.ini. Laps only recorded live are worked out from speed and heading and can sit 2–6 m off."));
         _body.Children.Add(flow);
 
         if (r is null)
@@ -58,32 +58,32 @@ internal sealed class TelemetryFilesCard : ContentControl
         }
 
         string rate = r.BytesPerHour is { } bph ? $" · about {Mb(bph)} per hour of driving (measured from your newest files)" : "";
-        var size = Ui.Text($"{r.Files.Count:N0} file{(r.Files.Count == 1 ? "" : "s")} · {HealthCheck.Gb(r.TotalBytes)}{rate}", "Body");
+        var size = Ui.Text($"{SimRacing.Race.RaceFormat.Count(r.Files.Count, "file")} · {HealthCheck.Gb(r.TotalBytes)}{rate}", "Body");
         size.TextWrapping = TextWrapping.Wrap;
         var sizeLine = Ui.IconText("I.Folder", size, "TextMuted");
-        sizeLine.Margin = new Thickness(0, 14, 0, 0);
+        sizeLine.Margin = new Thickness(0, 11, 0, 0);
         _body.Children.Add(sizeLine);
 
         if (r.TotalBytes >= HealthCheck.TelemetryWarnBytes)
         {
             var warn = Ui.Notice("Warn", "I.Alert", $"The folder is {HealthCheck.Gb(r.TotalBytes)}",
                 "iRacing never deletes these files. Clear the ones Session Stats has already read to get the space back.");
-            warn.Margin = new Thickness(0, 14, 0, 0);
+            warn.Margin = new Thickness(0, 11, 0, 0);
             _body.Children.Add(warn);
         }
 
-        var buttons = new WrapPanel { Margin = new Thickness(0, 16, 0, 0) };
+        var buttons = new WrapPanel { Margin = new Thickness(0, 13, 0, 0) };
         var open = Ui.LabeledButton("I.Folder", "Open telemetry folder", () => OpenFolder(r.Folder));
-        open.Margin = new Thickness(0, 0, 8, 8);
+        open.Margin = new Thickness(0, 0, Ui.GroupGap, 6);
         buttons.Children.Add(open);
         var clear = Ui.LabeledButton("I.Trash", r.Clearable.Count > 0
-            ? $"Move {r.Clearable.Count:N0} read file{(r.Clearable.Count == 1 ? "" : "s")} to the Recycle Bin ({HealthCheck.Gb(r.ClearableBytes)})"
+            ? $"Move {SimRacing.Race.RaceFormat.Count(r.Clearable.Count, "read file")} to the Recycle Bin ({HealthCheck.Gb(r.ClearableBytes)})"
             : "Nothing to clear", () => _ = ClearAsync(r), "DangerButton");
         clear.IsEnabled = r.Clearable.Count > 0 && !_app.Demo;
-        clear.Margin = new Thickness(0, 0, 8, 8);
+        clear.Margin = new Thickness(0, 0, 6, 6);
         buttons.Children.Add(clear);
         _body.Children.Add(buttons);
-        _body.Children.Add(Note("Only files Session Stats has already read are moved: their laps, stats and lines are saved here. "
+        _body.Children.Add(Note("Clearing moves only files Session Stats has already read to the Recycle Bin. Their laps, stats and the lap traces you keep stay here; other laps' lines go with the files. "
             + "The newest file and any file not read yet are always kept."));
     }
 
@@ -92,7 +92,7 @@ internal sealed class TelemetryFilesCard : ContentControl
         var t = Ui.Text(text, "Caption");
         t.TextWrapping = TextWrapping.Wrap;
         var line = Ui.IconText("I.Info", t, "TextMuted");
-        line.Margin = new Thickness(0, 4, 0, 0);
+        line.Margin = new Thickness(0, 3, 0, 0);
         return line;
     }
 
@@ -120,13 +120,13 @@ internal sealed class TelemetryFilesCard : ContentControl
     {
         if (_app.Demo || r.Clearable.Count == 0) return;
         if (!await _window.Confirm("Move read telemetry to the Recycle Bin?",
-                $"{r.Clearable.Count:N0} .ibt file{(r.Clearable.Count == 1 ? "" : "s")} ({HealthCheck.Gb(r.ClearableBytes)}) that Session Stats has already read. "
-                + "Their laps and lines stay here, and you can restore the files from the Recycle Bin.", "Move to Recycle Bin", danger: true))
+                $"{SimRacing.Race.RaceFormat.Count(r.Clearable.Count, ".ibt file")} ({HealthCheck.Gb(r.ClearableBytes)}) that Session Stats has already read. "
+                + "Their laps, stats and the lap traces you keep stay here; other laps' lines go with the files. You can restore them from the Recycle Bin.", "Move to Recycle Bin", danger: true))
             return;
         try
         {
             int moved = await Task.Run(() => RecycleBin.Send(r.Clearable.Select(f => f.FullName).ToList()));
-            _app.Notify("Telemetry tidied", $"{moved:N0} file{(moved == 1 ? "" : "s")} moved to the Recycle Bin.", NoticeKind.Success);
+            _app.Notify("Telemetry tidied", $"{SimRacing.Race.RaceFormat.Count(moved, "file")} moved to the Recycle Bin.", NoticeKind.Success);
         }
         catch (Exception ex)
         {

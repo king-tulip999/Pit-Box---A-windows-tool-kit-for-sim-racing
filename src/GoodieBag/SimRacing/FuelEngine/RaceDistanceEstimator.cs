@@ -31,7 +31,7 @@ public static class RaceDistanceEstimator
 
         double lapsRemaining = LapsToFirstCrossingAfter(checkeredIn, input);
         return new(lapsRemaining, Math.Max(0, lapsRemaining - 1), lapsRemaining + 1, whiteFlagIn, false,
-            $"Forecast only: at the leader's recent pace the checkered flag falls in about {checkeredIn:0} s (white flag in about {whiteFlagIn:0} s); "
+            $"Forecast only: at the leader's recent pace the checkered flag falls in about {checkeredIn:0} S (white flag in about {whiteFlagIn:0} S); "
             + "the player finishes at their first crossing after it, at their own recent pace. Replaced by iRacing's flags as soon as they show.");
     }
 

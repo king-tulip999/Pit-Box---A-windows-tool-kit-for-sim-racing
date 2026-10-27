@@ -26,7 +26,7 @@ internal sealed class PluginManager
 
     public Plugin? Find(string id) => All.FirstOrDefault(p => p.Id == id);
 
-    public bool IsEnabled(Plugin plugin) => PluginStates.IsEnabled(_config.Plugins, plugin.Id, plugin.EnabledByDefault);
+    public bool IsEnabled(Plugin plugin) => PluginStates.IsEnabled(_config.Plugins, plugin, Find);
 
     public bool IsActive(string id) => Find(id)?.IsActive == true;
 
@@ -50,7 +50,8 @@ internal sealed class PluginManager
     {
         _config.Plugins[plugin.Id] = enabled;
         _app.Save();
-        StartOrStop(plugin, enabled);
+        StartOrStop(plugin, IsEnabled(plugin));
+        StartOrStopChildren(plugin);
         _app.Hotkeys.RegisterAll();
         Changed?.Invoke();
     }
@@ -63,7 +64,10 @@ internal sealed class PluginManager
         _app.Save();
         foreach (var id in changed)
             if (Find(id) is { } plugin)
-                StartOrStop(plugin, _config.Plugins[id]);
+            {
+                StartOrStop(plugin, IsEnabled(plugin));
+                StartOrStopChildren(plugin);
+            }
         _app.Hotkeys.RegisterAll();
         Changed?.Invoke();
     }
@@ -72,6 +76,12 @@ internal sealed class PluginManager
     {
         _app.Hotkeys.RegisterAll();
         Changed?.Invoke();
+    }
+
+    private void StartOrStopChildren(Plugin parent)
+    {
+        foreach (var child in All.Where(c => c.ParentId == parent.Id))
+            StartOrStop(child, IsEnabled(child));
     }
 
     private void StartOrStop(Plugin plugin, bool enabled)
@@ -133,6 +143,10 @@ internal static class PluginStates
 {
     public static bool IsEnabled(IReadOnlyDictionary<string, bool> stored, string id, bool byDefault) =>
         stored.TryGetValue(id, out var on) ? on : byDefault;
+
+    public static bool IsEnabled(IReadOnlyDictionary<string, bool> stored, Plugin plugin, Func<string, Plugin?> find) =>
+        IsEnabled(stored, plugin.Id, plugin.EnabledByDefault)
+        && (plugin.ParentId is not { } parentId || find(parentId) is not { } parent || IsEnabled(stored, parent, find));
 
     public static List<string> Apply(Dictionary<string, bool> stored, IEnumerable<(string Id, bool Default)> plugins, Func<string, bool> wanted)
     {

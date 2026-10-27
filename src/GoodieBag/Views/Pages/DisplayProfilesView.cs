@@ -13,8 +13,9 @@ internal sealed class DisplayProfilesView : Tile
 {
     private readonly AppServices _app;
     private readonly MainWindow _window;
-    private readonly MasonryPanel _grid = new() { MinColumnWidth = 440, MaxColumns = 3, Gap = 12, Margin = new Thickness(0, 12, 0, 0) };
+    private readonly System.Windows.Controls.Primitives.UniformGrid _grid = new() { Margin = new Thickness(0, 10, -CardGap, -CardGap) };
     private readonly Func<bool> _hasPending;
+    private readonly Border _empty = new() { Visibility = Visibility.Collapsed, HorizontalAlignment = HorizontalAlignment.Stretch };
 
     public DisplayProfilesView(AppServices app, MainWindow window, Func<bool> hasPending)
     {
@@ -22,7 +23,7 @@ internal sealed class DisplayProfilesView : Tile
         _window = window;
         _hasPending = hasPending;
         Style = Ui.Res<Style>("Card");
-        Margin = new Thickness(0, 0, 0, 16);
+        Margin = new Thickness(0, 0, 0, 13);
 
         var stack = new StackPanel();
         var head = new Grid();
@@ -37,7 +38,9 @@ internal sealed class DisplayProfilesView : Tile
         head.Children.Add(save);
         stack.Children.Add(head);
         stack.Children.Add(_grid);
+        stack.Children.Add(_empty);
         Child = stack;
+        _grid.SizeChanged += (_, e) => FitColumns(e.NewSize.Width - CardGap);
         Ui.Anchor(this, "displays.profiles");
     }
 
@@ -47,19 +50,18 @@ internal sealed class DisplayProfilesView : Tile
         var profiles = _app.Config.Displays.Profiles;
         if (profiles.Count == 0)
         {
-            var empty = new StackPanel { Margin = new Thickness(6, 10, 6, 6), HorizontalAlignment = HorizontalAlignment.Center };
-            empty.Children.Add(new TextBlock { Text = "No display profiles yet", Style = Ui.Res<Style>("H3"), HorizontalAlignment = HorizontalAlignment.Center });
-            empty.Children.Add(new TextBlock
-            {
-                Text = "Set your monitors up the way you like (here or in Windows), then Save current setup. One for each setup: desk, triples, TV…",
-                Style = Ui.Res<Style>("Muted"), TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, MaxWidth = 560, Margin = new Thickness(0, 4, 0, 0),
-            });
-            _grid.Children.Add(empty);
+            _grid.Visibility = Visibility.Collapsed;
+            _empty.Child = Ui.EmptyState("I.Monitor", "No display profiles yet",
+                "Set your monitors up the way you like (here or in Windows), then Save current setup. One for each setup: desk, triples, TV…");
+            _empty.Visibility = Visibility.Visible;
             return;
         }
+        _grid.Visibility = Visibility.Visible;
+        _empty.Visibility = Visibility.Collapsed;
         var active = _app.DisplayProfiles.Active;
         foreach (var profile in profiles)
             _grid.Children.Add(ProfileTile(profile, profile == active));
+        FitColumns(_grid.ActualWidth - CardGap);
     }
 
     private FrameworkElement ProfileTile(DisplayProfile profile, bool isActive)
@@ -70,9 +72,9 @@ internal sealed class DisplayProfilesView : Tile
         top.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         top.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         top.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        var name = TextFit.TipWhenTrimmed(new TextBlock { Text = profile.Name, Style = Ui.Res<Style>("H3"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) });
+        var name = new TextBlock { Text = profile.Name, Style = Ui.Res<Style>("H3"), TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
         top.Children.Add(name);
-        var tags = new WrapPanel { Margin = new Thickness(0, 4, 0, 0) };
+        var tags = new WrapPanel { Margin = new Thickness(0, 3, 0, 0) };
         if (isActive)
             tags.Children.Add(Ui.Chip("Active", "SageSoft", "SageDeep"));
         if (profile.Hotkey is { } hk)
@@ -83,72 +85,84 @@ internal sealed class DisplayProfilesView : Tile
             Grid.SetColumnSpan(tags, 2);
             top.Children.Add(tags);
         }
-        var apply = isActive
-            ? Ui.IconButton("I.Refresh", "Apply again", () => _ = _app.DisplayProfiles.ApplyAsync(profile))
-            : Ui.LabeledButton("I.Zap", "Apply", () => _ = _app.DisplayProfiles.ApplyAsync(profile), "PrimaryButton");
+        var apply = Ui.LabeledButton("I.Zap", isActive ? "Apply again" : "Apply", () => _ = _app.DisplayProfiles.ApplyAsync(profile));
         apply.VerticalAlignment = VerticalAlignment.Top;
-        if (!isActive) apply.ToolTip = "Apply this profile";
         Grid.SetColumn(apply, 1);
         top.Children.Add(apply);
         stack.Children.Add(top);
 
-        var previewBox = new Tile { Style = Ui.Res<Style>("Inset"), Margin = new Thickness(0, 10, 0, 0), Padding = new Thickness(6) };
+        var previewBox = new Tile { Style = Ui.Res<Style>("Inset"), Margin = new Thickness(0, 8, 0, 0), Padding = new Thickness(5) };
         if (profile.Layout is null)
-            previewBox.Child = new TextBlock { Text = "Leaves the arrangement as it is", Style = Ui.Res<Style>("Caption"), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 39, 0, 39) };
+            previewBox.Child = new TextBlock { Text = "Leaves the arrangement as it is", Style = Ui.Res<Style>("Caption"), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 32, 0, 32) };
         else
         {
-            var preview = new MonitorLayoutView { Height = 110 };
+            var preview = new MonitorLayoutView { Height = 89 };
             preview.SetTiles(ProfileLayout.Tiles(_app, profile.Layout));
             previewBox.Child = preview;
         }
         stack.Children.Add(previewBox);
 
-        var chips = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
+        var chips = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
         if (profile.Hdr != HdrMode.Unchanged) chips.Children.Add(Ui.Chip(profile.Hdr == HdrMode.On ? "HDR on" : "HDR off"));
         if (profile.Taskbar != TaskbarMode.Unchanged) chips.Children.Add(Ui.Chip(profile.Taskbar == TaskbarMode.MainOnly ? "Taskbar: main display only" : "Taskbar: every display"));
-        if (profile.Wallpapers.Count > 0) chips.Children.Add(Ui.Chip(profile.Wallpapers.Count == 1 ? "1 wallpaper" : $"{profile.Wallpapers.Count} wallpapers"));
+        if (profile.Wallpapers.Count > 0) chips.Children.Add(Ui.Chip(SimRacing.Race.RaceFormat.Count(profile.Wallpapers.Count, "wallpaper")));
         if (profile.Audio?.PlaybackName is { } speakers) chips.Children.Add(Ui.Chip("Audio: " + speakers));
         if (profile.Volume is { } vol) chips.Children.Add(Ui.Chip($"Volume {vol}%"));
         if (chips.Children.Count > 0)
             stack.Children.Add(chips);
 
-        if (!isActive)
-        {
-            var changes = _app.DisplayProfiles.Preview(profile);
-            if (changes.Count > 0)
-                stack.Children.Add(ChangesFold(changes.Select(c => (FrameworkElement)Ui.ChangeLine(c.Text, c.Area)).ToList()));
-        }
+        var changes = isActive ? new List<Display.ProfileChange>() : _app.DisplayProfiles.Preview(profile);
+        if (changes.Count > 0)
+            stack.Children.Add(ChangesFold(changes.Select(c => (FrameworkElement)Ui.ChangeLine(c.Text, c.Area)).ToList()));
+        else
+            stack.Children.Add(new TextBlock { Text = isActive ? "On now: applying it changes nothing" : "Applying it changes nothing", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(5, 9, 0, 3) });
 
-        var actions = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 6) };
         var edit = Ui.LabeledButton("I.Pencil", "Edit", () => _ = EditAsync(profile, isNew: false), "GhostButton");
-        edit.Margin = new Thickness(0, 0, 8, 8);
+        edit.Margin = new Thickness(0, 0, 6, 0);
         actions.Children.Add(edit);
-        var update = Ui.LabeledButton("I.Refresh", "Update to current", () => UpdateToCurrent(profile), "GhostButton");
-        update.ToolTip = "Save the setup that's on right now (layout, wallpapers and audio devices) into this profile";
-        update.Margin = new Thickness(0, 0, 8, 8);
-        actions.Children.Add(update);
-        var delete = Ui.LabeledButton("I.Trash", "Delete", () => _ = DeleteAsync(profile), "DangerButton");
-        delete.Margin = new Thickness(0, 0, 0, 8);
-        actions.Children.Add(delete);
-        stack.Children.Add(actions);
+        var more = Ui.IconButton("I.More", "More for this profile", () => { });
+        more.Click += (_, _) =>
+        {
+            var menu = new ContextMenu { PlacementTarget = more, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
+            Ui.DropBelow(menu);
+            var update = new MenuItem { Header = "Overwrite with current", ToolTip = "Save the setup that's on right now (layout, wallpapers and audio devices) into this profile" };
+            update.Click += (_, _) => UpdateToCurrent(profile);
+            menu.Items.Add(update);
+            menu.IsOpen = true;
+        };
+        actions.Children.Add(more);
 
+        var card = new DockPanel();
+        DockPanel.SetDock(actions, Dock.Bottom);
+        card.Children.Add(actions);
+        card.Children.Add(stack);
         return new Tile
         {
-            Style = Ui.Res<Style>("Inset"), Padding = new Thickness(14, 12, 14, 6), Child = stack,
+            Style = Ui.Res<Style>("Inset"), Padding = new Thickness(11, 10, 11, 5), Child = card, Margin = new Thickness(0, 0, CardGap, CardGap),
             BorderBrush = Ui.Res<Brush>(isActive ? "Sage" : "Line"),
         };
     }
 
+    private const double CardGap = 10, CardMinWidth = 356;
+
+    private void FitColumns(double width)
+    {
+        int count = Math.Max(1, _grid.Children.Count);
+        int columns = Math.Clamp((int)((width + CardGap) / (CardMinWidth + CardGap)), 1, Math.Min(3, count));
+        if (_grid.Columns != columns) _grid.Columns = columns;
+    }
+
     private static StackPanel ChangesFold(List<FrameworkElement> lines)
     {
-        var panel = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
-        var list = new StackPanel { Visibility = Visibility.Collapsed, Margin = new Thickness(4, 4, 0, 0) };
+        var panel = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
+        var list = new StackPanel { Visibility = Visibility.Collapsed, Margin = new Thickness(3, 3, 0, 0) };
         foreach (var line in lines) list.Children.Add(line);
-        var chevron = new Icon { Data = Ui.Res<Geometry>("I.ChevronRight"), Width = 10, Height = 10, VerticalAlignment = VerticalAlignment.Center };
+        var chevron = new Icon { Data = Ui.Res<Geometry>("I.ChevronRight"), Width = 8, Height = 8, VerticalAlignment = VerticalAlignment.Center };
         var label = new StackPanel { Orientation = Orientation.Horizontal };
         label.Children.Add(chevron);
-        label.Children.Add(new TextBlock { Text = lines.Count == 1 ? "What applying it changes (1)" : $"What applying it changes ({lines.Count})", Margin = new Thickness(7, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
-        var toggle = new Button { Style = Ui.Res<Style>("QuietButton"), Content = label, HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(6, 4, 8, 4) };
+        label.Children.Add(new TextBlock { Text = lines.Count == 1 ? "What applying it changes (1)" : $"What applying it changes ({lines.Count})", Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
+        var toggle = new Button { Style = Ui.Res<Style>("QuietButton"), Content = label, HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(5, 3, 6, 3) };
         ClickGuard.SetAllowRepeat(toggle, true);
         toggle.Click += (_, _) =>
         {
@@ -181,17 +195,24 @@ internal sealed class DisplayProfilesView : Tile
             _app.Notify("Apply your changes first", "Profiles save the setup that's actually on.", NoticeKind.Info, important: true);
             return;
         }
+        var (layout, wallpapers, audio) = (profile.Layout, profile.Wallpapers, profile.Audio);
         _app.DisplayProfiles.Recapture(profile);
         _app.DisplayProfiles.RaiseChanged();
-        _app.Notify("Profile updated", $"{profile.Name} now matches your current setup.", NoticeKind.Success);
+        _app.Notify("Profile updated", $"“{profile.Name}” now matches your current setup.", NoticeKind.Success, action: new NoticeAction("Undo", () =>
+        {
+            if (!_app.Config.Displays.Profiles.Contains(profile)) return;
+            (profile.Layout, profile.Wallpapers, profile.Audio) = (layout, wallpapers, audio);
+            _app.DisplayProfiles.RaiseChanged();
+        }));
     }
 
-    private async Task DeleteAsync(DisplayProfile profile)
+    private async Task<bool> DeleteAsync(DisplayProfile profile)
     {
         string message = "This can't be undone.";
         if (!await _window.Confirm($"Delete “{profile.Name}”?", message, "Delete", danger: true))
-            return;
+            return false;
         _app.DisplayProfiles.Remove(profile);
+        return true;
     }
 
     public void OpenNew() => SaveCurrentAsync();
@@ -205,9 +226,13 @@ internal sealed class DisplayProfilesView : Tile
 
     private async Task EditAsync(DisplayProfile profile, bool isNew)
     {
-        var editor = new DisplayProfileEditor(_app, _window, profile, isNew);
+        bool deleteAsked = false;
+        var editor = new DisplayProfileEditor(_app, _window, profile, isNew, isNew ? null : () => { deleteAsked = true; _window.CloseModal(false); }, _hasPending());
         if (!await _window.ShowModal(editor.Card))
+        {
+            if (deleteAsked && !await DeleteAsync(profile)) await EditAsync(profile, false);
             return;
+        }
         string oldName = profile.Name;
         editor.SaveInto(profile);
         if (isNew)
@@ -220,7 +245,7 @@ internal sealed class DisplayProfilesView : Tile
 
 internal sealed class DisplayProfileEditor
 {
-    private const double LabelWidth = 170;
+    private const double LabelWidth = 138;
     private readonly AppServices _app;
     private readonly DisplayProfile _profile;
     private readonly TextBox _name = new() { MaxLength = Ui.NameLength };
@@ -237,7 +262,7 @@ internal sealed class DisplayProfileEditor
 
     public Border Card { get; }
 
-    public DisplayProfileEditor(AppServices app, MainWindow window, DisplayProfile profile, bool isNew)
+    public DisplayProfileEditor(AppServices app, MainWindow window, DisplayProfile profile, bool isNew, Action? onDelete = null, bool pendingEdits = false)
     {
         _app = app;
         _profile = profile;
@@ -253,7 +278,8 @@ internal sealed class DisplayProfileEditor
         stack.Children.Add(Ui.FieldRow("Keybind", _hotkey, LabelWidth));
 
         stack.Children.Add(Ui.EditorSection("Monitors"));
-        string[] layoutOptions = isNew ? new[] { "Save this layout", "", "Don't change displays" } : new[] { "Keep saved layout", "Use current layout", "Don't change displays" };
+        string[] layoutOptions = isNew ? new[] { "Save this layout", "", "Don't change displays" }
+            : new[] { profile.Layout is null ? "" : "Keep saved layout", pendingEdits ? "" : "Use current layout", "Don't change displays" };
         var options = layoutOptions.Select((t, i) => (t, i)).Where(x => x.t.Length > 0).ToList();
         stack.Children.Add(Ui.FieldRow("Layout", Ui.Segmented(options.Select(o => o.t).ToList(), Math.Max(0, options.FindIndex(o => o.i == _layoutChoice)),
             i => _layoutChoice = options[i].i, "layout"), LabelWidth,
@@ -296,7 +322,8 @@ internal sealed class DisplayProfileEditor
         }
 
         var buttons = Ui.DialogButtons(window, isNew ? "Save profile" : "Save changes", Validate);
-        Card = Ui.Dialog(window, isNew ? "New display profile" : $"Edit “{profile.Name}”", "Applied with its keybind or from the tray.", stack, buttons, _error, 900);
+        var delete = onDelete is null ? null : Ui.LabeledButton("I.Trash", "Delete profile", onDelete, "DangerButton");
+        Card = Ui.Dialog(window, isNew ? "New display profile" : $"Edit “{profile.Name}”", "", stack, buttons, _error, 640, delete);
     }
 
     private IEnumerable<(string Key, string Name)> WallpaperMonitors()
@@ -316,11 +343,13 @@ internal sealed class DisplayProfileEditor
     private bool Validate()
     {
         var problem = _app.DisplayProfiles.Validate(_name.Text.Trim(), _hotkey.Hotkey, _profile)
-                      ?? _wallpapers.Values.Select(b => b.Text.Trim()).Where(p => p.Length > 0 && !File.Exists(p)).Select(p => $"Can't find {Path.GetFileName(p)}.").FirstOrDefault();
+                      ?? _wallpapers.Values.Select(b => WallpaperPath(b.Text)).Where(p => p.Length > 0 && !File.Exists(p)).Select(p => $"Can't find {Path.GetFileName(p)}.").FirstOrDefault();
         _error.Text = problem ?? "";
         _error.Visibility = problem is null ? Visibility.Collapsed : Visibility.Visible;
         return problem is null;
     }
+
+    internal static string WallpaperPath(string typed) => typed.Trim().Trim('"').Trim();
 
     public void SaveInto(DisplayProfile profile)
     {
@@ -331,7 +360,7 @@ internal sealed class DisplayProfileEditor
         profile.Layout = _layoutChoice switch { 1 => _current ?? profile.Layout, 2 => null, _ => profile.Layout };
         var wallpapers = profile.Wallpapers.Where(w => !_wallpapers.ContainsKey(w.Key)).ToDictionary(w => w.Key, w => w.Value, StringComparer.OrdinalIgnoreCase);
         foreach (var (key, box) in _wallpapers)
-            if (box.Text.Trim() is { Length: > 0 } path) wallpapers[key] = path;
+            if (WallpaperPath(box.Text) is { Length: > 0 } path) wallpapers[key] = path;
         profile.Wallpapers = wallpapers;
         var playback = _playback.SelectedItem as Choice;
         var recording = _recording.SelectedItem as Choice;

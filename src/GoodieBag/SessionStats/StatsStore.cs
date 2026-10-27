@@ -65,7 +65,13 @@ internal sealed class StatsStore : IDisposable
     public static StatsStore Open(string path)
     {
         if (path != ":memory:") Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        return new StatsStore(SqliteDb.Open(path));
+        var db = SqliteDb.Open(path);
+        try { return new StatsStore(db); }
+        catch
+        {
+            db.Dispose();
+            throw;
+        }
     }
 
     public SqliteDb Db => _db;
@@ -87,13 +93,27 @@ internal sealed class StatsStore : IDisposable
     {
         var replaced = new List<long>();
         var attach = new List<(long Id, SessionRow Row, int? Offset)>();
+        var renumber = new List<long>();
+        bool readLater = false;
         _db.Transaction(() =>
         {
             foreach (var (row, laps) in sessions)
             {
                 if (Match(row) is { } existing)
                 {
-                    if (existing.Source == "live" && row.Source != "live") { attach.Add((existing.Id, row, null)); continue; }
+                    if (existing.Source == "live" && row.Source != "live")
+                    {
+                        if (StillRecording(existing.Id))
+                        {
+                            readLater = true;
+                            attach.Add((existing.Id, row, null));
+                            continue;
+                        }
+                        bool took = TakeEarlierLaps(existing.Id, row, laps);
+                        if (took) renumber.Add(existing.Id);
+                        attach.Add((existing.Id, row, took ? 0 : null));
+                        continue;
+                    }
                     if (existing.Source == row.Source) { attach.Add((existing.Id, row, Merge(existing.Id, row, laps))); continue; }
                     _db.Run("DELETE FROM sessions WHERE id = ?1", existing.Id);
                     replaced.Add(existing.Id);
@@ -103,15 +123,17 @@ internal sealed class StatsStore : IDisposable
                 LinkRatings(row);
                 attach.Add((row.Id, row, 0));
             }
-            if (imported is { } f) MarkImported(f.File, f.Hash);
+            if (imported is { } f && !readLater) MarkImported(f.File, f.Hash);
         });
         foreach (var old in replaced) Traces?.DeleteSession(old);
+        RenumberTraces(renumber);
         foreach (var a in attach) AttachTraces(a.Id, a.Row, a.Offset);
     }
 
     public void Replace(IReadOnlyList<(SessionRow Row, List<LapRow> Laps)> sessions, HashSet<long> replaced)
     {
         var attach = new List<(long Id, SessionRow Row, int? Offset)>();
+        var renumber = new List<long>();
         _db.Transaction(() =>
         {
             foreach (var (row, laps) in sessions)
@@ -124,9 +146,16 @@ internal sealed class StatsStore : IDisposable
                     replaced.Add(row.Id);
                     attach.Add((row.Id, row, 0));
                 }
-                else if (existing.Source == "live") attach.Add((existing.Id, row, null));
-                else if (replaced.Add(existing.Id))
+                else if (existing.Source == "live")
                 {
+                    bool took = !StillRecording(existing.Id) && TakeEarlierLaps(existing.Id, row, laps);
+                    if (took) { renumber.Add(existing.Id); replaced.Add(existing.Id); }
+                    attach.Add((existing.Id, row, took ? 0 : null));
+                }
+                else if (replaced.Contains(existing.Id)) attach.Add((existing.Id, row, Merge(existing.Id, row, laps)));
+                else if (StartsSession(existing.Id, row))
+                {
+                    replaced.Add(existing.Id);
                     row.Id = existing.Id;
                     UpdateRow(row);
                     _db.Run("DELETE FROM laps WHERE session_id = ?1", existing.Id);
@@ -134,10 +163,50 @@ internal sealed class StatsStore : IDisposable
                     LinkRatings(row);
                     attach.Add((existing.Id, row, 0));
                 }
-                else attach.Add((existing.Id, row, Merge(existing.Id, row, laps)));
+                else attach.Add((existing.Id, row, null));
             }
         });
+        RenumberTraces(renumber);
         foreach (var a in attach) AttachTraces(a.Id, a.Row, a.Offset);
+    }
+
+    private const double SameStartSeconds = 60;
+
+    private bool StillRecording(long id) => _liveIds.Values.Any(t => t.Id == id);
+
+    private bool StartsSession(long id, SessionRow row) =>
+        _db.Scalar("SELECT start_utc FROM sessions WHERE id = ?1", id) is { } start && Unix(row.StartUtc) <= Convert.ToDouble(start) + SameStartSeconds;
+
+    internal const double SameLapSeconds = 0.05;
+
+    internal static int EarlierLaps(IReadOnlyList<double> file, IReadOnlyList<double> live)
+    {
+        if (live.Count == 0) return file.Count;
+        for (int k = 1; k + live.Count <= file.Count; k++)
+        {
+            bool same = true;
+            for (int i = 0; i < live.Count && same; i++) same = Math.Abs(file[k + i] - live[i]) <= SameLapSeconds;
+            if (same) return k;
+        }
+        return 0;
+    }
+
+    private bool TakeEarlierLaps(long id, SessionRow row, IReadOnlyList<LapRow> laps)
+    {
+        var live = _db.Query("SELECT time FROM laps WHERE session_id = ?1 ORDER BY lap", id).Select(r => Convert.ToDouble(r[0])).ToList();
+        if (EarlierLaps(laps.Select(l => l.Time).ToList(), live) == 0) return false;
+        foreach (var key in _liveIds.Where(kv => kv.Value.Id == id).Select(kv => kv.Key).ToList()) _liveIds.Remove(key);
+        var kept = _db.Query("SELECT finish_pos, finished, incidents, end_utc, garage_s FROM sessions WHERE id = ?1", id)[0];
+        row.Id = id;
+        UpdateRow(row);
+        _db.Run("""
+            UPDATE sessions SET finish_pos = COALESCE(finish_pos, ?2), finished = MAX(finished, ?3), incidents = COALESCE(MAX(incidents, ?4), incidents, ?4),
+            end_utc = MAX(end_utc, ?5), garage_s = MAX(garage_s, ?6) WHERE id = ?1
+            """, id, kept[0], kept[1], kept[2], kept[3], kept[4]);
+        _db.Run("DELETE FROM laps WHERE session_id = ?1", id);
+        InsertLaps(id, laps, 0);
+        LinkRatings(row);
+        return true;
     }
 
     public void RenumberTraces(IEnumerable<long> sessions)
@@ -184,7 +253,7 @@ internal sealed class StatsStore : IDisposable
         catch (Exception ex) { App.LogError(ex); }
     }
 
-    public void SaveLive(SessionRow row, IReadOnlyList<LapRow> newLaps)
+    public void SaveLive(SessionRow row, IReadOnlyList<LapRow> newLaps, bool ended = false)
     {
         long? replaced = null;
         int lapOffset = 0;
@@ -234,6 +303,7 @@ internal sealed class StatsStore : IDisposable
         });
         if (replaced is { } old) Traces?.DeleteSession(old);
         if (row.Id > 0) AttachTraces(row.Id, row, lapOffset);
+        if (ended) lock (_db.Gate) _liveIds.Remove(row.Key);
     }
 
     private bool SameTime(long id, SessionRow row) =>
@@ -334,7 +404,7 @@ internal sealed class StatsStore : IDisposable
     private void MergeTotals(long id, SessionRow r, int lapCount, int lapOffset = 0)
     {
         _db.Run("""
-            UPDATE sessions SET start_utc = MIN(start_utc, ?2), end_utc = MAX(end_utc, ?3), laps = laps + ?4, incidents = MAX(COALESCE(incidents, 0), COALESCE(?5, 0)),
+            UPDATE sessions SET start_utc = MIN(start_utc, ?2), end_utc = MAX(end_utc, ?3), laps = laps + ?4, incidents = COALESCE(MAX(incidents, ?5), incidents, ?5),
             start_pos = COALESCE(start_pos, ?6), finish_pos = COALESCE(?7, finish_pos), finished = MAX(finished, ?8),
             drive_s = drive_s + ?9, garage_s = garage_s + ?10, longest_stint_s = MAX(longest_stint_s, ?11), rain_s = rain_s + ?12,
             night_s = CASE WHEN night_s IS NULL AND ?13 IS NULL THEN NULL ELSE COALESCE(night_s, 0) + COALESCE(?13, 0) END,
@@ -386,7 +456,11 @@ internal sealed class StatsStore : IDisposable
         return Convert.ToHexString(sha.Hash!);
     }
 
+    public const string Unreadable = "unreadable";
+
     public bool Imported(string file) => _db.Scalar("SELECT 1 FROM imported WHERE file = ?1", file) is not null;
+
+    public bool ReadInFull(string file) => _db.Scalar("SELECT 1 FROM imported WHERE file = ?1 AND hash <> ?2", file, Unreadable) is not null;
 
     public bool HashImported(string hash) => _db.Scalar("SELECT 1 FROM imported WHERE hash = ?1", hash) is not null;
 

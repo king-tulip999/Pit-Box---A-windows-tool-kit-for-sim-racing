@@ -122,8 +122,6 @@ public static class ConfigStore
         if (config.Ui.Window is null) config.Ui.SidebarVersion = 1;
         foreach (var key in config.Ui.PageSections.Where(p => string.IsNullOrWhiteSpace(p.Value)).Select(p => p.Key).ToList()) config.Ui.PageSections.Remove(key);
         config.Ui.LandingVersion = 1;
-        if (config.Ui.InterfaceScaleVersion < 1) config.Ui.InterfaceScale = UiSettings.MigrateScale(config.Ui.InterfaceScale);
-        config.Ui.InterfaceScaleVersion = 1;
         if (config.Ui.MonitorSectionsVersion < 2) config.Ui.MonitorHiddenSections.RemoveAll(id => id is "performance" or "sensors");
         config.Ui.MonitorSectionsVersion = 2;
         config.Ui.LandingLayout ??= new();
@@ -303,7 +301,6 @@ public static class ConfigStore
     internal static AppConfig Defaults()
     {
         var config = new AppConfig();
-        config.Ui.InterfaceScaleVersion = 1;
         config.Ui.MonitorSectionsVersion = 2;
         config.Fans.PresetNamesVersion = 1;
         return config;

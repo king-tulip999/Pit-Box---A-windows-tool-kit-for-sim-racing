@@ -9,11 +9,11 @@ namespace GoodieBag.Controls;
 
 internal sealed class CollapseAllButton : Button
 {
-    private readonly Icon _chevron = new() { Width = 15, Height = 15, VerticalAlignment = VerticalAlignment.Center };
+    private readonly Icon _chevron = new() { Width = 12, Height = 12, VerticalAlignment = VerticalAlignment.Center };
     private readonly RotateTransform _turn = new(180);
     private readonly ScaleTransform _squash = new(1, 1);
-    private readonly TextBlock _label = new() { Margin = new Thickness(7, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-    private readonly TextBlock _countText = new() { FontSize = 11.5, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBlock _label = new() { Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBlock _countText = new() { VerticalAlignment = VerticalAlignment.Center };
     private readonly Border _count;
     private bool? _anyOpen;
 
@@ -26,14 +26,13 @@ internal sealed class CollapseAllButton : Button
         _chevron.Data = Ui.Res<Geometry>("I.ChevronDown");
         _chevron.RenderTransformOrigin = new Point(0.5, 0.5);
         _chevron.RenderTransform = new TransformGroup { Children = { _squash, _turn } };
-        _countText.SetResourceReference(TextBlock.ForegroundProperty, "AccentText");
+        _countText.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
         _count = new Border
         {
-            CornerRadius = ThemeManager.Round(8), Padding = new Thickness(6, 0, 6, 1), Margin = new Thickness(8, 0, 0, 0),
+            Margin = new Thickness(4, 0, 0, 0),
             VerticalAlignment = VerticalAlignment.Center, Child = _countText, RenderTransformOrigin = new Point(0.5, 0.5),
             RenderTransform = new ScaleTransform(1, 1),
         };
-        _count.SetResourceReference(Border.BackgroundProperty, "AccentSoft");
         var content = new StackPanel { Orientation = Orientation.Horizontal };
         content.Children.Add(_chevron);
         content.Children.Add(_label);
@@ -46,7 +45,7 @@ internal sealed class CollapseAllButton : Button
     public void SetOpen(int open, int total, bool animate = true)
     {
         bool anyOpen = open > 0;
-        _countText.Text = $"{open} open";
+        _countText.Text = $"({open})";
         _count.Visibility = anyOpen && total > 1 ? Visibility.Visible : Visibility.Collapsed;
         ToolTip = anyOpen ? $"Fold every panel ({open} of {total} open)" : "Open every panel";
         if (_anyOpen == anyOpen)

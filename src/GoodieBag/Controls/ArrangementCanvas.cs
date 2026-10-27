@@ -38,11 +38,11 @@ public sealed class ArrangementCanvas : Canvas
 
     public bool Animate { get; set; } = true;
 
-    public double MinFitHeight { get; set; } = 200;
+    public double MinFitHeight { get; set; } = 162;
 
-    public double MaxFitHeight { get; set; } = 440;
+    public double MaxFitHeight { get; set; } = 356;
 
-    private const double Pad = 40, MaxScale = 0.13;
+    private const double Pad = 32, MaxScale = 0.13;
 
     public ArrangementCanvas()
     {
@@ -168,13 +168,13 @@ public sealed class ArrangementCanvas : Canvas
         stack.Children.Add(new TextBlock
         {
             Text = tile.Number,
-            FontSize = 30,
+            FontSize = 24.5,
             FontWeight = FontWeights.SemiBold,
             HorizontalAlignment = HorizontalAlignment.Center,
             FontFamily = ThemeManager.DisplayFace.FontFamily,
         });
-        stack.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = tile.Name, FontSize = 11.5, HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(6, 0, 6, 0) }));
-        stack.Children.Add(new TextBlock { Text = tile.Detail, FontSize = 11.5, Opacity = 0.8, HorizontalAlignment = HorizontalAlignment.Center });
+        stack.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = tile.Name, FontSize = 9.5, HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(5, 0, 5, 0) }));
+        stack.Children.Add(new TextBlock { Text = tile.Detail, FontSize = 9.5, Opacity = 0.8, HorizontalAlignment = HorizontalAlignment.Center });
         grid.Children.Add(stack);
         if (tile.Primary)
         {
@@ -182,11 +182,11 @@ public sealed class ArrangementCanvas : Canvas
             {
                 CornerRadius = ThemeManager.Round(6),
                 Background = ThemeManager.Brush("Accent", Brushes.SlateBlue),
-                Padding = new Thickness(6, 1, 6, 2),
-                Margin = new Thickness(6),
+                Padding = new Thickness(5, 1, 5, 2),
+                Margin = new Thickness(5),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Top,
-                Child = new TextBlock { Text = "Main", FontSize = 11, Foreground = ThemeManager.Brush("OnAccent", Brushes.Black), FontWeight = FontWeights.SemiBold },
+                Child = new TextBlock { Text = "Main", FontSize = 9, Foreground = ThemeManager.Brush("OnAccent", Brushes.Black), FontWeight = FontWeights.SemiBold },
             });
         }
     }

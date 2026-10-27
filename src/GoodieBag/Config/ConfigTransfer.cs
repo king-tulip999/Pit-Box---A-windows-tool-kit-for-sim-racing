@@ -93,7 +93,7 @@ internal static class ConfigTransfer
     {
         var lines = new List<string>
         {
-            $"Theme {ThemeName(c.Ui.Theme)}, interface size {c.Ui.InterfaceScale}%, animations {(c.Ui.Animations ? "on" : "off")}",
+            $"Theme {ThemeName(c.Ui.Theme)}, animations {(c.Ui.Animations ? "on" : "off")}",
             Count(c.WindowProfiles.Profiles.Count, "window profile", "window profiles") + $" ({c.WindowProfiles.Profiles.Count(p => p.Auto)} automatic), {Count(c.WindowProfiles.Groups.Count, "group", "groups")}",
             Count(c.Displays.Profiles.Count, "display profile", "display profiles"),
             $"Fan control {(c.Fans.Enabled ? "on" : "off")}: {Count(c.Fans.Presets.Count, "preset", "presets")}, {Count(c.Fans.Curves.Count, "curve", "curves")}, {Count(c.Fans.Hardware.Count, "fan", "fans")} set up",

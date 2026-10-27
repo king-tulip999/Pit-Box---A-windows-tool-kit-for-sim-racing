@@ -1,4 +1,5 @@
 using System.Drawing;
+using Units = GoodieBag.Services.CapsUnits;
 using GoodieBag.SimRacing.FuelEngine;
 using GoodieBag.SimRacing.Race;
 using GoodieBag.SimRacing.Telemetry;
@@ -11,7 +12,7 @@ internal sealed class TimingWidget : HudWidget
     {
         HudOption.Choice("reference", "Delta to", "best", new HudChoice("best", "My best lap"), new HudChoice("session", "Session best"), new HudChoice("optimal", "My optimal lap", "Best sectors combined")),
         HudOption.Bool("bar", "Delta bar", true),
-        HudOption.Number("range", "Bar range", 1.0, 0.2, 5, 0.1, "s"),
+        HudOption.Number("range", "Bar range", 1.0, 0.2, 5, 0.1, Units.S),
         HudOption.Columns("fields", "Times", "current,last,best,predicted",
             new HudChoice("current", "Current lap"), new HudChoice("last", "Last lap"), new HudChoice("best", "My best"), new HudChoice("predicted", "Predicted lap"),
             new HudChoice("sessionBest", "Session best (all)"), new HudChoice("classBest", "Best in my class"), new HudChoice("theoretical", "Optimal lap (best sectors)")),
@@ -50,7 +51,13 @@ internal sealed class TimingWidget : HudWidget
         if (!wide) times = rest.Top(Math.Min(rest.Height, p.BoxedStatHeight()), out rest);
         p.Region("delta", deltaBlock);
         var tint = d is null ? p.Raised(0.05) : HudPalette.Mix(p.Raised(0.05), d < 0 ? p.P.Good : p.P.Danger, 0.22);
-        if (d is null) p.Fill(deltaBlock, p.Solid(tint, 130)); else p.Soft(deltaBlock, d < 0 ? p.P.Good : p.P.Danger, 75);
+        if (d is null) p.Fill(deltaBlock, p.Solid(tint, 130));
+        else
+        {
+            var state = d < 0 ? p.P.Good : p.P.Danger;
+            p.Soft(deltaBlock, state, 75, false);
+            p.Outline(deltaBlock, HudPalette.Alpha(state, 115));
+        }
         var inner = deltaBlock.Inflated(-8 * p.Density, -4 * p.Density);
         var label = inner.Top(p.LineHeight(p.Label) + 1, out var number);
         p.Text(p.LabelText(refLabel), p.Label, p.LabelColor, label, HAlign.Left, VAlign.Top);
@@ -71,7 +78,7 @@ internal sealed class TimingWidget : HudWidget
                 "current" => ("LAP", RaceFormat.LapTime(f.LapCurrent, 1), (Color?)null),
                 "last" => ("LAST", RaceFormat.LapTime(f.LapLast), LastColor(p, v)),
                 "best" => ("BEST", RaceFormat.LapTime(f.LapBest), null),
-                "predicted" => ("PREDICTED", d is { } dd && refLap is { } rl ? RaceFormat.LapTime(rl + dd) : RaceFormat.Missing, p.P.AccentText),
+                "predicted" => ("PREDICTED", d is { } dd && refLap is { } rl ? RaceFormat.LapTime(rl + dd) : RaceFormat.Missing, (Color?)null),
                 "sessionBest" => ("SESSION", RaceFormat.LapTime(FieldOrder.FastestLap(f)?.Time), p.P.Fastest),
                 "classBest" => ((f.Session.Player?.ClassName ?? "CLASS").ToUpperInvariant(), RaceFormat.LapTime(FieldOrder.FastestLap(f, f.Session.Player?.ClassId)?.Time), p.P.Fastest),
                 "theoretical" => ("OPTIMAL", RaceFormat.LapTime(LapMath.Theoretical(LapMath.BestSectors(v.Race.Laps.Laps, v.Race.Laps.SectorCount))), (Color?)null),
@@ -208,7 +215,7 @@ internal sealed class FuelWidget : HudWidget
         float top = 0;
         if (v.Options.Bool("title"))
         {
-            string sub = measured == 0 ? "measuring…" : $"{measured} clean lap{(measured == 1 ? "" : "s")} · {Confidence(estimate.Reliability)}";
+            string sub = measured == 0 ? "measuring…" : $"{RaceFormat.Count(measured, "clean lap")} · {Confidence(estimate.Reliability)}";
             p.TitleBar(new RectangleF(0, 0, bounds.Width, p.PillHeight), "Fuel", r.FuelData.EnergyUnits ? "" : sub);
             p.Region("title", new RectangleF(0, 0, bounds.Width, p.PillHeight));
             top = p.PillHeight + p.PieceGap;
@@ -225,6 +232,7 @@ internal sealed class FuelWidget : HudWidget
         Color? edge = v.Options.Bool("statusEdge") ? HudPalette.Alpha(status switch { Status.Danger => p.P.Danger, Status.Caution => p.P.Warn, _ => p.P.Good }, 170) : null;
         var area = new RectangleF(pad, top + partPad, bounds.Width - pad * 2, bounds.Height - top - partPad * 2);
         var parts = v.Options.Columns("parts");
+        float edgeTop = float.NaN, edgeBottom = 0;
         for (int i = 0; i < parts.Count; i++)
         {
             float need = Height(parts[i], p, v);
@@ -239,7 +247,8 @@ internal sealed class FuelWidget : HudWidget
             p.Item("parts", parts[i], box);
             var piece = new RectangleF(0, box.Y - partPad, bounds.Width, box.Height + partPad * 2);
             p.Panel(piece);
-            if (edge is { } c) p.Outline(piece.Inflated(-1, -1), c, 2, p.CornerRadius(4));
+            if (float.IsNaN(edgeTop)) edgeTop = piece.Y;
+            edgeBottom = piece.Bottom;
             switch (parts[i])
             {
                 case "header": HeaderLine(p, v, box, level, plan); break;
@@ -251,6 +260,7 @@ internal sealed class FuelWidget : HudWidget
             }
             area = new RectangleF(area.X, area.Y + gap, area.Width, Math.Max(0, area.Height - gap));
         }
+        if (edge is { } c && !float.IsNaN(edgeTop)) p.Outline(new RectangleF(0, edgeTop, bounds.Width, edgeBottom - edgeTop).Inflated(-1, -1), c, 2, p.CornerRadius(4));
     }
 
     private static Status StatusOf(FuelPlan? plan, double lowLaps)
@@ -357,7 +367,7 @@ internal sealed class FuelWidget : HudWidget
         float lh = p.LineHeight(p.SmallBold);
         var line = new RectangleF(box.X, box.Y, box.Width, lh);
         p.Text("TANK", p.Label, p.LabelColor, line, HAlign.Left, VAlign.Center, false);
-        string middle = RaceFormat.Fuel(level, u) + (plan is not null ? $" · {plan.LapsOfFuel:0.0} laps" : "");
+        string middle = RaceFormat.Fuel(level, u) + (plan is not null ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $" · {plan.LapsOfFuel:0.0} LAPS") : "");
         p.Text(middle, p.SmallBold, p.P.Heading, line, HAlign.Center, VAlign.Center);
         if (r.Tank is { } cap) p.Text($"{RaceFormat.Fuel(cap, u)} CAP", p.Label, p.LabelColor, line, HAlign.Right, VAlign.Center, false);
         var track = new RectangleF(box.X, line.Bottom + 2, box.Width, 6 * p.Density);
@@ -441,7 +451,7 @@ internal sealed class FuelWidget : HudWidget
                     switch (cols[c])
                     {
                         case "use": text = FuelNumber(x, u); break;
-                        case "laps": text = (level / x).ToString("0.0"); break;
+                        case "laps": text = (level / x).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture); break;
                         case "refuel":
                             if (togo is { } t)
                             {
@@ -553,7 +563,7 @@ internal sealed class FuelWidget : HudWidget
                         case "perlap": text = FuelNumber(x, u); break;
                         case "laps":
                             double laps = level / x;
-                            text = laps.ToString("0.0");
+                            text = laps.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
                             break;
                         case "refuel":
                             if (togo is { } t)
@@ -593,7 +603,7 @@ internal sealed class FuelWidget : HudWidget
         var neutral = p.Raised(0.12);
         if (plan is null) return (neutral, "MEASURING", measured == 0 ? "After 1 clean lap" : "…");
         if (plan.Reliability is EstimateReliability.Learning or EstimateReliability.Low && plan.LapsToGo is not null)
-            return (p.P.Warn, "LOW CONFIDENCE", $"{measured} clean lap{(measured == 1 ? "" : "s")}");
+            return (p.P.Warn, "LOW CONFIDENCE", $"{RaceFormat.Count(measured, "clean lap")}");
         if (plan.LapsToGo is null) return (neutral, "PER LAP", RaceFormat.Fuel(plan.PerLap, u));
         if (plan.Stops == 0) return (p.P.Good, "NO STOP · EST.", "+" + RaceFormat.Fuel(plan.Surplus ?? 0, u));
         if (plan.Stops is not { } stops) return (p.P.Danger, "SHORT · EST.", RaceFormat.Fuel(-(plan.Surplus ?? 0), u));
@@ -601,7 +611,7 @@ internal sealed class FuelWidget : HudWidget
         string many = stops > 1 ? $" · {stops} STOPS" : "";
         return plan.WindowOpensIn is <= 0
             ? (p.P.Good, "WINDOW OPEN" + many, add)
-            : (p.P.Warn, (plan.WindowOpensIn is { } o ? $"WINDOW IN {o:0.0} LAPS" : "PIT NEEDED") + many, add);
+            : (p.P.Warn, (plan.WindowOpensIn is { } o ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"WINDOW IN {o:0.0} LAPS") : "PIT NEEDED") + many, add);
     }
 
     internal static string Confidence(EstimateReliability r) => r switch
@@ -626,11 +636,11 @@ internal sealed class FuelWidget : HudWidget
             case "atflag":
                 return (id, "AT THE FLAG", plan?.AtFlag is { } at ? (at < 0 ? "−" : "") + RaceFormat.Fuel(Math.Abs(at), u) : RaceFormat.Missing,
                     plan?.AtFlag is < 0 ? p.P.DangerText : null);
-            case "laps": return (id, "LAPS LEFT", plan is null ? RaceFormat.Missing : plan.LapsOfFuel.ToString("0.0"), null);
+            case "laps": return (id, "LAPS LEFT", plan is null ? RaceFormat.Missing : plan.LapsOfFuel.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture), null);
             case "time":
                 double? pace = r.Laps.Laps.Count > 0 ? LapMath.Stats(r.Laps.Laps, 5)?.Average : f.LapBest;
                 return (id, "TIME LEFT", plan is not null && pace is { } pc ? RaceFormat.Clock(plan.LapsOfFuel * pc) : RaceFormat.Missing, null);
-            case "togo": return (id, "LAPS TO GO", plan?.LapsToGo is { } tg ? tg.ToString("0.0") : RaceFormat.Missing, null);
+            case "togo": return (id, "LAPS TO GO", plan?.LapsToGo is { } tg ? tg.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) : RaceFormat.Missing, null);
             case "tofinish": return (id, "TO FINISH", plan?.ToFinish is { } tf ? RaceFormat.Fuel(tf, u) : RaceFormat.Missing, null);
             case "surplus":
                 return (id, plan?.Surplus is < 0 ? "SHORT" : "SPARE", plan?.Surplus is { } s ? RaceFormat.Fuel(Math.Abs(s), u) : RaceFormat.Missing,
@@ -642,7 +652,7 @@ internal sealed class FuelWidget : HudWidget
                 string win = plan?.Stops switch
                 {
                     0 => "Not needed",
-                    > 0 when plan.WindowOpensIn is { } o => o <= 0 ? "Open" : $"In {o:0.0} laps",
+                    > 0 when plan.WindowOpensIn is { } o => o <= 0 ? "Open" : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"In {o:0.0} LAPS"),
                     _ => RaceFormat.Missing,
                 };
                 return (id, "PIT WINDOW", win, plan?.WindowOpensIn is <= 0 && plan.Stops > 0 ? p.P.GoodText : null);

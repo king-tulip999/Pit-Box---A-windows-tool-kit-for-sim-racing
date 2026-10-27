@@ -24,7 +24,12 @@ internal sealed class SqliteDb : IDisposable
         }
         sqlite3_busy_timeout(db, 3000);
         var conn = new SqliteDb(db);
-        conn.Exec("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;");
+        try { conn.Exec("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;"); }
+        catch
+        {
+            conn.Dispose();
+            throw;
+        }
         return conn;
     }
 
@@ -32,6 +37,7 @@ internal sealed class SqliteDb : IDisposable
     {
         lock (Gate)
         {
+            if (_db == IntPtr.Zero) throw new ObjectDisposedException(nameof(SqliteDb));
             if (sqlite3_exec(_db, sql, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero) != Ok) throw Error(sql);
         }
     }

@@ -18,6 +18,7 @@ internal sealed class PerformanceSection : UserControl, IPage
     private const int FrameCount = 300;
     private const string Consumer = "Performance page";
     private const double ChartSeconds = 120;
+    private const int StorageGraceReads = 5;
 
     private readonly AppServices _app;
     private readonly DashboardGrid _grid = new();
@@ -166,16 +167,16 @@ internal sealed class PerformanceSection : UserControl, IPage
             }))).ToList());
 
         var row = new StackPanel { Orientation = Orientation.Horizontal };
-        var label = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 10, 0) };
-        var icon = new Icon { Data = Ui.Res<Geometry>("I.Refresh"), Width = 15, Height = 15, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) };
+        var label = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(3, 0, 8, 0) };
+        var icon = new Icon { Data = Ui.Res<Geometry>("I.Refresh"), Width = 12, Height = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 5, 0) };
         icon.SetResourceReference(Icon.ForegroundProperty, "AccentText");
         label.Children.Add(icon);
         var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        texts.Children.Add(new TextBlock { Text = "Update rate", FontWeight = FontWeights.SemiBold, FontSize = 13 });
+        texts.Children.Add(new TextBlock { Text = "Sensor update rate", FontWeight = FontWeights.SemiBold, FontSize = 10.5 });
         texts.Children.Add(new TextBlock
         {
             Text = (p.Rate == SensorRate.Custom ? "Custom · " : "") + "every " + PerformanceSettings.Describe(p.IntervalMs),
-            Style = Ui.Res<Style>("Caption"), FontSize = 11.5,
+            Style = Ui.Res<Style>("Caption"), FontSize = 9.5,
         });
         label.Children.Add(texts);
         row.Children.Add(label);
@@ -204,7 +205,7 @@ internal sealed class PerformanceSection : UserControl, IPage
     private (FrameworkElement, Action<Frame>) CpuPanel(PanelSize size)
     {
         var now = new TextBlock();
-        var (stats, values) = Stats(("Load", "%"), ("Temp", "°C"), ("Clock", "GHz"));
+        var (stats, values) = Stats(("Load", "%"), ("Temp", "°C"), ("Clock", Units.GHz));
         var parts = new List<UIElement> { stats };
         Reading? power = null;
         Sparkline? spark = null;
@@ -216,7 +217,7 @@ internal sealed class PerformanceSection : UserControl, IPage
             power = new Reading("Power draw", "How much power the CPU is using, in watts. Higher under load; the label says how busy the CPU is.");
             var left = new StackPanel { Children = { power.Root } };
             cores = new CoreBars();
-            left.Children.Add(new TextBlock { Text = "Each core", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 4, 0, 4) });
+            left.Children.Add(new TextBlock { Text = "Each core", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 3, 0, 3) });
             left.Children.Add(cores.Root);
             if (size == PanelSize.Medium) left.Children.Add(Spark(out spark, "SlateDeep", "Load, last two minutes"));
             details = new Details();
@@ -285,7 +286,7 @@ internal sealed class PerformanceSection : UserControl, IPage
     private (FrameworkElement, Action<Frame>) GpuPanel(PanelSize size)
     {
         var now = new TextBlock();
-        var (stats, values) = Stats(("Load", "%"), ("Temp", "°C"), ("Clock", "MHz"));
+        var (stats, values) = Stats(("Load", "%"), ("Temp", "°C"), ("Clock", Units.MHz));
         var parts = new List<UIElement> { stats };
         Reading? hotSpot = null, power = null, fan = null, vram = null;
         LineChart? chart = null;
@@ -392,7 +393,7 @@ internal sealed class PerformanceSection : UserControl, IPage
             if (hw?.RamUsedGb is { } used && hw.RamTotalGb is { } total and > 0)
             {
                 double share = used / total;
-                ram.Show($"{used:0.0}", $"of {total:0} GB", share, share >= 0.9 ? ("Nearly full", "ApricotDeep") : share >= 0.7 ? ("Busy", "GoldDeep") : ("Plenty free", "SageDeep"), $"{share * 100:0}% in use");
+                ram.Show($"{used:0.0}", $"of {total:0.0} GB", share, share >= 0.9 ? ("Nearly full", "ApricotDeep") : share >= 0.7 ? ("Busy", "GoldDeep") : ("Plenty free", "SageDeep"), $"{share * 100:0}% in use");
                 TextCase.Set(now, $"{share * 100:0}%");
             }
             else
@@ -454,6 +455,7 @@ internal sealed class PerformanceSection : UserControl, IPage
         var view = Card("Storage", "I.HardDrive", "GoldSoft", "GoldDeep", now, parts);
         SensorTree? seen = NotRead;
         bool haveStorage = false;
+        int emptyTrees = 0;
         (string Label, string? Text)[] detailItems = Array.Empty<(string Label, string? Text)>();
         List<(string Key, string Name, string Text, double? Share)>? driveItems = null, volumeItems = null;
         return (view, f =>
@@ -478,7 +480,8 @@ internal sealed class PerformanceSection : UserControl, IPage
             {
                 seen = f.Tree;
                 var storage = f.Tree?.OfKind(DeviceKind.Storage).ToList();
-                haveStorage = storage is not null;
+                emptyTrees = storage is { Count: 0 } ? emptyTrees + 1 : 0;
+                haveStorage = storage is { Count: > 0 } || (storage is not null && emptyTrees > StorageGraceReads);
                 if (details is not null)
                 {
                     var disks = storage?.Where(d => d.Id != "/volumes").ToList();
@@ -533,7 +536,7 @@ internal sealed class PerformanceSection : UserControl, IPage
         LineChart? chart = null;
         if (size == PanelSize.Small)
         {
-            var (row, v) = Stats(("Ping", "ms"), ("Down", "Mbit/s"), ("Up", "Mbit/s"));
+            var (row, v) = Stats(("Ping", Units.Ms), ("Down", "Mbit/s"), ("Up", "Mbit/s"));
             values = v;
             parts.Add(row);
         }
@@ -550,7 +553,7 @@ internal sealed class PerformanceSection : UserControl, IPage
             parts.Add(Side(new StackPanel { Children = { ping!.Root, down!.Root, up!.Root } }, details.Root, size));
         }
         if (size == PanelSize.Large)
-            parts.Add(ChartBlock(out chart, ("Download", "AccentText", "", 0, 125_000), ("Ping", "Apricot", " ms", 0, 100)));
+            parts.Add(ChartBlock(out chart, ("Download", "AccentText", "", 0, 125_000), ("Ping", "Apricot", " " + Units.Ms, 0, 100)));
         var view = Card("Network", "I.Wifi", "SageSoft", "SageDeep", now, parts);
         Ui.Anchor(view, "monitor.network");
         return (view, f =>
@@ -571,7 +574,7 @@ internal sealed class PerformanceSection : UserControl, IPage
             if (ping is not null)
             {
                 if (net is { Connected: true, PingMs: { } p })
-                    ping.Show($"{p:0}", "ms", Math.Clamp(p / 150, 0, 1),
+                    ping.Show($"{p:0}", Units.Ms, Math.Clamp(p / 150, 0, 1),
                         p < 30 ? ("Great", "SageDeep") : p < 60 ? ("Good", "SageDeep") : p < 100 ? ("OK", "GoldDeep") : ("Laggy", "Danger"),
                         net.LossPercent is > 0 and var loss ? $"{loss:0.#}% of pings lost" : "no pings lost");
                 else if (net is { Connected: false }) ping.Unavailable("Offline");
@@ -646,13 +649,16 @@ internal sealed class PerformanceSection : UserControl, IPage
             var up = TimeSpan.FromMilliseconds(Environment.TickCount64);
             string? missing = _app.Hardware.PawnIoLikelyMissing ? "Needs PawnIO" : null;
             var items = new List<(string, string?)>();
-            foreach (var x in t.Take(size == PanelSize.Small ? 2 : 3)) items.Add((x.Name, V(x)));
+            bool listed = size == PanelSize.Large;
+            if (!listed)
+                foreach (var x in t.Take(size == PanelSize.Small ? 2 : 3)) items.Add((x.Name, V(x)));
             if (t.Count == 0) items.Add(("Temperatures", f.Tree is null ? null : missing));
             if (size >= PanelSize.Medium)
             {
                 items.Add(("Fan headers", fanHeaders.Count == 0 ? missing : $"{fanHeaders.Count(x => x.Value > 0)} spinning of {fanHeaders.Count}"));
                 var twelve = v.FirstOrDefault(x => x.Name.Contains("12V", StringComparison.OrdinalIgnoreCase));
-                items.Add(("Voltages", v.Count == 0 ? missing : $"{v.Count} rails" + (twelve?.Value is { } tv ? $" · +12V {tv:0.00} V" : "")));
+                if (!listed || v.Count == 0)
+                    items.Add(("Voltages", v.Count == 0 ? missing : $"{v.Count} rails" + (twelve?.Value is { } tv ? $" · +12V {tv:0.00} V" : "")));
             }
             items.Add(("Uptime", up.TotalDays >= 1 ? $"{(int)up.TotalDays} d {up.Hours} h" : $"{up.Hours} h {up.Minutes} m"));
             summary.Show(items.ToArray());
@@ -669,7 +675,7 @@ internal sealed class PerformanceSection : UserControl, IPage
         MeterList? list = null;
         if (size >= PanelSize.Medium)
         {
-            list = new MeterList { ItemWidth = 200 };
+            list = new MeterList { ItemWidth = 162 };
             parts.Add(list.Root);
         }
         var view = Card("Fans", "I.Fan", "GoldSoft", "GoldDeep", now, parts);
@@ -679,7 +685,8 @@ internal sealed class PerformanceSection : UserControl, IPage
             TextCase.Set(values[0], fans is null ? "–" : fans.Count(x => x.Rpm > 0 || x.Percent > 0).ToString());
             TextCase.Set(values[1], fans is null ? "–" : fans.Count.ToString());
             TextCase.Set(values[2], fans?.Max(x => x.Rpm) is { } top ? $"{top:N0}" : "–");
-            TextCase.Set(now, _app.Hardware.Catalog?.Emergency == true ? "At 100% (hot!)" : $"Preset: {_app.Config.Fans.ActivePreset}");
+            TextCase.Set(now, !(_app.FanControlAvailable && _app.Config.Fans.Enabled) ? "Fan control off"
+                : _app.Hardware.Catalog?.Emergency == true ? "At 100% (hot!)" : $"Preset: {_app.Config.Fans.ActivePreset}");
             list?.Show(fans?.Take(size == PanelSize.Large ? 32 : 6).Select(x => (x.ControlId, _app.FanName(x),
                 Join(x.HasRpm ? x.Rpm is { } r ? $"{r:N0} RPM" : "RPM –" : null, x.Controllable ? x.Percent is { } p ? $"{p:0}%" : "control –" : null),
                 x.Percent / 100.0)).ToList(),
@@ -689,8 +696,8 @@ internal sealed class PerformanceSection : UserControl, IPage
 
     private (FrameworkElement, Action<Frame>) FpsPanel(PanelSize size)
     {
-        var game = TextFit.TipWhenTrimmed(new TextBlock { Style = Ui.Res<Style>("Caption"), TextTrimming = TextTrimming.CharacterEllipsis });
-        var (stats, values) = Stats(("Now", ""), ("Average", ""), ("1% low", ""), ("Frame time", "ms"));
+        var game = TextFit.TipWhenTrimmed(new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap });
+        var (stats, values) = Stats(("Now", ""), ("Average", ""), ("1% low", ""), ("Frame time", Units.Ms));
         values[0].Foreground = Ui.Res<Brush>("SageDeep");
         var parts = new List<UIElement> { game, stats };
         LineChart? chart = null;
@@ -699,9 +706,9 @@ internal sealed class PerformanceSection : UserControl, IPage
         {
             var reset = Ui.LabeledButton("I.Refresh", "Reset FPS statistics", _app.ResetFpsStats, "GhostButton");
             reset.HorizontalAlignment = HorizontalAlignment.Left;
-            reset.Margin = new Thickness(0, 6, 0, 0);
+            reset.Margin = new Thickness(0, 5, 0, 0);
             parts.Add(reset);
-            chart = new LineChart { Height = size == PanelSize.Large ? 150 : 120, Margin = new Thickness(0, 8, 0, 0) };
+            chart = new LineChart { Height = size == PanelSize.Large ? 122 : 97, Margin = new Thickness(0, 6, 0, 0) };
             chart.Series.Add(new ChartSeries { Stroke = Ui.Res<Brush>("SageDeep"), Unit = "", Max = 60, AutoMax = true });
             parts.Add(Cap(chart, ChartMax));
         }
@@ -709,8 +716,8 @@ internal sealed class PerformanceSection : UserControl, IPage
         {
             parts.Add(Section("Frame time"));
             parts.Add(new TextBlock { Text = "Every frame, newest on the right. A flat line is smooth; spikes are stutters.", Style = Ui.Res<Style>("Caption") });
-            frames = new LineChart { Height = 120, Capacity = FrameCount, StartLabel = $"{FrameCount} frames ago", EndLabel = "latest frame", Margin = new Thickness(0, 6, 0, 0) };
-            frames.Series.Add(new ChartSeries { Stroke = Ui.Res<Brush>("Accent"), Unit = " ms", Max = 20, AutoMax = true });
+            frames = new LineChart { Height = 97, Capacity = FrameCount, StartLabel = $"{FrameCount} frames ago", EndLabel = "latest frame", Margin = new Thickness(0, 5, 0, 0) };
+            frames.Series.Add(new ChartSeries { Stroke = Ui.Res<Brush>("Accent"), Unit = " " + Units.Ms, Max = 20, AutoMax = true });
             parts.Add(Cap(frames, ChartMax));
         }
         _frameChart = frames;
@@ -750,12 +757,12 @@ internal sealed class PerformanceSection : UserControl, IPage
     private static Tile Card(string title, string icon, string soft, string deep, TextBlock? now, IEnumerable<UIElement> parts)
     {
         var stack = new StackPanel();
-        var head = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+        var head = new Grid { Margin = new Thickness(0, 0, 0, 6) };
         head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         head.ColumnDefinitions.Add(new ColumnDefinition());
         head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        head.Children.Add(Ui.Badge(icon, soft, deep, 28, 8, 15));
-        var name = TextFit.TipWhenTrimmed(new TextBlock { Text = title, Style = Ui.Res<Style>("H3"), Margin = new Thickness(10, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
+        head.Children.Add(Ui.Badge(icon, soft, deep, 22.5, 6.5, 12));
+        var name = TextFit.TipWhenTrimmed(new TextBlock { Text = title, Style = Ui.Res<Style>("H3"), Margin = new Thickness(8, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap });
         Grid.SetColumn(name, 1);
         head.Children.Add(name);
         if (now is not null)
@@ -763,32 +770,33 @@ internal sealed class PerformanceSection : UserControl, IPage
             now.Style = Ui.Res<Style>("Caption");
             now.HorizontalAlignment = HorizontalAlignment.Right;
             now.VerticalAlignment = VerticalAlignment.Center;
-            now.TextTrimming = TextTrimming.CharacterEllipsis;
+            now.TextWrapping = TextWrapping.Wrap;
+            now.TextAlignment = TextAlignment.Right;
             TextFit.TipWhenTrimmed(now);
-            now.MaxWidth = 180;
+            now.MaxWidth = 146;
             Grid.SetColumn(now, 2);
             head.Children.Add(now);
         }
         stack.Children.Add(head);
         foreach (var part in parts) stack.Children.Add(part);
-        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(16, 14, 16, 14), Child = stack };
+        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(13, 11, 13, 11), Child = stack };
     }
 
     private static (UIElement Row, TextBlock[] Values) Stats(params (string Label, string Unit)[] items)
     {
-        var row = new UniformGrid { Rows = 1, Margin = new Thickness(0, 2, 0, 4) };
+        var row = new UniformGrid { Rows = 1, Margin = new Thickness(0, 2, 0, 3) };
         var values = new TextBlock[items.Length];
         for (int i = 0; i < items.Length; i++)
         {
-            var cell = new StackPanel { Margin = new Thickness(0, 0, 8, 0) };
-            cell.Children.Add(new TextBlock { Text = items[i].Label, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.NoWrap, TextTrimming = TextTrimming.CharacterEllipsis, ToolTip = items[i].Label });
+            var cell = new StackPanel { Margin = new Thickness(0, 0, 6, 0) };
+            cell.Children.Add(new TextBlock { Text = items[i].Label, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap });
             var line = new StackPanel { Orientation = Orientation.Horizontal };
-            values[i] = new TextBlock { Text = "–", FontSize = 24, FontWeight = FontWeights.SemiBold };
+            values[i] = new TextBlock { Text = "–", FontSize = 19.5, FontWeight = FontWeights.SemiBold };
             values[i].SetResourceReference(TextBlock.ForegroundProperty, "Text");
             line.Children.Add(values[i]);
             if (items[i].Unit.Length > 0)
             {
-                var unit = new TextBlock { Text = items[i].Unit, FontSize = 12.5, Margin = new Thickness(4, 0, 0, 4), VerticalAlignment = VerticalAlignment.Bottom };
+                var unit = new TextBlock { Text = items[i].Unit, FontSize = 10, Margin = new Thickness(3, 0, 0, 3), VerticalAlignment = VerticalAlignment.Bottom };
                 unit.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
                 line.Children.Add(unit);
             }
@@ -798,9 +806,9 @@ internal sealed class PerformanceSection : UserControl, IPage
         return (Cap(row, items.Length * StatWidth), values);
     }
 
-    private static TextBlock Section(string text) => new() { Text = text, Style = Ui.Res<Style>("H3"), Margin = new Thickness(0, 10, 0, 4) };
+    private static TextBlock Section(string text) => new() { Text = text, Style = Ui.Res<Style>("H3"), Margin = new Thickness(0, 8, 0, 3) };
 
-    private const double StatWidth = 120, ReadingWidth = 260, DetailWidth = 140, ChartMax = 640, SparkMax = 360;
+    private const double StatWidth = 97, ReadingWidth = 211, DetailWidth = 113, ChartMax = 640, SparkMax = 360;
 
     private static SplitPanel Side(UIElement primary, UIElement secondary, PanelSize size, double secondaryMin = DetailWidth) =>
         new() { PrimaryWidth = ReadingWidth, SecondaryMin = secondaryMin, DropWhenNarrow = size < PanelSize.Large, Children = { primary, secondary } };
@@ -826,21 +834,21 @@ internal sealed class PerformanceSection : UserControl, IPage
 
     private static UIElement Spark(out Sparkline spark, string color, string caption)
     {
-        var stack = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+        var stack = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
         stack.Children.Add(new TextBlock { Text = caption, Style = Ui.Res<Style>("Caption") });
-        spark = new Sparkline { Height = 40, Margin = new Thickness(0, 6, 0, 0), Stroke = Ui.Res<Brush>(color), Capacity = 240, Min = 0, Max = 100 };
+        spark = new Sparkline { Height = 32, Margin = new Thickness(0, 5, 0, 0), Stroke = Ui.Res<Brush>(color), Capacity = 240, Min = 0, Max = 100 };
         stack.Children.Add(spark);
         return Cap(stack, SparkMax);
     }
 
     private static UIElement ChartBlock(out LineChart chart, (string Label, string Color, string Unit, double Min, double Max) a, (string Label, string Color, string Unit, double Min, double Max) b)
     {
-        var stack = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+        var stack = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
         var legend = new StackPanel { Orientation = Orientation.Horizontal };
         legend.Children.Add(Legend(a.Label, a.Color, false));
         legend.Children.Add(Legend(b.Label, b.Color, true));
         stack.Children.Add(legend);
-        chart = new LineChart { Height = 150, Margin = new Thickness(0, 6, 0, 0) };
+        chart = new LineChart { Height = 122, Margin = new Thickness(0, 5, 0, 0) };
         bool bits = a.Max > 1000;
         chart.Series.Add(new ChartSeries { Stroke = Ui.Res<Brush>(a.Color), Unit = a.Unit, Min = a.Min, Max = a.Max, AutoMax = bits, Format = bits ? v => NetworkMonitor.Bits(v) : null });
         chart.Series.Add(new ChartSeries { Stroke = Ui.Res<Brush>(b.Color), Unit = b.Unit, Min = b.Min, Max = b.Max });
@@ -858,13 +866,13 @@ internal sealed class PerformanceSection : UserControl, IPage
 
     private static StackPanel Legend(string label, string color, bool dashed)
     {
-        var s = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 16, 0) };
+        var s = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 13, 0) };
         s.Children.Add(new System.Windows.Shapes.Line
         {
-            X1 = 0, X2 = 16, Y1 = 6, Y2 = 6, Stroke = Ui.Res<Brush>(color), StrokeThickness = 2,
-            StrokeDashArray = dashed ? new DoubleCollection { 2, 1.5 } : null, Width = 16, Height = 12, VerticalAlignment = VerticalAlignment.Center,
+            X1 = 0, X2 = 16, Y1 = 6, Y2 = 6, Stroke = Ui.Res<Brush>(color), StrokeThickness = 1.62,
+            StrokeDashArray = dashed ? new DoubleCollection { 2, 1.5 } : null, Width = 13, Height = 10, VerticalAlignment = VerticalAlignment.Center,
         });
-        s.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(6, 0, 0, 0) });
+        s.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(5, 0, 0, 0) });
         return s;
     }
 
@@ -894,13 +902,14 @@ internal sealed class PerformanceSection : UserControl, IPage
 
     private static string F(float? v) => v is { } x ? x.ToString("0") : "–";
 
-    private static string? V(SensorReading? r) => r?.Value is { } v ? r.Format(v) : null;
+    private static string? V(SensorReading? r) => r?.Value is not { } v ? null
+        : r.Kind == SensorKind.Temperature ? $"{v:0} °C" : r.Format(v);
 
     private static string Join(params string?[] parts) => string.Join(" · ", parts.Where(p => !string.IsNullOrEmpty(p)));
 
     private sealed class CoreBars
     {
-        public UniformGrid Root { get; } = new() { Rows = 1, Height = 44 };
+        public UniformGrid Root { get; } = new() { Rows = 1, Height = 36 };
         private readonly List<Border> _bars = new();
         private readonly List<float?> _loads = new();
 
@@ -942,7 +951,7 @@ internal sealed class PerformanceSection : UserControl, IPage
 
     private sealed class Details
     {
-        public FlowPanel Root { get; } = new() { ItemWidth = DetailWidth, Margin = new Thickness(0, 6, 0, 0) };
+        public FlowPanel Root { get; } = new() { ItemWidth = DetailWidth, Margin = new Thickness(0, 5, 0, 0) };
         private readonly List<TextBlock> _values = new();
         private readonly List<string> _labels = new();
         private readonly List<bool> _missing = new();
@@ -969,9 +978,9 @@ internal sealed class PerformanceSection : UserControl, IPage
                 foreach (var (label, _) in items)
                 {
                     _labels.Add(label);
-                    var cell = new StackPanel { Margin = new Thickness(0, 0, 12, 6) };
-                    cell.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), TextTrimming = TextTrimming.CharacterEllipsis }));
-                    var value = TextFit.TipWhenTrimmed(new TextBlock { FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis });
+                    var cell = new StackPanel { Margin = new Thickness(0, 0, 10, 5) };
+                    cell.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap }));
+                    var value = TextFit.TipWhenTrimmed(new TextBlock { FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
                     value.SetResourceReference(TextBlock.ForegroundProperty, "Text");
                     cell.Children.Add(value);
                     Root.Children.Add(cell);
@@ -1022,23 +1031,23 @@ internal sealed class PerformanceSection : UserControl, IPage
                 foreach (var item in items!)
                 {
                     _keys.Add(item.Key);
-                    var grid = new Grid { Margin = new Thickness(0, 3, 20, 5) };
+                    var grid = new Grid { Margin = new Thickness(0, 2, 16, 4) };
                     grid.ColumnDefinitions.Add(new ColumnDefinition());
                     grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                     grid.RowDefinitions.Add(new RowDefinition());
                     grid.RowDefinitions.Add(new RowDefinition());
                     grid.RowDefinitions.Add(new RowDefinition());
-                    grid.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = item.Name, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 10, 0) }));
-                    var text = TextFit.TipWhenTrimmed(new TextBlock { Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap });
+                    grid.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = item.Name, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 8, 0) }));
+                    var text = TextFit.TipWhenTrimmed(new TextBlock { Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right });
                     if (TextBelow)
                     {
                         Grid.SetRow(text, 2);
                         Grid.SetColumnSpan(text, 2);
-                        text.Margin = new Thickness(0, 3, 0, 0);
+                        text.Margin = new Thickness(0, 2, 0, 0);
                     }
                     else Grid.SetColumn(text, 1);
                     grid.Children.Add(text);
-                    var bar = new Meter { Height = 5, Tiered = true, Margin = new Thickness(0, 5, 0, 0) };
+                    var bar = new Meter { Height = 4, Tiered = true, Margin = new Thickness(0, 4, 0, 0) };
                     Grid.SetRow(bar, 1);
                     Grid.SetColumnSpan(bar, 2);
                     grid.Children.Add(bar);
@@ -1059,14 +1068,14 @@ internal sealed class PerformanceSection : UserControl, IPage
 
     private sealed class Reading
     {
-        public Grid Root { get; } = new() { Margin = new Thickness(0, 4, 0, 6) };
-        private readonly TextBlock _value = new() { FontSize = 20, FontWeight = FontWeights.SemiBold };
-        private readonly TextBlock _unit = new() { FontSize = 13, Margin = new Thickness(5, 0, 0, 3), VerticalAlignment = VerticalAlignment.Bottom };
-        private readonly TextBlock _verdict = new() { FontSize = 11.5, FontWeight = FontWeights.SemiBold };
-        private readonly Tile _pill = new() { CornerRadius = ThemeManager.Round(9), Padding = new Thickness(8, 1, 8, 2), VerticalAlignment = VerticalAlignment.Center };
-        private readonly Border _track = new() { Height = 5, CornerRadius = ThemeManager.Round(2.5), Margin = new Thickness(0, 6, 0, 0) };
-        private readonly Border _fill = new() { Height = 5, CornerRadius = ThemeManager.Round(2.5), HorizontalAlignment = HorizontalAlignment.Left };
-        private readonly TextBlock _detail = TextFit.TipWhenTrimmed(new TextBlock { TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 4, 0, 0) });
+        public Grid Root { get; } = new() { Margin = new Thickness(0, 3, 0, 5) };
+        private readonly TextBlock _value = new() { FontSize = 16, FontWeight = FontWeights.SemiBold };
+        private readonly TextBlock _unit = new() { FontSize = 10.5, Margin = new Thickness(4, 0, 0, 2), VerticalAlignment = VerticalAlignment.Bottom };
+        private readonly TextBlock _verdict = new() { FontSize = 9.5, FontWeight = FontWeights.SemiBold };
+        private readonly Tile _pill = new() { CornerRadius = ThemeManager.Round(9), Padding = new Thickness(6, 1, 6, 2), VerticalAlignment = VerticalAlignment.Center };
+        private readonly Border _track = new() { Height = 4, CornerRadius = ThemeManager.Round(2.5), Margin = new Thickness(0, 5, 0, 0) };
+        private readonly Border _fill = new() { Height = 4, CornerRadius = ThemeManager.Round(2.5), HorizontalAlignment = HorizontalAlignment.Left };
+        private readonly TextBlock _detail = TextFit.TipWhenTrimmed(new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 3, 0, 0) });
         private double _share;
         public bool Steady { get; init; }
         private Visibility Gone => Steady ? Visibility.Hidden : Visibility.Collapsed;
@@ -1130,7 +1139,7 @@ internal sealed class PerformanceSection : UserControl, IPage
                 _verdict.SetResourceReference(TextBlock.ForegroundProperty, _color);
                 _fill.SetResourceReference(Border.BackgroundProperty, _color);
             }
-            _pill.Visibility = verdict.Text.Length > 0 ? Visibility.Visible : Gone;
+            _pill.Visibility = verdict.Text.Length > 0 && Alarming(verdict.Color) ? Visibility.Visible : Gone;
             if (share is { } nan && double.IsNaN(nan)) share = null;
             _share = Math.Clamp(share ?? 0, 0, 1);
             _track.Visibility = share is null ? Gone : Visibility.Visible;
@@ -1138,6 +1147,8 @@ internal sealed class PerformanceSection : UserControl, IPage
             TextCase.Set(_detail, detail ?? "");
             _detail.Visibility = detail is null && !Steady ? Visibility.Collapsed : Visibility.Visible;
         }
+
+        private static bool Alarming(string color) => color is "ApricotDeep" or "WarnDeep" or "Danger" or "DangerDeep";
 
         public void Waiting()
         {
@@ -1160,9 +1171,9 @@ internal sealed class PerformanceSection : UserControl, IPage
 
 internal sealed class SplitPanel : Panel
 {
-    public double PrimaryWidth { get; set; } = 260;
+    public double PrimaryWidth { get; set; } = 211;
     public double SecondaryMin { get; set; } = 140;
-    public double Gap { get; set; } = 20;
+    public double Gap { get; set; } = 16;
     public bool DropWhenNarrow { get; set; }
 
     private bool SideBySide(double width) => width >= PrimaryWidth + Gap + SecondaryMin;
@@ -1217,7 +1228,7 @@ internal sealed class SplitPanel : Panel
 
 internal sealed class FlowPanel : Panel
 {
-    public double ItemWidth { get; set; } = 300;
+    public double ItemWidth { get; set; } = 243;
 
     private (int Cols, double Cell) Cells(double width)
     {
@@ -1262,9 +1273,9 @@ internal sealed class FlowPanel : Panel
 
 internal sealed class DashboardGrid : Panel
 {
-    public double MinCellWidth { get; init; } = 440;
+    public double MinCellWidth { get; init; } = 356;
     public int MaxColumns { get; init; } = 3;
-    public double Gap { get; init; } = 14;
+    public double Gap { get; init; } = 11;
 
     private readonly List<Rect> _rects = new();
 

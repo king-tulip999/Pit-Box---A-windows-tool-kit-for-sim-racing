@@ -239,7 +239,7 @@ internal static class ShowcaseRunner
         {
             S.Caption("iRacing Controller", "Sim Racing Tools");
             await Stage.Rendered();
-            foreach (var tab in new[] { "Overview and Backups" })
+            foreach (var tab in new[] { "Health and backups" })
             {
                 if (Find.Shown<RadioButton>(controller).FirstOrDefault(r => Find.Is(Find.TextOf(r), tab)) is { } button)
                 {
@@ -251,12 +251,10 @@ internal static class ShowcaseRunner
             }
         }
 
-        if (await Section(sim, "tradingpaints", "Trading Paints") is not null)
+        if (await Section(sim, "companions", "Companion apps") is not null)
         {
             S.Caption("Trading Paints · Garage 61", "Sim Racing Tools");
-            await Task.Delay(700);
-            await Section(sim, "garage61", "Garage 61");
-            await Task.Delay(500);
+            await Task.Delay(1200);
         }
     }
 

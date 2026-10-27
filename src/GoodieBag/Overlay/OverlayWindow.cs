@@ -61,82 +61,34 @@ internal class OverlayWindow : Form
         base.WndProc(ref m);
     }
 
-    private IntPtr _memDc, _dib, _oldObject, _bits;
+    private readonly DibSurface _surface = new();
     private readonly PresentGuard _guard = new();
-    private Bitmap? _surface;
-    private Graphics? _graphics;
-    private Size _surfaceSize;
 
-    public Graphics Surface(Size size)
-    {
-        if (_graphics is not null && size == _surfaceSize)
-            return _graphics;
-        ReleaseSurface();
-        IntPtr screenDc = GetDC(IntPtr.Zero);
-        try
-        {
-            var info = new BITMAPINFOHEADER
-            {
-                biSize = (uint)Marshal.SizeOf<BITMAPINFOHEADER>(),
-                biWidth = size.Width,
-                biHeight = -size.Height,
-                biPlanes = 1,
-                biBitCount = 32,
-                biCompression = 0,
-            };
-            _memDc = CreateCompatibleDC(screenDc);
-            _dib = CreateDIBSection(screenDc, ref info, 0, out IntPtr bits, IntPtr.Zero, 0);
-            if (_memDc == IntPtr.Zero || _dib == IntPtr.Zero || bits == IntPtr.Zero)
-                throw new OutOfMemoryException("The overlay's drawing surface couldn't be created.");
-            _oldObject = SelectObject(_memDc, _dib);
-            _bits = bits;
-            _surface = new Bitmap(size.Width, size.Height, size.Width * 4, System.Drawing.Imaging.PixelFormat.Format32bppPArgb, bits);
-            _graphics = Graphics.FromImage(_surface);
-            _surfaceSize = size;
-            return _graphics;
-        }
-        catch
-        {
-            ReleaseSurface();
-            throw;
-        }
-        finally
-        {
-            ReleaseDC(IntPtr.Zero, screenDc);
-        }
-    }
+    public IntPtr SurfaceDc => _surface.Dc;
+
+    public Graphics Surface(Size size) => _surface.Ensure(size);
 
     public void ReleaseSurface()
     {
-        _graphics?.Dispose();
-        _graphics = null;
-        _surface?.Dispose();
-        _surface = null;
-        if (_memDc != IntPtr.Zero && _oldObject != IntPtr.Zero)
-            SelectObject(_memDc, _oldObject);
-        if (_dib != IntPtr.Zero)
-            DeleteObject(_dib);
-        if (_memDc != IntPtr.Zero)
-            DeleteDC(_memDc);
-        (_memDc, _dib, _oldObject, _bits) = (IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+        _surface.Dispose();
         _guard.Release();
-        _surfaceSize = Size.Empty;
     }
 
     public void Present(Point location, byte opacity = 255)
     {
-        if (_graphics is null)
+        if (_surface.Graphics is not { } graphics)
             return;
-        _graphics.Flush(System.Drawing.Drawing2D.FlushIntention.Sync);
-        if (_guard.Same(_bits, _surfaceSize.Width * _surfaceSize.Height * 4, location, opacity)) return;
+        graphics.Flush(System.Drawing.Drawing2D.FlushIntention.Sync);
+        var surfaceSize = _surface.Size;
+        if (_guard.Same(_surface.Bits, surfaceSize.Width * surfaceSize.Height * 4, location, opacity)) return;
         IntPtr screenDc = GetDC(IntPtr.Zero);
         try
         {
-            var size = new SIZE { cx = _surfaceSize.Width, cy = _surfaceSize.Height };
+            var size = new SIZE { cx = surfaceSize.Width, cy = surfaceSize.Height };
             var source = new POINT();
             var destination = new POINT { x = location.X, y = location.Y };
             var blend = new BLENDFUNCTION { BlendOp = 0, BlendFlags = 0, SourceConstantAlpha = opacity, AlphaFormat = 1 };
-            if (!UpdateLayeredWindow(Handle, screenDc, ref destination, ref size, _memDc, ref source, 0, ref blend, 2)) _guard.Reset();
+            if (!UpdateLayeredWindow(Handle, screenDc, ref destination, ref size, _surface.Dc, ref source, 0, ref blend, 2)) _guard.Reset();
         }
         finally
         {
@@ -174,17 +126,6 @@ internal class OverlayWindow : Form
     [StructLayout(LayoutKind.Sequential)] private struct POINT { public int x, y; }
     [StructLayout(LayoutKind.Sequential)] private struct SIZE { public int cx, cy; }
 
-    [StructLayout(LayoutKind.Sequential)]
-    private struct BITMAPINFOHEADER
-    {
-        public uint biSize;
-        public int biWidth, biHeight;
-        public ushort biPlanes, biBitCount;
-        public uint biCompression, biSizeImage;
-        public int biXPelsPerMeter, biYPelsPerMeter;
-        public uint biClrUsed, biClrImportant;
-    }
-
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     private struct BLENDFUNCTION
     {
@@ -193,12 +134,6 @@ internal class OverlayWindow : Form
 
     [DllImport("user32.dll")] private static extern IntPtr GetDC(IntPtr hWnd);
     [DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDc);
-    [DllImport("gdi32.dll")] private static extern IntPtr CreateCompatibleDC(IntPtr hDc);
-    [DllImport("gdi32.dll")] private static extern bool DeleteDC(IntPtr hDc);
-    [DllImport("gdi32.dll")] private static extern IntPtr SelectObject(IntPtr hDc, IntPtr obj);
-    [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr obj);
-    [DllImport("gdi32.dll")]
-    private static extern IntPtr CreateDIBSection(IntPtr hdc, ref BITMAPINFOHEADER info, uint usage, out IntPtr bits, IntPtr section, uint offset);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool UpdateLayeredWindow(IntPtr hWnd, IntPtr hdcDst, ref POINT pptDst, ref SIZE psize,

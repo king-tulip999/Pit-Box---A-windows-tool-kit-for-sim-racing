@@ -76,7 +76,7 @@ public sealed class RaceHudSettings
 
     public static string SessionKind(string session) => string.Equals(session, "Warmup", StringComparison.OrdinalIgnoreCase) ? "Practice" : session;
 
-    public static readonly string[] RemovedKinds = { "radar", "blindspot", "spotter", "h2h", "pit", "inputs", "flags", "dash", "trackmap" };
+    public static readonly string[] RemovedKinds = { "radar", "blindspot", "spotter", "h2h", "pit", "inputs", "flags", "dash", "trackmap", "radio", "spotterbox" };
 
     public string? ToggleHotkey { get; set; }
     public string? EditHotkey { get; set; }
@@ -153,10 +153,13 @@ public sealed class RaceHudSettings
     public string UniqueName(string wanted)
     {
         wanted = string.IsNullOrWhiteSpace(wanted) ? "Layout" : wanted.Trim();
-        string name = wanted;
-        for (int n = 2; Layout(name) is not null; n++) name = $"{wanted} {n}";
+        string name = Fit(wanted, "");
+        for (int n = 2; Layout(name) is not null; n++) name = Fit(wanted, $" {n}");
         return name;
     }
+
+    private static string Fit(string name, string suffix) =>
+        (name.Length + suffix.Length > Views.Ui.NameLength ? name[..(Views.Ui.NameLength - suffix.Length)].TrimEnd() : name) + suffix;
 
     public void Normalize(Func<List<HudLayout>> defaults, Func<List<HudLayoutRule>> defaultRules)
     {
@@ -324,6 +327,7 @@ public sealed class HudLayoutRule
     public string? Track { get; set; }
     public string? Class { get; set; }
 
+    [System.Text.Json.Serialization.JsonIgnore]
     public int Specificity => (Session is null ? 0 : 1) + (Car is null ? 0 : 1) + (Track is null ? 0 : 1) + (Class is null ? 0 : 1);
 
     public int ExactFields(string car, string track, string carClass) =>
@@ -361,7 +365,7 @@ public sealed class HudAppearance
 
     public HudDensity Density { get; set; } = HudDensity.Compact;
 
-    public int Corner { get; set; } = 6;
+    public int Corner { get; set; }
 
     public bool ReducedMotion { get; set; }
 
@@ -421,18 +425,18 @@ public sealed class HudAlertSetting
 
 public sealed class HudCustomColors
 {
-    public string Background { get; set; } = "#0A0A0B";
-    public string Surface { get; set; } = "#1C1C1F";
-    public string Text { get; set; } = "#F2F2F3";
+    public string Background { get; set; } = "#0A0D16";
+    public string Surface { get; set; } = "#151B2B";
+    public string Text { get; set; } = "#E9ECF5";
     public string Heading { get; set; } = "#FFFFFF";
-    public string Muted { get; set; } = "#9C9CA2";
-    public string Lines { get; set; } = "#45454B";
-    public string Accent { get; set; } = "#3B82F6";
-    public string YourRow { get; set; } = "#EAB308";
-    public string YourRowText { get; set; } = "#FCD34D";
-    public string Good { get; set; } = "#22C55E";
-    public string Warn { get; set; } = "#F59E0B";
-    public string Danger { get; set; } = "#EF4444";
+    public string Muted { get; set; } = "#8A93AB";
+    public string Lines { get; set; } = "#2B3348";
+    public string Accent { get; set; } = "#DB156B";
+    public string YourRow { get; set; } = "#DB156B";
+    public string YourRowText { get; set; } = "#FFFFFF";
+    public string Good { get; set; } = "#3DD68C";
+    public string Warn { get; set; } = "#F5B53D";
+    public string Danger { get; set; } = "#E5484D";
     public string FastestLap { get; set; } = "#B06BFF";
     public string Lapping { get; set; } = "#F87171";
     public string Lapped { get; set; } = "#60A5FA";

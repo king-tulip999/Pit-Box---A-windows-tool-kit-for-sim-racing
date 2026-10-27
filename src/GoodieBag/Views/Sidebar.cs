@@ -9,13 +9,13 @@ using GoodieBag.Theme;
 
 namespace GoodieBag.Views;
 
-internal sealed record SidebarPage(string Key, string Title, string Icon, (string Soft, string Deep) Colors);
+internal sealed record SidebarPage(string Key, string Title, string Icon);
 
 internal sealed class Sidebar : Border
 {
-    public const double PanelWidth = 264;
+    public const double PanelWidth = 214;
 
-    private const double RowHeight = 60, SubRowHeight = 52, Indent = 14, IconSize = 48, SubIconSize = 48, TextSize = 17, SubTextSize = 15.5, PictureWidth = 2.5;
+    private const double RowHeight = 49, SubRowHeight = 32, Indent = 11, IconSize = 39, SubIconSize = 22, TextSize = 14, SubTextSize = 13, PictureWidth = 2;
 
     public event Action<string>? PageClicked;
     public event Action<string, string>? SectionClicked;
@@ -23,7 +23,7 @@ internal sealed class Sidebar : Border
     public event Action<string, IReadOnlyList<string>>? SectionsMoved;
 
     private readonly StackPanel _pages = new();
-    private readonly StackPanel _footer = new() { Margin = new Thickness(8, 6, 8, 8) };
+    private readonly StackPanel _footer = new() { Margin = new Thickness(6, 5, 6, 6) };
     private readonly ScrollViewer _scroll;
     private readonly Dictionary<string, Group> _groups = new(StringComparer.OrdinalIgnoreCase);
     private readonly DragList _pageDrag;
@@ -47,25 +47,24 @@ internal sealed class Sidebar : Border
         public required Border Bar;
         public required NavIcon Icon;
         public required TextBlock Text;
-        public required (string Soft, string Deep) Colors;
-        public bool Selected, Hover;
+        public bool Selected, Hover, HasChild;
         public bool Sub;
     }
 
     public Sidebar()
     {
         Width = PanelWidth;
-        BorderThickness = new Thickness(1);
+        Hairline.Frame(this);
         SetResourceReference(BackgroundProperty, "SidebarBg");
         SetResourceReference(BorderBrushProperty, "Line");
         SetResourceReference(CornerRadiusProperty, "R.Card");
-        _scroll = new ScrollViewer { Style = Ui.Res<Style>("PageScroll"), Content = _pages, Focusable = false, Padding = new Thickness(8), HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        _scroll = new ScrollViewer { Style = Ui.Res<Style>("PageScroll"), Content = _pages, Focusable = false, Padding = new Thickness(6), HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         var root = new Grid();
         root.RowDefinitions.Add(new RowDefinition());
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.Children.Add(_scroll);
-        var line = new Border { Height = 1, Margin = new Thickness(12, 0, 12, 0) };
+        var line = Hairline.Rule(new Border { Margin = new Thickness(10, 0, 10, 0) });
         line.SetResourceReference(BackgroundProperty, "Line");
         Grid.SetRow(line, 1);
         root.Children.Add(line);
@@ -78,11 +77,11 @@ internal sealed class Sidebar : Border
 
     private Group MakeGroup(SidebarPage p, Func<bool> dragging)
     {
-        var row = MakeRow(p.Title, p.Icon, p.Colors, RowHeight, IconSize, sub: false);
+        var row = MakeRow(p.Title, p.Icon, RowHeight, IconSize, sub: false);
         row.Box.MouseLeftButtonUp += (_, e) => { if (!dragging()) { e.Handled = true; PageClicked?.Invoke(p.Key); } };
         OnActivate(row.Box, () => PageClicked?.Invoke(p.Key));
         var subList = new StackPanel();
-        var guide = new Border { BorderThickness = new Thickness(1, 0, 0, 0), Margin = new Thickness(Indent, 2, 0, 6), Padding = new Thickness(4, 0, 0, 0), Child = subList };
+        var guide = Hairline.Frame(new Border { Margin = new Thickness(Indent, 2, 0, 6), Padding = new Thickness(3, 0, 0, 0), Child = subList }, Sides.Left);
         guide.SetResourceReference(BorderBrushProperty, "Line");
         var subHost = new Border { ClipToBounds = true, Child = guide, Visibility = Visibility.Collapsed };
         var group = new Group { Page = p, Row = row, SubHost = subHost, SubList = subList };
@@ -112,17 +111,17 @@ internal sealed class Sidebar : Border
         _footer.Children.Clear();
         if (searchHost.Parent is Panel oldHost) oldHost.Children.Remove(searchHost);
         if (searchButton.Parent is Panel oldButton) oldButton.Children.Remove(searchButton);
-        searchHost.Margin = new Thickness(0, 2, 0, 6);
+        searchHost.Margin = new Thickness(0, 2, 0, 5);
         _footer.Children.Add(searchHost);
         var line = new DockPanel { LastChildFill = true };
         if (themeButton is not null)
         {
-            themeButton.Margin = new Thickness(4, 0, 0, 0);
+            themeButton.Margin = new Thickness(3, 0, 0, 0);
             themeButton.VerticalAlignment = VerticalAlignment.Center;
             DockPanel.SetDock(themeButton, Dock.Right);
             line.Children.Add(themeButton);
         }
-        searchButton.Margin = new Thickness(6, 0, 0, 0);
+        searchButton.Margin = new Thickness(5, 0, 0, 0);
         searchButton.VerticalAlignment = VerticalAlignment.Center;
         DockPanel.SetDock(searchButton, Dock.Right);
         line.Children.Add(searchButton);
@@ -140,9 +139,10 @@ internal sealed class Sidebar : Border
         foreach (var (k, group) in _groups)
         {
             bool selected = string.Equals(k, key, StringComparison.OrdinalIgnoreCase);
-            group.Row.Selected = selected;
-            Paint(group.Row);
             var info = selected || allOpen && k != _settingsKey ? sectionsOf(k) : null;
+            group.Row.Selected = selected;
+            group.Row.HasChild = selected && info is { Sections.Count: > 1 };
+            Paint(group.Row);
             if (info is not null) FillSections(group, info.Sections, selected ? info.Current : null, info.Movable);
             SetOpen(group, info is { Sections.Count: > 1 }, animate);
         }
@@ -164,7 +164,7 @@ internal sealed class Sidebar : Border
             foreach (var section in sections)
             {
                 var id = section.Id;
-                var row = MakeRow(section.Title, section.Icon, section.Colors, SubRowHeight, SubIconSize, sub: true);
+                var row = MakeRow(section.Title, section.Icon, SubRowHeight, SubIconSize, sub: true);
                 row.Box.MouseLeftButtonUp += (_, e) => { if (!drag.Dragging) { e.Handled = true; SectionClicked?.Invoke(page, id); } };
                 OnActivate(row.Box, () => SectionClicked?.Invoke(page, id));
                 group.SubRows[id] = row;
@@ -221,17 +221,16 @@ internal sealed class Sidebar : Border
         };
     }
 
-    private Row MakeRow(string title, string icon, (string Soft, string Deep) colors, double height, double iconSize, bool sub)
+    private Row MakeRow(string title, string icon, double height, double iconSize, bool sub)
     {
-        var bar = new Border { Width = 3, HorizontalAlignment = HorizontalAlignment.Left, Visibility = Visibility.Hidden };
-        bar.SetResourceReference(BackgroundProperty, colors.Deep);
+        var bar = new Border { Width = 2, HorizontalAlignment = HorizontalAlignment.Left, Visibility = Visibility.Hidden };
+        bar.SetResourceReference(BackgroundProperty, "Accent");
         double iconWidth = NavIcon.IsPicture(icon) ? iconSize * PictureWidth : iconSize;
-        var glyph = new NavIcon { Glyph = icon, Width = iconWidth, Height = iconSize, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(sub ? 4 : 6, 0, sub ? 8 : 10, 0), IsActive = true };
-        glyph.SetResourceReference(NavIcon.ForegroundProperty, colors.Deep);
+        var glyph = new NavIcon { Glyph = icon, Width = iconWidth, Height = iconSize, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(sub ? 8 : 5, 0, sub ? 10 : 8, 0) };
         var text = TextFit.TipWhenTrimmed(new TextBlock
         {
             Text = title, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis,
-            FontSize = sub ? SubTextSize : TextSize, FontWeight = sub ? FontWeights.Normal : FontWeights.SemiBold, Margin = new Thickness(0, 0, 8, 0),
+            FontSize = sub ? SubTextSize : TextSize, FontWeight = sub ? FontWeights.Normal : FontWeights.SemiBold, Margin = new Thickness(0, 0, 6, 0),
         });
         var line = new DockPanel { LastChildFill = true };
         line.Children.Add(glyph);
@@ -247,7 +246,7 @@ internal sealed class Sidebar : Border
         box.SetResourceReference(CornerRadiusProperty, "R.Control");
         AutomationProperties.SetName(box, title);
         KeyboardNavigation.SetIsTabStop(box, true);
-        var row = new Row { Box = box, Bar = bar, Icon = glyph, Text = text, Colors = colors, Sub = sub };
+        var row = new Row { Box = box, Bar = bar, Icon = glyph, Text = text, Sub = sub };
         box.MouseEnter += (_, _) => { row.Hover = true; Paint(row); };
         box.MouseLeave += (_, _) => { row.Hover = false; Paint(row); };
         box.GotKeyboardFocus += (_, _) => { row.Hover = true; Paint(row); };
@@ -259,27 +258,16 @@ internal sealed class Sidebar : Border
 
     private static void Paint(Row row)
     {
-        row.Bar.Visibility = row.Selected ? Visibility.Visible : Visibility.Hidden;
-        if (row.Selected) row.Box.SetResourceReference(BackgroundProperty, row.Colors.Soft);
+        bool filled = row.Selected && !row.HasChild;
+        row.Bar.Visibility = filled ? Visibility.Visible : Visibility.Hidden;
+        if (filled) row.Box.SetResourceReference(BackgroundProperty, "AccentSoft");
         else if (row.Hover) row.Box.SetResourceReference(BackgroundProperty, "Hover");
         else row.Box.Background = Brushes.Transparent;
-        row.Text.SetResourceReference(TextBlock.ForegroundProperty, row.Selected ? row.Colors.Deep : row.Hover ? "Heading" : row.Sub ? "TextMuted" : "Text");
+        string tone = row.Selected ? "Accent" : row.Hover ? "Heading" : "TextMuted";
+        row.Text.SetResourceReference(TextBlock.ForegroundProperty, tone);
+        row.Icon.SetResourceReference(NavIcon.ForegroundProperty, tone);
         row.Text.FontWeight = row.Selected || !row.Sub ? FontWeights.SemiBold : FontWeights.Normal;
-    }
-
-    public void SetSide(bool right)
-    {
-        foreach (var bar in AllRows().Select(r => r.Bar))
-            bar.HorizontalAlignment = right ? HorizontalAlignment.Right : HorizontalAlignment.Left;
-    }
-
-    private IEnumerable<Row> AllRows()
-    {
-        foreach (var group in _groups.Values)
-        {
-            yield return group.Row;
-            foreach (var row in group.SubRows.Values) yield return row;
-        }
+        row.Icon.IsActive = row.Selected || row.Hover;
     }
 
     private sealed class DragList

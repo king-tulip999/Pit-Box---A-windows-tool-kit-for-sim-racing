@@ -1,4 +1,5 @@
 using GoodieBag.Config;
+using Units = GoodieBag.Services.CapsUnits;
 using GoodieBag.SimRacing.Race;
 using GoodieBag.SimRacing.Telemetry;
 
@@ -101,11 +102,11 @@ internal static class HudChannels
     {
         ChannelUnit.Speed => RaceFormat.SpeedUnit(u),
         ChannelUnit.Temp => u == HudUnits.Imperial ? "°F" : "°C",
-        ChannelUnit.Pressure => u == HudUnits.Imperial ? "psi" : "kPa",
+        ChannelUnit.Pressure => u == HudUnits.Imperial ? Units.Psi : Units.KPa,
         ChannelUnit.Fuel => RaceFormat.FuelUnit(u),
-        ChannelUnit.Seconds => "s",
+        ChannelUnit.Seconds => Units.S,
         ChannelUnit.Percent => "%",
-        ChannelUnit.Rpm => "rpm",
+        ChannelUnit.Rpm => Units.Rpm,
         ChannelUnit.G => "g",
         ChannelUnit.Degrees => "°",
         _ => "",

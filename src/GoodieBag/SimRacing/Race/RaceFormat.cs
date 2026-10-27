@@ -1,5 +1,6 @@
 using System.Globalization;
 using GoodieBag.Config;
+using Units = GoodieBag.Services.CapsUnits;
 using GoodieBag.SimRacing.Telemetry;
 
 namespace GoodieBag.SimRacing.Race;
@@ -8,7 +9,10 @@ internal static class RaceFormat
 {
     public const string Missing = "–";
 
-    public static string Count(long n, string word) => $"{n} {word}{(n == 1 ? "" : "s")}";
+    public static string Count(long n, string word) => n.ToString("N0", Inv) + " " + (n == 1 ? word : Plural(word));
+
+    public static string Plural(string word) =>
+        word.EndsWith("s", StringComparison.Ordinal) || word.EndsWith("x", StringComparison.Ordinal) || word.EndsWith("ch", StringComparison.Ordinal) || word.EndsWith("sh", StringComparison.Ordinal) ? word + "es" : word + "s";
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
     public static string LapTime(double? seconds, int decimals = 3)
@@ -82,18 +86,18 @@ internal static class RaceFormat
     }
 
     public static string Speed(double metresPerSecond, HudUnits u) =>
-        u == HudUnits.Imperial ? $"{metresPerSecond * 2.23694:0} mph" : $"{metresPerSecond * 3.6:0} km/h";
+        u == HudUnits.Imperial ? $"{metresPerSecond * 2.23694:0} {Units.Mph}" : $"{metresPerSecond * 3.6:0} {Units.Kmh}";
 
     public static string SpeedKph(double kph, HudUnits u) =>
-        u == HudUnits.Imperial ? $"{kph / 1.609344:0} mph" : $"{kph:0} km/h";
+        u == HudUnits.Imperial ? $"{kph / 1.609344:0} {Units.Mph}" : $"{kph:0} {Units.Kmh}";
 
     public static double SpeedValue(double metresPerSecond, HudUnits u) => u == HudUnits.Imperial ? metresPerSecond * 2.23694 : metresPerSecond * 3.6;
 
-    public static string SpeedUnit(HudUnits u) => u == HudUnits.Imperial ? "mph" : "km/h";
+    public static string SpeedUnit(HudUnits u) => u == HudUnits.Imperial ? Units.Mph : Units.Kmh;
 
     public static double FuelValue(double litres, HudUnits u) => u == HudUnits.Imperial ? litres / 3.785411784 : litres;
 
-    public static string FuelUnit(HudUnits u) => u == HudUnits.Imperial ? "gal" : "L";
+    public static string FuelUnit(HudUnits u) => u == HudUnits.Imperial ? Units.Gal : Units.L;
 
     public static string Fuel(double? litres, HudUnits u)
     {
@@ -111,11 +115,11 @@ internal static class RaceFormat
     public static string Pressure(double? kpa, HudUnits u)
     {
         if (kpa is not { } p || !double.IsFinite(p) || p <= 0) return Missing;
-        return u == HudUnits.Imperial ? $"{p * 0.145038:0.0} psi" : $"{p:0} kPa";
+        return u == HudUnits.Imperial ? $"{p * 0.145038:0.0} {Units.Psi}" : $"{p:0} {Units.KPa}";
     }
 
     public static string Distance(double metres, HudUnits u) =>
-        u == HudUnits.Imperial ? $"{metres * 3.28084:0} ft" : $"{metres:0} m";
+        u == HudUnits.Imperial ? $"{metres * 3.28084:0} {Units.Ft}" : $"{metres:0} {Units.M}";
 
     public static string Gear(int? gear) => gear switch { null => Missing, -1 => "R", 0 => "N", { } g => g.ToString(Inv) };
 
@@ -132,8 +136,8 @@ internal static class RaceFormat
 
     public static string Wetness(int? w) => w switch
     {
-        null => Missing,
-        <= 1 => "Dry",
+        null or <= 0 => Missing,
+        1 => "Dry",
         2 => "Mostly dry",
         3 => "Very lightly wet",
         4 => "Lightly wet",
@@ -144,12 +148,13 @@ internal static class RaceFormat
 
     public static string Pos(int position) => position > 0 ? "P" + position.ToString(Inv) : Missing;
 
+    private static readonly string[] CompassPoints = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
+
     public static string Compass(double? radians)
     {
         if (radians is not { } r || !double.IsFinite(r)) return Missing;
-        string[] points = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
         double deg = (r * 180 / Math.PI % 360 + 360) % 360;
-        return points[(int)Math.Round(deg / 45) % 8];
+        return CompassPoints[(int)Math.Round(deg / 45) % 8];
     }
 
     public static string License(string lic) => lic.StartsWith("Rookie", StringComparison.OrdinalIgnoreCase) ? "R" + lic[6..] : lic;

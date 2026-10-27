@@ -7,7 +7,7 @@ internal sealed class DisplaysPlugin : Plugin
 {
     public override string Id => PluginIds.Displays;
     public override string Name => "Displays";
-    public override string Description => "Display profiles (monitors, arrangement, HDR, taskbar, wallpapers, audio) with keybinds, and the live arrangement.";
+    public override string Description => "Switch monitors, arrangement, HDR, wallpapers and audio in one click.";
     public override string Icon => "I.Monitor";
     public override (string Soft, string Deep) Colors => ("SlateSoft", "SlateDeep");
     public override int Order => 40;
@@ -37,7 +37,7 @@ internal sealed class DisplaysPlugin : Plugin
     public override string? Status(AppServices app)
     {
         int profiles = app.Config.Displays.Profiles.Count;
-        return $"{profiles} display profile{(profiles == 1 ? "" : "s")}";
+        return $"{SimRacing.Race.RaceFormat.Count(profiles, "display profile")}";
     }
 
     protected override void OnStart(AppServices app) { }

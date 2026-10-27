@@ -11,8 +11,11 @@ internal static class HudSheet
 {
     public const string Arg = "--hud-sheet";
 
+    public static bool Running { get; private set; }
+
     public static void Run(App app, string folder)
     {
+        Running = true;
         try
         {
             Directory.CreateDirectory(folder);
@@ -73,8 +76,8 @@ internal static class HudSheet
             {
                 var config = new HudWidgetConfig { Id = "sheet-" + def.Kind, Kind = def.Kind, W = w, H = h };
                 foreach (var (key, value) in options) config.Options[key] = value;
-                using var bitmap = new Bitmap((int)Math.Round(w * scale), (int)Math.Round(h * scale), System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
-                using (var g = Graphics.FromImage(bitmap))
+                using var surface = new GoodieBag.Overlay.DibSurface();
+                var g = surface.Ensure(new Size((int)Math.Round(w * scale), (int)Math.Round(h * scale)));
                 {
                     painter.Simulated = true;
                     painter.MarkSimulated = false;
@@ -82,8 +85,10 @@ internal static class HudSheet
                     painter.Begin(g, scale, new SizeF((float)w, (float)h), palette, settings.Appearance);
                     var view = new HudView { Frame = race.Frame, Race = race, Settings = settings, Config = config, Options = new HudOptions(def, config), Def = def };
                     def.Create().Draw(painter, view);
+                    painter.FinishPanels();
+                    painter.End(surface.Dc, surface.Size);
                 }
-                bitmap.Save(path);
+                surface.Bitmap!.Save(path);
             }
         }
     }

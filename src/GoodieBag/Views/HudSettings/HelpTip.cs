@@ -10,11 +10,11 @@ internal static class HelpTip
 {
     public static FrameworkElement For(string text, string? name = null)
     {
-        var icon = new Icon { Data = Ui.Res<Geometry>("I.Info"), Width = 13, Height = 13 };
+        var icon = new Icon { Data = Ui.Res<Geometry>("I.Info"), Width = 11, Height = 11 };
         icon.SetResourceReference(Control.ForegroundProperty, "TextFaint");
         var box = new Border
         {
-            Child = icon, Padding = new Thickness(3), Margin = new Thickness(4, 0, 0, 0), Background = Brushes.Transparent,
+            Child = icon, Padding = new Thickness(2), Margin = new Thickness(3, 0, 0, 0), Background = Brushes.Transparent,
             VerticalAlignment = VerticalAlignment.Center, Cursor = Cursors.Help, Focusable = true, ToolTip = text,
             FocusVisualStyle = Ui.Res<Style>("FocusRing"),
         };

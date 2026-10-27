@@ -14,16 +14,16 @@ internal static class ChangelogDialog
 {
     public static Task Show(MainWindow window, UpdateService updates, Version? since, bool justUpdated)
     {
-        var body = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
-        var loading = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 12, 0, 12) };
-        loading.Children.Add(new LoadingSpinner(22) { Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center });
+        var body = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
+        var loading = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 10, 0, 10) };
+        loading.Children.Add(new LoadingSpinner(18) { Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center });
         loading.Children.Add(new TextBlock { Text = "Loading the release notes…", Style = Ui.Res<Style>("Muted"), VerticalAlignment = VerticalAlignment.Center });
         body.Children.Add(loading);
 
         string page = UpdateService.ReleasesPage;
         var buttons = new StackPanel();
         var github = Ui.LabeledButton("I.ChevronRight", "Open on GitHub", () => Ui.OpenUrl(page));
-        github.Margin = new Thickness(0, 0, 8, 0);
+        github.Margin = new Thickness(0, 0, 6, 0);
         var close = new Button { Content = "Close", Style = Ui.Res<Style>("PrimaryButton"), IsDefault = true };
         close.Click += (_, _) => window.CloseModal(false);
         buttons.Children.Add(github);
@@ -33,7 +33,7 @@ internal static class ChangelogDialog
         string subtitle = justUpdated
             ? (since is { } from ? $"Goodie Bag {UpdateService.Tag(from)} → {UpdateService.Tag(updates.Installed)}" : $"Goodie Bag {UpdateService.Tag(updates.Installed)}")
             : "Every release up to the one you have, newest first.";
-        var shown = window.ShowModal(Ui.Dialog(window, title, subtitle, body, buttons, null, 640));
+        var shown = window.ShowModal(Ui.Dialog(window, title, subtitle, body, buttons, null, 518));
         close.Focus();
         _ = Fill(body, updates, since, justUpdated, url => page = url);
         return shown;
@@ -65,12 +65,12 @@ internal static class ChangelogDialog
 
     private static StackPanel Release(ReleaseInfo release, bool first)
     {
-        var stack = new StackPanel { Margin = new Thickness(0, first ? 0 : 22, 0, 0) };
+        var stack = new StackPanel { Margin = new Thickness(0, first ? 0 : 18, 0, 0) };
         string when = release.Published is { } at ? " · " + Dates.Date(at.ToLocalTime()) : "";
         stack.Children.Add(new TextBlock { Text = UpdateService.Tag(release.Version) + when, Style = Ui.Res<Style>("H3") });
         var lines = PlainText(release.Notes);
         if (lines.Count == 0)
-            stack.Children.Add(new TextBlock { Text = "No notes for this release.", Style = Ui.Res<Style>("Muted"), Margin = new Thickness(0, 6, 0, 0) });
+            stack.Children.Add(new TextBlock { Text = "No notes for this release.", Style = Ui.Res<Style>("Muted"), Margin = new Thickness(0, 5, 0, 0) });
         foreach (var line in lines) stack.Children.Add(Line(line));
         return stack;
     }
@@ -78,11 +78,11 @@ internal static class ChangelogDialog
     private static FrameworkElement Line(ReleaseLine line)
     {
         if (line.Kind == ReleaseLineKind.Heading)
-            return new TextBlock { Text = line.Text, Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 12, 0, 2), TextWrapping = TextWrapping.Wrap };
+            return new TextBlock { Text = line.Text, Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 10, 0, 2), TextWrapping = TextWrapping.Wrap };
         if (line.Kind == ReleaseLineKind.Text)
-            return new TextBlock { Text = line.Text, Style = Ui.Res<Style>("Body"), Margin = new Thickness(0, 6, 0, 0) };
+            return new TextBlock { Text = line.Text, Style = Ui.Res<Style>("Body"), Margin = new Thickness(0, 5, 0, 0) };
         var row = new Grid { Margin = new Thickness(line.Indent * 16, 4, 0, 0) };
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(16) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(13) });
         row.ColumnDefinitions.Add(new ColumnDefinition());
         row.Children.Add(new TextBlock { Text = "•", Style = Ui.Res<Style>("Muted") });
         var text = new TextBlock { Text = line.Text, Style = Ui.Res<Style>("Body") };

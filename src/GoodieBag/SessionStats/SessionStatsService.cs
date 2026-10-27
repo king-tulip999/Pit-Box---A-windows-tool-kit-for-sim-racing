@@ -111,7 +111,7 @@ internal sealed class SessionStatsService : IDisposable
         if (ReferenceEquals(_app.Telemetry.FrameObserver, _observer)) _app.Telemetry.FrameObserver = null;
         if (!_app.Demo) _app.Telemetry.Release(Consumer);
         lock (_feedGate)
-            if (_live.Finish() is { } last) Queue(store => store.SaveLive(last.Row, last.Laps));
+            if (_live.Finish() is { } last) Queue(store => store.SaveLive(last.Row, last.Laps, ended: true));
         _importCancel?.Cancel();
         bool stillImporting = _import is { } import && !import.Join(4000);
         if (stillImporting) _disposeAfterImport = true;
@@ -134,7 +134,7 @@ internal sealed class SessionStatsService : IDisposable
         lock (_feedGate)
         {
             if (_live.Feed(frame, DateTime.UtcNow) is { } ended)
-                Queue(store => store.SaveLive(ended.Row, ended.Laps));
+                Queue(store => store.SaveLive(ended.Row, ended.Laps, ended: true));
         }
     }
 
@@ -215,6 +215,7 @@ internal sealed class SessionStatsService : IDisposable
         var store = Store;
         var traceStore = Traces;
         try { ImportCore(folder, traces, retention, cancel); }
+        catch (Exception ex) { App.LogError(ex); }
         finally
         {
             Foreground();
@@ -267,7 +268,7 @@ internal sealed class SessionStatsService : IDisposable
         finally
         {
             SetProgress(null);
-            try { if (!cancel.IsCancellationRequested && Traces is { } prune) prune.Prune(retention, DateTime.UtcNow, null); }
+            try { if (!cancel.IsCancellationRequested && Traces is { } prune) prune.Prune(Retention, DateTime.UtcNow, null); }
             catch (Exception ex) { App.LogError(ex); }
             if (_rescan && _started)
             {
@@ -291,7 +292,7 @@ internal sealed class SessionStatsService : IDisposable
 
     private void ImportAll(StatsStore store, string folder, bool traces, HashSet<string> done, CancellationToken cancel)
     {
-        bool simRunning = _app.Telemetry.Status != SimStatus.NotRunning;
+        bool simRunning = _app.Telemetry.Status != SimStatus.NotRunning || Processes.AppWatcher.IsRunningNow(TelemetryService.SimProcess);
         var todo = new DirectoryInfo(folder).EnumerateFiles("*.ibt")
             .Where(f => !store.Imported(f.Name))
             .Where(f => !simRunning || DateTime.UtcNow - f.LastWriteTimeUtc > TimeSpan.FromMinutes(2))
@@ -320,13 +321,13 @@ internal sealed class SessionStatsService : IDisposable
             catch (Exception ex)
             {
                 App.LogError(new InvalidOperationException($"Couldn't import {file.Name}.", ex));
-                try { store.MarkImported(file.Name, "unreadable"); } catch { }
+                try { store.MarkImported(file.Name, StatsStore.Unreadable); } catch { }
             }
             SetProgress((i + 1, todo.Count));
         }
     }
 
-    private const string RereadKey = "recorder_reread", RereadVersion = "line-dip-pit-exit";
+    private const string RereadKey = "recorder_reread", RereadVersion = "line-dip-pit-exit-early-laps";
 
     private void Reread(StatsStore store, string folder, bool traces, TraceRetention retention, CancellationToken cancel)
     {

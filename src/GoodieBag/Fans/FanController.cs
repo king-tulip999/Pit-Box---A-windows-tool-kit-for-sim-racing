@@ -20,9 +20,11 @@ internal sealed class FanController : IDisposable
     private readonly Dictionary<string, ISensor> _controls = new();
     private readonly Dictionary<string, ISensor?> _rpmForControl = new();
     private readonly Dictionary<string, ISensor> _temps = new();
+    private readonly Dictionary<string, IHardware> _tempDevice = new();
     private readonly Dictionary<string, WriteState> _written = new();
     private readonly Dictionary<string, string> _errors = new();
     private readonly Dictionary<string, int> _handBack = new();
+    private readonly HashSet<string> _handBackThrew = new();
     private readonly Dictionary<string, CurveState> _curveState = new();
     private readonly Dictionary<string, long> _spinUntil = new();
     private readonly Dictionary<string, float> _overrides = new();
@@ -45,6 +47,10 @@ internal sealed class FanController : IDisposable
     public IReadOnlyDictionary<string, CurveLive> LiveCurves { get; private set; } = new Dictionary<string, CurveLive>();
 
     public event Action<string, string>? Problem;
+
+    public Func<IHardware, bool> DeviceStale { get; set; } = _ => false;
+
+    public bool Restored => _restored;
 
     private sealed class WriteState
     {
@@ -93,7 +99,7 @@ internal sealed class FanController : IDisposable
     {
         _settings = settings;
         foreach (var hw in computer.Hardware)
-            Index(hw);
+            Index(hw, hw);
     }
 
     public void Reindex(IComputer computer)
@@ -104,10 +110,11 @@ internal sealed class FanController : IDisposable
         _amd.Clear();
         _rpmForControl.Clear();
         _temps.Clear();
+        _tempDevice.Clear();
         _monitorOnly.Clear();
         _names.Clear();
         foreach (var hw in computer.Hardware)
-            Index(hw);
+            Index(hw, hw);
 
         foreach (var id in _written.Keys.Concat(_handBack.Keys).Distinct().ToList())
         {
@@ -144,17 +151,21 @@ internal sealed class FanController : IDisposable
                 _spinUntil.Remove(id);
                 _errors.Remove(id);
                 _handBack.Remove(id);
+                _handBackThrew.Remove(id);
             }
         }
     }
 
-    private void Index(IHardware hw)
+    private void Index(IHardware hw, IHardware device)
     {
         foreach (var sensor in hw.Sensors)
         {
             string id = sensor.Identifier.ToString();
             if (sensor.SensorType == SensorType.Temperature)
+            {
                 _temps[id] = sensor;
+                _tempDevice[id] = device;
+            }
 
             if (sensor.SensorType == SensorType.Control && sensor.Control is not null)
             {
@@ -177,7 +188,7 @@ internal sealed class FanController : IDisposable
             }
         }
         foreach (var sub in hw.SubHardware)
-            Index(sub);
+            Index(sub, device);
     }
 
     private AmdFanCurve? AmdFor(IHardware hw)
@@ -334,7 +345,7 @@ internal sealed class FanController : IDisposable
             _scratchIds.Add(id);
         foreach (var id in _scratchIds)
         {
-            if (targets.ContainsKey(id)) _handBack.Remove(id);
+            if (targets.ContainsKey(id)) { _handBack.Remove(id); _handBackThrew.Remove(id); }
             else RetryHandBack(id);
         }
 
@@ -358,13 +369,21 @@ internal sealed class FanController : IDisposable
         return null;
     }
 
-    internal static bool StopTested(FanHardware hw) => !hw.IsPump && hw.Calibration is { StopPercent: not null, StartPercent: not null };
+    internal static bool StopTested(FanHardware hw) => !hw.IsPump && hw.Calibration is { StopPercent: { } stop, StartPercent: { } start } && start > stop;
 
     internal static bool CanStop(FanHardware hw) => hw.AllowStop && StopTested(hw);
 
-    internal static int? StopAt(FanHardware hw) => CanStop(hw) ? Math.Clamp(hw.StopPercent ?? hw.Calibration!.StopPercent!.Value, 0, 100) : null;
+    public const int StopLimit = 50;
 
-    internal static int StartAt(FanHardware hw) => Math.Clamp(hw.StartPercent ?? hw.Calibration?.StartPercent ?? 0, 0, 100);
+    public const int UncalibratedFloor = 20;
+
+    internal static int Lowest(FanHardware hw) =>
+        CanStop(hw) ? 0 : hw.Calibration is { MinStablePercent: > 0 } cal ? cal.MinStablePercent : UncalibratedFloor;
+
+    internal static int? StopAt(FanHardware hw) => CanStop(hw) ? Math.Clamp(hw.StopPercent ?? hw.Calibration!.StopPercent!.Value, 0, StopLimit) : null;
+
+    internal static int StartAt(FanHardware hw) => Math.Clamp(
+        CanStop(hw) && hw.Calibration?.StartPercent is { } tested ? Math.Max(hw.StartPercent ?? 0, tested) : hw.StartPercent ?? hw.Calibration?.StartPercent ?? 0, 0, 100);
 
     internal static float Drive(float target, FanHardware hw, FanDrive state, double dt, double now)
     {
@@ -374,8 +393,10 @@ internal sealed class FanController : IDisposable
         int floor = min;
         if (hw.Calibration is { MinStablePercent: > 0 } cal)
             floor = Math.Min(max, Math.Max(floor, cal.MinStablePercent));
+        floor = Math.Min(max, Math.Max(floor, Lowest(hw)));
 
-        bool stop = StopAt(hw) is { } stopAt && (state.Stopped ? target < stopAt + RestartMargin : target <= stopAt);
+        float? stopAt = StopAt(hw) is { } chosen ? Math.Min(chosen, max - RestartMargin - 1) : null;
+        bool stop = stopAt is { } at && (state.Stopped ? target < at + RestartMargin : target <= at);
         float wanted = stop ? floor : Math.Clamp(target, floor, max);
         float running = wanted;
         if (state.Value is { } prev)
@@ -403,13 +424,14 @@ internal sealed class FanController : IDisposable
         return now < state.StartUntil ? Math.Min(max, Math.Max(running, start)) : running;
     }
 
-    public void RestoreAll()
+    public bool RestoreAll()
     {
-        if (!Monitor.TryEnter(_restoreGate, 6000)) return;
+        if (!Monitor.TryEnter(_restoreGate, 6000)) return false;
         try
         {
             if (!_restored) RestoreCore();
             _restored = true;
+            return true;
         }
         finally { Monitor.Exit(_restoreGate); }
     }
@@ -463,8 +485,7 @@ internal sealed class FanController : IDisposable
                 break;
 
             case FanCurveType.Graph:
-                temp = curve.SensorId is not null && _temps.TryGetValue(curve.SensorId, out var sensor) ? sensor.Value : null;
-                if (temp is { } t && float.IsNaN(t)) temp = null;
+                temp = curve.SensorId is not null ? Temp(curve.SensorId) : null;
                 if (temp is not null && curve.Points.Count > 0)
                 {
                     var state = _curveState.TryGetValue(curve.Name, out var s) ? s : _curveState[curve.Name] = new CurveState();
@@ -511,6 +532,11 @@ internal sealed class FanController : IDisposable
         return output;
     }
 
+    private float? Temp(string id) =>
+        _temps.TryGetValue(id, out var sensor) && !DeviceStale(_tempDevice[id]) && sensor.Value is { } v && Plausible(v) ? v : null;
+
+    internal static bool Plausible(float celsius) => float.IsFinite(celsius) && celsius > -40 && celsius < 150;
+
     internal static float Interpolate(List<CurvePoint> points, float temp) =>
         Interpolate(points.OrderBy(p => p.Temp).ToArray(), temp);
 
@@ -544,7 +570,7 @@ internal sealed class FanController : IDisposable
         foreach (var curve in settings.Curves)
         {
             if (curve.Type == FanCurveType.Graph && curve.SensorId is not null)
-                Watch(_temps.TryGetValue(curve.SensorId, out var s) ? s.Value : null);
+                Watch(Temp(curve.SensorId));
         }
         float hottest = best ?? 0;
         float limit = Math.Clamp(settings.EmergencyTempC, 70, 105);
@@ -646,7 +672,7 @@ internal sealed class FanController : IDisposable
                 if (HandBackPending(sensor) == true) _handBack.TryAdd(id, 0);
             }
         }
-        catch (Exception ex) { _errors[id] = ex.Message; }
+        catch (Exception ex) { _errors[id] = ex.Message; _handBack.TryAdd(id, 0); _handBackThrew.Add(id); }
         _written.Remove(id);
     }
 
@@ -664,14 +690,14 @@ internal sealed class FanController : IDisposable
         {
             if (_amd.TryGetValue(id, out var amd))
                 pending = amd.Restore() is not null;
-            else if (_controls.TryGetValue(id, out var sensor) && sensor.Control is { } control && HandBackPending(sensor) == true)
+            else if (_controls.TryGetValue(id, out var sensor) && sensor.Control is { } control && (_handBackThrew.Remove(id) || HandBackPending(sensor) == true))
             {
-                control.SetSoftware(control.SoftwareValue);
+                if (HandBackPending(sensor) == true) control.SetSoftware(control.SoftwareValue);
                 HandBack(sensor);
                 pending = HandBackPending(sensor) == true;
             }
         }
-        catch (Exception ex) { _errors[id] = ex.Message; pending = true; }
+        catch (Exception ex) { _errors[id] = ex.Message; pending = true; _handBackThrew.Add(id); }
         if (!pending)
         {
             _handBack.Remove(id);
@@ -684,6 +710,7 @@ internal sealed class FanController : IDisposable
         else if (tries >= HandBackGiveUp)
         {
             _handBack.Remove(id);
+            _handBackThrew.Remove(id);
             _errors[id] = "couldn't hand it back to the BIOS / driver; switch fan control off and on, or restart, to try again";
         }
     }

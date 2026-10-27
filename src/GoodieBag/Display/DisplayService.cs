@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using GoodieBag.Config;
+using GoodieBag.Services;
 using static GoodieBag.Display.Ccd;
 
 namespace GoodieBag.Display;
@@ -81,7 +82,7 @@ internal sealed class DisplayService : IDisposable
             Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
     }
 
-    private void OnDisplaySettingsChanged(object? sender, EventArgs e) => Invalidate();
+    private void OnDisplaySettingsChanged(object? sender, EventArgs e) => NotifyChanged();
 
     public void Dispose()
     {
@@ -299,12 +300,12 @@ internal sealed class DisplayService : IDisposable
             var dm = mode;
             uint flags = Gdi.CDS_UPDATEREGISTRY | Gdi.CDS_NORESET | (e.Primary ? Gdi.CDS_SET_PRIMARY : 0);
             int r = Gdi.ChangeDisplaySettingsEx(m.GdiName!, ref dm, IntPtr.Zero, flags, IntPtr.Zero);
-            if (r < 0)
+            if (r < 0 || r == Gdi.DISP_CHANGE_RESTART)
                 problems.Add($"{m.Name}: {Gdi.Describe(r)}");
         }
 
         int apply = Gdi.ChangeDisplaySettingsEx(null, IntPtr.Zero, IntPtr.Zero, 0, IntPtr.Zero);
-        if (apply < 0)
+        if (apply < 0 || apply == Gdi.DISP_CHANGE_RESTART)
             problems.Add(Gdi.Describe(apply));
 
         NotifyChanged();
@@ -455,7 +456,7 @@ internal sealed class DisplayService : IDisposable
             return new DisplaySnapshot
             {
                 Paths = "demo:" + string.Join(";", active.Select(m => $"{m.Key},{m.X},{m.Y},{m.Width},{m.Height},{m.Hz},{m.Rotation}")),
-                Summary = active.Select(m => $"{m.Name} · {m.Width}×{m.Height} · {m.Hz} Hz").ToList(),
+                Summary = active.Select(m => $"{m.Name} · {m.Width}×{m.Height} · {m.Hz} {Units.Hz}").ToList(),
                 TargetDevicePaths = active.Select(m => m.Key).ToList(),
             };
         }

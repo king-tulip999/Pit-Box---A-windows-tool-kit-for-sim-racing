@@ -41,7 +41,7 @@ internal sealed class ArrangeList
         var order = _getOrder();
         var slots = order.Where(id => items.Any(i => i.Id == id)).Concat(items.Select(i => i.Id).Where(id => !order.Contains(id)))
             .Select(id => new PanelSlot { Id = id }).ToList();
-        var grid = new PanelGrid(slots, () => _setOrder(slots.Select(s => s.Id).ToList())) { Editing = Editing, RowHeight = 2, Gap = 8, MinColumns = 1 };
+        var grid = new PanelGrid(slots, () => _setOrder(slots.Select(s => s.Id).ToList())) { Editing = Editing, RowHeight = 2, Gap = 6, MinColumns = 1 };
         for (int i = 0; i < items.Count; i++)
         {
             var (id, label, build) = items[i];

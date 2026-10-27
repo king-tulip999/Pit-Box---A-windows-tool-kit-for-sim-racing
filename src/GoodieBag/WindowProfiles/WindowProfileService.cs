@@ -13,7 +13,7 @@ internal sealed class WindowProfileService : IDisposable
 {
     private const string Consumer = "Window profiles";
     private readonly AppServices _app;
-    private readonly Dictionary<string, CancellationTokenSource> _watchers = new();
+    private readonly Dictionary<string, (IntPtr Window, CancellationTokenSource Hold, WindowProfile Placed)> _watchers = new();
     private readonly object _gate = new();
     private bool _watching;
 
@@ -43,10 +43,11 @@ internal sealed class WindowProfileService : IDisposable
     public void Refresh()
     {
         if (!Active) StopWatching();
-        var ids = S.Profiles.Select(p => p.Id).ToHashSet();
+        var now = S.Profiles.GroupBy(p => p.Id).ToDictionary(g => g.Key, g => g.First());
         lock (_gate)
-            foreach (var id in _watchers.Keys.Where(id => !ids.Contains(id)).ToList())
-                if (_watchers.Remove(id, out var stale)) stale.Cancel();
+            foreach (var (id, held) in _watchers.ToList())
+                if (!now.TryGetValue(id, out var profile) || !SamePlace(profile, held.Placed))
+                    if (_watchers.Remove(id, out var stale)) stale.Hold.Cancel();
         var names = Automatic.Select(p => p.ProcessName).ToList();
         if (!_app.Demo && names.Count > 0)
         {
@@ -59,6 +60,10 @@ internal sealed class WindowProfileService : IDisposable
             _watching = false;
         }
     }
+
+    internal static bool SamePlace(WindowProfile a, WindowProfile b) =>
+        Same(a.ProcessName, b.ProcessName) && a.X == b.X && a.Y == b.Y && a.Width == b.Width && a.Height == b.Height
+        && a.RemoveBorders == b.RemoveBorders && a.HideTitleBar == b.HideTitleBar;
 
     public WindowProfile? FindProfile(string name) => S.Profiles.FirstOrDefault(p => Same(p.Name, name));
 
@@ -80,7 +85,13 @@ internal sealed class WindowProfileService : IDisposable
 
     public void ApplyKey(string hotkey)
     {
-        bool group = S.Groups.Any(g => Hotkeys.Hotkey.SameKey(g.Hotkey, hotkey));
+        var groups = S.Groups.Where(g => Hotkeys.Hotkey.SameKey(g.Hotkey, hotkey)).ToList();
+        bool group = groups.Count > 0;
+        if (groups.Count == 1 && !S.Profiles.Any(p => Hotkeys.Hotkey.SameKey(p.Hotkey, hotkey)))
+        {
+            _ = ApplyGroupAsync(groups[0]);
+            return;
+        }
         var profiles = S.Profiles.Where(p => Hotkeys.Hotkey.SameKey(p.Hotkey, hotkey))
             .Concat(S.Groups.Where(g => Hotkeys.Hotkey.SameKey(g.Hotkey, hotkey)).SelectMany(S.Members))
             .Distinct().ToList();
@@ -130,12 +141,13 @@ internal sealed class WindowProfileService : IDisposable
         {
             for (int attempt = 0; ; attempt++)
             {
+                if (!Active) return WindowApplyResult.Failed;
                 var r = Win32.PerMonitor(() => ApplyOnce(snapshot, watch));
                 if (r != WindowApplyResult.NoWindow || !retry || attempt >= 2) return r;
                 await Task.Delay(5000);
             }
         });
-        if (!quiet)
+        if (!quiet && Active)
         {
             if (Problem(profile, result) is { } problem) _app.Notify($"“{profile.Label}” not applied", problem, NoticeKind.Warning);
             else _app.Notify($"“{profile.Label}” applied", $"{profile.ProcessName}: {Describe(profile)}.", NoticeKind.Success);
@@ -149,20 +161,28 @@ internal sealed class WindowProfileService : IDisposable
     private WindowApplyResult ApplyOnce(WindowProfile p, bool watch)
     {
         var pids = ProcessIds(p.ProcessName);
-        foreach (int pid in pids)
-        {
-            if (Win32.LargestWindow(pid) is not { } hwnd) continue;
-            var result = MoveAndCheck(hwnd, p);
-            if (result == WindowApplyResult.Applied && watch) Watch(hwnd, pid, p);
-            return result;
-        }
-        if (Win32.PidByTitle(p.Name) is { } titled && Win32.LargestWindow(titled) is { } byTitle)
-        {
-            var result = MoveAndCheck(byTitle, p);
-            if (result == WindowApplyResult.Applied && watch) Watch(byTitle, titled, p);
-            return result;
-        }
-        return pids.Count == 0 ? WindowApplyResult.NotRunning : WindowApplyResult.NoWindow;
+        if (pids.Count == 0) return WindowApplyResult.NotRunning;
+        if (Win32.LargestWindow(pids) is { } found)
+            return MoveAndHold(found.Window, found.Pid, p, watch);
+        if (Win32.PidByTitle(p.Name) is { } titled && Win32.LargestWindow(new[] { titled }) is { } byTitle)
+            return MoveAndHold(byTitle.Window, titled, p, watch);
+        return WindowApplyResult.NoWindow;
+    }
+
+    private WindowApplyResult MoveAndHold(IntPtr hwnd, int pid, WindowProfile p, bool watch)
+    {
+        StopHolding(hwnd);
+        var target = Target(hwnd, p);
+        var result = MoveAndCheck(hwnd, p, target);
+        if (result == WindowApplyResult.Applied && watch) Watch(hwnd, pid, p, target);
+        return result;
+    }
+
+    private void StopHolding(IntPtr hwnd)
+    {
+        lock (_gate)
+            foreach (var id in _watchers.Where(w => w.Value.Window == hwnd).Select(w => w.Key).ToList())
+                if (_watchers.Remove(id, out var held)) held.Hold.Cancel();
     }
 
     private static List<int> ProcessIds(string processName)
@@ -174,11 +194,10 @@ internal sealed class WindowProfileService : IDisposable
         return ids;
     }
 
-    private static WindowApplyResult MoveAndCheck(IntPtr hwnd, WindowProfile p)
+    private static WindowApplyResult MoveAndCheck(IntPtr hwnd, WindowProfile p, (int X, int Y, int W, int H) target)
     {
         Win32.Restore(hwnd);
         if (p.RemoveBorders) Win32.RemoveBorders(hwnd);
-        var target = Target(hwnd, p);
         if (!Win32.MoveWindow(hwnd, target.X, target.Y, target.W, target.H, true))
             return Marshal.GetLastWin32Error() == 5 ? WindowApplyResult.AccessDenied : WindowApplyResult.Failed;
         if (p.RemoveBorders) Win32.HideUwpTitleBar(hwnd);
@@ -194,13 +213,14 @@ internal sealed class WindowProfileService : IDisposable
         return (p.X, p.Y, w, h);
     }
 
-    private void Watch(IntPtr hwnd, int pid, WindowProfile p)
+    private void Watch(IntPtr hwnd, int pid, WindowProfile p, (int X, int Y, int W, int H) target)
     {
         var cts = new CancellationTokenSource();
         lock (_gate)
         {
-            if (_watchers.Remove(p.Id, out var old)) old.Cancel();
-            _watchers[p.Id] = cts;
+            if (!Active) { cts.Dispose(); return; }
+            if (_watchers.Remove(p.Id, out var old)) old.Hold.Cancel();
+            _watchers[p.Id] = (hwnd, cts, p);
         }
         _ = Task.Run(async () =>
         {
@@ -213,8 +233,8 @@ internal sealed class WindowProfileService : IDisposable
                     if (Win32.IsIconic(hwnd)) continue;
                     Win32.PerMonitor(() =>
                     {
-                        if (Win32.Rect(hwnd) != Target(hwnd, p))
-                            MoveAndCheck(hwnd, p);
+                        if (Win32.Rect(hwnd) != target)
+                            MoveAndCheck(hwnd, p, target);
                         return 0;
                     });
                 }
@@ -224,7 +244,7 @@ internal sealed class WindowProfileService : IDisposable
             {
                 lock (_gate)
                 {
-                    if (_watchers.TryGetValue(p.Id, out var current) && current == cts) _watchers.Remove(p.Id);
+                    if (_watchers.TryGetValue(p.Id, out var current) && current.Hold == cts) _watchers.Remove(p.Id);
                 }
                 cts.Dispose();
             }
@@ -233,7 +253,7 @@ internal sealed class WindowProfileService : IDisposable
 
     private void OnProgramStarted(string name)
     {
-        if (_app.Demo) return;
+        if (_app.Demo || _app.Watcher.CatchingUp) return;
         foreach (var p in Automatic.Where(p => AppWatcher.Normalize(p.ProcessName) == name).ToList())
             _ = ApplyWhenStartedAsync(p);
     }
@@ -257,10 +277,7 @@ internal sealed class WindowProfileService : IDisposable
     public static (int X, int Y, int W, int H)? CurrentRect(string processName) =>
         Win32.PerMonitor<(int, int, int, int)?>(() =>
         {
-            foreach (int pid in ProcessIds(processName))
-                if (Win32.LargestWindow(pid) is { } hwnd)
-                    return Win32.Rect(hwnd);
-            return null;
+            return Win32.LargestWindow(ProcessIds(processName)) is { } found ? Win32.Rect(found.Window) : null;
         });
 
     public static List<(string Process, string Title)> ProgramsWithWindows() => Win32.TitledWindows()
@@ -277,7 +294,7 @@ internal sealed class WindowProfileService : IDisposable
     {
         lock (_gate)
         {
-            foreach (var cts in _watchers.Values) cts.Cancel();
+            foreach (var held in _watchers.Values) held.Hold.Cancel();
             _watchers.Clear();
         }
     }
@@ -295,6 +312,8 @@ internal sealed class WindowProfileService : IDisposable
     {
         private const int GWL_STYLE = -16, GWL_EXSTYLE = -20;
         private const long WS_VISIBLE = 0x10000000, WS_THICKFRAME = 0x00040000, WS_DLGFRAME = 0x00400000, WS_BORDER = 0x00800000;
+        private const long WS_EX_TOOLWINDOW = 0x80;
+        private const int DWMWA_CLOAKED = 14;
         private const long WS_EX_DLGMODALFRAME = 0x1, WS_EX_WINDOWEDGE = 0x100, WS_EX_CLIENTEDGE = 0x200, WS_EX_STATICEDGE = 0x20000;
         private const uint SWP_NOSIZE = 0x1, SWP_NOMOVE = 0x2, SWP_NOZORDER = 0x4, SWP_NOACTIVATE = 0x10, SWP_FRAMECHANGED = 0x20, SWP_NOOWNERZORDER = 0x200, SWP_NOSENDCHANGING = 0x400;
         private static readonly IntPtr PerMonitorAwareV2 = new(-4);
@@ -319,6 +338,7 @@ internal sealed class WindowProfileService : IDisposable
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassNameW(IntPtr hwnd, StringBuilder name, int max);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowTextW(IntPtr hwnd, StringBuilder text, int max);
         [DllImport("user32.dll")] private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
+        [DllImport("dwmapi.dll")] private static extern int DwmGetWindowAttribute(IntPtr hwnd, int attribute, out int value, int size);
 
         public static T PerMonitor<T>(Func<T> work)
         {
@@ -350,20 +370,26 @@ internal sealed class WindowProfileService : IDisposable
             return GetWindowTextW(hwnd, sb, sb.Capacity) > 0 ? sb.ToString() : "";
         }
 
-        public static IntPtr? LargestWindow(int pid)
+        public static (IntPtr Window, int Pid)? LargestWindow(IReadOnlyCollection<int> pids)
         {
             IntPtr best = IntPtr.Zero;
-            long bestArea = -1;
+            int bestPid = 0;
+            long bestArea = 0;
             EnumWindows((hwnd, _) =>
             {
-                if (Pid(hwnd) != pid || !Visible(hwnd)) return true;
+                int pid = Pid(hwnd);
+                if (!pids.Contains(pid) || !Visible(hwnd) || IsToolWindow(hwnd) || IsCloaked(hwnd)) return true;
                 var r = Rect(hwnd);
                 long area = (long)r.W * r.H;
-                if (area > bestArea) { bestArea = area; best = hwnd; }
+                if (area > bestArea) { bestArea = area; best = hwnd; bestPid = pid; }
                 return true;
             }, IntPtr.Zero);
-            return best == IntPtr.Zero ? null : best;
+            return best == IntPtr.Zero ? null : (best, bestPid);
         }
+
+        private static bool IsToolWindow(IntPtr hwnd) => (GetWindowLongPtr(hwnd, GWL_EXSTYLE).ToInt64() & WS_EX_TOOLWINDOW) != 0;
+
+        private static bool IsCloaked(IntPtr hwnd) => DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, out int cloaked, sizeof(int)) == 0 && cloaked != 0;
 
         public static int? PidByTitle(string name)
         {

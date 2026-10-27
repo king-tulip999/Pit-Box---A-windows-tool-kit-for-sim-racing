@@ -5,7 +5,7 @@ namespace GoodieBag.Controls;
 
 public sealed class KnobOffset : IValueConverter
 {
-    public const double Travel = 18;
+    public const double Travel = 15;
 
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => value is true ? Travel : 0.0;
 

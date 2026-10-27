@@ -20,10 +20,12 @@ public sealed class WindowProfileSettings
 
     public IEnumerable<WindowProfile> Members(WindowGroup group) => Profiles.Where(p => p.GroupId == group.Id);
 
+    [System.Text.Json.Serialization.JsonIgnore]
     public IEnumerable<WindowProfile> Ungrouped => Profiles.Where(p => p.GroupId is null);
 
     public WindowGroup? GroupOf(WindowProfile p) => p.GroupId is null ? null : Groups.FirstOrDefault(g => g.Id == p.GroupId);
 
+    [System.Text.Json.Serialization.JsonIgnore]
     public IEnumerable<string> Names => Profiles.Select(p => p.Name).Concat(Groups.Select(g => g.Name));
 
     public string? NameProblem(string name, object? except)
@@ -37,10 +39,13 @@ public sealed class WindowProfileSettings
     public string UniqueName(string wanted, object? except = null)
     {
         string baseName = wanted.Trim().Length > 0 ? wanted.Trim() : "Window";
-        string name = baseName;
-        for (int i = 2; NameProblem(name, except) is not null; i++) name = $"{baseName} {i}";
+        string name = Fit(baseName, "");
+        for (int i = 2; NameProblem(name, except) is not null; i++) name = Fit(baseName, $" {i}");
         return name;
     }
+
+    private static string Fit(string name, string suffix) =>
+        (name.Length + suffix.Length > Views.Ui.NameLength ? name[..(Views.Ui.NameLength - suffix.Length)].TrimEnd() : name) + suffix;
 
     public void MoveWithinGroup(WindowGroup group, int from, int to)
     {
@@ -131,6 +136,7 @@ public sealed class WindowProfile
 
     public string? GroupId { get; set; }
 
+    [System.Text.Json.Serialization.JsonIgnore]
     public string Label => Name.Length > 0 ? Name : ProcessName;
 
     public WindowProfile Copy() => (WindowProfile)MemberwiseClone();

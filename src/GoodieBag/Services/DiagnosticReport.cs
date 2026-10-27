@@ -115,7 +115,7 @@ internal static class DiagnosticReport
         sb.AppendLine();
 
         sb.AppendLine("## Settings (choices and counts only)");
-        sb.AppendLine($"- Theme {c.Ui.Theme}, interface size {c.Ui.InterfaceScale}%, animations {(c.Ui.Animations ? "on" : "off")}");
+        sb.AppendLine($"- Theme {c.Ui.Theme}, animations {(c.Ui.Animations ? "on" : "off")}");
         sb.AppendLine($"- Sensor update rate {Rate(c.Performance)}, background usage {c.Performance.Background}");
         sb.AppendLine($"- Fan control {(c.Fans.Enabled ? "on" : "off")}{(app.FanControlAvailable ? "" : " (plugin off)")}, failsafe {c.Fans.EmergencyTempC} °C, {c.Fans.Presets.Count} presets, {c.Fans.Curves.Count} curves, {c.Fans.Hardware.Count} fans set up");
         sb.AppendLine($"- Overlay {(c.Overlay.Visible ? "shown" : "hidden")}, {c.Overlay.Layouts.Count} layouts, updates every {c.Overlay.UpdateIntervalMs} ms");

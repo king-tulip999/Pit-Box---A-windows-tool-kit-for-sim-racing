@@ -15,7 +15,7 @@ namespace GoodieBag.Views.Pages;
 
 internal sealed class IracingControllerSection : StackPanel
 {
-    private static readonly string[] Tabs = { "All settings", "Keybinds", "Overview and Backups" };
+    private static readonly string[] Tabs = { "All settings", "Keybinds", "Health and backups" };
     private const int MaxRows = 80;
     private static readonly HashSet<string> HiddenSections = new(StringComparer.OrdinalIgnoreCase) { "renderer|AutoCfg", "renderer|Debug" };
     private const string WideSection = "renderer|Graphics Options";
@@ -34,7 +34,7 @@ internal sealed class IracingControllerSection : StackPanel
     private readonly HashSet<string> _searchFolded = new(StringComparer.OrdinalIgnoreCase);
     private string[] _words = Array.Empty<string>();
     private bool _changedOnly;
-    private const double SideNavMin = 1080;
+    private const double SideNavMin = 875;
     private Action? _draftsChanged;
 
     public IracingControllerSection(AppServices app, MainWindow window)
@@ -57,8 +57,9 @@ internal sealed class IracingControllerSection : StackPanel
             Children.Add(NotFound());
             return;
         }
+        if (!_ws.Demo && LayoutGuard.CaptureIfEmpty(Session, S.SavedLayout)) _app.Save();
 
-        var tabs = Ui.Segmented(Tabs, _tabIndex, i => { _tabIndex = i; ShowTab(); }, "TiTab");
+        var tabs = Ui.PageTabs(Tabs, _tabIndex, i => { _tabIndex = i; ShowTab(); }, "TiTab");
         tabs.HorizontalAlignment = HorizontalAlignment.Left;
         tabs.VerticalAlignment = VerticalAlignment.Center;
         var tools = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
@@ -66,7 +67,7 @@ internal sealed class IracingControllerSection : StackPanel
         tools.Children.Add(_tabTools);
         if (_ws.Modes.Count > 1)
         {
-            var modes = Ui.Combo(_ws.Modes.Select(m => new Choice(m.File, m.Label + " graphics")), Session.RendererFile, c => _ = SwitchMode(c.Id!), 170);
+            var modes = Ui.Combo(_ws.Modes.Select(m => new Choice(m.File, m.Label + " graphics")), Session.RendererFile, c => _ = SwitchMode(c.Id!), 138);
             modes.ToolTip = "Which display mode's graphics file to show (iRacing keeps one per mode)";
             tools.Children.Add(modes);
         }
@@ -74,10 +75,10 @@ internal sealed class IracingControllerSection : StackPanel
             tools.Children.Add(Ui.IconButton("I.Folder", "Open the iRacing folder", () => Ui.OpenUrl(folder)));
         tools.Children.Add(Ui.IconButton("I.Refresh", "Read the files again", () => _ = Reload()));
         var bar = Ui.SplitRow(tabs, tools);
-        bar.Margin = new Thickness(0, 0, 0, 12);
+        bar.Margin = new Thickness(0, 0, 0, 10);
         Children.Add(bar);
 
-        var where = TextFit.TipWhenTrimmed(new TextBlock { Style = Ui.Res<Style>("Caption"), Margin = new Thickness(2, 0, 0, 10), TextTrimming = TextTrimming.CharacterEllipsis });
+        var where = TextFit.TipWhenTrimmed(new TextBlock { Style = Ui.Res<Style>("Caption"), Margin = new Thickness(2, 0, 0, 8), TextTrimming = TextTrimming.CharacterEllipsis });
         if (_ws.Demo) where.Inlines.Add(new System.Windows.Documents.Run("Demo settings (nothing is read from or written to the PC) · "));
         else where.Inlines.Add(TextCase.Verbatim(new System.Windows.Documents.Run(_ws.Folder + " · ")));
         where.Inlines.Add(new System.Windows.Documents.Run($"{Session.Settings.Count} settings in "));
@@ -85,8 +86,8 @@ internal sealed class IracingControllerSection : StackPanel
         Children.Add(where);
 
         _pending.Style = Ui.Res<Style>("Inset");
-        _pending.Padding = new Thickness(14, 10, 10, 10);
-        _pending.Margin = new Thickness(0, 0, 0, 12);
+        _pending.Padding = new Thickness(11, 8, 8, 8);
+        _pending.Margin = new Thickness(0, 0, 0, 10);
         Children.Add(_pending);
         Children.Add(_tab);
         ShowTab();
@@ -99,7 +100,7 @@ internal sealed class IracingControllerSection : StackPanel
         stack.Children.Add(new TextBlock
         {
             Text = _ws.LoadError ?? "iRacing Controller reads Documents\\iRacing (app.ini, core.ini and the graphics files). Start iRacing once so it creates them, then check again.",
-            Style = Ui.Res<Style>("Muted"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 12),
+            Style = Ui.Res<Style>("Muted"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 5, 0, 10),
         });
         var again = Ui.LabeledButton("I.Refresh", "Check again", () => _ = Reload());
         again.HorizontalAlignment = HorizontalAlignment.Left;
@@ -126,6 +127,15 @@ internal sealed class IracingControllerSection : StackPanel
         }
     }
 
+    public void OnShown()
+    {
+        if (Session is { } session && !session.Pending.Any() && _ws.ChangedOnDisk())
+        {
+            _ws.Load();
+            Build();
+        }
+    }
+
     private async Task Reload()
     {
         if (!await ConfirmDropPending()) return;
@@ -148,6 +158,13 @@ internal sealed class IracingControllerSection : StackPanel
         return n == 0 || await _window.Confirm("Discard changes?", $"{n} change{(n == 1 ? " hasn't" : "s haven't")} been written to iRacing yet.", "Discard", danger: true);
     }
 
+    private async Task DiscardAsync()
+    {
+        if (Session is null || !await ConfirmDropPending()) return;
+        Session.DiscardAll();
+        ShowTab();
+    }
+
     private long _simCheckedAt = long.MinValue / 2;
 
     private void UpdatePending()
@@ -162,45 +179,49 @@ internal sealed class IracingControllerSection : StackPanel
             _simCheckedAt = Environment.TickCount64;
         }
 
-        var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition());
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         bool running = _simRunning;
-        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        text.Children.Add(new TextBlock { Text = $"{pending.Count} change{(pending.Count == 1 ? "" : "s")} not written yet", FontWeight = FontWeights.SemiBold });
-        text.Children.Add(new TextBlock
+        if (_pending.Child is null || _pendingCount is null || _pendingNote is null || _writeButton is null)
         {
-            Text = running ? "iRacing is running. It rewrites its files when it closes, so close it first, then write."
-                : _ws.Demo ? "Demo: nothing is written." : "Everything is backed up before writing.",
-            Style = Ui.Res<Style>("Caption"), Foreground = Ui.Res<Brush>(running ? "WarnDeep" : "TextMuted"),
-        });
-        grid.Children.Add(text);
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal };
-        buttons.Children.Add(Ui.LabeledButton("I.Eye", "Review", () => _ = Review(), "GhostButton"));
-        var discard = Ui.LabeledButton("I.Undo", "Discard", () => { Session!.DiscardAll(); ShowTab(); }, "GhostButton");
-        discard.Margin = new Thickness(4, 0, 4, 0);
-        buttons.Children.Add(discard);
-        var write = Ui.LabeledButton("I.Save", "Write to iRacing", () => _ = Write(), "PrimaryButton");
-        write.IsEnabled = !running && !_ws.Demo;
-        buttons.Children.Add(write);
-        Grid.SetColumn(buttons, 1);
-        grid.Children.Add(buttons);
-        _pending.Child = grid;
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition());
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            text.Children.Add(_pendingCount = new TextBlock { FontWeight = FontWeights.SemiBold });
+            text.Children.Add(_pendingNote = new TextBlock { Style = Ui.Res<Style>("Caption") });
+            grid.Children.Add(text);
+            var buttons = new StackPanel { Orientation = Orientation.Horizontal };
+            buttons.Children.Add(Ui.LabeledButton("I.Eye", "Review", () => _ = Review(), "GhostButton"));
+            var discard = Ui.LabeledButton("I.Undo", "Discard", () => _ = DiscardAsync(), "GhostButton");
+            discard.Margin = new Thickness(3, 0, 3, 0);
+            buttons.Children.Add(discard);
+            buttons.Children.Add(_writeButton = Ui.LabeledButton("I.Save", "Write to iRacing", () => _ = Write(), "PrimaryButton"));
+            Grid.SetColumn(buttons, 1);
+            grid.Children.Add(buttons);
+            _pending.Child = grid;
+        }
+        TextCase.Set(_pendingCount, $"{RaceFormat.Count(pending.Count, "change")} not written yet");
+        TextCase.Set(_pendingNote, running ? "iRacing is running. It rewrites its files when it closes, so close it first, then write."
+            : _ws.Demo ? "Demo: nothing is written." : "Everything is backed up before writing.");
+        _pendingNote.SetResourceReference(TextBlock.ForegroundProperty, running ? "WarnDeep" : "TextMuted");
+        _writeButton.IsEnabled = !running && !_ws.Demo;
     }
+
+    private TextBlock? _pendingCount, _pendingNote;
+    private Button? _writeButton;
 
     private async Task Review()
     {
         var list = new StackPanel();
         foreach (var s in Session!.Pending)
         {
-            var row = new Grid { Margin = new Thickness(0, 5, 0, 5) };
+            var row = new Grid { Margin = new Thickness(0, 4, 0, 4) };
             row.ColumnDefinitions.Add(new ColumnDefinition());
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var name = new StackPanel();
             name.Children.Add(new TextBlock { Text = s.Def.Label, FontWeight = FontWeights.SemiBold });
             name.Children.Add(TextCase.Verbatim(new TextBlock { Text = $"{s.FileName} · [{s.Section}] {s.Key}", Style = Ui.Res<Style>("Caption") }));
             row.Children.Add(name);
-            var change = new TextBlock { Text = $"{s.Show(s.Applied)}  →  {s.Show(s.Draft)}", Foreground = Ui.Res<Brush>("AccentText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
+            var change = new TextBlock { Text = $"{s.Show(s.Applied)}  →  {s.Show(s.Draft)}", Foreground = Ui.Res<Brush>("AccentText"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
             Grid.SetColumn(change, 1);
             row.Children.Add(change);
             list.Children.Add(row);
@@ -209,7 +230,7 @@ internal sealed class IracingControllerSection : StackPanel
         var ok = new Button { Content = "Close", Style = Ui.Res<Style>("PrimaryButton") };
         ok.Click += (_, _) => _window.CloseModal(false);
         close.Children.Add(ok);
-        await _window.ShowModal(Ui.Dialog(_window, "Changes to write", "These go into iRacing's files when you write them.", list, close, null, 620));
+        await _window.ShowModal(Ui.Dialog(_window, "Changes to write", "These go into iRacing's files when you write them.", list, close, null, 502));
     }
 
     private async Task Write()
@@ -240,7 +261,7 @@ internal sealed class IracingControllerSection : StackPanel
         {
             var result = Session.Write(_ws.Store);
             string skipped = result.Skipped.Count == 0 ? "" : $" Not found any more: {string.Join(", ", result.Skipped)}.";
-            _app.Notify($"Wrote {result.Written} change{(result.Written == 1 ? "" : "s")} to iRacing", $"Backup #{result.Backup?.Number} has the files from before.{skipped}", NoticeKind.Success);
+            _app.Notify($"Wrote {RaceFormat.Count(result.Written, "change")} to iRacing", $"Backup #{result.Backup?.Number} has the files from before.{skipped}", NoticeKind.Success);
         }
         catch (Exception ex)
         {
@@ -261,10 +282,10 @@ internal sealed class IracingControllerSection : StackPanel
             _tab.Children.Add(FindingCard(Rating.Concerning, "The overview couldn't be built", ex.Message));
             return;
         }
-        var layout = LayoutGuard.Differences(Session!, S.SavedLayout);
+        var layout = _ws.ChangedOnDisk() ? new List<LayoutGuard.Difference>() : LayoutGuard.Differences(Session!, S.SavedLayout);
         int problems = report.Findings.Count + (report.TelemetryLarge ? 1 : 0) + (layout.Count > 0 ? 1 : 0);
 
-        var counts = new System.Windows.Controls.Primitives.UniformGrid { Columns = 3, Margin = new Thickness(-6, 0, -6, 6) };
+        var counts = new System.Windows.Controls.Primitives.UniformGrid { Columns = 3, Margin = new Thickness(-5, 0, -5, 5) };
         counts.Children.Add(Counter(problems.ToString(CultureInfo.InvariantCulture), problems == 1 ? "thing to look at" : "things to look at", problems == 0 ? "SageSoft" : "WarnSoft", problems == 0 ? "SageDeep" : "Warn"));
         counts.Children.Add(Counter(report.Unusual.Count.ToString(CultureInfo.InvariantCulture), "changed from iRacing's default", "SlateSoft", "SlateDeep"));
         counts.Children.Add(Counter(report.Passed.Count.ToString(CultureInfo.InvariantCulture), "checks passed", "SageSoft", "SageDeep"));
@@ -272,9 +293,21 @@ internal sealed class IracingControllerSection : StackPanel
 
         if (layout.Count > 0)
             _tab.Children.Add(FindingCard(Rating.Concerning, "iRacing changed your triple-screen layout",
-                $"{layout.Count} value{(layout.Count == 1 ? "" : "s")} differ from the layout you saved ({string.Join(", ", layout.Take(4).Select(d => d.Setting.Def.Label))}). This often happens after a driver update or a crash.",
+                $"{RaceFormat.Count(layout.Count, "value")} {(layout.Count == 1 ? "differs" : "differ")} from the layout you saved ({string.Join(", ", layout.Take(4).Select(d => d.Setting.Def.Label))}). This often happens after a driver update or a crash.",
                 ("Put it back", () => { LayoutGuard.StageRestore(Session!, S.SavedLayout); ShowTab(); }),
-                ("Forget saved layout", () => { S.SavedLayout = new(StringComparer.OrdinalIgnoreCase); _app.Save(); ShowTab(); })));
+                ("Keep iRacing's layout", () =>
+                {
+                    var before = S.SavedLayout;
+                    S.SavedLayout = LayoutGuard.Capture(Session!);
+                    _app.Save();
+                    ShowTab();
+                    _app.Notify("Layout kept", "iRacing's layout is now the one Goodie Bag watches for.", NoticeKind.Success, action: new NoticeAction("Undo", () =>
+                    {
+                        S.SavedLayout = before;
+                        _app.Save();
+                        ShowTab();
+                    }));
+                })));
 
         foreach (var f in report.Findings)
         {
@@ -288,8 +321,16 @@ internal sealed class IracingControllerSection : StackPanel
         if (report.TelemetryLarge && report.Telemetry is { } t)
         {
             var old = t.OlderThan(30);
+            int unread = 0;
+            if (Plugins.BuiltIn.SessionStatsPlugin.Of(_app)?.Store is { } stats)
+            {
+                var read = old.Where(f => stats.ReadInFull(f.Name)).ToList();
+                unread = old.Count - read.Count;
+                old = read;
+            }
             _tab.Children.Add(FindingCard(Rating.Concerning, $"The telemetry folder is {HealthCheck.Gb(t.TotalBytes)}",
-                $"{t.Files.Count} .ibt files from auto-logging. {old.Count} are older than 30 days ({HealthCheck.Gb(old.Sum(f => f.Length))}).",
+                $"{t.Files.Count} .ibt files from auto-logging. {old.Count} are older than 30 days ({HealthCheck.Gb(old.Sum(f => f.Length))})."
+                + (unread > 0 ? $" {RaceFormat.Count(unread, "older file")} Session Stats hasn't read yet {(unread == 1 ? "is" : "are")} kept." : ""),
                 ("Move old files to the Recycle Bin", () => _ = CleanTelemetry(old)),
                 ("Ignore", () => { S.IgnoredFindings.Add("telemetry-large"); _app.Save(); ShowTab(); })));
         }
@@ -297,13 +338,13 @@ internal sealed class IracingControllerSection : StackPanel
         if (report.Unusual.Count > 0)
         {
             _tab.Children.Add(Ui.EditorSection("Changed from iRacing's default"));
-            _tab.Children.Add(new TextBlock { Text = "Usually on purpose. Reset one if you didn't mean to change it, or keep it to stop it being listed.", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 0, 0, 6) });
+            _tab.Children.Add(new TextBlock { Text = "Usually on purpose. Reset one if you didn't mean to change it, or keep it to stop it being listed.", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 0, 0, 5) });
             var card = new StackPanel();
             foreach (var s in report.Unusual.Take(30))
                 card.Children.Add(UnusualRow(s));
             if (report.Unusual.Count > 30)
-                card.Children.Add(new TextBlock { Text = $"+{report.Unusual.Count - 30} more: search for them under All settings.", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 8, 0, 0) });
-            _tab.Children.Add(new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(18, 8, 18, 10), Child = card });
+                card.Children.Add(new TextBlock { Text = $"+{report.Unusual.Count - 30} more: search for them under All settings.", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 6, 0, 0) });
+            _tab.Children.Add(new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(15, 6, 15, 8), Child = card });
         }
 
         if (report.Passed.Count > 0)
@@ -313,7 +354,7 @@ internal sealed class IracingControllerSection : StackPanel
             foreach (var p in report.Passed)
             {
                 var chip = Ui.Chip(p, "SageSoft", "SageDeep");
-                chip.Margin = new Thickness(0, 0, 6, 6);
+                chip.Margin = new Thickness(0, 0, 5, 5);
                 wrap.Children.Add(chip);
             }
             _tab.Children.Add(wrap);
@@ -323,9 +364,9 @@ internal sealed class IracingControllerSection : StackPanel
     private static Tile Counter(string value, string label, string soft, string deep)
     {
         var stack = new StackPanel();
-        stack.Children.Add(new TextBlock { Text = value, FontSize = 26, FontWeight = FontWeights.Bold, Foreground = Ui.Res<Brush>(deep) });
+        stack.Children.Add(new TextBlock { Text = value, FontSize = 21, FontWeight = FontWeights.Bold, Foreground = Ui.Res<Brush>(deep) });
         stack.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption") });
-        return new Tile { Style = Ui.Res<Style>("Card"), Background = Ui.Res<Brush>(soft), BorderBrush = Ui.Res<Brush>(soft), Margin = new Thickness(6), Padding = new Thickness(16, 12, 16, 12), Child = stack };
+        return new Tile { Style = Ui.Res<Style>("Card"), Background = Ui.Res<Brush>(soft), BorderBrush = Ui.Res<Brush>(soft), Margin = new Thickness(5), Padding = new Thickness(13, 10, 13, 10), Child = stack };
     }
 
     private static Tile FindingCard(Rating rating, string title, string detail, params (string Label, Action Run)[] actions)
@@ -337,26 +378,26 @@ internal sealed class IracingControllerSection : StackPanel
         bool bad = rating == Rating.Bad;
         grid.Children.Add(new Tile
         {
-            Width = 30, Height = 30, CornerRadius = ThemeManager.Round(8), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 0, 12, 0),
+            Width = 24, Height = 24, CornerRadius = ThemeManager.Round(8), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 0, 10, 0),
             Background = Ui.Res<Brush>(bad ? "DangerSoft" : "WarnSoft"),
-            Child = new Icon { Data = Ui.Res<Geometry>("I.Alert"), Width = 15, Height = 15, Foreground = Ui.Res<Brush>(bad ? "Danger" : "Warn") },
+            Child = new Icon { Data = Ui.Res<Geometry>("I.Alert"), Width = 12, Height = 12, Foreground = Ui.Res<Brush>(bad ? "Danger" : "Warn") },
         });
         var text = new StackPanel();
         text.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
         text.Children.Add(new TextBlock { Text = detail, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) });
         Grid.SetColumn(text, 1);
         grid.Children.Add(text);
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
         for (int i = 0; i < actions.Length; i++)
         {
             var (label, run) = actions[i];
-            var b = new Button { Content = label, Style = Ui.Res<Style>(i == 0 && label != "Ignore" ? "SoftButton" : "GhostButton"), Margin = new Thickness(4, 0, 0, 0) };
+            var b = new Button { Content = label, Style = Ui.Res<Style>(i == 0 && label != "Ignore" ? "SoftButton" : "GhostButton"), Margin = new Thickness(3, 0, 0, 0) };
             b.Click += (_, _) => run();
             buttons.Children.Add(b);
         }
         Grid.SetColumn(buttons, 2);
         grid.Children.Add(buttons);
-        var card = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(16, 12, 14, 12), Margin = new Thickness(0, 0, 0, 8), Child = grid };
+        var card = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(13, 10, 11, 10), Margin = new Thickness(0, 0, 0, 6), Child = grid };
         if (bad)
         {
             card.Background = Ui.Res<Brush>("DangerSoft");
@@ -371,7 +412,7 @@ internal sealed class IracingControllerSection : StackPanel
 
     private Grid UnusualRow(Setting s)
     {
-        var row = new Grid { Margin = new Thickness(0, 6, 0, 6) };
+        var row = new Grid { Margin = new Thickness(0, 5, 0, 5) };
         row.ColumnDefinitions.Add(new ColumnDefinition());
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var text = new StackPanel();
@@ -385,7 +426,7 @@ internal sealed class IracingControllerSection : StackPanel
             reset.Click += (_, _) => { Session.SetDraft(s, std); ShowTab(); };
             buttons.Children.Add(reset);
         }
-        var keep = new Button { Content = "Keep", Style = Ui.Res<Style>("GhostButton"), Margin = new Thickness(4, 0, 0, 0), ToolTip = "It's on purpose: stop listing it until it changes" };
+        var keep = new Button { Content = "Keep mine", Style = Ui.Res<Style>("GhostButton"), Margin = new Thickness(3, 0, 0, 0), ToolTip = "It's on purpose: stop listing it until it changes" };
         keep.Click += (_, _) => { Session.Ignore(s); _app.Save(); ShowTab(); };
         buttons.Children.Add(keep);
         Grid.SetColumn(buttons, 1);
@@ -405,7 +446,7 @@ internal sealed class IracingControllerSection : StackPanel
         try
         {
             int moved = RecycleBin.Send(files.Select(f => f.FullName).ToList());
-            _app.Notify("Telemetry tidied", $"{moved} file{(moved == 1 ? "" : "s")} moved to the Recycle Bin.", NoticeKind.Success);
+            _app.Notify("Telemetry tidied", $"{RaceFormat.Count(moved, "file")} moved to the Recycle Bin.", NoticeKind.Success);
         }
         catch (Exception ex)
         {
@@ -424,8 +465,8 @@ internal sealed class IracingControllerSection : StackPanel
         layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         var sideNav = new StackPanel();
-        var sideCard = new Tile { Style = Ui.Res<Style>("Card"), Width = 266, Padding = new Thickness(8, 8, 8, 4), Margin = new Thickness(0, 0, 20, 0), VerticalAlignment = VerticalAlignment.Top, Child = sideNav };
-        var topNav = new WrapPanel { Margin = new Thickness(0, 0, 0, 10) };
+        var sideCard = new Tile { Style = Ui.Res<Style>("Card"), Width = 215, Padding = new Thickness(6, 6, 6, 3), Margin = new Thickness(0, 0, 16, 0), VerticalAlignment = VerticalAlignment.Top, Child = sideNav };
+        var topNav = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
         Grid.SetRow(topNav, 0);
         Grid.SetColumnSpan(topNav, 2);
         Grid.SetRow(sideCard, 1);
@@ -437,10 +478,10 @@ internal sealed class IracingControllerSection : StackPanel
         _tab.Children.Add(layout);
         bool side = false;
 
-        var search = new TextBox { Width = 240, Text = _search, Tag = "Search names, keys and values", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
+        var search = new TextBox { Width = 194, Text = _search, Tag = "Search names, keys and values", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) };
         var onlyChanged = Ui.LabeledButton("I.Sliders", "Changed only", () => { });
         onlyChanged.ToolTip = "Show only settings that differ from iRacing's default or aren't saved yet";
-        onlyChanged.Margin = new Thickness(0, 0, 8, 0);
+        onlyChanged.Margin = new Thickness(0, 0, 6, 0);
         Ui.SetToggled(onlyChanged, _changedOnly);
         var cards = new List<SectionCard>();
         var foldAll = new CollapseAllButton { VerticalAlignment = VerticalAlignment.Center };
@@ -450,7 +491,7 @@ internal sealed class IracingControllerSection : StackPanel
         _tabTools.Children.Add(foldAll);
         var wide = new StackPanel();
         content.Children.Add(wide);
-        var results = new MasonryPanel { MinColumnWidth = 520, MaxColumns = 3 };
+        var results = new MasonryPanel { MinColumnWidth = 421, MaxColumns = 3 };
         content.Children.Add(results);
 
         IEnumerable<Setting> Listed(SectionInfo sec) => Session.In(sec).Where(s => !s.IsHidden);
@@ -495,16 +536,16 @@ internal sealed class IracingControllerSection : StackPanel
                 int unsaved = listed.Count(x => x.IsChanged);
                 bool selected = !Global() && i == _area;
                 var look = AreaLook(areas[i].Title, i);
-                var glyph = new Icon { Data = Ui.Res<Geometry>(look.Icon), Width = 14, Height = 14, Margin = new Thickness(0, 0, 9, 0), VerticalAlignment = VerticalAlignment.Center };
+                var glyph = new Icon { Data = Ui.Res<Geometry>(look.Icon), Width = 11, Height = 11, Margin = new Thickness(0, 0, 7, 0), VerticalAlignment = VerticalAlignment.Center };
                 glyph.SetResourceReference(Control.ForegroundProperty, look.Hue.Deep);
                 var row = new DockPanel { LastChildFill = true };
                 DockPanel.SetDock(glyph, Dock.Left);
                 row.Children.Add(glyph);
-                var counts = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
+                var counts = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
                 if (unsaved > 0)
                 {
                     var u = Ui.Chip(unsaved.ToString(CultureInfo.InvariantCulture), "AccentSoft", "AccentText");
-                    u.Padding = new Thickness(5, 0, 5, 0);
+                    u.Padding = new Thickness(4, 0, 4, 0);
                     u.Margin = new Thickness(0);
                     u.VerticalAlignment = VerticalAlignment.Center;
                     u.ToolTip = RaceFormat.Count(unsaved, "unsaved change");
@@ -512,9 +553,9 @@ internal sealed class IracingControllerSection : StackPanel
                 }
                 if (modified > 0)
                 {
-                    var m = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, ToolTip = RaceFormat.Count(modified, "setting") + " changed from iRacing's default" };
+                    var m = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(5, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, ToolTip = RaceFormat.Count(modified, "setting") + " changed from iRacing's default" };
                     var mdot = Ui.ChangedDot();
-                    mdot.Margin = new Thickness(0, 0, 5, 0);
+                    mdot.Margin = new Thickness(0, 0, 4, 0);
                     mdot.VerticalAlignment = VerticalAlignment.Center;
                     m.Children.Add(mdot);
                     m.Children.Add(new TextBlock { Text = modified.ToString(CultureInfo.InvariantCulture), Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center });
@@ -526,14 +567,14 @@ internal sealed class IracingControllerSection : StackPanel
                 var b = new Button
                 {
                     Content = row, Style = Ui.Res<Style>(selected ? "SelectedButton" : side ? "QuietButton" : "GhostButton"),
-                    Margin = side ? new Thickness(0, 0, 0, 4) : new Thickness(0, 0, 6, 6),
+                    Margin = side ? new Thickness(0, 0, 0, 3) : new Thickness(0, 0, 5, 5),
                     HorizontalAlignment = side ? HorizontalAlignment.Stretch : HorizontalAlignment.Left,
                     HorizontalContentAlignment = HorizontalAlignment.Stretch,
                 };
                 if (side)
                 {
-                    b.Height = 38;
-                    b.Padding = new Thickness(12, 0, 10, 0);
+                    b.Height = 31;
+                    b.Padding = new Thickness(10, 0, 8, 0);
                 }
                 if (selected)
                 {
@@ -577,7 +618,7 @@ internal sealed class IracingControllerSection : StackPanel
                 results.Children.Add(new TextBlock
                 {
                     Text = words.Length > 0 ? "No settings match." : _changedOnly ? "Everything is at iRacing's default." : "None of this area's settings are in your files.",
-                    Style = Ui.Res<Style>("Muted"), Margin = new Thickness(2, 6, 0, 0),
+                    Style = Ui.Res<Style>("Muted"), Margin = new Thickness(2, 5, 0, 0),
                 });
                 UpdateFoldAll();
                 return;
@@ -622,7 +663,7 @@ internal sealed class IracingControllerSection : StackPanel
             FillTabs();
         }
         layout.SizeChanged += (_, _) => Place();
-        Sticky.Install(sideCard, layout, () => side, gap: 14);
+        Sticky.Install(sideCard, layout, () => side, gap: 11);
 
         onlyChanged.Click += (_, _) =>
         {
@@ -675,8 +716,8 @@ internal sealed class IracingControllerSection : StackPanel
         private readonly bool _span;
         private readonly SectionInfo _section;
         private readonly Action<bool> _toggled;
-        private readonly Icon _chevron = new() { Width = 14, Height = 14, VerticalAlignment = VerticalAlignment.Center };
-        private readonly TextBlock _summary = new() { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
+        private readonly Icon _chevron = new() { Width = 11, Height = 11, VerticalAlignment = VerticalAlignment.Center };
+        private readonly TextBlock _summary = new() { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
         private readonly Border _body = new();
         private readonly Button _header;
         private readonly TextBlock _fileLine;
@@ -694,7 +735,7 @@ internal sealed class IracingControllerSection : StackPanel
             _toggled = toggled;
             Style = Ui.Res<Style>("Card");
             Padding = new Thickness(0);
-            _body.Margin = new Thickness(12, 0, 12, 14);
+            _body.Margin = new Thickness(10, 0, 10, 11);
 
             var head = new Grid();
             head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -702,11 +743,11 @@ internal sealed class IracingControllerSection : StackPanel
             head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var hue = AreaLook(section.Area, section.AreaIndex).Hue;
             _chevron.SetResourceReference(Control.ForegroundProperty, hue.Deep);
-            _chevron.Width = _chevron.Height = 12;
-            var badge = new Tile { Width = 22, Height = 22, CornerRadius = ThemeManager.Round(6), VerticalAlignment = VerticalAlignment.Center, Child = _chevron };
+            _chevron.Width = _chevron.Height = 10;
+            var badge = new Tile { Width = 18, Height = 18, CornerRadius = ThemeManager.Round(6), VerticalAlignment = VerticalAlignment.Center, Child = _chevron };
             badge.SetResourceReference(Border.BackgroundProperty, hue.Soft);
             head.Children.Add(badge);
-            var name = new WrapPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
+            var name = new WrapPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
             var title = Ui.Text(section.Name, "H3");
             title.TextWrapping = TextWrapping.Wrap;
             title.VerticalAlignment = VerticalAlignment.Center;
@@ -714,8 +755,8 @@ internal sealed class IracingControllerSection : StackPanel
             if (section.IsRare)
             {
                 var chip = Ui.Chip("expert", "PlumSoft", "PlumDeep");
-                chip.Margin = new Thickness(8, 0, 0, 0);
-                chip.Padding = new Thickness(6, 0, 6, 0);
+                chip.Margin = new Thickness(6, 0, 0, 0);
+                chip.Padding = new Thickness(5, 0, 5, 0);
                 chip.VerticalAlignment = VerticalAlignment.Center;
                 name.Children.Add(chip);
             }
@@ -727,8 +768,9 @@ internal sealed class IracingControllerSection : StackPanel
             _fileLine = TextFit.TipWhenTrimmed(new TextBlock
             {
                 Text = $"{(_searching ? _section.Area + " · " : "")}{_section.FileName} [{_section.Section}]",
-                Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 10, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis,
+                Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 8, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis,
             });
+            _fileLine.SetResourceReference(TextBlock.ForegroundProperty, "TextFaint");
             TextCase.SetVerbatim(_fileLine, !_searching);
             TextFit.TipWhenTrimmed(_fileLine);
             var headStack = new StackPanel();
@@ -736,14 +778,14 @@ internal sealed class IracingControllerSection : StackPanel
             headStack.Children.Add(_fileLine);
             if (section.Note is { } note)
             {
-                _note = new TextBlock { Text = note, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0) };
+                _note = new TextBlock { Text = note, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 5, 0, 0) };
                 headStack.Children.Add(_note);
             }
             _header = new Button
             {
                 Style = Ui.Res<Style>("QuietButton"), Content = headStack,
                 HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                Padding = new Thickness(24, 22, 26, 22),
+                Padding = new Thickness(19, 18, 21, 18),
             };
             AutomationProperties.SetName(_header, section.Name);
             ClickGuard.SetAllowRepeat(_header, true);
@@ -786,8 +828,8 @@ internal sealed class IracingControllerSection : StackPanel
 
         private StackPanel BuildBody()
         {
-            var body = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
-            Panel list = _span ? new SplitRows { MinColumnWidth = 480, Gap = 32 } : new StackPanel();
+            var body = new StackPanel { Margin = new Thickness(0, 10, 0, 0) };
+            Panel list = _span ? new SplitRows { MinColumnWidth = 389, Gap = 26 } : new StackPanel();
             body.Children.Add(list);
             int next = 0;
             string? lastGroup = null;
@@ -798,7 +840,7 @@ internal sealed class IracingControllerSection : StackPanel
                     string group = _settings[next].Def.Group ?? "";
                     if (_grouped && group != lastGroup)
                     {
-                        var head = new TextBlock { Text = group.Length > 0 ? group : "Other", Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(12, lastGroup is null ? 2 : 16, 0, 6) };
+                        var head = new TextBlock { Text = group.Length > 0 ? group : "Other", Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(12, lastGroup is null ? 2 : 13, 0, 6) };
                         head.SetResourceReference(TextBlock.ForegroundProperty, "EyebrowText");
                         list.Children.Add(head);
                         lastGroup = group;
@@ -853,8 +895,8 @@ internal sealed class IracingControllerSection : StackPanel
 
     private sealed class SplitRows : Panel
     {
-        public double MinColumnWidth { get; set; } = 480;
-        public double Gap { get; set; } = 32;
+        public double MinColumnWidth { get; set; } = 389;
+        public double Gap { get; set; } = 26;
 
         private int _split = -1;
         private double _splitWidth = double.NaN;
@@ -926,7 +968,7 @@ internal sealed class IracingControllerSection : StackPanel
 
     private Border SettingRow(Setting s)
     {
-        var host = new Border { BorderBrush = Ui.Res<Brush>("Line"), BorderThickness = new Thickness(0, 1, 0, 0), Padding = new Thickness(12, 8, 10, 8) };
+        var host = Hairline.Frame(new Border { BorderBrush = Ui.Res<Brush>("Line"), Padding = new Thickness(10, 6, 8, 6) }, Sides.Top);
         Ui.HoverHighlight(host);
         void Fill()
         {
@@ -934,7 +976,7 @@ internal sealed class IracingControllerSection : StackPanel
             var grid = new Grid();
             grid.ColumnDefinitions.Add(new ColumnDefinition());
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var text = new StackPanel { Margin = new Thickness(0, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
+            var text = new StackPanel { Margin = new Thickness(0, 0, 13, 0), VerticalAlignment = VerticalAlignment.Center };
             var title = new WrapPanel();
             var label = new TextBlock { FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
             label.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
@@ -943,8 +985,8 @@ internal sealed class IracingControllerSection : StackPanel
             if (s.IsChanged)
             {
                 var chip = Ui.Chip("Unsaved", "AccentSoft", "AccentText");
-                chip.Margin = new Thickness(8, 0, 0, 0);
-                chip.Padding = new Thickness(6, 0, 6, 0);
+                chip.Margin = new Thickness(6, 0, 0, 0);
+                chip.Padding = new Thickness(5, 0, 5, 0);
                 chip.VerticalAlignment = VerticalAlignment.Center;
                 chip.ToolTip = "Not written to the file yet: " + s.Show(s.Applied) + " there now";
                 title.Children.Add(chip);
@@ -964,7 +1006,7 @@ internal sealed class IracingControllerSection : StackPanel
                 if (string.IsNullOrWhiteSpace(note)) return;
                 var line = new TextBlock { Text = note, Style = Ui.Res<Style>("Caption"), Foreground = Ui.Res<Brush>(brush), TextWrapping = TextWrapping.Wrap };
                 FrameworkElement shown = icon is null ? line : Ui.IconText(icon, line, brush);
-                shown.Margin = new Thickness(0, 3, 0, 0);
+                shown.Margin = new Thickness(0, 2, 0, 0);
                 text.Children.Add(shown);
             }
             Note(s.Def.Danger, "Danger", "I.Alert");
@@ -972,7 +1014,7 @@ internal sealed class IracingControllerSection : StackPanel
             Note(s.IsInert ? s.Def.DependsOn?.Message : null, "TextFaint");
             if (words.Length > 0 && words.Any(w => s.Key.Contains(w, StringComparison.OrdinalIgnoreCase)))
             {
-                var key = new TextBlock { Style = Ui.Res<Style>("Caption"), Foreground = Ui.Res<Brush>("TextFaint"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 3, 0, 0) };
+                var key = new TextBlock { Style = Ui.Res<Style>("Caption"), Foreground = Ui.Res<Brush>("TextFaint"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) };
                 Ui.Highlight(key, $"[{s.Section}] {s.Key}", words);
                 text.Children.Add(key);
             }
@@ -987,14 +1029,14 @@ internal sealed class IracingControllerSection : StackPanel
             if (s.IsModified && std is not null)
             {
                 var reset = Ui.IconButton("I.Undo", "Back to iRacing's default (" + s.Show(std) + ")", () => { Session.SetDraft(s, std); Fill(); UpdatePending(); });
-                reset.Margin = new Thickness(0, 0, 6, 0);
+                reset.Margin = new Thickness(0, 0, 5, 0);
                 control.Children.Add(reset);
             }
             control.Children.Add(Editor(s, Fill));
             if (s.IsChanged)
             {
                 var undo = Ui.IconButton("I.X", "Drop this change (keep " + s.Show(s.Applied) + ")", () => { Session.Discard(s); Fill(); UpdatePending(); });
-                undo.Margin = new Thickness(6, 0, 0, 0);
+                undo.Margin = new Thickness(5, 0, 0, 0);
                 control.Children.Add(undo);
             }
             Grid.SetColumn(control, 1);
@@ -1019,7 +1061,7 @@ internal sealed class IracingControllerSection : StackPanel
         if (s.IsReadOnly)
             return new TextBlock
             {
-                Text = s.Show(s.Draft), Style = Ui.Res<Style>("Muted"), MaxWidth = 240, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center,
+                Text = s.Show(s.Draft), Style = Ui.Res<Style>("Muted"), MaxWidth = 194, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center,
                 ToolTip = (s.Def.ReadOnlyNote ?? "iRacing marks this setting as not to be edited.") + (s.Draft.Length > 0 ? "\n" + s.Draft : ""),
             };
 
@@ -1030,8 +1072,8 @@ internal sealed class IracingControllerSection : StackPanel
             case "text" when TextChoices(s) is { } textChoices:
             {
                 var choices = textChoices.Select(c => new Choice(c.Value, c.Label, c.Tip)).ToList();
-                var box = Ui.Combo(choices, s.Draft, c => { if (c.Id is { } v && v != s.Draft) Set(v); }, 180);
-                box.MaxWidth = 260;
+                var box = Ui.Combo(choices, s.Draft, c => { if (c.Id is { } v && v != s.Draft) Set(v); }, 146);
+                box.MaxWidth = 211;
                 return box;
             }
             case "bool":
@@ -1042,7 +1084,7 @@ internal sealed class IracingControllerSection : StackPanel
                 if (!choices.Any(c => Setting.SameValue(c.Id, s.Draft)))
                     choices.Insert(0, new Choice(s.Draft, s.Draft + " (not a listed option)"));
                 var selected = choices.First(c => Setting.SameValue(c.Id, s.Draft)).Id;
-                return Ui.Combo(choices, selected, c => Set(c.Id ?? ""), 180);
+                return Ui.Combo(choices, selected, c => Set(c.Id ?? ""), 146);
             }
             case "num" or "range" or "enum":
             {
@@ -1060,9 +1102,10 @@ internal sealed class IracingControllerSection : StackPanel
             }
             default:
             {
-                var box = new TextBox { Text = s.Draft, Width = 260 };
+                var box = new TextBox { Text = s.Draft, Width = 211 };
                 box.SetResourceReference(Control.FontFamilyProperty, "MonoFont");
                 box.LostKeyboardFocus += (_, _) => { if (box.Text != s.Draft) Set(box.Text); };
+                box.KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Enter && box.Text != s.Draft) { e.Handled = true; Set(box.Text); } };
                 return box;
             }
         }
@@ -1084,8 +1127,8 @@ internal sealed class IracingControllerSection : StackPanel
         bool blank = s.Draft.Length == 0;
         panel.Children.Add(new TextBlock
         {
-            Text = s.Show(s.Draft), Style = Ui.Res<Style>(blank ? "Muted" : "Body"), MaxWidth = 160, TextTrimming = TextTrimming.CharacterEllipsis,
-            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0), ToolTip = blank ? s.Def.Help : s.Draft,
+            Text = s.Show(s.Draft), Style = Ui.Res<Style>(blank ? "Muted" : "Body"), MaxWidth = 130, TextTrimming = TextTrimming.CharacterEllipsis,
+            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0), ToolTip = blank ? s.Def.Help : s.Draft,
         });
         var browse = Ui.LabeledButton("I.Folder", "Browse", () =>
         {
@@ -1099,7 +1142,7 @@ internal sealed class IracingControllerSection : StackPanel
         if (!blank)
         {
             var reset = Ui.IconButton("I.X", "Clear: back to the default folder", () => set(""));
-            reset.Margin = new Thickness(4, 0, 0, 0);
+            reset.Margin = new Thickness(3, 0, 0, 0);
             panel.Children.Add(reset);
         }
         return panel;
@@ -1107,18 +1150,17 @@ internal sealed class IracingControllerSection : StackPanel
 
     private void BackupsTab()
     {
-        var head = new Grid { Margin = new Thickness(0, 0, 0, 10) };
-        head.ColumnDefinitions.Add(new ColumnDefinition());
-        head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var head = new StackPanel { Margin = new Thickness(0, 0, 0, 8) };
         head.Children.Add(new TextBlock
         {
             Text = "A full backup (settings, controls, calibration, cameras and profiles) is taken before every write and restore. The last 30 automatic ones are kept; ones you take stay until you delete them.",
-            Style = Ui.Res<Style>("Muted"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 16, 0),
+            Style = Ui.Res<Style>("Muted"), TextWrapping = TextWrapping.Wrap,
         });
         var now = Ui.LabeledButton("I.Save", "Back up now", () => _ = BackupNow(), "PrimaryButton");
         now.IsEnabled = !_ws.Demo;
-        now.VerticalAlignment = VerticalAlignment.Top;
-        Grid.SetColumn(now, 1);
+        if (_ws.Demo) now.ToolTip = "Not with demo data";
+        now.HorizontalAlignment = HorizontalAlignment.Left;
+        now.Margin = new Thickness(0, 8, 0, 0);
         head.Children.Add(now);
         _tab.Children.Add(head);
 
@@ -1154,8 +1196,8 @@ internal sealed class IracingControllerSection : StackPanel
         var list = new StackPanel();
         foreach (var b in backups)
             list.Children.Add(BackupRow(b));
-        _tab.Children.Add(new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(18, 6, 18, 6), Child = list });
-        var where = TextCase.Verbatim(TextFit.TipWhenTrimmed(new TextBlock { Text = "Kept in " + _ws.Store.Root, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(2, 8, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis }));
+        _tab.Children.Add(new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(15, 5, 15, 5), Child = list });
+        var where = TextCase.Verbatim(TextFit.TipWhenTrimmed(new TextBlock { Text = "Kept in " + _ws.Store.Root, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(2, 6, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis }));
         _tab.Children.Add(where);
     }
 
@@ -1170,8 +1212,8 @@ internal sealed class IracingControllerSection : StackPanel
         if (b.Kind != BackupKind.Auto)
         {
             var chip = Ui.Chip(b.Kind == BackupKind.Manual ? "kept" : "imported", "SlateSoft", "SlateDeep");
-            chip.Margin = new Thickness(8, 0, 0, 0);
-            chip.Padding = new Thickness(6, 0, 6, 0);
+            chip.Margin = new Thickness(6, 0, 0, 0);
+            chip.Padding = new Thickness(5, 0, 5, 0);
             title.Children.Add(chip);
         }
         text.Children.Add(title);
@@ -1180,12 +1222,12 @@ internal sealed class IracingControllerSection : StackPanel
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         buttons.Children.Add(Ui.LabeledButton("I.Eye", "Compare", () => _ = Compare(b), "GhostButton"));
         var restore = Ui.LabeledButton("I.Restore", "Restore", () => _ = Restore(b), "GhostButton");
-        restore.Margin = new Thickness(6, 0, 2, 0);
+        restore.Margin = new Thickness(5, 0, 2, 0);
         buttons.Children.Add(restore);
         buttons.Children.Add(Ui.IconButton("I.Trash", "Delete this backup", () => _ = DeleteBackup(b)));
         Grid.SetColumn(buttons, 1);
         grid.Children.Add(buttons);
-        return new Border { BorderBrush = Ui.Res<Brush>("Line"), BorderThickness = new Thickness(0, 0, 0, 1), Padding = new Thickness(0, 9, 0, 9), Child = grid };
+        return Hairline.Frame(new Border { BorderBrush = Ui.Res<Brush>("Line"), Padding = new Thickness(0, 7, 0, 7), Child = grid }, Sides.Bottom);
     }
 
     private async Task BackupNow()
@@ -1207,12 +1249,14 @@ internal sealed class IracingControllerSection : StackPanel
     private void ImportStrays(IReadOnlyList<StrayCopy> strays)
     {
         int done = 0;
+        string? problem = null;
         foreach (var copy in strays)
         {
             try { _ws.Store.Import(copy, _ws.Folder!); done++; }
-            catch { }
+            catch (Exception ex) { problem ??= ex.Message; }
         }
-        _app.Notify("Copies imported", $"{done} of {strays.Count} turned into backups.", NoticeKind.Success);
+        if (problem is null) _app.Notify("Copies imported", $"{done} of {strays.Count} turned into backups.", NoticeKind.Success);
+        else _app.Notify("Not every copy was imported", $"{done} of {strays.Count} turned into backups. {problem}", NoticeKind.Warning, important: true);
         ShowTab();
     }
 
@@ -1224,7 +1268,7 @@ internal sealed class IracingControllerSection : StackPanel
             var diffs = BackupStore.Compare(b, _ws.Folder);
             foreach (var d in diffs.Where(d => d.State != FileState.Same))
             {
-                list.Children.Add(new TextBlock { Text = d.Name + (d.State == FileState.MissingNow ? " (missing now)" : ""), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 10, 0, 2) });
+                list.Children.Add(new TextBlock { Text = d.Name + (d.State == FileState.MissingNow ? " (missing now)" : ""), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 8, 0, 2) });
                 foreach (var k in d.Keys.Take(60))
                     list.Children.Add(new TextBlock { Text = $"[{k.Section}] {k.Key}: {k.Then ?? "(not there)"}  →  now {k.Now ?? "(not there)"}", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap });
                 if (d.Keys.Count > 60)
@@ -1241,7 +1285,7 @@ internal sealed class IracingControllerSection : StackPanel
         var ok = new Button { Content = "Close", Style = Ui.Res<Style>("PrimaryButton") };
         ok.Click += (_, _) => _window.CloseModal(false);
         close.Children.Add(ok);
-        await _window.ShowModal(Ui.Dialog(_window, $"Backup #{b.Number} compared with now", "What restoring it would change (backup → current value).", list, close, null, 680));
+        await _window.ShowModal(Ui.Dialog(_window, $"Backup #{b.Number} compared with now", "What restoring it would change (backup → current value).", list, close, null, 551));
     }
 
     private async Task Restore(Backup b)

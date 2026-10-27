@@ -13,9 +13,9 @@ internal sealed class PresetRow : DockPanel
 
     public PresetRow(IReadOnlyList<HudPreset> presets, Action<HudPreset> apply)
     {
-        Margin = new Thickness(0, 0, 0, 12);
+        Margin = new Thickness(0, 0, 0, 10);
         LastChildFill = false;
-        var label = new TextBlock { Text = "Preset", Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0) };
+        var label = new TextBlock { Text = "Preset", Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
         Children.Add(label);
         var panel = new WrapPanel();
         string group = "preset-" + Guid.NewGuid().ToString("N");
@@ -31,7 +31,7 @@ internal sealed class PresetRow : DockPanel
         _custom = new Border
         {
             Child = new TextBlock { Text = "Modified", Style = Ui.Res<Style>("Caption"), FontStyle = FontStyles.Italic, VerticalAlignment = VerticalAlignment.Center },
-            Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center,
             ToolTip = "Your own settings: they don't match a preset",
         };
         Children.Add(_custom);

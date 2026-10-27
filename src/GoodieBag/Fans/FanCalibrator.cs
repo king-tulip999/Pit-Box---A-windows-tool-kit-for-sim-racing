@@ -18,7 +18,6 @@ internal sealed class FanCalibrator
 
     private readonly HardwareService _hardware;
     private readonly bool _demo;
-    private bool _stopTest;
 
     public FanCalibrator(HardwareService hardware, bool demo)
     {
@@ -28,7 +27,6 @@ internal sealed class FanCalibrator
 
     public async Task<FanCalibration> RunAsync(string controlId, CalibrationOptions options, IProgress<CalibrationStep> progress, CancellationToken cancel)
     {
-        _stopTest = options.TestStop;
         var steps = new List<int> { 100, 80, 60, 45, 35, 30, 25, 20 };
         if (options.TestStop)
             steps.AddRange(new[] { 15, 10, 5, 0 });
@@ -47,7 +45,7 @@ internal sealed class FanCalibrator
             {
                 cancel.ThrowIfCancellationRequested();
                 progress.Report(new CalibrationStep(percent, CurrentRpm(controlId), $"Testing {percent}%…", (double)done / total));
-                var (rpm, spread) = await MeasureAsync(controlId, percent, progress, done, total, cancel);
+                var (rpm, spread) = await MeasureAsync(controlId, percent, options.TestStop, progress, done, total, cancel);
                 if (percent == 100 && rpm == 0)
                     throw new CalibrationAbortedException("The fan reported 0 RPM at full speed (no speed signal on that header?), so nothing was saved.");
                 points.Add(new CalibrationPoint { Percent = percent, Rpm = rpm });
@@ -66,7 +64,7 @@ internal sealed class FanCalibrator
                 for (int percent = stopPercent.Value + 5; percent <= 60; percent += 5)
                 {
                     cancel.ThrowIfCancellationRequested();
-                    var (rpm, _) = await MeasureAsync(controlId, percent, progress, done, total, cancel);
+                    var (rpm, _) = await MeasureAsync(controlId, percent, options.TestStop, progress, done, total, cancel);
                     progress.Report(new CalibrationStep(percent, rpm, $"Restart test: {percent}% → {rpm:N0} RPM", (double)Math.Min(total - 1, ++done) / total));
                     if (rpm > 0)
                     {
@@ -100,7 +98,7 @@ internal sealed class FanCalibrator
         }
     }
 
-    private async Task<(int Rpm, double Spread)> MeasureAsync(string controlId, int percent, IProgress<CalibrationStep> progress,
+    private async Task<(int Rpm, double Spread)> MeasureAsync(string controlId, int percent, bool stopTest, IProgress<CalibrationStep> progress,
         int done, int total, CancellationToken cancel)
     {
         const int Window = 4;
@@ -110,7 +108,7 @@ internal sealed class FanCalibrator
         for (int i = 0; i < maximum; i++)
         {
             await Task.Delay(interval, cancel);
-            Guard();
+            Guard(stopTest);
             int rpm = CurrentRpm(controlId) ?? throw new CalibrationAbortedException("The fan's speed reading went away (sensors stopped or rescanned), so nothing was saved.");
             samples.Add(rpm);
             progress.Report(new CalibrationStep(percent, rpm, $"Testing {percent}%…", (double)done / total));
@@ -139,12 +137,12 @@ internal sealed class FanCalibrator
         return rpm is { } r ? (int)Math.Round(r) : null;
     }
 
-    private void Guard()
+    private void Guard(bool stopTest)
     {
         var snapshot = _hardware.Latest;
         if (_hardware.Catalog?.Emergency == true)
             throw new CalibrationAbortedException("The emergency temperature failsafe tripped, so all fans went to full speed.", safety: true);
-        if (_stopTest && snapshot is { CpuTemp: null })
+        if (stopTest && snapshot is { CpuTemp: null })
             throw new CalibrationAbortedException("The CPU temperature can't be read, so the stop test can't watch it. Calibrate without the stop test.", safety: true);
         if ((snapshot?.CpuTemp ?? 0) >= AbortTempC || (snapshot?.GpuTemp ?? 0) >= AbortTempC)
             throw new CalibrationAbortedException($"The CPU or GPU passed {AbortTempC:0} °C. Calibrate while the PC is idle.", safety: true);

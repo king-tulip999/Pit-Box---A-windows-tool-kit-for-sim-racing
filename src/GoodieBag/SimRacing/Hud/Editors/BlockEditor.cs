@@ -21,7 +21,7 @@ internal static class BlockEditor
         Groups = new HudGroup[]
         {
             new("value", "Value", HudTab.Layout, true, O("source"), O("decimals") with { InlineHelp = true }, O("visual")),
-            new("range", "Bar & graph", HudTab.Layout, true, O("min") with { ShowIf = o => o.Choice("visual") != "number" }, O("max") with { ShowIf = o => o.Choice("visual") != "number" }),
+            new("range", "Bar and graph", HudTab.Layout, true, O("min") with { ShowIf = o => o.Choice("visual") != "number" }, O("max") with { ShowIf = o => o.Choice("visual") != "number" }),
             new("coloring", "Coloring", HudTab.Layout, false, Coloring, O("warn") with { ShowIf = Colored }, O("crit") with { ShowIf = Colored }),
         },
         PresetKeeps = new[] { "source", "decimals", "min", "max", "warn", "crit", "above" },

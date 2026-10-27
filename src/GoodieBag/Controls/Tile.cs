@@ -53,6 +53,40 @@ public class Tile : Border
         return Shape(bounds, chamfer > 0 ? new CornerRadius(0) : ThemeManager.Round(radius));
     }
 
+    protected override Size MeasureOverride(Size constraint)
+    {
+        var size = base.MeasureOverride(constraint);
+        if (LayoutPadding() is not { } whole) return size;
+        var padding = Padding;
+        return new Size(
+            Math.Max(0, size.Width + whole.Left + whole.Right - padding.Left - padding.Right),
+            Math.Max(0, size.Height + whole.Top + whole.Bottom - padding.Top - padding.Bottom));
+    }
+
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        var arranged = base.ArrangeOverride(finalSize);
+        if (Child is { } child && LayoutPadding() is { } whole)
+        {
+            var dpi = VisualTreeHelper.GetDpi(this);
+            var edge = Hairline.WholePixels(BorderThickness, dpi.DpiScaleX, dpi.DpiScaleY);
+            double left = edge.Left + whole.Left, top = edge.Top + whole.Top;
+            child.Arrange(new Rect(left, top,
+                Math.Max(0, finalSize.Width - left - edge.Right - whole.Right),
+                Math.Max(0, finalSize.Height - top - edge.Bottom - whole.Bottom)));
+        }
+        return arranged;
+    }
+
+    private Thickness? LayoutPadding()
+    {
+        if (!UseLayoutRounding) return null;
+        var padding = Padding;
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var whole = Hairline.WholePixels(padding, dpi.DpiScaleX, dpi.DpiScaleY);
+        return whole == padding ? null : whole;
+    }
+
     protected override void OnRender(DrawingContext dc)
     {
         var spec = ThemeManager.Current;
@@ -146,11 +180,10 @@ public class Tile : Border
         }
         if (!ReferenceEquals(at, root)) return (edge, default);
         var unit = new Vector(toRoot.M11 + toRoot.M21, toRoot.M12 + toRoot.M22);
-        var device = Services.ScreenshotRunner.Active ? Matrix.Identity : target.TransformToDevice;
+        var device = Services.ScreenshotRunner.DrawsAt96 ? Matrix.Identity : target.TransformToDevice;
         double sx = Math.Abs(unit.X) * device.M11, sy = Math.Abs(unit.Y) * device.M22;
         if (sx < 0.01 || sy < 0.01) return (edge, default);
-        static double Whole(double v, double scale) => v <= 0 ? 0 : Math.Max(1, Math.Round(v * scale)) / scale;
-        return (new Thickness(Whole(edge.Left, sx), Whole(edge.Top, sy), Whole(edge.Right, sx), Whole(edge.Bottom, sy)), new Vector(0.5 / sx, 0.5 / sy));
+        return (Hairline.Edge(edge, sx, sy), new Vector(0.5 / sx, 0.5 / sy));
     }
 
     private void OnSourceChanged(object sender, SourceChangedEventArgs e)

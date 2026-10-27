@@ -5,7 +5,7 @@ using GoodieBag.Controls;
 
 namespace GoodieBag.Views;
 
-internal sealed record PageSection(string Id, string Title, string Icon, (string Soft, string Deep) Colors);
+internal sealed record PageSection(string Id, string Title, string Icon);
 
 internal sealed record SectionList(IReadOnlyList<PageSection> Sections, string? Current, bool Movable = true);
 
@@ -26,8 +26,8 @@ internal interface ISectionedPage
     event Action? SectionsChanged;
 }
 
-internal sealed record SectionDef(string Id, string Title, string Subtitle, string Icon, (string Soft, string Deep) Colors, Func<UIElement> Build,
-    string? Anchor = null, Action? Shown = null, Action? Hidden = null, FrameworkElement? Tools = null);
+internal sealed record SectionDef(string Id, string Title, string Subtitle, string Icon, Func<UIElement> Build,
+    string? Anchor = null, Action? Shown = null, Action? Hidden = null, FrameworkElement? Tools = null, bool Beta = false);
 
 internal sealed class SectionView
 {
@@ -41,9 +41,10 @@ internal sealed class SectionView
 
     private readonly Dictionary<string, Entry> _entries = new(StringComparer.OrdinalIgnoreCase);
     private readonly Grid _content = new();
-    private readonly NavIcon _icon = new() { Width = 34, Height = 34, Margin = new Thickness(0, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center, IsActive = true };
+    private readonly NavIcon _icon = new() { Width = 28, Height = 28, Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock _title = TextFit.TipWhenTrimmed(new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
-    private readonly TextBlock _subtitle = new() { TextWrapping = TextWrapping.Wrap, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 4, 0, 0) };
+    private readonly Border _beta = Ui.BetaChip();
+    private readonly TextBlock _subtitle = new() { TextWrapping = TextWrapping.Wrap, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 3, 0, 0) };
     private readonly ContentControl _tools = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
     private readonly StackPanel _right = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
     private readonly StackPanel _heading = new();
@@ -55,9 +56,11 @@ internal sealed class SectionView
         _scroll = scroll;
         _title.Style = Ui.Res<Style>("H1");
         _subtitle.Style = Ui.Res<Style>("Muted");
-        var name = new DockPanel { LastChildFill = true };
+        var name = new DockPanel { LastChildFill = true, Background = Brushes.Transparent };
+        name.MouseEnter += (_, _) => _icon.IsActive = true;
+        name.MouseLeave += (_, _) => _icon.IsActive = false;
         name.Children.Add(_icon);
-        name.Children.Add(_title);
+        name.Children.Add(new TrimRow { VerticalAlignment = VerticalAlignment.Center, Children = { _title, _beta } });
         _right.Children.Add(_tools);
         _heading.Children.Add(Ui.SplitRow(name, _right));
         _heading.Children.Add(_subtitle);
@@ -134,9 +137,10 @@ internal sealed class SectionView
         if (def is null) return;
         if (next is not null) Build(next);
         _icon.Glyph = def.Icon;
-        _icon.SetResourceReference(NavIcon.ForegroundProperty, def.Colors.Deep);
+        _icon.SetResourceReference(NavIcon.ForegroundProperty, "Accent");
         _title.Text = def.Title;
-        _title.SetResourceReference(TextBlock.ForegroundProperty, def.Colors.Deep);
+        _beta.Visibility = def.Beta ? Visibility.Visible : Visibility.Collapsed;
+        _title.SetResourceReference(TextBlock.ForegroundProperty, "Accent");
         _subtitle.Text = def.Subtitle;
         _subtitle.Visibility = next is null && def.Subtitle.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         _icon.ToolTip = def.Subtitle.Length > 0 ? def.Subtitle : null;

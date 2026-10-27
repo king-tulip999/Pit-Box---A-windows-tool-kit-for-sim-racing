@@ -143,8 +143,8 @@ internal static class LayoutLint
                 found.Add(new Finding("cut", where, Short(text), $"needs {natural:0} px, has {room:0} in {Ancestry(tb)}"));
             else if (tb.ActualWidth - tb.Padding.Left - tb.Padding.Right >= natural - Slack)
                 found.Add(new Finding("cut", where, Short(text), $"trims, but got all {natural:0} px it asked for and an ancestor clips it at {room:0} (no ellipsis) in {Ancestry(tb)}"));
-            else if (!HasTip(tb))
-                found.Add(new Finding("trimmed-no-tip", where, Short(text), $"needs {natural:0} px, has {room:0}"));
+            else
+                found.Add(new Finding(HasTip(tb) ? "trimmed" : "trimmed-no-tip", where, Short(text), $"needs {natural:0} px, has {room:0} in {Ancestry(tb)}"));
             return;
         }
         double longest = 0;

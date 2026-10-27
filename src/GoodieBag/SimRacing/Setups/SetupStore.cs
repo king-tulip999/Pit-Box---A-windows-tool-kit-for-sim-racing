@@ -338,7 +338,10 @@ internal sealed class SetupStore : IDisposable
             if (left)
             {
                 foreach (var n in list) n.Parent!.Children.Remove(n);
-                return (list.Count, "Some items are still there (in use, no permission, or kept when asked).");
+                bool tooLong = paths.Any(p => p.Length >= RecycleBin.MaxPath && (File.Exists(p) || Directory.Exists(p)));
+                return (list.Count, tooLong
+                    ? "Some items are still there: the Recycle Bin can't take paths longer than 260 characters. Shorten the folder names, then try again."
+                    : "Some items are still there (in use, no permission, or kept when asked).");
             }
         }
         foreach (var n in list) n.Parent!.Children.Remove(n);

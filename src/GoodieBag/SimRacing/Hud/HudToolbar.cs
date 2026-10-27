@@ -34,7 +34,8 @@ internal sealed class HudToolbar
         float width = x - Gap + Pad;
         var rect = new RectangleF(monitor.Bounds.Left + (monitor.Bounds.Width - width * _scale) / 2, monitor.Bounds.Top + 24 * _scale, width * _scale, Height * _scale);
         _window.Rect = rect;
-        var g = _window.Surface(new Size((int)Math.Ceiling(rect.Width), (int)Math.Ceiling(rect.Height)));
+        var size = new Size((int)Math.Ceiling(rect.Width), (int)Math.Ceiling(rect.Height));
+        var g = _window.Surface(size);
         var look = host.Settings.Appearance;
         var p = _painter;
         p.Begin(g, _scale, new SizeF(width, Height), HudPalette.Of(look), look);
@@ -53,6 +54,7 @@ internal sealed class HudToolbar
             var color = primary ? p.P.OnAccent : enabled ? p.P.Text : p.P.Faint;
             p.Text(label, p.Bold, color, box, HAlign.Center, VAlign.Center);
         }
+        p.End(_window.SurfaceDc, size);
         if (!_window.Visible) _window.Show();
         _window.Present(new Point((int)rect.X, (int)rect.Y));
         _window.KeepOnTop();

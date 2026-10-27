@@ -8,10 +8,12 @@ internal sealed class OverlayPlugin : Plugin
 {
     public override string Id => PluginIds.Overlay;
     public override string Name => "Performance Overlay";
-    public override string Description => "FPS, temperatures, load and fan speeds drawn on top of your game, toggled with a keybind. Set it up in Hardware Monitor → Performance Overlay.";
+    public override string Description => "FPS, temperatures, load and fan speeds on top of your game, toggled with a keybind.";
     public override string Icon => "I.Overlay";
     public override (string Soft, string Deep) Colors => ("ApricotSoft", "ApricotDeep");
     public override int Order => 55;
+
+    public override string? ParentId => PluginIds.HardwareMonitor;
     public override string Reads => "The sensors and frame rate it shows, at its update rate, only while it's on screen.";
     public override string BackgroundWork =>
         "Only while the overlay is on screen. While it's hidden, only its keybinds are registered.";
@@ -53,7 +55,7 @@ internal sealed class OverlayPlugin : Plugin
     public override void AddTrayItems(WinForms.ToolStripItemCollection items, AppServices app)
     {
         var o = app.Config.Overlay;
-        var item = new WinForms.ToolStripMenuItem("Show overlay") { Checked = o.Visible, ShortcutKeyDisplayString = GoodieBag.Hotkeys.Hotkey.Display(o.Hotkey) };
+        var item = new WinForms.ToolStripMenuItem("Show Performance Overlay") { Checked = o.Visible, ShortcutKeyDisplayString = GoodieBag.Hotkeys.Hotkey.Display(o.Hotkey) };
         item.Click += (_, _) => app.SetOverlayVisible(!o.Visible);
         items.Add(item);
     }

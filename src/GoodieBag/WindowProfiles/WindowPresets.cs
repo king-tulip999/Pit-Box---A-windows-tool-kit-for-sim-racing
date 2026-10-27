@@ -2,7 +2,7 @@ namespace GoodieBag.WindowProfiles;
 
 internal sealed record WindowPreset(string Id, string Group, string Name, int X, int Y, int Width, int Height)
 {
-    public string Text => $"{Name} · {Width} × {Height} at {X}, {Y}";
+    public string Text => $"{Name} · {Width}×{Height} at {X}, {Y}";
 }
 
 internal sealed record ScreenArea(string Name, int X, int Y, int Width, int Height, bool Primary);

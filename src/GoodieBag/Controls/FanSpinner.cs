@@ -30,9 +30,9 @@ public sealed class FanSpinner : Grid
     private bool IsPump => _drop is not null;
 
     private static readonly double[] TrailOpacity = { 0.5, 0.32, 0.18 };
-    private const double TrailSpread = 10;
+    private const double TrailSpread = 8;
 
-    public FanSpinner(Geometry fanIcon, Brush color, double size = 22) : this(fanIcon, color, size, trails: true) { }
+    public FanSpinner(Geometry fanIcon, Brush color, double size = 18) : this(fanIcon, color, size, trails: true) { }
 
     private FanSpinner(Geometry rotor, Brush color, double size, bool trails)
     {
@@ -50,14 +50,14 @@ public sealed class FanSpinner : Grid
                 _trailOffsets[i] = new RotateTransform();
                 _trails[i] = new Icon
                 {
-                    Data = rotor, Foreground = color, Width = size, Height = size, StrokeThickness = 1.9, Opacity = 0, Visibility = Visibility.Collapsed,
+                    Data = rotor, Foreground = color, Width = size, Height = size, StrokeThickness = 1.54, Opacity = 0, Visibility = Visibility.Collapsed,
                     RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new TransformGroup { Children = { _trailOffsets[i], _target } },
                     CacheMode = Cached(),
                 };
                 Children.Add(_trails[i]);
             }
         }
-        _rotor = new Icon { Data = rotor, Foreground = color, Width = size, Height = size, StrokeThickness = 1.9, RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = _target, CacheMode = Cached() };
+        _rotor = new Icon { Data = rotor, Foreground = color, Width = size, Height = size, StrokeThickness = 1.54, RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = _target, CacheMode = Cached() };
         Children.Add(_rotor);
         IsVisibleChanged += (_, _) => Update();
         Loaded += (_, _) => Hook(Window.GetWindow(this));
@@ -72,13 +72,13 @@ public sealed class FanSpinner : Grid
         _onBrush = running;
         _offBrush = off;
         _rotor.RenderTransformOrigin = new Point(10.0 / 24, 13.0 / 24);
-        _body = new Icon { Data = body, Foreground = off, Width = size, Height = size, StrokeThickness = 1.9 };
-        _drop = new Icon { Data = drop, Foreground = off, Width = size, Height = size, StrokeThickness = 1.9, Visibility = Visibility.Hidden };
+        _body = new Icon { Data = body, Foreground = off, Width = size, Height = size, StrokeThickness = 1.54 };
+        _drop = new Icon { Data = drop, Foreground = off, Width = size, Height = size, StrokeThickness = 1.54, Visibility = Visibility.Hidden };
         Children.Insert(0, _body);
         Children.Add(_drop);
     }
 
-    public static FanSpinner Pump(Brush running, Brush off, double size = 22)
+    public static FanSpinner Pump(Brush running, Brush off, double size = 18)
     {
         var res = Application.Current;
         return new FanSpinner((Geometry)res.FindResource("I.PumpBody"), (Geometry)res.FindResource("I.PumpImpeller"),

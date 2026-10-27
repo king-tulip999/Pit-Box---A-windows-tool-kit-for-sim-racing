@@ -51,12 +51,28 @@ internal sealed class Workspace
                 return;
             string renderer = Modes.Any(m => m.File == _settings.RendererFile) ? _settings.RendererFile : Modes.Count > 0 ? Modes[0].File : IracingPaths.MonitorRenderer;
             Session = SettingsSession.Load(Folder, renderer, SettingsCatalog.Embedded, _settings.IgnoredValues);
+            _readStamp = DiskStamp();
         }
         catch (Exception ex)
         {
             Session = null;
             LoadError = ex.Message;
         }
+    }
+
+    private string _readStamp = "";
+
+    private string DiskStamp()
+    {
+        if (_demo || Folder is null || Session is null) return "";
+        return string.Join("|", new[] { IracingPaths.App, IracingPaths.Core, Session.RendererFile }
+            .Select(f => Path.Combine(Folder, f)).Select(p => File.Exists(p) ? File.GetLastWriteTimeUtc(p).Ticks.ToString(System.Globalization.CultureInfo.InvariantCulture) : "-"));
+    }
+
+    public bool ChangedOnDisk()
+    {
+        try { return Session is not null && DiskStamp() != _readStamp; }
+        catch (Exception) { return false; }
     }
 
     public void SetMode(string rendererFile)

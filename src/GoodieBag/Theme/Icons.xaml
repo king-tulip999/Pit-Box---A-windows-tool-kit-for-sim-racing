@@ -42,6 +42,7 @@
     <Geometry x:Key="I.Memory">M6 19v-3M10 19v-3M14 19v-3M18 19v-3M8 11V9M16 11V9M12 11V9M2 15h20M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v1.1a2 2 0 0 0 0 3.837V17a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-5.1a2 2 0 0 0 0-3.837z</Geometry>
     <Geometry x:Key="I.Gauge">M12 14l4-4M3.34 19a10 10 0 1 1 17.32 0</Geometry>
     <Geometry x:Key="I.Speaker">M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298zM16 9a5 5 0 0 1 0 6M19.364 18.364a9 9 0 0 0 0-12.728</Geometry>
+    <Geometry x:Key="I.Headset">M4 14v-2a8 8 0 0 1 16 0v2M4 14h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H5a1 1 0 0 1-1-1zM20 14h-2a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h1a1 1 0 0 0 1-1zM6 20c0 1.4 1.6 2 4 2h1.5</Geometry>
     <Geometry x:Key="I.Target">M22 12a10 10 0 1 1-20 0a10 10 0 1 1 20 0zM18 12a6 6 0 1 1-12 0a6 6 0 1 1 12 0zM14 12a2 2 0 1 1-4 0a2 2 0 1 1 4 0z</Geometry>
     <Geometry x:Key="I.Hash">M4 9h16M4 15h16M10 3 8 21M16 3l-2 18</Geometry>
     <Geometry x:Key="I.Info">M22 12a10 10 0 1 1-20 0a10 10 0 1 1 20 0zM12 16v-4M12 8h.01</Geometry>
@@ -111,8 +112,32 @@
     <Geometry x:Key="I.RaceOverlay">M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM5.5 20l5.7-6.8M18.5 20l-5.7-6.8M5 7.4h0.01M7.2 7.4h3.3M5 9.6h0.01M7.2 9.6h3.3M5 11.8h0.01M7.2 11.8h3.3M12 14.5v1.2M12 17v1.8</Geometry>
     <Geometry x:Key="I.Trophy">M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0V2z</Geometry>
     <Geometry x:Key="I.Calendar">M8 2v4M16 2v4M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM3 10h18</Geometry>
-    <!-- Settings → Keybinds -->
     <Geometry x:Key="I.Keyboard">M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10</Geometry>
     <!-- Settings → Diagnostics -->
     <Geometry x:Key="I.Stethoscope">M11 2v2M5 2v2M5 3H4a2 2 0 0 0-2 2v4a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1M8 15a6 6 0 0 0 12 0v-3M22 10a2 2 0 1 1-4 0a2 2 0 1 1 4 0z</Geometry>
+    <Geometry x:Key="F.TradingPaints">F1 M1.83,9.56 14.62,9.56 12.98,22.03 8.16,22.03 8.72,18 5.44,20.95 2.34,17.67 5.86,14.3 1.17,14.3zM22.17,14.44 9.38,14.44 11.02,1.97 15.84,1.97 15.28,6 18.56,3.05 21.66,6.33 18.14,9.7 22.83,9.7z</Geometry>
+    <CombinedGeometry x:Key="F.Garage61" GeometryCombineMode="Exclude">
+        <CombinedGeometry.Transform>
+            <ScaleTransform ScaleX="0.70588" ScaleY="0.70588" />
+        </CombinedGeometry.Transform>
+        <CombinedGeometry.Geometry1>
+            <GeometryGroup>
+                <RectangleGeometry Rect="0,0,34,4.71" />
+                <RectangleGeometry Rect="0,0,1.85,34" />
+                <RectangleGeometry Rect="32.01,0,1.85,34" />
+                <RectangleGeometry Rect="2.69,5.53,28.34,9.08" RadiusX="2.21" RadiusY="2.21" />
+                <RectangleGeometry Rect="2.69,15.16,28.34,9.08" RadiusX="2.21" RadiusY="2.21" />
+                <RectangleGeometry Rect="2.69,24.79,28.34,9.08" RadiusX="2.21" RadiusY="2.21" />
+            </GeometryGroup>
+        </CombinedGeometry.Geometry1>
+        <CombinedGeometry.Geometry2>
+            <GeometryGroup>
+                <GeometryGroup.Transform>
+                    <ScaleTransform ScaleX="0.925" ScaleY="1.081" />
+                </GeometryGroup.Transform>
+                <PathGeometry FillRule="EvenOdd" Figures="m 14.975,7.71 q 0.509,0 1.152,0.054 0.67,0.054 1.34,0.188 0.697,0.107 1.34,0.321 0.67,0.188 1.179,0.51 l -0.857,3.751 h -4.153 q 0.027,-0.295 0.054,-0.563 0.027,-0.268 0.027,-0.563 0,-0.697 -0.161,-1.259 -0.161,-0.59 -0.616,-0.59 -0.322,0 -0.75,0.349 -0.429,0.348 -0.884,1.098 -0.456,0.75 -0.857,1.929 -0.402,1.179 -0.67,2.814 h 0.268 q 0.777,-0.857 1.902,-1.313 1.152,-0.456 2.358,-0.456 2.063,0 2.947,1.26 0.884,1.232 0.884,3.376 0,1.634 -0.509,2.84 -0.509,1.179 -1.634,2.063 -0.965,0.75 -2.438,1.233 -1.447,0.455 -3.43,0.455 -1.42,0 -2.626,-0.295 -1.179,-0.321 -2.063,-1.072 -0.857,-0.777 -1.34,-2.063 -0.482,-1.313 -0.482,-3.296 0,-2.117 0.59,-4.073 0.616,-1.956 1.849,-3.43 1.232,-1.5 3.108,-2.385 1.902,-0.884 4.475,-0.884 z m -3.644,15.675 q 0.643,0 1.125,-0.59 0.482,-0.589 0.777,-1.447 0.295,-0.857 0.429,-1.822 0.161,-0.991 0.161,-1.768 0,-0.643 -0.161,-0.991 -0.134,-0.349 -0.67,-0.349 -0.723,0 -1.232,0.616 -0.509,0.59 -0.857,1.447 -0.322,0.831 -0.482,1.742 -0.134,0.911 -0.134,1.527 0,0.75 0.241,1.206 0.241,0.429 0.804,0.429 z" />
+                <PathGeometry Figures="m 22.29,10.738 q 1.661,-0.241 3.001,-0.992 1.367,-0.75 2.17,-1.768 h 4.1 l -3.644,17.015 h -5.788 l 2.653,-12.46 h -2.894 z" />
+            </GeometryGroup>
+        </CombinedGeometry.Geometry2>
+    </CombinedGeometry>
 </ResourceDictionary>

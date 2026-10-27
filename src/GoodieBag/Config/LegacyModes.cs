@@ -64,8 +64,14 @@ internal static class LegacyModes
         {
             var fresh = mode.Windows.Where(r => !string.IsNullOrWhiteSpace(r.ProcessName) && (r.Id.Length == 0 || known.Add(r.Id)))
                 .Select(r => r.ToProfile()).ToList();
-            if (fresh.Count == 0) continue;
             string? hotkey = string.IsNullOrWhiteSpace(mode.Hotkey) || Taken(config, mode.Hotkey) ? null : mode.Hotkey;
+            if (fresh.Count == 0)
+            {
+                if (hotkey is not null && config.Displays.Profiles.FirstOrDefault(p => string.Equals(p.Name, mode.DisplayProfile, StringComparison.OrdinalIgnoreCase)) is { } display
+                    && string.IsNullOrWhiteSpace(display.Hotkey))
+                    display.Hotkey = hotkey;
+                continue;
+            }
             if (fresh.Count > 1)
             {
                 var group = new WindowGroup { Name = settings.UniqueName(mode.Name.Length > 0 ? mode.Name : "Group"), Hotkey = hotkey };

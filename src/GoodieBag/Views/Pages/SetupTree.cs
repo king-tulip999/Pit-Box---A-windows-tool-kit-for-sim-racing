@@ -13,7 +13,7 @@ namespace GoodieBag.Views.Pages;
 
 internal sealed class SetupTree : Grid
 {
-    public const double RowHeight = 30, Indent = 20, GapHeight = 14;
+    public const double RowHeight = 24, Indent = 16, GapHeight = 11;
     private const double Threshold = 6;
 
     private readonly StackPanel _rows = new();
@@ -75,8 +75,8 @@ internal sealed class SetupTree : Grid
     {
         var grid = new Grid { Height = RowHeight };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(depth * Indent + 4) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(19) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(19) });
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
@@ -84,8 +84,8 @@ internal sealed class SetupTree : Grid
         {
             var arrow = new Button
             {
-                Style = Ui.Res<Style>("QuietIconButton"), Width = 22, Height = 22, Padding = new Thickness(0), Focusable = false,
-                Content = new Icon { Data = Ui.Res<Geometry>(open ? "I.ChevronDown" : "I.ChevronRight"), Width = 13, Height = 13 },
+                Style = Ui.Res<Style>("QuietIconButton"), Width = 18, Height = 18, Padding = new Thickness(0), Focusable = false,
+                Content = new Icon { Data = Ui.Res<Geometry>(open ? "I.ChevronDown" : "I.ChevronRight"), Width = 11, Height = 11 },
                 ToolTip = open ? "Close folder" : "Open folder",
             };
             System.Windows.Automation.AutomationProperties.SetName(arrow, open ? "Close folder" : "Open folder");
@@ -103,13 +103,13 @@ internal sealed class SetupTree : Grid
         }
         var icon = new Icon
         {
-            Data = Ui.Res<Geometry>(node.IsFolder ? "I.Folder" : "I.FileText"), Width = 16, Height = 16, VerticalAlignment = VerticalAlignment.Center,
+            Data = Ui.Res<Geometry>(node.IsFolder ? "I.Folder" : "I.FileText"), Width = 13, Height = 13, VerticalAlignment = VerticalAlignment.Center,
             Foreground = Ui.Res<Brush>(node.IsFolder ? (target ? "AccentText" : "GoldDeep") : "TextFaint"),
         };
         Grid.SetColumn(icon, 2);
         grid.Children.Add(icon);
 
-        var name = TextCase.Verbatim(new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 8, 0) });
+        var name = TextCase.Verbatim(new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(3, 0, 6, 0) });
         string stem = node.IsFolder ? node.Name : System.IO.Path.GetFileNameWithoutExtension(node.Name);
         name.Children.Add(TextFit.TipWhenTrimmed(new TextBlock
         {
@@ -122,8 +122,8 @@ internal sealed class SetupTree : Grid
         if (!node.IsFolder && fresh > 0)
         {
             var chip = Ui.Chip("New", "AccentSoft", "AccentText");
-            chip.Margin = new Thickness(8, 0, 0, 0);
-            chip.Padding = new Thickness(6, 0, 6, 0);
+            chip.Margin = new Thickness(6, 0, 0, 0);
+            chip.Padding = new Thickness(5, 0, 5, 0);
             chip.VerticalAlignment = VerticalAlignment.Center;
             name.Children.Add(chip);
         }
@@ -133,7 +133,7 @@ internal sealed class SetupTree : Grid
         string meta = node.IsFolder
             ? Plural(node.Files, "setup") + (fresh > 0 ? $" · {fresh} new" : "")
             : $"{Size(node.Size)} · {Date(node.Modified)}";
-        var metaText = new TextBlock { Text = meta, Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+        var metaText = new TextBlock { Text = meta, Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
         if (node.IsFolder && fresh > 0) metaText.Foreground = Ui.Res<Brush>("AccentText");
         Grid.SetColumn(metaText, 4);
         grid.Children.Add(metaText);
@@ -157,11 +157,11 @@ internal sealed class SetupTree : Grid
         gap.SetValue(DepthProperty, depth);
         gap.SetValue(ParentFolderProperty, folder.Parent);
         if (divider)
-            gap.Children.Add(new Border
+            gap.Children.Add(Hairline.Rule(new Border
             {
-                Height = 1, VerticalAlignment = VerticalAlignment.Center, Background = Ui.Res<Brush>("LineStrong"),
+                VerticalAlignment = VerticalAlignment.Center, Background = Ui.Res<Brush>("LineStrong"),
                 Margin = new Thickness((depth + 1) * Indent + 4, 0, 16, 0), IsHitTestVisible = false,
-            });
+            }));
         return gap;
     }
 
@@ -173,12 +173,12 @@ internal sealed class SetupTree : Grid
     private static int DepthOf(UIElement e) => (int)e.GetValue(DepthProperty);
     private static SetupNode? ParentOf(UIElement e) => (SetupNode?)e.GetValue(ParentFolderProperty);
 
-    public static string Plural(int n, string word) => $"{n} {word}{(n == 1 ? "" : "s")}";
+    public static string Plural(int n, string word) => SimRacing.Race.RaceFormat.Count(n, word);
     public static string Size(long bytes) => bytes >= 1048576 ? $"{bytes / 1048576.0:0.0} MB" : $"{bytes / 1024.0:0.0} KB";
     public static string Date(DateTime t)
     {
         double days = (DateTime.Now.Date - t.Date).TotalDays;
-        return days < 1 ? "Today" : days < 2 ? "Yesterday" : t.Year == DateTime.Now.Year ? Dates.Short(t) : Dates.Date(t);
+        return days < 1 ? "Today" : days < 2 ? "Yesterday" : Dates.Day(t);
     }
 
     private sealed class Drag
@@ -296,7 +296,7 @@ internal sealed class SetupTree : Grid
         Canvas.SetLeft(ghost, 0);
         Canvas.SetTop(ghost, slotTop);
         _overlay.Children.Add(ghost);
-        if (row is Tile slot) { slot.Child.Visibility = Visibility.Hidden; slot.BorderBrush = Ui.Res<Brush>("Accent"); slot.BorderThickness = new Thickness(1); slot.Background = Ui.Res<Brush>("AccentSoft"); }
+        if (row is Tile slot) { slot.Child.Visibility = Visibility.Hidden; slot.BorderBrush = Ui.Res<Brush>("Accent"); Hairline.Frame(slot); slot.Background = Ui.Res<Brush>("AccentSoft"); }
         foreach (var hide in Subtree(row)) { hide.Visibility = Visibility.Collapsed; _drag.Hidden.Add(hide); }
         foreach (var other in _rows.Children.OfType<FrameworkElement>().Where(r => r != row && r.Tag is SetupNode n && nodes.Contains(n)).ToList())
         {
@@ -310,13 +310,13 @@ internal sealed class SetupTree : Grid
 
     private static FrameworkElement GhostContent(SetupNode node, int count)
     {
-        var panel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 10, 0) };
-        panel.Children.Add(new Icon { Data = Ui.Res<Geometry>(node.IsFolder ? "I.Folder" : "I.FileText"), Width = 16, Height = 16, Foreground = Ui.Res<Brush>("AccentText") });
-        panel.Children.Add(new TextBlock { Text = node.Name, Margin = new Thickness(8, 0, 0, 0), FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>("Text"), VerticalAlignment = VerticalAlignment.Center });
+        var panel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 8, 0) };
+        panel.Children.Add(new Icon { Data = Ui.Res<Geometry>(node.IsFolder ? "I.Folder" : "I.FileText"), Width = 13, Height = 13, Foreground = Ui.Res<Brush>("AccentText") });
+        panel.Children.Add(new TextBlock { Text = node.Name, Margin = new Thickness(6, 0, 0, 0), FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>("Text"), VerticalAlignment = VerticalAlignment.Center });
         if (count > 1)
         {
             var chip = Ui.Chip($"{count} items", "AccentSoft", "AccentText");
-            chip.Margin = new Thickness(10, 0, 0, 0);
+            chip.Margin = new Thickness(8, 0, 0, 0);
             panel.Children.Add(chip);
         }
         return panel;

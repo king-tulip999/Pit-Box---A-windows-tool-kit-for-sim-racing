@@ -11,14 +11,14 @@ internal sealed class HardwareMonitorPage : UserControl, IPage, IScreenshotState
 
     private readonly AppServices _app;
     private readonly MainWindow _window;
-    private readonly StackPanel _body = new() { Margin = new Thickness(28, 0, 28, 28) };
+    private readonly StackPanel _body = new() { Margin = new Thickness(23, 0, 23, 23) };
     private readonly ScrollViewer _scroll;
     private readonly PerformanceSection _performance;
     private OverlayPage? _overlay;
     private readonly SectionView _view;
     private bool _shown;
 
-    internal static readonly string[] DefaultSections = { "overlay", "performance" };
+    internal static readonly string[] DefaultSections = { "performance", "overlay" };
 
     public event Action? SectionsChanged;
 
@@ -30,9 +30,8 @@ internal sealed class HardwareMonitorPage : UserControl, IPage, IScreenshotState
         Content = _scroll;
         _view = new SectionView(() => _scroll);
 
-        _view.Empty = new SectionDef("", "Hardware Monitor", "Every section is off. Switch them on again in Settings → Plugins.", "I.HeartPulse",
-            Hues.Tool(PluginIds.HardwareMonitor, Hues.Accent), () => new Border());
-        _view.Heading.Margin = new Thickness(0, 0, 0, Ui.HeaderGap);
+        _view.Empty = new SectionDef("", "Hardware Monitor", "Every section is off. Switch them on again in Settings → Tools.", "I.HeartPulse", () => new Border());
+        _view.Heading.Margin = Ui.HeaderMargin;
         _body.Children.Add(_view.Heading);
         _body.Children.Add(_view.Content);
 
@@ -40,7 +39,7 @@ internal sealed class HardwareMonitorPage : UserControl, IPage, IScreenshotState
         _view.Add(Def("overlay", "",
             () => _overlay = new OverlayPage(_app, _window, embedded: true), "monitor.overlay",
             () => _overlay?.OnShown(), () => _overlay?.OnHidden()));
-        _view.Add(Def("performance", "CPU, graphics card, memory, storage, network, motherboard, fans and frame rate, with the last two minutes on graphs.",
+        _view.Add(Def("performance", "",
             () => _performance, "monitor.performance", _performance.OnShown, _performance.OnHidden, _performance.Tools));
         Layout(animate: false);
     }
@@ -49,8 +48,8 @@ internal sealed class HardwareMonitorPage : UserControl, IPage, IScreenshotState
 
     private static readonly PageSection[] Parts =
     {
-        new("overlay", "Performance Overlay", "I.Overlay", ("ApricotSoft", "ApricotDeep")),
-        new("performance", "Performance", "I.Activity", ("SageSoft", "SageDeep")),
+        new("performance", "Dashboard", "I.Activity"),
+        new("overlay", "Performance Overlay", "I.Overlay"),
     };
 
     private static List<string> OrderedFor(AppServices app)
@@ -90,7 +89,7 @@ internal sealed class HardwareMonitorPage : UserControl, IPage, IScreenshotState
     private static SectionDef Def(string id, string subtitle, Func<UIElement> build, string? anchor, Action? shown, Action? hidden, FrameworkElement? tools = null)
     {
         var p = Parts.First(x => x.Id == id);
-        return new SectionDef(id, p.Title, subtitle, p.Icon, p.Colors, build, anchor, shown, hidden, tools);
+        return new SectionDef(id, p.Title, subtitle, p.Icon, build, anchor, shown, hidden, tools);
     }
 
     private List<string> Order => _app.Config.Ui.MonitorSectionOrder;

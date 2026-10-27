@@ -32,7 +32,7 @@ internal static class IracingPaths
                     && Directory.Exists(Path.Combine(d, "Backups"))
                     && Directory.GetDirectories(Path.Combine(d, "Backups")).Any(b => File.Exists(Path.Combine(b, "backup.txt"))))
                 : null;
-            if (earlier is not null && !Directory.Exists(home)) Directory.Move(earlier, home);
+            if (earlier is not null && !Directory.Exists(home) && !ConfigStore.ReadOnly) Directory.Move(earlier, home);
         }
         catch { }
         return folder;
@@ -386,6 +386,8 @@ internal static class RecycleBin
 
     private const uint FO_DELETE = 3;
     private const ushort FOF_SILENT = 0x4, FOF_NOCONFIRMATION = 0x10, FOF_ALLOWUNDO = 0x40, FOF_NOERRORUI = 0x400, FOF_WANTNUKEWARNING = 0x4000;
+
+    public const int MaxPath = 260;
 
     public static int Send(IReadOnlyList<string> paths)
     {

@@ -98,7 +98,13 @@ internal static class ProcessLauncher
         catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { return -2; }
     }
 
-    private static readonly int CurrentSession = Process.GetCurrentProcess().SessionId;
+    private static readonly int CurrentSession = OwnSession();
+
+    private static int OwnSession()
+    {
+        using var me = Process.GetCurrentProcess();
+        return me.SessionId;
+    }
 
     private static async Task ExitedAsync(Process process, CancellationToken grace)
     {

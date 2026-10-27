@@ -165,7 +165,7 @@ internal static class DemoData
     private static DisplaySnapshot Snapshot(string paths, params (string Name, string Key)[] monitors) => new()
     {
         Paths = paths,
-        Summary = monitors.Select(m => $"{m.Name} · 2560×1440 · 165 Hz").ToList(),
+        Summary = monitors.Select(m => $"{m.Name} · 2560×1440 · 165 {Units.Hz}").ToList(),
         TargetDevicePaths = paths["demo:".Length..].Split(';').Select(p => p.Split(',')[0]).ToList(),
     };
 }

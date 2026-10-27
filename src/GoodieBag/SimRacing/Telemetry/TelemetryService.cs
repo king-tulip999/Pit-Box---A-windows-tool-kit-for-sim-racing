@@ -219,7 +219,11 @@ internal sealed class TelemetryService : IDisposable
                     }
                 }
                 int tick = mem.CopyLatest();
-                if (tick < 0 || tick == lastTick) continue;
+                if (tick < 0 || tick == lastTick)
+                {
+                    if (Stopwatch.GetElapsedTime(lastData).TotalSeconds > 2) PublishStatus(SimStatus.Waiting);
+                    continue;
+                }
                 lastTick = tick;
                 lastData = Stopwatch.GetTimestamp();
                 _tickRate = mem.TickRate;

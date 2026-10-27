@@ -17,7 +17,7 @@ internal sealed class TrayService : IDisposable
     public event Action<string?>? OpenRequested;
     public event Action? ExitRequested;
 
-    public TrayService(AppServices app)
+    public TrayService(AppServices app, bool showIcon = true)
     {
         _app = app;
         _image = LoadIcon();
@@ -27,7 +27,7 @@ internal sealed class TrayService : IDisposable
             Text = "Goodie Bag (running in the background)",
             ContextMenuStrip = _menu,
         };
-        Show();
+        if (showIcon) Show();
         var again = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
         again.Tick += (_, _) => { again.Stop(); if (!_disposed) { Safe(() => _icon.Visible = false); Show(); } };
         if (Environment.GetCommandLineArgs().Contains("--minimized", StringComparer.OrdinalIgnoreCase)) again.Start();
@@ -174,11 +174,35 @@ internal sealed class TrayService : IDisposable
             themes.DropDownItems.Add(item);
         }
         _menu.Items.Add(themes);
-        _menu.Items.Add(new ToolStripMenuItem("Settings…", null, (_, _) => OpenRequested?.Invoke("settings")));
+        _menu.Items.Add(new ToolStripMenuItem("Settings", null, (_, _) => OpenRequested?.Invoke("settings")));
         var exit = new ToolStripMenuItem("Quit Goodie Bag") { ToolTipText = "Closes Goodie Bag. With fan control on, it asks whether a small helper keeps your fan curves running." };
         exit.Click += (_, _) => ExitRequested?.Invoke();
         _menu.Items.Add(exit);
         TrayTheme.Apply(_menu);
+    }
+
+    internal void SaveMenuPictures(string folder)
+    {
+        Rebuild();
+        _menu.Show(Point.Empty);
+        try
+        {
+            SavePicture(_menu, System.IO.Path.Combine(folder, "menu.png"));
+            foreach (var item in _menu.Items.OfType<ToolStripMenuItem>().Where(i => i.HasDropDownItems))
+            {
+                item.ShowDropDown();
+                SavePicture(item.DropDown, System.IO.Path.Combine(folder, $"menu-{item.Text?.ToLowerInvariant().Replace(' ', '-')}.png"));
+                item.HideDropDown();
+            }
+        }
+        finally { _menu.Close(); }
+    }
+
+    private static void SavePicture(ToolStripDropDown menu, string path)
+    {
+        using var bitmap = new Bitmap(Math.Max(1, menu.Width), Math.Max(1, menu.Height));
+        menu.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
+        bitmap.Save(path, System.Drawing.Imaging.ImageFormat.Png);
     }
 
     internal static Icon? FanIcon(Config.AppTheme theme) => TileIcon("I.Fan", theme);

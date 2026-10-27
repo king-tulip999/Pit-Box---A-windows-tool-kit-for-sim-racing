@@ -18,7 +18,7 @@ public sealed class LoadingSpinner : Grid
     private Window? _window;
     private bool _spinning;
 
-    public LoadingSpinner(double size = 40)
+    public LoadingSpinner(double size = 32)
     {
         Width = Height = size;
         if (ThemeManager.Current.RacingDecor)

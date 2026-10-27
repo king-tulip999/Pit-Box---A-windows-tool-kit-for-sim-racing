@@ -18,13 +18,13 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
 {
     private readonly AppServices _app;
     private readonly MainWindow _window;
-    private readonly StackPanel _body = new() { Margin = new Thickness(28, 0, 28, 28) };
-    private readonly TextBlock _driver = TextFit.TipWhenTrimmed(new TextBlock { FontSize = 18, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
-    private readonly TextBlock _number = new() { FontSize = 17, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-    private readonly Tile _numberPlate = new() { MinWidth = 44, Height = 30, Padding = new Thickness(9, 0, 9, 0), BorderThickness = new Thickness(1.5), Margin = new Thickness(0, 0, 10, 0) };
+    private readonly StackPanel _body = new() { Margin = new Thickness(23, 0, 23, 23) };
+    private readonly TextBlock _driver = TextFit.TipWhenTrimmed(new TextBlock { FontSize = 14.5, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
+    private readonly TextBlock _number = new() { FontSize = 14, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+    private readonly Tile _numberPlate = new() { MinWidth = 36, Height = 24, Padding = new Thickness(7, 0, 7, 0), BorderThickness = new Thickness(1.5), Margin = new Thickness(0, 0, 8, 0) };
     private readonly StackPanel _driverPlate = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
     private readonly StackPanel _crumbs = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
-    private readonly TextBlock _sessionsCount = new() { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 0, 0, 0) };
+    private readonly TextBlock _sessionsCount = new() { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(11, 0, 0, 0) };
     private readonly StackPanel _tools = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
     private readonly ContentControl _progress = new() { Focusable = false }, _content = new() { Focusable = false };
     private readonly ScrollViewer _scroll;
@@ -52,14 +52,14 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
             e.Handled = true;
             Back();
         };
-        var header = new StackPanel { Margin = new Thickness(0, 0, 0, Ui.HeaderGap) };
+        var header = new StackPanel { Margin = Ui.HeaderMargin };
         var left = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
         var title = Ui.PluginTitle(PluginIds.SessionStats, "Session Stats");
-        title.Margin = new Thickness(0, 0, 28, 0);
+        title.Margin = new Thickness(0, 0, 23, 0);
         left.Children.Add(title);
         left.Children.Add(_driverPlate);
         left.Children.Add(_crumbs);
-        header.Children.Add(Ui.SplitRow(left, _tools, 16, stackLeft: true));
+        header.Children.Add(Ui.SplitRow(left, _tools, 13, stackLeft: true));
         _body.Children.Add(header);
         _body.Children.Add(_progress);
         _body.Children.Add(_content);
@@ -70,7 +70,7 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
             _tools.Children.Add(StatsUi.RangePicker(stats, "page", Changed));
             var more = Ui.IconButton("I.Sliders", "Units and car number", () => { });
             more.Click += (_, _) => OpenOptions(more, stats);
-            more.Margin = new Thickness(10, 0, 0, 0);
+            more.Margin = new Thickness(8, 0, 0, 0);
             _tools.Children.Add(more);
         }
     }
@@ -87,9 +87,9 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         _numberPlate.Child = _number;
         _numberPlate.ToolTip = "Your car number";
         _driver.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
-        _driver.MaxWidth = 360;
+        _driver.MaxWidth = 292;
         var edit = Ui.IconButton("I.Pencil", "Your car number (blank = the one you used most, league races first)", () => _ = EditNumberAsync(), "QuietIconButton");
-        edit.Margin = new Thickness(6, 0, 0, 0);
+        edit.Margin = new Thickness(5, 0, 0, 0);
         edit.VerticalAlignment = VerticalAlignment.Center;
         _sessionsCount.Style = Ui.Res<Style>("Caption");
         _driverPlate.Children.Add(_numberPlate);
@@ -100,7 +100,8 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
 
     private void OpenOptions(Button anchor, SessionStatsService stats)
     {
-        var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom, MinWidth = 220 };
+        var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom, MinWidth = 178 };
+        Ui.DropBelow(menu);
         foreach (var (label, imperial) in new[] { ("Metric units", false), ("Imperial units", true) })
         {
             var item = new MenuItem { Header = label, IsCheckable = true, IsChecked = stats.Settings.Imperial == imperial };
@@ -126,13 +127,13 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         {
             if (_crumbs.Children.Count > 0)
             {
-                var chevron = new Icon { Data = Ui.Res<Geometry>("I.ChevronRight"), Width = 14, Height = 14, Margin = new Thickness(4, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center };
+                var chevron = new Icon { Data = Ui.Res<Geometry>("I.ChevronRight"), Width = 11, Height = 11, Margin = new Thickness(3, 0, 3, 0), VerticalAlignment = VerticalAlignment.Center };
                 chevron.SetResourceReference(Control.ForegroundProperty, "TextFaint");
                 _crumbs.Children.Add(chevron);
             }
             if (go is null)
             {
-                var here = new TextBlock { Text = text, Style = Ui.Res<Style>("Body"), FontSize = 15, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
+                var here = new TextBlock { Text = text, Style = Ui.Res<Style>("Body"), FontSize = 12, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
                 here.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
                 _crumbs.Children.Add(here);
                 return;
@@ -238,7 +239,7 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         return view;
     }
 
-    private async void RefreshDrill(SessionStatsService stats, StatsStore store, int version)
+    private async Task RefreshDrill(SessionStatsService stats, StatsStore store, int version)
     {
         long id = _sessionId!.Value;
         var traces = stats.Traces;
@@ -291,7 +292,7 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         (string, LapTrace)? trackBest = null;
         if (traces.BestOf(session.Car, session.Track, session.Config) is { } tb && !(tb.Session == id && tb.Lap == best.Row?.Lap) && traces.Load(tb.Session, tb.Lap) is { } tbTrace)
         {
-            string when = store.Session(tb.Session) is { } other ? Dates.Date(other.StartUtc.ToLocalTime()) : "";
+            string when = store.Session(tb.Session) is { } other ? Dates.Day(other.StartUtc.ToLocalTime()) : "";
             trackBest = ($"{StatFormat.LapTime(tb.Time)}{(when.Length > 0 ? " · " + when : "")}", tbTrace);
         }
         var shared = traces.SharedAt(session.Track, session.Config);
@@ -312,11 +313,21 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
     private void ExportLap(StatsStore store, TraceStore traces, long session, int lap)
     {
         if (_app.Demo) { _app.Notify("Demo mode", "Demo laps aren't saved to files.", NoticeKind.Info); return; }
-        var summary = store.Session(session);
-        var trace = traces.Load(session, lap);
-        if (summary is null || trace is null) { _app.Notify("Couldn't export the lap", "Its telemetry isn't stored any more.", NoticeKind.Warning); return; }
-        var row = store.Laps(session).FirstOrDefault(l => l.Lap == lap);
-        var shared = new SharedLap(store.DriverOf(session), summary.Car, summary.Track, summary.Config, row?.Sectors, summary.StartUtc, trace);
+        SharedLap shared;
+        try
+        {
+            var summary = store.Session(session);
+            var trace = traces.Load(session, lap);
+            if (summary is null || trace is null) { _app.Notify("Couldn't export the lap", "Its telemetry isn't stored any more.", NoticeKind.Warning); return; }
+            var row = store.Laps(session).FirstOrDefault(l => l.Lap == lap);
+            shared = new SharedLap(store.DriverOf(session), summary.Car, summary.Track, summary.Config, row?.Sectors, summary.StartUtc, trace);
+        }
+        catch (Exception ex)
+        {
+            App.LogError(ex);
+            _app.Notify("Couldn't export the lap", ex.Message, NoticeKind.Warning);
+            return;
+        }
         if (!GoodieBag.Services.External.Allowed("save dialog")) return;
         var dialog = new Microsoft.Win32.SaveFileDialog { Title = "Export lap", Filter = LapFile.Filter, FileName = LapFile.FileName(shared), DefaultExt = LapFile.Extension, AddExtension = true };
         if (dialog.ShowDialog(_window) != true) return;
@@ -373,6 +384,16 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
 
     private async void Refresh(bool restoreOffset = false)
     {
+        try { await RefreshCore(restoreOffset); }
+        catch (Exception ex)
+        {
+            App.LogError(ex);
+            if (_shown) _content.Content = Ui.DangerBanner("Stats unavailable", ex.Message);
+        }
+    }
+
+    private async Task RefreshCore(bool restoreOffset)
+    {
         if (!_shown || Stats is not { } stats) return;
         int version = ++_version;
         _progress.Content = StatsUi.Progress(stats);
@@ -387,7 +408,7 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
             _content.Content = new Tile { Style = Ui.Res<Style>("Card"), Child = Ui.Text(StatsSessionsNote(stats), "Muted") };
             return;
         }
-        if (_sessionId is not null) { RefreshDrill(stats, store, version); return; }
+        if (_sessionId is not null) { await RefreshDrill(stats, store, version); return; }
         var q = stats.Query();
         var range = stats.Range;
         var results = await stats.EvaluateAsync(stats.Available, q);
@@ -671,9 +692,9 @@ internal static class StatsUi
     public static FrameworkElement? Progress(SessionStatsService stats)
     {
         if (stats.Importing is not { } p || p.Total == 0) return null;
-        var stack = new StackPanel { Margin = new Thickness(0, 10, 0, 0) };
+        var stack = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
         stack.Children.Add(Ui.Text($"Reading telemetry files · {p.Done} / {p.Total}", "Caption"));
-        stack.Children.Add(new Meter { Value = (double)p.Done / p.Total, Fill = Ui.Res<Brush>("Accent"), Margin = new Thickness(0, 4, 0, 0) });
+        stack.Children.Add(new Meter { Value = (double)p.Done / p.Total, Fill = Ui.Res<Brush>("Accent"), Margin = new Thickness(0, 3, 0, 0) });
         return stack;
     }
 }
@@ -696,7 +717,7 @@ internal static class StatsSections
             grid.Add(new PanelDef(id, label, _ => element) { FullWidth = true, Order = order++ });
         }
 
-        var groups = new StatGrid { MinTileWidth = 420, Gap = 40, RowGap = 28, Columns = 3 };
+        var groups = new StatGrid { MinTileWidth = 340, Gap = 32, RowGap = 23, Columns = 3 };
         void Group(string title, IEnumerable<(StatDef, StatResult)> stats)
         {
             var list = stats.ToList();
@@ -719,34 +740,34 @@ internal static class StatsSections
                 Chart("Personal best progression", "Your best clean lap in this car and track, session by session", charts.Timeline.Count switch
                 {
                     0 => Empty("No clean laps for this pair yet."),
-                    1 => Empty($"One best so far: {StatFormat.LapTime(charts.Timeline[0].Lap)} on {Dates.Date(charts.Timeline[0].When.ToLocalTime())}. The line starts once you beat it."),
+                    1 => Empty($"One best so far: {StatFormat.LapTime(charts.Timeline[0].Lap)} on {Dates.Day(charts.Timeline[0].When.ToLocalTime())}. The line starts once you beat it."),
                     _ => StatsCharts.Progression(charts.Timeline),
                 }),
                 Chart("Lap consistency", "Clean laps per session: the box holds the middle half, the line runs from the fastest lap to the 90th percentile, the tick is the median",
-                    charts.Consistency.Count == 0 ? Empty("No session with 3 or more clean laps in this pair yet.") : StatsCharts.Consistency(charts.Consistency)), 1050, gap: 32)!));
+                    charts.Consistency.Count == 0 ? Empty("No session with 3 or more clean laps in this pair yet.") : StatsCharts.Consistency(charts.Consistency)), 1050, gap: 26)!, movable: true));
 
         var types = charts.SessionTypes;
-        var activity = Section("Driving activity", "I.Clock", $"{charts.Sessions:N0} session{(charts.Sessions == 1 ? "" : "s")}", null, Stack(
+        var activity = Section("Driving activity", "I.Clock", $"{SimRacing.Race.RaceFormat.Count(charts.Sessions, "session")}", null, Stack(
             Chart("Session mix", null, StatsCharts.SessionMix(types)),
             StatsLayout.Pair(
                 Chart("When you drive", "Driving time by the hour each session started, local time", StatsCharts.Heatmap(charts.Heatmap)),
-                Chart(charts.Trend.Title, "Driving time per period of this range", StatsCharts.Trend(charts.Trend)), 1050, gap: 32),
-            Metrics(Many("time.week", "time.month", "time.weekly", "time.streak", "time.session", "time.stint", "time.garage"))));
+                Chart(charts.Trend.Title, "Driving time per period of this range", StatsCharts.Trend(charts.Trend)), 1050, gap: 26),
+            Metrics(Many("time.week", "time.month", "time.weekly", "time.streak", "time.session", "time.stint", "time.garage"))), movable: true);
         Ui.Anchor(activity, "stats.activity");
         Add("activity", "Driving activity", activity);
 
         string? variety = string.Join(" · ", new[] { Count(Get("car.unique"), "car"), Count(Get("track.unique"), "track") }.OfType<string>());
-        var rankings = new StatGrid { MinTileWidth = 280, Gap = 32, Columns = 3 };
+        var rankings = new StatGrid { MinTileWidth = 227, Gap = 26, Columns = 3 };
         rankings.Children.Add(Chart("Cars", "By driving time", StatsCharts.Ranked(charts.Cars, "Accent", "No cars in this range", cars: true)));
         rankings.Children.Add(Chart("Tracks", "By driving time", StatsCharts.Ranked(charts.Tracks, "Slate", "No tracks in this range")));
         rankings.Children.Add(Chart("Classes", "By driving time", StatsCharts.Ranked(charts.Classes, "Gold", "No classes in this range")));
-        var cars = Section("Cars & tracks", "I.Flag", variety.Length > 0 ? variety : null, null, Stack(rankings, PersonalBests(charts, q, Get("combo.top"))));
+        var cars = Section("Cars and tracks", "I.Flag", variety.Length > 0 ? variety : null, null, Stack(rankings, PersonalBests(charts, q, Get("combo.top"))), movable: true);
         Ui.Anchor(cars, "stats.cars");
-        Add("cars", "Cars & tracks", cars);
-        var tip = Ui.Text("Tip: drag a panel by an empty spot to move it in the order", "Caption");
+        Add("cars", "Cars and tracks", cars);
+        var tip = Ui.Text("Drag a panel by an empty spot to reorder the panels", "Caption");
         tip.TextWrapping = TextWrapping.Wrap;
         var tipLine = Ui.IconText("I.Info", tip, "TextMuted");
-        tipLine.Margin = new Thickness(2, 0, 0, 8);
+        tipLine.Margin = new Thickness(2, 0, 0, 6);
         tipLine.HorizontalAlignment = HorizontalAlignment.Center;
         return new StackPanel { Children = { grid, tipLine } };
     }
@@ -754,27 +775,33 @@ internal static class StatsSections
     private static string? Count((StatDef Def, StatResult Result)? stat, string noun) =>
         stat is { Result: { NoData: false } r } ? $"{r.Value} {noun}{(r.Value == "1" ? "" : "s")}" : null;
 
-    internal static FrameworkElement Empty(string text) => new TextBlock { Text = text, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 4, 0, 0) };
+    internal static FrameworkElement Empty(string text) => new TextBlock { Text = text, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 3, 0, 0) };
 
-    internal static Tile Section(string title, string icon, string? note, FrameworkElement? tools, FrameworkElement body)
+    internal static Tile Section(string title, string icon, string? note, FrameworkElement? tools, FrameworkElement body, bool movable = false)
     {
         var left = new StackPanel { Orientation = Orientation.Horizontal };
-        var mark = new Icon { Data = Ui.Res<Geometry>(icon), Width = 20, Height = 20, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+        if (movable)
+        {
+            left.Background = Brushes.Transparent;
+            left.Cursor = Cursors.SizeAll;
+            left.ToolTip = "Drag to move this panel";
+        }
+        var mark = new Icon { Data = Ui.Res<Geometry>(icon), Width = 16, Height = 16, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
         mark.SetResourceReference(Control.ForegroundProperty, "AccentText");
         left.Children.Add(mark);
         var text = Ui.Text(title, "H2");
         text.VerticalAlignment = VerticalAlignment.Center;
         left.Children.Add(text);
         if (note is not null)
-            left.Children.Add(new TextBlock { Text = note, Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 0, 0) });
+            left.Children.Add(new TextBlock { Text = note, Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(13, 0, 0, 0) });
         FrameworkElement head = left;
         if (tools is not null)
         {
             tools.Margin = new Thickness(0);
             head = Ui.SplitRow(left, tools, stackLeft: true);
         }
-        body.Margin = new Thickness(0, 18, 0, 0);
-        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(24, 20, 24, 24), Child = new StackPanel { Children = { head, body } } };
+        body.Margin = new Thickness(0, 15, 0, 0);
+        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(19, 16, 19, 19), Child = new StackPanel { Children = { head, body } } };
     }
 
     internal static StackPanel Stack(params FrameworkElement?[] parts)
@@ -784,7 +811,7 @@ internal static class StatsSections
         {
             if (stack.Children.Count > 0)
             {
-                var rule = new Border { Height = 1, Margin = new Thickness(0, 22, 0, 20) };
+                var rule = Hairline.Rule(new Border { Margin = new Thickness(0, 18, 0, 16) });
                 rule.SetResourceReference(Border.BackgroundProperty, "Line");
                 stack.Children.Add(rule);
             }
@@ -798,14 +825,14 @@ internal static class StatsSections
         var stack = new StackPanel();
         stack.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("H3") });
         if (caption is not null) stack.Children.Add(new TextBlock { Text = caption, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 2, 0, 0) });
-        content.Margin = new Thickness(0, 12, 0, 0);
+        content.Margin = new Thickness(0, 10, 0, 0);
         stack.Children.Add(content);
         return stack;
     }
 
-    private static FrameworkElement? Metrics(IEnumerable<(StatDef Def, StatResult Result)> stats, double size = 22)
+    private static FrameworkElement? Metrics(IEnumerable<(StatDef Def, StatResult Result)> stats, double size = 18)
     {
-        var grid = new StatGrid { MinTileWidth = 150, Gap = 0, RowGap = 16 };
+        var grid = new StatGrid { MinTileWidth = 122, Gap = 0, RowGap = 13 };
         foreach (var (def, result) in stats)
         {
             var element = Metric(def, result, size);
@@ -822,20 +849,20 @@ internal static class StatsSections
         var value = new TextBlock { Text = result.NoData ? "No data" : result.Value, Style = Ui.Res<Style>("BigValue"), FontSize = size, TextWrapping = TextWrapping.Wrap };
         if (result.NoData)
         {
-            value.FontSize = 15;
+            value.FontSize = 12;
             value.FontWeight = FontWeights.SemiBold;
             value.SetResourceReference(TextBlock.ForegroundProperty, "TextFaint");
         }
         else
         {
-            if (name) { value.FontSize = 16; value.MaxHeight = 16 * 2.8; value.TextTrimming = TextTrimming.CharacterEllipsis; TextFit.TipWhenTrimmed(value); }
+            if (name) { value.FontSize = 13; value.MaxHeight = 13 * 2.8; value.TextTrimming = TextTrimming.CharacterEllipsis; TextFit.TipWhenTrimmed(value); }
             if (tone is { } t) value.SetResourceReference(TextBlock.ForegroundProperty, t.Deep);
             else if (hue is not null) value.SetResourceReference(TextBlock.ForegroundProperty, hue);
         }
-        var label = new DockPanel { Margin = new Thickness(0, 3, 0, 0) };
+        var label = new DockPanel { Margin = new Thickness(0, 2, 0, 0) };
         if (tone is { Icon: { } icon } mark)
         {
-            var glyph = new Icon { Data = Ui.Res<Geometry>(icon), Width = 13, Height = 13, Margin = new Thickness(0, 0, 5, 0), VerticalAlignment = VerticalAlignment.Center };
+            var glyph = new Icon { Data = Ui.Res<Geometry>(icon), Width = 11, Height = 11, Margin = new Thickness(0, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center };
             glyph.SetResourceReference(Control.ForegroundProperty, mark.Deep);
             label.Children.Add(glyph);
         }
@@ -847,7 +874,7 @@ internal static class StatsSections
             line.SetResourceReference(TextBlock.ForegroundProperty, "TextFaint");
             stack.Children.Add(line);
         }
-        var cell = new Border { BorderThickness = new Thickness(1, 0, 0, 0), Padding = new Thickness(14, 2, 12, 2), Child = stack, ToolTip = StatsUi.TipOf(def, result, full: name) };
+        var cell = Hairline.Frame(new Border { Padding = new Thickness(11, 2, 10, 2), Child = stack, ToolTip = StatsUi.TipOf(def, result, full: name) }, Sides.Left);
         cell.SetResourceReference(Border.BorderBrushProperty, "Line");
         return cell;
     }
@@ -856,12 +883,12 @@ internal static class StatsSections
     {
         var left = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         var best = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        best.Children.Add(Scoped("Personal best", "all time"));
+        best.Children.Add(Scoped("Personal best", "all time, in the car and track you drove last"));
         DockPanel? top = null;
         FrameworkElement? carPicture = null;
-        if (charts.Bests.FirstOrDefault() is { } shown && CarPictures.Picture(shown.Car, 112, 300) is { } picture)
+        if (charts.Bests.FirstOrDefault() is { } shown && CarPictures.Picture(shown.Car, 91, 243) is { } picture)
         {
-            picture.Margin = new Thickness(24, 0, 0, 0);
+            picture.Margin = new Thickness(19, 0, 0, 0);
             top = new DockPanel { LastChildFill = true };
             DockPanel.SetDock(picture, Dock.Right);
             top.Children.Add(picture);
@@ -872,40 +899,40 @@ internal static class StatsSections
         else left.Children.Add(best);
         if (charts.Bests.FirstOrDefault() is { } pb)
         {
-            var lap = new TextBlock { Text = StatFormat.LapTime(pb.Best), Style = Ui.Res<Style>("BigValue"), FontSize = 48, Margin = new Thickness(0, 4, 0, 0) };
+            var lap = new TextBlock { Text = StatFormat.LapTime(pb.Best), Style = Ui.Res<Style>("BigValue"), FontSize = 39, Margin = new Thickness(0, 3, 0, 0) };
             lap.SetResourceReference(TextBlock.ForegroundProperty, "AccentText");
             best.Children.Add(lap);
             if (top is not null && carPicture is not null)
                 PictureOnlyWithRoom(top, carPicture, lap);
             best.Children.Add(new TextBlock { Text = pb.Car, Style = Ui.Res<Style>("H3"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) });
             best.Children.Add(new TextBlock { Text = pb.Config.Length > 0 ? $"{pb.Track} · {pb.Config}" : pb.Track, Style = Ui.Res<Style>("Muted"), TextWrapping = TextWrapping.Wrap });
-            var facts = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
-            void Fact(FrameworkElement element) { element.Margin = new Thickness(0, 0, 10, 4); element.VerticalAlignment = VerticalAlignment.Center; facts.Children.Add(element); }
+            var facts = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
+            void Fact(FrameworkElement element) { element.Margin = new Thickness(0, 0, 8, 3); element.VerticalAlignment = VerticalAlignment.Center; facts.Children.Add(element); }
             if (pb.InRange && q.From > 0)
             {
                 var (goldSoft, goldDeep) = StatsUi.Hue("Gold");
-                Fact(Ui.Chip("New in this range", goldSoft, goldDeep));
+                Fact(Ui.Chip($"New {range}", goldSoft, goldDeep));
             }
-            Fact(new TextBlock { Text = $"Set {Dates.Date(pb.When.ToLocalTime())} · {pb.Laps:N0} clean lap{(pb.Laps == 1 ? "" : "s")} in this range", Style = Ui.Res<Style>("Caption") });
+            Fact(new TextBlock { Text = $"Set {Dates.Day(pb.When.ToLocalTime())} · {SimRacing.Race.RaceFormat.Count(pb.Laps, "clean lap")} {range}", Style = Ui.Res<Style>("Caption") });
             if (charts.HeroFirst is { } first && first.Lap - pb.Best > 0.0005)
             {
-                var gain = new TextBlock { Text = $"{StatFormat.Value(StatKind.LapDelta, pb.Best - first.Lap, false)} since your first session here ({Dates.Date(first.When.ToLocalTime())})", Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold };
+                var gain = new TextBlock { Text = $"{StatFormat.Value(StatKind.LapDelta, pb.Best - first.Lap, false)} since your first session here ({Dates.Day(first.When.ToLocalTime())})", Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold };
                 gain.SetResourceReference(TextBlock.ForegroundProperty, StatsUi.Hue("Sage").Deep);
                 Fact(gain);
             }
             left.Children.Add(facts);
             left.ToolTip = "The all-time best clean lap in the car and track you drove last in this range";
         }
-        else left.Children.Add(new TextBlock { Text = "No clean laps in this range yet", Style = Ui.Res<Style>("Muted"), Margin = new Thickness(0, 8, 0, 0) });
+        else left.Children.Add(new TextBlock { Text = "No clean laps in this range yet", Style = Ui.Res<Style>("Muted"), Margin = new Thickness(0, 6, 0, 0) });
 
-        var totals = new StatGrid { MinTileWidth = 190, Gap = 0, RowGap = 18 };
-        foreach (var (def, result) in headline) totals.Children.Add(Metric(def, result, 30));
+        var totals = new StatGrid { MinTileWidth = 154, Gap = 0, RowGap = 15 };
+        foreach (var (def, result) in headline) totals.Children.Add(Metric(def, result, 24));
         var totalsLabel = Scoped("Totals", range);
-        totalsLabel.Margin = new Thickness(14, 0, 0, 10);
+        totalsLabel.Margin = new Thickness(11, 0, 0, 8);
         var right = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { totalsLabel, totals } };
-        var hero = StatsLayout.Pair(left, right, 900, 4, 6, 40, center: true)!;
+        var hero = StatsLayout.Pair(left, right, 900, 4, 6, 32, center: true)!;
         var body = racecraft.Children.Count > 0 ? Stack(hero, racecraft) : hero;
-        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(28, 24, 28, 26), Child = body };
+        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(23, 19, 23, 21), Child = body };
     }
 
     private static TextBlock Scoped(string title, string scope)
@@ -940,12 +967,14 @@ internal static class StatsSections
     {
         if (charts.Bests.Count == 0) return null;
         var combos = charts.Bests.Select(b => (b.Key, Label: $"{b.Car} · {b.Track}{(b.Config.Length > 0 ? " · " + b.Config : "")}")).ToList();
-        var pick = Ui.Combo(combos.Select(c => new Choice(c.Key, c.Label)), charts.TimelineKey ?? combos[0].Key, c => { service.Settings.TimelineCombo = c.Id; service.Settings.TimelinePickedUtc = StatsStore.Unix(DateTime.UtcNow); changed(); }, 260);
-        pick.MaxWidth = 460;
+        var pick = Ui.Combo(combos.Select(c => new Choice(c.Key, c.Label)), charts.TimelineKey ?? combos[0].Key, c => { service.Settings.TimelineCombo = c.Id; service.Settings.TimelinePickedUtc = StatsStore.Unix(DateTime.UtcNow); changed(); }, 211);
+        pick.MaxWidth = 373;
         pick.VerticalAlignment = VerticalAlignment.Center;
         pick.ToolTip = "The car and track the charts below show";
         return pick;
     }
+
+    private const int BestsShown = 12;
 
     private static FrameworkElement PersonalBests(StatsCharts.Data charts, StatQuery q, (StatDef Def, StatResult Result)? top)
     {
@@ -953,13 +982,13 @@ internal static class StatsSections
         if (charts.Bests.Count == 0) return Chart("Personal bests", caption, Empty("No clean laps in this range."));
         bool everything = q.From <= 0;
         var table = new Grid();
-        table.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 90 });
-        table.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.3, GridUnitType.Star), MinWidth = 90 });
+        table.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 73 });
+        table.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.3, GridUnitType.Star), MinWidth = 73 });
         for (int c = 0; c < 4; c++) table.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         int row = 0;
         void Cell(FrameworkElement element, int col, bool right = false, bool center = false)
         {
-            element.Margin = new Thickness(col == 0 ? 0 : 18, 8, 0, 8);
+            element.Margin = new Thickness(col == 0 ? 0 : 15, 8, 0, 8);
             element.VerticalAlignment = VerticalAlignment.Center;
             if (right) element.HorizontalAlignment = HorizontalAlignment.Right;
             if (center) element.HorizontalAlignment = HorizontalAlignment.Center;
@@ -970,23 +999,24 @@ internal static class StatsSections
         TextBlock Text(string text, string style) => new() { Text = text, Style = Ui.Res<Style>(style), TextWrapping = TextWrapping.Wrap };
         table.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         Cell(Text("Car", "Eyebrow"), 0); Cell(Text("Track", "Eyebrow"), 1); Cell(Text("Clean laps", "Eyebrow"), 2, center: true); Cell(Text("Best lap", "Eyebrow"), 3, true); Cell(Text("Set", "Eyebrow"), 5, true);
-        foreach (int c in new[] { 1, 2, 3, 5 }) StatsSessions.ColumnBar(table, 0, c, 18);
         var (goldSoft, goldDeep) = StatsUi.Hue("Gold");
-        foreach (var pb in charts.Bests.Take(12))
+        var later = new List<UIElement>();
+        foreach (var pb in charts.Bests)
         {
+            int before = table.Children.Count;
             row++;
             table.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            var rule = new Border { Height = 1, VerticalAlignment = VerticalAlignment.Top };
+            var rule = Hairline.Rule(new Border { VerticalAlignment = VerticalAlignment.Top });
             rule.SetResourceReference(Border.BackgroundProperty, "Line");
             Grid.SetRow(rule, row);
             Grid.SetColumnSpan(rule, 6);
             table.Children.Add(rule);
-            Cell(CarPictures.Beside(Text(pb.Car, "Body"), pb.Car, 22, 8), 0);
+            Cell(CarPictures.Beside(Text(pb.Car, "Body"), pb.Car, 18, 6.5), 0);
             var track = Text(pb.Config.Length > 0 ? $"{pb.Track} · {pb.Config}" : pb.Track, "Body");
             track.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
             Cell(track, 1);
             Cell(Text(pb.Laps.ToString("N0", CultureInfo.CurrentCulture), "Caption"), 2, center: true);
-            var lap = new TextBlock { Text = StatFormat.LapTime(pb.Best), FontWeight = FontWeights.SemiBold, FontSize = 14 };
+            var lap = new TextBlock { Text = StatFormat.LapTime(pb.Best), FontWeight = FontWeights.SemiBold, FontSize = 11.5 };
             lap.SetResourceReference(TextBlock.FontFamilyProperty, "MetricFont");
             lap.SetResourceReference(TextBlock.ForegroundProperty, "AccentText");
             System.Windows.Documents.Typography.SetNumeralAlignment(lap, FontNumeralAlignment.Tabular);
@@ -997,11 +1027,27 @@ internal static class StatsSections
                 chip.ToolTip = "Set in this range";
                 Cell(chip, 4, center: true);
             }
-            Cell(new TextBlock { Text = Dates.Date(pb.When.ToLocalTime()), Style = Ui.Res<Style>("Caption") }, 5, true);
+            Cell(new TextBlock { Text = Dates.Day(pb.When.ToLocalTime()), Style = Ui.Res<Style>("Caption") }, 5, true);
+            if (row > BestsShown)
+                for (int i = before; i < table.Children.Count; i++)
+                {
+                    table.Children[i].Visibility = Visibility.Collapsed;
+                    later.Add(table.Children[i]);
+                }
         }
         var content = new StackPanel { Children = { table } };
-        if (charts.Bests.Count > 12)
-            content.Children.Add(new TextBlock { Text = $"12 of {charts.Bests.Count} shown: the latest driven", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 8, 0, 0) });
+        if (charts.Bests.Count > BestsShown)
+        {
+            Button more = null!;
+            more = Ui.LabeledButton("I.ChevronDown", $"Show more ({charts.Bests.Count - BestsShown} left)", () =>
+            {
+                foreach (var element in later) element.Visibility = Visibility.Visible;
+                content.Children.Remove(more);
+            });
+            more.Margin = new Thickness(0, 10, 0, 0);
+            more.HorizontalAlignment = HorizontalAlignment.Left;
+            content.Children.Add(more);
+        }
         string what = everything ? "Best clean lap per car and track, the latest driven first" : "All-time best clean lap of each car and track driven in this range, the latest driven first";
         return Chart("Personal bests", caption is null ? what : what + ". " + caption, content);
     }
@@ -1009,7 +1055,7 @@ internal static class StatsSections
 
 internal static class StatsLayout
 {
-    public static FrameworkElement? Pair(FrameworkElement? first, FrameworkElement? second, double sideBySide, double a = 1, double b = 1, double gap = 24, bool center = false)
+    public static FrameworkElement? Pair(FrameworkElement? first, FrameworkElement? second, double sideBySide, double a = 1, double b = 1, double gap = 19, bool center = false)
     {
         if (first is null) return second;
         if (second is null) return first;
@@ -1018,7 +1064,7 @@ internal static class StatsLayout
 
     private sealed class PairPanel : Panel
     {
-        public double Threshold, A = 1, B = 1, Gap = 24;
+        public double Threshold, A = 1, B = 1, Gap = 19;
         public bool Center;
 
         private bool Side(double width) => double.IsInfinity(width) || width >= Threshold;
@@ -1069,8 +1115,8 @@ internal sealed class StatGrid : Panel
     public static void SetSpan(UIElement element, int span) => element.SetValue(SpanProperty, span);
     public static int GetSpan(UIElement element) => (int)element.GetValue(SpanProperty);
 
-    public double MinTileWidth { get; init; } = 158;
-    public double Gap { get; init; } = 10;
+    public double MinTileWidth { get; init; } = 128;
+    public double Gap { get; init; } = 8;
     public double? RowGap { get; init; }
     public int Columns { get; init; } = int.MaxValue;
 
@@ -1274,13 +1320,13 @@ internal static class StatsCharts
         double max = 0;
         foreach (double v in seconds) max = Math.Max(max, v);
         var grid = new Grid { HorizontalAlignment = HorizontalAlignment.Stretch };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(38) });
-        for (int h = 0; h < 24; h++) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 11 });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(31) });
+        for (int h = 0; h < 24; h++) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 9 });
         var accent = ((SolidColorBrush)Ui.Res<Brush>("Accent")).Color;
         Brush Shade(double share) => Frozen(Color.FromArgb((byte)(50 + 205 * Math.Sqrt(share)), accent.R, accent.G, accent.B));
         for (int row = 0; row < 7; row++)
         {
-            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(24) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(19) });
             int day = (row + 1) % 7;
             var label = new TextBlock { Text = Weekdays[day], Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center };
             Grid.SetRow(label, row);
@@ -1299,25 +1345,25 @@ internal static class StatsCharts
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         for (int h = 0; h < 24; h += 3)
         {
-            var hour = new TextBlock { Text = $"{h:00}", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(1.5, 4, 0, 0) };
+            var hour = new TextBlock { Text = $"{h:00}", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(1.5, 3, 0, 0) };
             Grid.SetRow(hour, 7);
             Grid.SetColumn(hour, h + 1);
             Grid.SetColumnSpan(hour, 3);
             grid.Children.Add(hour);
         }
-        var legend = new DockPanel { Margin = new Thickness(38, 12, 0, 0) };
-        var less = new TextBlock { Text = "Less", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
+        var legend = new DockPanel { Margin = new Thickness(31, 10, 0, 0) };
+        var less = new TextBlock { Text = "Less", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) };
         DockPanel.SetDock(less, Dock.Left);
         legend.Children.Add(less);
-        var more = new TextBlock { Text = max > 0 ? $"More (up to {StatFormat.Duration(max)})" : "More", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
+        var more = new TextBlock { Text = max > 0 ? $"More (up to {StatFormat.Duration(max)})" : "More", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
         DockPanel.SetDock(more, Dock.Right);
         legend.Children.Add(more);
         var steps = new UniformGrid { Rows = 1 };
-        var none = new Border { Height = 8, Margin = new Thickness(1.5, 0, 1.5, 0) };
+        var none = new Border { Height = 6, Margin = new Thickness(1.5, 0, 1.5, 0) };
         none.SetResourceReference(Border.BackgroundProperty, "MeterTrack");
         steps.Children.Add(none);
         foreach (double share in new[] { 0.1, 0.35, 0.65, 1.0 })
-            steps.Children.Add(new Border { Height = 8, Margin = new Thickness(1.5, 0, 1.5, 0), Background = Shade(share) });
+            steps.Children.Add(new Border { Height = 6, Margin = new Thickness(1.5, 0, 1.5, 0), Background = Shade(share) });
         legend.Children.Add(steps);
         Grid.SetRow(legend, 8);
         Grid.SetColumnSpan(legend, 25);
@@ -1336,34 +1382,34 @@ internal static class StatsCharts
         {
             place++;
             string name = item.Label.Length > 0 ? item.Label : "Unknown";
-            string figures = $"{StatFormat.Duration(item.Seconds)} · {item.Laps:N0} lap{(item.Laps == 1 ? "" : "s")}";
-            var line = new DockPanel { Margin = new Thickness(0, place == 1 ? 0 : 12, 0, 5), ToolTip = $"{name}\n{figures}" };
-            var rank = new TextBlock { Text = place.ToString(CultureInfo.CurrentCulture), Style = Ui.Res<Style>("Caption"), Width = 22, FontWeight = FontWeights.SemiBold };
+            string figures = $"{StatFormat.Duration(item.Seconds)} · {SimRacing.Race.RaceFormat.Count(item.Laps, "lap")}";
+            var line = new DockPanel { Margin = new Thickness(0, place == 1 ? 0 : 10, 0, 5), ToolTip = $"{name}\n{figures}" };
+            var rank = new TextBlock { Text = place.ToString(CultureInfo.CurrentCulture), Style = Ui.Res<Style>("Caption"), Width = 18, FontWeight = FontWeights.SemiBold };
             if (place == 1) rank.SetResourceReference(TextBlock.ForegroundProperty, "AccentText");
             DockPanel.SetDock(rank, Dock.Left);
             line.Children.Add(rank);
-            var value = new TextBlock { Text = figures, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Bottom };
+            var value = new TextBlock { Text = figures, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Bottom };
             System.Windows.Documents.Typography.SetNumeralAlignment(value, FontNumeralAlignment.Tabular);
             DockPanel.SetDock(value, Dock.Right);
             line.Children.Add(value);
-            if (cars && CarPictures.Slotted(item.Label, 20) is { } picture)
+            if (cars && CarPictures.Slotted(item.Label, 16) is { } picture)
             {
-                picture.Margin = new Thickness(0, 0, 8, 0);
+                picture.Margin = new Thickness(0, 0, 6, 0);
                 DockPanel.SetDock(picture, Dock.Left);
                 line.Children.Add(picture);
             }
-            line.Children.Add(new TextBlock { Text = name, Style = Ui.Res<Style>("Body"), FontSize = 13, FontWeight = place == 1 ? FontWeights.SemiBold : FontWeights.Normal, VerticalAlignment = VerticalAlignment.Center });
+            line.Children.Add(new TextBlock { Text = name, Style = Ui.Res<Style>("Body"), FontSize = 10.5, FontWeight = place == 1 ? FontWeights.SemiBold : FontWeights.Normal, VerticalAlignment = VerticalAlignment.Center });
             stack.Children.Add(line);
-            var track = new Grid { Height = 6, Margin = new Thickness(22, 0, 0, 0), ToolTip = line.ToolTip };
+            var track = new Grid { Height = 5, Margin = new Thickness(18, 0, 0, 0), ToolTip = line.ToolTip };
             track.SetResourceReference(Panel.BackgroundProperty, "MeterTrack");
             track.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(item.Seconds, GridUnitType.Star) });
             track.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(0, max - item.Seconds), GridUnitType.Star) });
-            var bar = new Border { MinWidth = 3 };
+            var bar = new Border { MinWidth = 2 };
             bar.SetResourceReference(Border.BackgroundProperty, fill);
             track.Children.Add(bar);
             stack.Children.Add(track);
         }
-        if (items.Count > 8) stack.Children.Add(new TextBlock { Text = $"Top 8 of {items.Count}{(items.Count == 10 ? "+" : "")}", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(22, 10, 0, 0) });
+        if (items.Count > 8) stack.Children.Add(new TextBlock { Text = $"Top 8 of {items.Count}{(items.Count == 10 ? "+" : "")}", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(18, 8, 0, 0) });
         return stack;
     }
 
@@ -1374,10 +1420,10 @@ internal static class StatsCharts
         static (string Name, string Brush, int Order) Look(string type) => type switch
         {
             "Practice" => ("Practice", "Slate", 0), "Qualify" => ("Qualifying", "Gold", 1), "Race" => ("Race", "Accent", 2),
-            _ => (type.Length > 0 ? type : "Other", "LineStrong", 3),
+            _ => (StatsSessions.TypeName(type), "LineStrong", 3),
         };
         var parts = types.Where(t => t.Seconds > 0).Select(t => (Look: Look(t.Type), t.Seconds)).OrderBy(p => p.Look.Order).ToList();
-        var bar = new Grid { Height = 16 };
+        var bar = new Grid { Height = 13 };
         foreach (var (look, seconds) in parts)
         {
             bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(seconds, GridUnitType.Star) });
@@ -1386,26 +1432,26 @@ internal static class StatsCharts
             Grid.SetColumn(piece, bar.ColumnDefinitions.Count - 1);
             bar.Children.Add(piece);
         }
-        var legend = new WrapPanel { Margin = new Thickness(0, 12, 0, 0) };
+        var legend = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
         foreach (var (look, seconds) in parts)
         {
-            var item = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 28, 4) };
-            var swatch = new Border { Width = 10, Height = 10, Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
+            var item = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 23, 3) };
+            var swatch = new Border { Width = 8, Height = 8, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center };
             swatch.SetResourceReference(Border.BackgroundProperty, look.Brush);
             item.Children.Add(swatch);
-            item.Children.Add(new TextBlock { Text = look.Name, Style = Ui.Res<Style>("Body"), FontSize = 13, VerticalAlignment = VerticalAlignment.Center });
-            var figure = new TextBlock { Text = $"{StatFormat.Duration(seconds)} · {seconds / total:P0}", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            item.Children.Add(new TextBlock { Text = look.Name, Style = Ui.Res<Style>("Body"), FontSize = 10.5, VerticalAlignment = VerticalAlignment.Center });
+            var figure = new TextBlock { Text = $"{StatFormat.Duration(seconds)} · {seconds / total:P0}", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
             item.Children.Add(figure);
             legend.Children.Add(item);
         }
         return new StackPanel { Children = { bar, legend } };
     }
 
-    public static FrameworkElement Trend(TrendData trend) => new TrendChart(trend.Bins) { Height = 200 };
+    public static FrameworkElement Trend(TrendData trend) => new TrendChart(trend.Bins) { Height = 162 };
 
-    public static FrameworkElement Progression(List<(DateTime When, double Lap)> points) => new ProgressionChart(points) { Height = 230 };
+    public static FrameworkElement Progression(List<(DateTime When, double Lap)> points) => new ProgressionChart(points) { Height = 186 };
 
-    public static FrameworkElement Consistency(List<SessionSpread> sessions) => new ConsistencyChart(sessions) { Height = 230 };
+    public static FrameworkElement Consistency(List<SessionSpread> sessions) => new ConsistencyChart(sessions) { Height = 186 };
 
     internal static string AxisLap(double seconds, double step)
     {
@@ -1424,7 +1470,7 @@ internal static class StatsCharts
 
     internal abstract class HoverChart : FrameworkElement
     {
-        protected const double Left = 70, Bottom = 24, Top = 10, Right = 14;
+        protected const double Left = 57, Bottom = 19, Top = 8, Right = 11;
         private readonly ToolTip _tip;
         protected int Hover = -1;
 
@@ -1458,22 +1504,23 @@ internal static class StatsCharts
 
         protected double Dpi => VisualTreeHelper.GetDpi(this).PixelsPerDip;
 
-        protected FormattedText Text(string s, Brush? brush = null, bool bold = false, double size = 11.5) =>
+        protected FormattedText Text(string s, Brush? brush = null, bool bold = false, double size = 9) =>
             new(ThemeManager.Case(s), CultureInfo.CurrentCulture, FlowDirection.LeftToRight, ThemeManager.UiFace(bold: bold), size, brush ?? Ui.Res<Brush>("TextMuted"), Dpi);
 
         protected Func<double, double> LapAxis(DrawingContext dc, double lo, double hi, double step)
         {
             double w = ActualWidth, plotH = ActualHeight - Top - Bottom;
             double Y(double lap) => Top + plotH * (hi - lap) / (hi - lo);
-            var grid = new Pen(Ui.Res<Brush>("GridLine"), 1);
+            double px = Hairline.ScaleOf(this);
+            var grid = Hairline.Pen(Ui.Res<Brush>("GridLine"), px);
             for (double v = lo; v <= hi + step / 2; v += step)
             {
-                double y = Math.Round(Y(v)) + 0.5;
+                double y = Hairline.Snap(Y(v), px);
                 dc.DrawLine(grid, new Point(Left, y), new Point(w - Right, y));
                 var label = Text(AxisLap(v, step));
                 dc.DrawText(label, new Point(Left - 8 - label.Width, y - label.Height / 2));
             }
-            dc.DrawLine(new Pen(Ui.Res<Brush>("LineStrong"), 1), new Point(Left, ActualHeight - Bottom + 0.5), new Point(w - Right, ActualHeight - Bottom + 0.5));
+            dc.DrawLine(Hairline.Pen(Ui.Res<Brush>("LineStrong"), px), new Point(Left, Hairline.Snap(ActualHeight - Bottom, px)), new Point(w - Right, Hairline.Snap(ActualHeight - Bottom, px)));
             return Y;
         }
     }
@@ -1523,7 +1570,7 @@ internal static class StatsCharts
             var (lo, hi, step) = LapScale(_points.Min(p => p.Lap), _points.Max(p => p.Lap));
             LapAxis(dc, lo, hi, step);
 
-            var axis = new Pen(Ui.Res<Brush>("LineStrong"), 1);
+            var axis = Hairline.Pen(Ui.Res<Brush>("LineStrong"), this);
             var (min, max) = TimeScale();
             string format = (max - min) / TimeSpan.TicksPerDay > 300 ? CultureInfo.CurrentCulture.DateTimeFormat.YearMonthPattern.Replace("MMMM", "MMM") : Dates.ShortPattern;
             double plotW = w - Left - Right;
@@ -1537,7 +1584,7 @@ internal static class StatsCharts
                 if (text == previous) continue;
                 previous = text;
                 var label = Text(text);
-                dc.DrawLine(axis, new Point(Math.Round(x) + 0.5, h - Bottom), new Point(Math.Round(x) + 0.5, h - Bottom + 4));
+                dc.DrawLine(axis, new Point(Hairline.Snap(x, Hairline.ScaleOf(this)), h - Bottom), new Point(Hairline.Snap(x, Hairline.ScaleOf(this)), h - Bottom + 4));
                 dc.DrawText(label, new Point(Math.Clamp(x - label.Width / 2, Left - 20, w - label.Width), h - Bottom + 6));
             }
 
@@ -1563,7 +1610,7 @@ internal static class StatsCharts
                 dc.DrawEllipse(accent, current || i == Hover ? ring : null, At(i), r, r);
             }
             var last = At(_points.Count - 1);
-            var best = Text(StatFormat.LapTime(_points[^1].Lap), Ui.Res<Brush>("Heading"), bold: true, size: 12.5);
+            var best = Text(StatFormat.LapTime(_points[^1].Lap), Ui.Res<Brush>("Heading"), bold: true, size: 10);
             double bx = last.X + 10 + best.Width <= w ? last.X + 10 : last.X - 10 - best.Width;
             dc.DrawText(best, new Point(bx, Math.Max(0, last.Y - best.Height - 4)));
         }
@@ -1636,7 +1683,7 @@ internal static class StatsCharts
 
     private sealed class TrendChart : HoverChart
     {
-        private new const double Left = 46;
+        private new const double Left = 37;
         private readonly List<TrendBin> _bins;
 
         public TrendChart(List<TrendBin> bins) => _bins = bins;
@@ -1652,7 +1699,7 @@ internal static class StatsCharts
         protected override string TipOf(int i)
         {
             var b = _bins[i];
-            return $"{b.Tip}\n{(b.Seconds > 0 ? StatFormat.Duration(b.Seconds) : "No driving")}{(b.Sessions > 0 ? $" · {b.Sessions} session{(b.Sessions == 1 ? "" : "s")}" : "")}";
+            return $"{b.Tip}\n{(b.Seconds > 0 ? StatFormat.Duration(b.Seconds) : "No driving")}{(b.Sessions > 0 ? $" · {SimRacing.Race.RaceFormat.Count(b.Sessions, "session")}" : "")}";
         }
 
         protected override void OnRender(DrawingContext dc)
@@ -1664,10 +1711,11 @@ internal static class StatsCharts
             double step = new[] { 0.25, 0.5, 1, 2, 3, 5, 10, 20, 50 }.FirstOrDefault(s => maxHours / s <= 4, 100);
             double top = Math.Ceiling(maxHours / step) * step, plotH = h - Top - Bottom;
             double Y(double hours) => Top + plotH * (1 - hours / top);
-            var grid = new Pen(Ui.Res<Brush>("GridLine"), 1);
+            double px = Hairline.ScaleOf(this);
+            var grid = Hairline.Pen(Ui.Res<Brush>("GridLine"), px);
             for (double v = 0; v <= top + step / 2; v += step)
             {
-                double yy = Math.Round(Y(v)) + 0.5;
+                double yy = Hairline.Snap(Y(v), px);
                 dc.DrawLine(grid, new Point(Left, yy), new Point(w - Right, yy));
                 var label = Text(v == 0 ? "0" : v < 1 ? $"{v * 60:0}m" : $"{v:0.#}h");
                 dc.DrawText(label, new Point(Left - 8 - label.Width, yy - label.Height / 2));
@@ -1681,7 +1729,7 @@ internal static class StatsCharts
                 double x = Left + slot * i + (slot - bar) / 2, yy = Y(_bins[i].Seconds / 3600);
                 dc.DrawRectangle(i == Hover ? hover : accent, null, new Rect(x, yy, bar, Math.Max(1, h - Bottom - yy)));
             }
-            dc.DrawLine(new Pen(Ui.Res<Brush>("LineStrong"), 1), new Point(Left, h - Bottom + 0.5), new Point(w - Right, h - Bottom + 0.5));
+            dc.DrawLine(Hairline.Pen(Ui.Res<Brush>("LineStrong"), px), new Point(Left, Hairline.Snap(h - Bottom, px)), new Point(w - Right, Hairline.Snap(h - Bottom, px)));
             var sample = Text(_bins.OrderByDescending(b => b.Label.Length).First().Label);
             int every = Math.Max(1, (int)Math.Ceiling((sample.Width + 12) / slot));
             for (int i = 0; i < _bins.Count; i += every)

@@ -11,14 +11,14 @@ namespace GoodieBag.Grr.Views;
 internal sealed class GrrDashboardSection : StackPanel
 {
     private const string Consumer = "GRR League dashboard";
-    private const double TwoColumnsAt = 900, Gap = 16;
+    private const double TwoColumnsAt = 729, Gap = 13;
     private const int TopRows = 10;
     private const int ShowAllUpTo = 25;
 
     private readonly AppServices _app;
     private readonly MainWindow _window;
     private readonly ContentControl _leaguePicker = new() { Focusable = false };
-    private readonly TextBlock _freshness = new() { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+    private readonly TextBlock _freshness = new() { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
     private readonly Button _refresh;
     private readonly ContentControl _content = new() { Focusable = false };
     private TextBlock? _heroClock;
@@ -49,8 +49,8 @@ internal sealed class GrrDashboardSection : StackPanel
         var right = new StackPanel { Orientation = Orientation.Horizontal };
         right.Children.Add(_freshness);
         right.Children.Add(_refresh);
-        var edit = GrrParts.Compact("I.Pencil", "Driver & leagues", () => _ = GrrParts.EditAsync(_app, _window));
-        edit.Margin = new Thickness(8, 0, 0, 0);
+        var edit = GrrParts.Compact("I.Pencil", "Driver and leagues", () => _ = GrrParts.EditAsync(_app, _window));
+        edit.Margin = new Thickness(6, 0, 0, 0);
         edit.ToolTip = "Your driver name on the GRR website and the leagues you follow";
         right.Children.Add(edit);
         LeagueTabs = leagueTabs;
@@ -199,13 +199,10 @@ internal sealed class GrrDashboardSection : StackPanel
 
     private FrameworkElement NoLeague()
     {
-        var body = new StackPanel();
-        body.Children.Add(Note("Pick the GRR series you race in. Each one gets its own section in the sidebar with its next race, standings, results and schedule."));
-        var pick = GrrParts.Compact("I.Plus", "Choose leagues", () => _ = GrrParts.EditAsync(_app, _window), "PrimaryButton");
-        pick.HorizontalAlignment = HorizontalAlignment.Left;
-        pick.Margin = new Thickness(0, 12, 0, 0);
-        body.Children.Add(pick);
-        return Card("No league picked", "I.Flag", body);
+        var pick = Ui.LabeledButton("I.Plus", "Choose leagues", () => _ = GrrParts.EditAsync(_app, _window), "PrimaryButton");
+        var empty = Ui.EmptyState("I.Flag", "No league picked",
+            "Pick the GRR series you race in. Each one gets its own section in the sidebar with its next race, standings, results and schedule.", pick);
+        return new Tile { Style = Ui.Res<Style>("Card"), Child = empty };
     }
 
     private static StackPanel Column(params FrameworkElement[] cards)
@@ -224,7 +221,7 @@ internal sealed class GrrDashboardSection : StackPanel
         var followed = _app.Config.Grr.Leagues;
         bool Follows(GrrLeague l) => followed.Contains(l.Id, StringComparer.OrdinalIgnoreCase);
         int selected = league is null ? -1 : GrrLeagues.All.ToList().FindIndex(l => l.Id == league);
-        var tips = GrrLeagues.All.Select(l => (string?)(Follows(l) ? l.Name : $"{l.Name}: tick it under Driver & leagues to see it here")).ToList();
+        var tips = GrrLeagues.All.Select(l => (string?)(Follows(l) ? l.Name : $"{l.Name}: tick it under Driver and leagues to see it here")).ToList();
         var picker = Ui.Segmented(GrrLeagues.All.Select(l => l.Name).ToList(), selected, i =>
         {
             if (!Follows(GrrLeagues.All[i])) return;
@@ -261,24 +258,24 @@ internal sealed class GrrDashboardSection : StackPanel
         else text = grr.FetchedAt(League!) is { } t ? $"Updated {GrrParts.Ago(t)}" : "Not read yet";
         if (_freshnessText != text) { _freshnessText = text; _freshness.Text = text; }
         _freshness.Foreground = Ui.Res<Brush>(brush);
-        _freshness.FontSize = 12.5;
+        _freshness.FontSize = 10;
         _freshness.ToolTip = tip;
     }
 
     private static Tile Card(string title, string? icon, UIElement body, params FrameworkElement[] tools)
     {
-        var head = new DockPanel { Margin = new Thickness(0, 0, 0, 14), LastChildFill = true };
+        var head = new DockPanel { Margin = new Thickness(0, 0, 0, 11), LastChildFill = true };
         var toolRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         foreach (var t in tools)
         {
-            t.Margin = new Thickness(8, 0, 0, 0);
+            t.Margin = new Thickness(6, 0, 0, 0);
             toolRow.Children.Add(t);
         }
         DockPanel.SetDock(toolRow, Dock.Right);
         head.Children.Add(toolRow);
         var name = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         if (icon is not null)
-            name.Children.Add(new Icon { Data = Ui.Res<Geometry>(icon), Width = 16, Height = 16, Foreground = Ui.Res<Brush>("AccentText"), Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center });
+            name.Children.Add(new Icon { Data = Ui.Res<Geometry>(icon), Width = 13, Height = 13, Foreground = Ui.Res<Brush>("AccentText"), Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center });
         name.Children.Add(Ui.Text(title, "H3"));
         head.Children.Add(name);
         var stack = new StackPanel();
@@ -296,14 +293,14 @@ internal sealed class GrrDashboardSection : StackPanel
 
     private FrameworkElement Footer(params FrameworkElement[] items)
     {
-        var row = new WrapPanel { Margin = new Thickness(0, 12, 0, 0) };
+        var row = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
         foreach (var i in items) row.Children.Add(i);
         return row;
     }
 
     private Button Toggle(string label, Action flip)
     {
-        var b = new Button { Content = label, Style = Ui.Res<Style>("GhostButton"), Margin = new Thickness(0, 0, 6, 6) };
+        var b = new Button { Content = label, Style = Ui.Res<Style>("GhostButton"), Margin = new Thickness(0, 0, 5, 5) };
         b.Click += (_, _) => { flip(); _shape = ""; Build(); };
         return b;
     }
@@ -322,13 +319,13 @@ internal sealed class GrrDashboardSection : StackPanel
         else
         {
             var race = new GrrRace(LeagueInfo.Id, round.Start, round.Track, round.Number is { } n ? $"Round {n}" : null);
-            body.Children.Add(GrrParts.Hero(race, data, now, out var clock, 38, league: false));
+            body.Children.Add(GrrParts.Hero(race, data, now, out var clock, 31, league: false));
             _heroClock = clock;
             _heroRace = race;
             _heroLive = race.Start <= now;
         }
         var schedule = Schedule(data, now, strip: TwoColumns);
-        schedule.Margin = new Thickness(0, 18, 0, 0);
+        schedule.Margin = new Thickness(0, 15, 0, 0);
         body.Children.Add(schedule);
         return Card("Next race", "I.Flag", body);
     }
@@ -342,7 +339,7 @@ internal sealed class GrrDashboardSection : StackPanel
             body.Children.Add(Note("Add your driver name as it appears on the GRR website to see your championship here and be highlighted in the standings and results."));
             var add = GrrParts.Compact("I.Plus", "Add driver name", () => _ = GrrParts.EditAsync(_app, _window));
             add.HorizontalAlignment = HorizontalAlignment.Left;
-            add.Margin = new Thickness(0, 10, 0, 0);
+            add.Margin = new Thickness(0, 8, 0, 0);
             body.Children.Add(add);
             return Card("Driver profile", null, body);
         }
@@ -355,12 +352,12 @@ internal sealed class GrrDashboardSection : StackPanel
         if (mine is { } me)
         {
             var table = data.Standings![me.Class];
-            var main = new WrapPanel { Margin = new Thickness(0, 16, 0, 0) };
+            var main = new WrapPanel { Margin = new Thickness(0, 13, 0, 0) };
             var place = new StackPanel { Orientation = Orientation.Horizontal };
-            place.Children.Add(GrrParts.Position(me.Row.Rank, true, 30, prefix: true, plain: "Heading"));
+            place.Children.Add(GrrParts.Position(me.Row.Rank, true, 24, prefix: true, plain: "Heading"));
             var of = GrrParts.Caption($"of {table.Count}");
             of.VerticalAlignment = VerticalAlignment.Bottom;
-            of.Margin = new Thickness(8, 0, 0, 4);
+            of.Margin = new Thickness(6, 0, 0, 3);
             place.Children.Add(of);
             main.Children.Add(Stat("Championship", place, null, big: true));
             int at = table.ToList().IndexOf(me.Row);
@@ -375,10 +372,10 @@ internal sealed class GrrDashboardSection : StackPanel
             if (me.Row.Poles is { } poles) record.Children.Add(Stat("Poles", $"{poles}"));
             if (me.Row.Starts is { } st) record.Children.Add(Stat("Starts", $"{st}"));
             if (data.LastEvent is { } e && GrrLeagueData.ResultOf(e, driver) is { } r)
-                record.Children.Add(Stat("Last race", GrrParts.Position(r.Position, false, 16, prefix: true, plain: "Heading"), data.RoundFor(e)?.Number is { } n ? $"Round {n}" : e.Track));
+                record.Children.Add(Stat("Last race", GrrParts.Position(r.Position, false, 13, prefix: true, plain: "Heading"), data.RoundFor(e)?.Number is { } n ? $"Round {n}" : e.Track));
             if (record.Children.Count > 0)
             {
-                body.Children.Add(new Border { Height = 1, Background = Ui.Res<Brush>("Line"), Margin = new Thickness(0, 2, 0, 12) });
+                body.Children.Add(Hairline.Rule(new Border { Background = Ui.Res<Brush>("Line"), Margin = new Thickness(0, 2, 0, 10) }));
                 body.Children.Add(record);
             }
         }
@@ -395,7 +392,7 @@ internal sealed class GrrDashboardSection : StackPanel
 
     private static StackPanel Stat(string label, FrameworkElement v, string? note = null, bool big = false)
     {
-        var s = new StackPanel { Margin = new Thickness(0, 0, big ? 36 : 24, 10), MinWidth = big ? 90 : 48 };
+        var s = new StackPanel { Margin = new Thickness(0, 0, big ? 29 : 19, 10), MinWidth = big ? 73 : 39 };
         s.Children.Add(Label(label));
         v.Margin = new Thickness(0, 2, 0, 0);
         v.HorizontalAlignment = HorizontalAlignment.Left;
@@ -483,16 +480,16 @@ internal sealed class GrrDashboardSection : StackPanel
         return list;
     }
 
-    private const double FillGap = 16;
+    private const double FillGap = 13;
 
     private static Grid Table<T>(List<T?> rows, Func<T, int> pos, Func<T, string> name, Func<T, string?> second, List<Col<T>> columns, Func<T, bool> mine, Func<T, FrameworkElement?>? marks = null) where T : class
     {
         var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(32) });
         bool fill = columns.Any(c => c.Fill);
         grid.ColumnDefinitions.Add(fill
-            ? new ColumnDefinition { Width = GridLength.Auto, MinWidth = 120, MaxWidth = 260 }
-            : new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 120 });
+            ? new ColumnDefinition { Width = GridLength.Auto, MinWidth = 97, MaxWidth = 211 }
+            : new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 97 });
         foreach (var c in columns)
             grid.ColumnDefinitions.Add(c.Fill ? new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = c.Width } : new ColumnDefinition { Width = new GridLength(c.Width) });
         int span = columns.Count + 2;
@@ -502,7 +499,7 @@ internal sealed class GrrDashboardSection : StackPanel
         {
             var head = Label(text);
             head.TextAlignment = right ? TextAlignment.Right : TextAlignment.Left;
-            head.Margin = new Thickness(0, 0, right ? 10 : 0, 6);
+            head.Margin = new Thickness(0, 0, right ? 8 : 0, 6);
             return head;
         }
 
@@ -516,7 +513,7 @@ internal sealed class GrrDashboardSection : StackPanel
             if (columns[c].Fill) h.Margin = new Thickness(FillGap, 0, 0, 6);
             Cell(h, 0, c + 2);
         }
-        var rule = new Border { Height = 1, Background = Ui.Res<Brush>("Line"), VerticalAlignment = VerticalAlignment.Bottom };
+        var rule = Hairline.Rule(new Border { Background = Ui.Res<Brush>("Line"), VerticalAlignment = VerticalAlignment.Bottom });
         Grid.SetColumnSpan(rule, span);
         Cell(rule, 0, 0);
 
@@ -527,7 +524,7 @@ internal sealed class GrrDashboardSection : StackPanel
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             if (rows[i] is not { } row)
             {
-                var gap = new TextBlock { Text = "⋯", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(8, 0, 0, 0) };
+                var gap = new TextBlock { Text = "⋯", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(6, 0, 0, 0) };
                 Grid.SetColumnSpan(gap, span);
                 Cell(gap, r, 0);
                 continue;
@@ -543,26 +540,26 @@ internal sealed class GrrDashboardSection : StackPanel
             Cell(back, r, 0);
             if (i < rows.Count - 1 && !me && !(rows[i + 1] is { } below && mine(below)))
             {
-                var hairline = new Border { Height = 1, Background = Ui.Res<Brush>("Line"), VerticalAlignment = VerticalAlignment.Bottom, IsHitTestVisible = false, Margin = new Thickness(8, 0, 8, 0) };
+                var hairline = Hairline.Rule(new Border { Background = Ui.Res<Brush>("Line"), VerticalAlignment = VerticalAlignment.Bottom, IsHitTestVisible = false, Margin = new Thickness(6, 0, 6, 0) });
                 Grid.SetColumnSpan(hairline, span);
                 Cell(hairline, r, 0);
             }
             string fg = me ? "AccentText" : "Text";
             var weight = me ? FontWeights.SemiBold : FontWeights.Normal;
             var posCell = GrrParts.Position(pos(row), me);
-            posCell.Margin = new Thickness(8, 7, 0, 7);
+            posCell.Margin = new Thickness(6, 6, 0, 6);
             posCell.IsHitTestVisible = pos(row) <= 3;
             Cell(posCell, r, 0);
 
-            var driverCell = new Grid { Margin = new Thickness(0, 6, 8, 6) };
+            var driverCell = new Grid { Margin = new Thickness(0, 5, 6, 5) };
             driverCell.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             driverCell.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var who = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             var line = new TrimRow();
-            line.Children.Add(new TextBlock { Text = name(row), FontSize = 13.5, FontWeight = weight, Foreground = Ui.Res<Brush>(fg), TextTrimming = TextTrimming.CharacterEllipsis, ToolTip = name(row), VerticalAlignment = VerticalAlignment.Center });
+            line.Children.Add(new TextBlock { Text = name(row), FontSize = 11, FontWeight = weight, Foreground = Ui.Res<Brush>(fg), TextTrimming = TextTrimming.CharacterEllipsis, ToolTip = name(row), VerticalAlignment = VerticalAlignment.Center });
             if (marks?.Invoke(row) is { } m)
             {
-                m.Margin = new Thickness(4, 0, 0, 0);
+                m.Margin = new Thickness(3, 0, 0, 0);
                 m.VerticalAlignment = VerticalAlignment.Center;
                 line.Children.Add(m);
             }
@@ -575,8 +572,8 @@ internal sealed class GrrDashboardSection : StackPanel
                 var col = columns[c];
                 var t = TextFit.TipWhenTrimmed(new TextBlock
                 {
-                    Text = col.Value(row) ?? "–", FontSize = 13, FontWeight = weight, Foreground = Ui.Res<Brush>(col == columns[^1] ? "Heading" : col.Right ? "TextMuted" : "Text"),
-                    TextAlignment = col.Right ? TextAlignment.Right : TextAlignment.Left, Margin = new Thickness(0, 0, col.Right ? 10 : 8, 0), VerticalAlignment = VerticalAlignment.Center,
+                    Text = col.Value(row) ?? "–", FontSize = 10.5, FontWeight = weight, Foreground = Ui.Res<Brush>(col == columns[^1] ? "Heading" : col.Right ? "TextMuted" : "Text"),
+                    TextAlignment = col.Right ? TextAlignment.Right : TextAlignment.Left, Margin = new Thickness(0, 0, col.Right ? 8 : 6, 0), VerticalAlignment = VerticalAlignment.Center,
                     TextTrimming = TextTrimming.CharacterEllipsis, IsHitTestVisible = false, Typography = { NumeralAlignment = FontNumeralAlignment.Tabular },
                 });
                 if (col == columns[^1]) t.FontWeight = FontWeights.SemiBold;
@@ -601,7 +598,7 @@ internal sealed class GrrDashboardSection : StackPanel
 
         var ev = events.FirstOrDefault(e => Key(e) == _eventKey) ?? events[0];
         var round = data.RoundFor(ev);
-        var picker = new ComboBox { MinWidth = 200, MaxWidth = 300 };
+        var picker = new ComboBox { MinWidth = 162, MaxWidth = 243 };
         foreach (var e in events)
         {
             var r = data.RoundFor(e);
@@ -633,14 +630,14 @@ internal sealed class GrrDashboardSection : StackPanel
                 Dispatcher.InvokeAsync(Build);
             }, "grrsession");
             tabs.HorizontalAlignment = HorizontalAlignment.Left;
-            tabs.Margin = new Thickness(0, 0, 0, 12);
+            tabs.Margin = new Thickness(0, 0, 0, 10);
             body.Children.Add(tabs);
         }
         var session = sessions[si];
         body.Children.Add(GrrParts.Caption($"{GrrParts.LongDate(ev.Date)}{(round?.Format is { } f ? $" · {char.ToUpperInvariant(f[0])}{f[1..]}" : "")}{(round?.Pole is { } pole ? $" · pole {pole}" : "")}", 0));
         if (round?.Winners.Count > 1)
         {
-            var chips = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
+            var chips = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
             foreach (var w in round.Winners)
             {
                 var chip = Ui.Chip($"{w.Class} · {w.Driver}");
@@ -675,7 +672,7 @@ internal sealed class GrrDashboardSection : StackPanel
         columns = columns.Where(c => c.Level <= level && rows.Any(r => !string.IsNullOrEmpty(c.Value(r)))).ToList();
         columns = columns.Skip(1).Concat(columns.Take(1)).ToList();
         var visible = Visible(rows, r => GrrFeed.SameDriver(r.Driver, Driver), _allResults, out bool more);
-        body.Children.Add(new Border { Height = 10 });
+        body.Children.Add(new Border { Height = 8 });
         bool classed = data.Classes.Count > 0;
         string? tableClass = data.ClassNamed(session.Label);
         body.Children.Add(Table(visible, r => r.Position, r => r.Driver, r => level >= 2 ? r.Car : null, columns, r => GrrFeed.SameDriver(r.Driver, Driver), Marks));
@@ -757,7 +754,7 @@ internal sealed class GrrDashboardSection : StackPanel
             }
             else if (i == next)
             {
-                var c = GrrParts.Clock(13, "AccentText");
+                var c = GrrParts.Clock(10.5, "AccentText");
                 c.Text = GrrLeagues.ShortCountdown(GrrLeagues.Until(r.Start, now));
                 right = c;
             }
@@ -787,30 +784,30 @@ internal sealed class GrrDashboardSection : StackPanel
 
     private static StackPanel Winner(string name, bool fastestLap)
     {
-        var row = new StackPanel { Orientation = Orientation.Horizontal, MaxWidth = 190 };
-        row.Children.Add(new Icon { Data = Ui.Res<Geometry>("I.Trophy"), Width = 12, Height = 12, Foreground = Ui.Res<Brush>("AccentText"), Margin = new Thickness(0, 0, 5, 0), VerticalAlignment = VerticalAlignment.Center });
+        var row = new StackPanel { Orientation = Orientation.Horizontal, MaxWidth = 154 };
+        row.Children.Add(new Icon { Data = Ui.Res<Geometry>("I.Trophy"), Width = 10, Height = 10, Foreground = Ui.Res<Brush>("AccentText"), Margin = new Thickness(0, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center });
         if (fastestLap)
         {
-            var fl = new Icon { Data = Ui.Res<Geometry>("I.Clock"), Width = 12, Height = 12, Foreground = Ui.Res<Brush>("PlumDeep"), Margin = new Thickness(-1, 0, 5, 0), VerticalAlignment = VerticalAlignment.Center };
+            var fl = new Icon { Data = Ui.Res<Geometry>("I.Clock"), Width = 10, Height = 10, Foreground = Ui.Res<Brush>("PlumDeep"), Margin = new Thickness(-1, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center };
             System.Windows.Automation.AutomationProperties.SetName(fl, "Fastest lap");
             row.Children.Add(fl);
         }
-        row.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = name, FontSize = 12.5, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>("Text"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center }));
+        row.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = name, FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>("Text"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center }));
         return row;
     }
 
     private static Button StripCell(string eyebrow, string track, string when, FrameworkElement? info, GrrParts.TimelineMark mark, bool first, bool last, Action? click, object? tip)
     {
-        var rail = new Grid { Height = 14, Margin = new Thickness(0, 0, 0, 8) };
-        rail.Children.Add(new System.Windows.Shapes.Rectangle
+        var rail = new Grid { Height = 11, Margin = new Thickness(0, 0, 0, 6) };
+        rail.Children.Add(Hairline.Rule(new System.Windows.Shapes.Rectangle
         {
-            Height = 1, Fill = Ui.Res<Brush>("LineStrong"), VerticalAlignment = VerticalAlignment.Center,
+            Fill = Ui.Res<Brush>("LineStrong"), VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(first ? 6 : -8, 0, last ? 0 : -8, 0), Visibility = first && last ? Visibility.Collapsed : Visibility.Visible,
-        });
+        }));
         var size = mark == GrrParts.TimelineMark.Next ? 12 : 10;
         rail.Children.Add(new System.Windows.Shapes.Ellipse
         {
-            Width = size, Height = size, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, StrokeThickness = 2,
+            Width = size, Height = size, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, StrokeThickness = 1.62,
             Stroke = Ui.Res<Brush>(mark switch { GrrParts.TimelineMark.Next => "Accent", GrrParts.TimelineMark.Done => "TextFaint", _ => "LineStrong" }),
             Fill = Ui.Res<Brush>(mark switch { GrrParts.TimelineMark.Next => "Accent", GrrParts.TimelineMark.Done => "TextFaint", _ => "Surface" }),
         });
@@ -819,20 +816,20 @@ internal sealed class GrrDashboardSection : StackPanel
         stack.Children.Add(GrrParts.Eyebrow(eyebrow, mark == GrrParts.TimelineMark.Next ? "AccentText" : null));
         stack.Children.Add(new TextBlock
         {
-            Text = track, FontSize = 13.5, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>(mark == GrrParts.TimelineMark.Done ? "TextMuted" : "Text"),
-            TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, MaxHeight = 38, Margin = new Thickness(0, 2, 0, 0), ToolTip = track,
+            Text = track, FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>(mark == GrrParts.TimelineMark.Done ? "TextMuted" : "Text"),
+            TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, MaxHeight = 31, Margin = new Thickness(0, 2, 0, 0), ToolTip = track,
         });
         stack.Children.Add(GrrParts.Caption(when, 2));
         if (info is not null)
         {
-            info.Margin = new Thickness(0, 4, 0, 0);
+            info.Margin = new Thickness(0, 3, 0, 0);
             info.HorizontalAlignment = HorizontalAlignment.Left;
             stack.Children.Add(info);
         }
         var b = new Button
         {
             Style = Ui.Res<Style>("QuietButton"), Content = stack, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Top,
-            Padding = new Thickness(6, 4, 10, 8), FontWeight = FontWeights.Normal, ToolTip = tip, IsHitTestVisible = click is not null, Focusable = click is not null,
+            Padding = new Thickness(5, 3, 8, 6), FontWeight = FontWeights.Normal, ToolTip = tip, IsHitTestVisible = click is not null, Focusable = click is not null,
         };
         if (click is not null) b.Click += (_, _) => click();
         return b;

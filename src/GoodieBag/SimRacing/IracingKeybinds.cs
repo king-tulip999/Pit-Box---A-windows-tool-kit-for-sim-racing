@@ -46,7 +46,7 @@ internal sealed class IracingKeybinds
     public IReadOnlyList<IracingAction> Actions()
     {
         long now = Environment.TickCount64;
-        if (now - _refreshedAt > 2000)
+        if (_refreshedAt == long.MinValue || now - _refreshedAt > 2000)
         {
             Refresh();
             _refreshedAt = now;

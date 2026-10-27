@@ -14,10 +14,11 @@ internal static class ProgramPicker
 {
     public static void Show(FrameworkElement anchor, Action<PickedProgram> picked)
     {
-        var search = new TextBox { Tag = "Filter running programs", Margin = new Thickness(0, 0, 0, 8) };
+        var search = new TextBox { Tag = "Filter running programs", Margin = new Thickness(0, 0, 0, 6) };
         var list = new StackPanel();
-        var scroll = new ScrollViewer { Content = list, MaxHeight = 300, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        var scroll = new ScrollViewer { Content = list, MaxHeight = 243, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         var popup = new Popup { PlacementTarget = anchor, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true, PopupAnimation = PopupAnimation.Fade };
+        Ui.DropBelow(popup);
         var browse = Ui.LabeledButton("I.Folder", "Browse for a program…", () =>
         {
             popup.IsOpen = false;
@@ -25,18 +26,18 @@ internal static class ProgramPicker
                 picked(new PickedProgram(AppWatcher.Normalize(path), path, FileDescription(path) ?? System.IO.Path.GetFileNameWithoutExtension(path)));
         }, "SoftButton");
         browse.HorizontalAlignment = HorizontalAlignment.Stretch;
-        browse.Margin = new Thickness(0, 8, 0, 0);
+        browse.Margin = new Thickness(0, 6, 0, 0);
 
-        var stack = new StackPanel { Width = 360 };
-        stack.Children.Add(new TextBlock { Text = "Running now", Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(2, 0, 0, 6) });
+        var stack = new StackPanel { Width = 292 };
+        stack.Children.Add(new TextBlock { Text = "Running now", Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(2, 0, 0, 5) });
         stack.Children.Add(search);
         stack.Children.Add(scroll);
         stack.Children.Add(browse);
         popup.Child = new Tile
         {
             Style = Ui.Res<Style>("LiftedCard"),
-            Padding = new Thickness(12),
-            Margin = new Thickness(8, 4, 8, 16),
+            Padding = new Thickness(10),
+            Margin = new Thickness(6, 3, 6, 13),
             Child = stack,
         };
 
@@ -46,7 +47,7 @@ internal static class ProgramPicker
             list.Children.Clear();
             if (programs is null)
             {
-                list.Children.Add(new TextBlock { Text = "Looking at what's running…", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(4, 6, 0, 6) });
+                list.Children.Add(new TextBlock { Text = "Looking at what's running…", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(3, 5, 0, 5) });
                 return;
             }
             string f = search.Text.Trim();
@@ -57,13 +58,13 @@ internal static class ProgramPicker
                 name.SetResourceReference(TextBlock.ForegroundProperty, "Text");
                 row.Children.Add(name);
                 row.Children.Add(TextCase.Verbatim(new TextBlock { Text = p.Process + ".exe", Style = Ui.Res<Style>("Caption") }));
-                var b = new Button { Style = Ui.Res<Style>("QuietButton"), Content = row, HorizontalContentAlignment = HorizontalAlignment.Left, Padding = new Thickness(10, 6, 10, 6) };
+                var b = new Button { Style = Ui.Res<Style>("QuietButton"), Content = row, HorizontalContentAlignment = HorizontalAlignment.Left, Padding = new Thickness(8, 5, 8, 5) };
                 var chosen = p;
                 b.Click += (_, _) => { popup.IsOpen = false; picked(chosen); };
                 list.Children.Add(b);
             }
             if (list.Children.Count == 0)
-                list.Children.Add(new TextBlock { Text = "Nothing matches. Start the program, or browse for it.", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(4, 6, 0, 6) });
+                list.Children.Add(new TextBlock { Text = "Nothing matches. Start the program, or browse for it.", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(3, 5, 0, 5) });
         }
         search.TextChanged += (_, _) => Fill();
         Fill();

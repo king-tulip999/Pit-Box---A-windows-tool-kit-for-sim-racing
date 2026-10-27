@@ -77,6 +77,14 @@ internal sealed class SessionInfo
     public double? ShiftRpm { get; init; }
     public string PlayerSetupName { get; init; } = "";
 
+    public double? PitBoxPct { get; init; }
+
+    public string TrackDirection { get; init; } = "";
+
+    public bool StandingStart { get; init; }
+
+    public IReadOnlyDictionary<string, string> CarSetup { get; init; } = new Dictionary<string, string>();
+
     public DriverEntry? Player => ByCar.TryGetValue(PlayerCarIdx, out var d) ? d : null;
 
     public SessionEntry? Session(int number)
@@ -181,6 +189,23 @@ internal sealed class SessionInfo
             ShiftLightFirstRpm = SessionYaml.Num(driverInfo, "DriverCarSLFirstRPM") is > 0 and var slFirst ? slFirst : null,
             ShiftRpm = SessionYaml.Num(driverInfo, "DriverCarSLShiftRPM") is > 0 and var slShift ? slShift : null,
             PlayerSetupName = SessionYaml.Str(driverInfo, "DriverSetupName") ?? "",
+            PitBoxPct = SessionYaml.Num(driverInfo, "DriverPitTrkPct") is >= 0 and <= 1 and var box ? box : null,
+            TrackDirection = SessionYaml.Str(weekend, "TrackDirection") ?? "",
+            StandingStart = SessionYaml.Int(weekend, "WeekendOptions", "StandingStart") == 1,
+            CarSetup = Flatten(SessionYaml.At(root, "CarSetup")),
         };
+    }
+
+    private static Dictionary<string, string> Flatten(object? node)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        void Walk(object? n, string path)
+        {
+            if (n is Dictionary<string, object> map)
+                foreach (var (k, v) in map) Walk(v, path.Length == 0 ? k : path + "." + k);
+            else if (n is string text && path.Length > 0 && !path.EndsWith("UpdateCount", StringComparison.OrdinalIgnoreCase)) result[path] = text.Trim();
+        }
+        Walk(node, "");
+        return result;
     }
 }

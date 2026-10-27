@@ -20,6 +20,7 @@ public sealed class MonitorLayoutView : FrameworkElement
     private static Brush PrimaryStroke => ThemeManager.Brush("Accent", Brushes.SlateBlue);
     private static Brush TextBrush => ThemeManager.Brush("Text", Brushes.Black);
     private static Brush DetailBrush => ThemeManager.Brush("TextMuted", Brushes.Gray);
+    private const double MinLabelHeight = 22;
     private Pen? _tilePen, _primaryPen, _targetPen;
     private Rect? _target;
 
@@ -71,14 +72,16 @@ public sealed class MonitorLayoutView : FrameworkElement
             if (r.Width <= 2 || r.Height <= 2)
                 continue;
             dc.DrawGeometry(t.Primary ? PrimaryFill : TileFill, t.Primary ? _primaryPen : _tilePen, Tile.Shape(r, ThemeManager.Round(6)));
+            if (r.Height < MinLabelHeight || string.IsNullOrEmpty(t.Label))
+                continue;
 
-            double size = Math.Clamp(r.Height * 0.28, 9, 22);
+            double size = Math.Clamp(r.Height * 0.28, 7, 18);
             var label = new FormattedText(ThemeManager.Case(t.Label), CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, LabelFace, size, TextBrush, dpi);
             double total = label.Height;
             FormattedText? detail = null;
             if (!string.IsNullOrEmpty(t.Detail) && r.Height > 44)
             {
-                detail = new FormattedText(ThemeManager.Case(t.Detail), CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, DetailFace, Math.Clamp(size * 0.55, 9, 12), DetailBrush, dpi);
+                detail = new FormattedText(ThemeManager.Case(t.Detail), CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, DetailFace, Math.Clamp(size * 0.55, 7, 10), DetailBrush, dpi);
                 if (detail.Width > r.Width - 6)
                     detail = null;
                 else

@@ -20,6 +20,12 @@ internal sealed class HotkeyManager : NativeWindow, IDisposable
 
     public bool TryRegister(string text, Action action, out string? error)
     {
+        if (ControllerButtons.TryParse(text, out var button))
+        {
+            ControllerButtons.Shared.Register(button, action);
+            error = null;
+            return true;
+        }
         if (!Hotkey.TryParse(text, out var hotkey))
         {
             error = "isn't a valid key combination";
@@ -47,6 +53,7 @@ internal sealed class HotkeyManager : NativeWindow, IDisposable
             UnregisterHotKey(Handle, id);
         _actions.Clear();
         _nextId = 1;
+        ControllerButtons.Shared.Clear();
     }
 
     protected override void WndProc(ref Message m)

@@ -1,4 +1,5 @@
 using System.Globalization;
+using GoodieBag.Services;
 
 namespace GoodieBag.SessionStats;
 
@@ -15,11 +16,11 @@ internal sealed record DriveNote(double Distance, NoteKind Kind, double Amount, 
         if (Kind == NoteKind.MinSpeed)
         {
             double v = imperial ? Amount * 2.236936 : Amount * 3.6;
-            string speed = v.ToString(v < 10 ? "0.0" : "0", CultureInfo.CurrentCulture) + (imperial ? " mph" : " km/h");
+            string speed = v.ToString(v < 10 ? "0.0" : "0", CultureInfo.CurrentCulture) + " " + (imperial ? Units.Mph : Units.Kmh);
             return ReferenceFirst ? $"{speed} slower than the reference." : $"{speed} faster than the reference.";
         }
         double d = imperial ? Amount * 3.28084 : Amount;
-        string gap = d.ToString(d < 10 ? "0.0" : "0", CultureInfo.CurrentCulture) + (imperial ? " ft" : " m");
+        string gap = d.ToString(d < 10 ? "0.0" : "0", CultureInfo.CurrentCulture) + " " + (imperial ? Units.Ft : Units.M);
         return Kind == NoteKind.Brake
             ? (ReferenceFirst ? $"Reference braked {gap} earlier than you." : $"You braked {gap} earlier than the reference.")
             : (ReferenceFirst ? $"Reference got on the throttle {gap} earlier than you." : $"You got on the throttle {gap} earlier than the reference.");

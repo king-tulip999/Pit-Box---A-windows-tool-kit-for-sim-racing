@@ -14,7 +14,15 @@ internal static class PerfProbe
 
     private static string _stage = "startup";
 
-    public static void Mark(string name) => Marks.Add((name, (DateTime.Now - Process.GetCurrentProcess().StartTime).TotalMilliseconds));
+    private static readonly DateTime Started = StartTime();
+
+    private static DateTime StartTime()
+    {
+        using var me = Process.GetCurrentProcess();
+        return me.StartTime;
+    }
+
+    public static void Mark(string name) => Marks.Add((name, (DateTime.Now - Started).TotalMilliseconds));
 
     public static async void Run(MainWindow window, string file)
     {

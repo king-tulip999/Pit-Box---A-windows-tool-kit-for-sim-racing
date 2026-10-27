@@ -16,7 +16,7 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
     private const string Consumer = "Window Profiles page";
     private readonly AppServices _app;
     private readonly MainWindow _window;
-    private readonly StackPanel _body = new() { Margin = new Thickness(28, 0, 28, 28) };
+    private readonly StackPanel _body = new() { Margin = new Thickness(23, 0, 23, 23) };
     private bool _shown, _buildQueued;
     private HashSet<string> _watched = new(StringComparer.OrdinalIgnoreCase);
 
@@ -37,6 +37,7 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
         _app.Watcher.Started += OnProcess;
         _app.Watcher.Stopped += OnProcess;
         _app.WindowProfiles.Changed += OnChanged;
+        _app.Displays.Changed += QueueBuild;
         Motion.Stagger(_body);
     }
 
@@ -48,6 +49,7 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
         _app.Watcher.Started -= OnProcess;
         _app.Watcher.Stopped -= OnProcess;
         _app.WindowProfiles.Changed -= OnChanged;
+        _app.Displays.Changed -= QueueBuild;
     }
 
     private void Watch()
@@ -87,24 +89,26 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
     {
         S.Normalize();
         _body.Children.Clear();
-        var header = new Grid { Margin = new Thickness(0, 0, 0, Ui.HeaderGap) };
+        var header = new Grid { Margin = Ui.HeaderMargin };
         header.Children.Add(Ui.PluginTitle(PluginIds.WindowProfiles, "Window Profiles"));
         _body.Children.Add(header);
-        _body.Children.Add(SettingsCard());
 
         if (S.Profiles.Count == 0 && S.Groups.Count == 0)
         {
-            _body.Children.Add(EmptyState());
+            var empty = EmptyState();
+            Ui.Anchor(empty, AutoAnchor);
+            _body.Children.Add(empty);
             return;
         }
+        _body.Children.Add(SettingsCard());
         var newGroup = Ui.LabeledButton("I.Folder", "New group", () => _ = EditGroupAsync(new WindowGroup(), isNew: true), "GhostButton");
-        newGroup.Margin = new Thickness(0, 0, 8, 0);
+        newGroup.Margin = new Thickness(0, 0, 6, 0);
         var create = Ui.LabeledButton("I.Plus", "New profile", () => _ = EditAsync(new WindowProfile(), isNew: true), "PrimaryButton");
         int n = S.Profiles.Count;
         _body.Children.Add(Ui.SectionHeader("Your profiles", RaceFormatCount(n) + (S.Layout.Count > 1 ? " · drag to arrange" : ""), newGroup, create));
         _screens = Screens();
 
-        var grid = new PanelGrid(S.Layout, _app.Save) { LiveEdit = true, RowHeight = 1, Gap = 0, PanelSpacing = 12 };
+        var grid = new PanelGrid(S.Layout, _app.Save) { LiveEdit = true, RowHeight = 1, Gap = 0, PanelSpacing = Ui.PanelSpacing };
         int order = 0;
         foreach (var slot in S.Layout.ToList())
         {
@@ -129,26 +133,14 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
             Ui.Switch(S.AutoApply, v => { S.AutoApply = v; _app.WindowProfiles.RaiseChanged(); }));
         Ui.Anchor(auto, AutoAnchor);
         flow.Children.Add(auto);
-        return new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, 18), Padding = new Thickness(20, 8, 20, 8), Child = flow };
+        return new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, 15), Padding = new Thickness(16, 6, 16, 6), Child = flow };
     }
 
     private Tile EmptyState()
     {
-        var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 24, 0, 24) };
-        var colors = Hues.Tool(PluginIds.WindowProfiles, Hues.Accent);
-        var icon = new NavIcon { Glyph = Plugins.BuiltIn.WindowProfilesPlugin.PageIcon, IsActive = true, Width = 48, Height = 48, HorizontalAlignment = HorizontalAlignment.Center };
-        icon.SetResourceReference(NavIcon.ForegroundProperty, colors.Deep);
-        stack.Children.Add(icon);
-        stack.Children.Add(new TextBlock { Text = "No window profiles yet", Style = Ui.Res<Style>("H2"), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 14, 0, 4) });
-        stack.Children.Add(new TextBlock
-        {
-            Text = "Pick a program and the exact size and spot for its window, e.g. a game stretched across triple screens or held at 1920 × 1080, borderless.",
-            Style = Ui.Res<Style>("Muted"), TextAlignment = TextAlignment.Center, MaxWidth = 480, TextWrapping = TextWrapping.Wrap,
-        });
         var create = Ui.LabeledButton("I.Plus", "New profile", () => _ = EditAsync(new WindowProfile(), isNew: true), "PrimaryButton");
-        create.HorizontalAlignment = HorizontalAlignment.Center;
-        create.Margin = new Thickness(0, 18, 0, 6);
-        stack.Children.Add(create);
+        var stack = Ui.EmptyState(Plugins.BuiltIn.WindowProfilesPlugin.PageIcon, "No window profiles yet",
+            "Pick a program and the exact size and spot for its window, e.g. a game stretched across triple screens or held at 1920×1080, borderless.", create);
         return new Tile { Style = Ui.Res<Style>("Card"), Child = stack };
     }
 
@@ -165,103 +157,96 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
     }
 
     private Tile ProfileCard(WindowProfile p) =>
-        new() { Style = Ui.Res<Style>("Card"), Padding = new Thickness(18, 14, 18, 16), Child = ProfileRow(p), Cursor = System.Windows.Input.Cursors.Hand, ToolTip = "Click to edit, drag to arrange" };
+        new() { Style = Ui.Res<Style>("Card"), Padding = new Thickness(15, 10, 15, 10), Child = ProfileRow(p), Cursor = System.Windows.Input.Cursors.Hand, ToolTip = "Click to edit, drag to arrange" };
 
-    private StackPanel ProfileRow(WindowProfile p)
+    private Grid ProfileRow(WindowProfile p)
     {
         bool running = Running(p);
         var row = new Grid();
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(new ColumnDefinition());
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var badge = Ui.Badge("I.AppWindow", running ? "AccentSoft" : "SurfaceAlt", running ? "AccentText" : "TextMuted", 40, 0, 20);
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var badge = Ui.Badge("I.AppWindow", running ? "AccentSoft" : "SurfaceAlt", running ? "AccentText" : "TextMuted", 32, 0, 16);
         badge.VerticalAlignment = VerticalAlignment.Center;
         row.Children.Add(badge);
 
-        var names = new StackPanel { Margin = new Thickness(14, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
+        var names = new StackPanel { Margin = new Thickness(11, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
         var title = new TrimRow();
-        title.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = p.Name, Style = Ui.Res<Style>("H3"), FontSize = 16, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) }));
+        title.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = p.Name, Style = Ui.Res<Style>("H3"), FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) }));
         names.Children.Add(title);
-        var exe = TextFit.TipWhenTrimmed(new TextBlock { Text = p.ProcessName.Length > 0 ? p.ProcessName : "No program picked", Style = Ui.Res<Style>("Caption"), TextTrimming = TextTrimming.CharacterEllipsis });
+        var line = new TrimRow { Margin = new Thickness(0, 2, 0, 0) };
+        var exe = TextFit.TipWhenTrimmed(new TextBlock { Text = p.ProcessName.Length > 0 ? p.ProcessName : "No program picked", Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 8, 0) });
         TextCase.Verbatim(exe);
-        names.Children.Add(exe);
+        line.Children.Add(exe);
+        line.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = Summary(p), Style = Ui.Res<Style>("Caption"), TextTrimming = TextTrimming.CharacterEllipsis }));
+        names.Children.Add(line);
         if (running)
         {
             var chip = Ui.Chip("Running", "SageSoft", "SageDeep");
-            chip.Margin = new Thickness(0, 2, 6, 2);
+            chip.Margin = new Thickness(0, 2, 5, 2);
             chip.VerticalAlignment = VerticalAlignment.Center;
             title.Children.Add(chip);
         }
         Grid.SetColumn(names, 1);
         row.Children.Add(names);
 
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        var apply = Ui.LabeledButton("I.Zap", "Apply", () => _ = _app.WindowProfiles.ApplyAsync(p), running ? "PrimaryButton" : "GhostButton");
-        apply.ToolTip = running ? "Move the window now" + Keys(p.Hotkey) : $"{p.ProcessName} isn't running";
-        actions.Children.Add(apply);
-        var edit = Ui.LabeledButton("I.Pencil", "Edit", () => _ = EditAsync(p, isNew: false), "GhostButton");
-        edit.Margin = new Thickness(8, 0, 0, 0);
-        actions.Children.Add(edit);
-        var delete = Ui.IconButton("I.Trash", "Delete this profile", () => _ = DeleteAsync(p));
-        delete.Margin = new Thickness(6, 0, 0, 0);
-        actions.Children.Add(delete);
-        Grid.SetColumn(actions, 2);
-        row.Children.Add(actions);
-
-        var stack = new StackPanel();
-        stack.Children.Add(row);
-        stack.Children.Add(Facts(p));
-        return stack;
-    }
-
-    private Grid Facts(WindowProfile p)
-    {
-        var facts = new (string Label, string Value, bool Verbatim)[]
-        {
-            ("Size", p.Width is { } w && p.Height is { } h ? $"{w}×{h}" : "Keep its size", false),
-            ("Position", $"{p.X}, {p.Y}", false),
-            ("Borders", StyleOf(p), false),
-            ("Keybind", p.Hotkey is null ? "Not set" : Hotkeys.Hotkey.Display(p.Hotkey), false),
-            ("Applying", ApplyingOf(p), false),
-        };
-        var grid = new Grid { Margin = new Thickness(54, 14, 0, 0) };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         if (_screens.Count > 0)
         {
-            var thumb = new MonitorLayoutView { Width = 120, Height = 48, Margin = new Thickness(0, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center, ToolTip = "Where the window goes on your displays" };
+            var thumb = new MonitorLayoutView { Width = 97, Height = 39, Margin = new Thickness(0, 0, 13, 0), VerticalAlignment = VerticalAlignment.Center, ToolTip = "Where the window goes on your displays" };
             thumb.SetTiles(_screens);
             if (p.Width is { } tw && p.Height is { } th) thumb.SetTarget(new Rect(p.X, p.Y, tw, th));
-            grid.Children.Add(thumb);
+            Grid.SetColumn(thumb, 2);
+            row.Children.Add(thumb);
         }
-        for (int i = 0; i < facts.Length; i++)
-        {
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            var cell = new Border { BorderThickness = new Thickness(i == 0 ? 0 : 1, 0, 0, 0), Padding = new Thickness(i == 0 ? 0 : 14, 1, 10, 1), VerticalAlignment = VerticalAlignment.Center };
-            cell.SetResourceReference(Border.BorderBrushProperty, "Line");
-            var text = new StackPanel();
-            text.Children.Add(new TextBlock { Text = facts[i].Label, Style = Ui.Res<Style>("Caption") });
-            var value = TextFit.TipWhenTrimmed(new TextBlock { Text = facts[i].Value, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 3, 0, 0) });
-            if (facts[i].Verbatim) TextCase.Verbatim(value);
-            text.Children.Add(value);
-            cell.Child = text;
-            Grid.SetColumn(cell, i + 1);
-            grid.Children.Add(cell);
-        }
-        return grid;
+
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        var apply = Ui.LabeledButton("I.Zap", "Apply", () => _ = _app.WindowProfiles.ApplyAsync(p));
+        apply.ToolTip = running ? "Move the window now" + Keys(p.Hotkey) : p.ProcessName.Length == 0 ? "No program picked" : $"{p.ProcessName} isn't running";
+        actions.Children.Add(apply);
+        var edit = Ui.LabeledButton("I.Pencil", "Edit", () => _ = EditAsync(p, isNew: false), "GhostButton");
+        edit.Margin = new Thickness(6, 0, 0, 0);
+        actions.Children.Add(edit);
+        Grid.SetColumn(actions, 3);
+        row.Children.Add(actions);
+        return row;
     }
 
-    private static string StyleOf(WindowProfile p) => (p.RemoveBorders, p.HideTitleBar) switch
+    private string Summary(WindowProfile p)
     {
-        (true, true) => "Removed, no title strip",
-        (true, false) => "Removed",
-        (false, true) => "No title strip",
-        _ => "Kept",
+        var parts = new List<string>
+        {
+            p.Width is { } w && p.Height is { } h ? $"{w}×{h}{Where(new Rect(p.X, p.Y, w, h))} at {p.X}, {p.Y}" : $"keeps its size{Where(new Rect(p.X, p.Y, 1, 1))}, at {p.X}, {p.Y}",
+        };
+        if (StyleOf(p) is { } style) parts.Add(style);
+        if (p.Hotkey is not null) parts.Add(Hotkeys.Hotkey.Display(p.Hotkey));
+        parts.Add(ApplyingOf(p));
+        return string.Join(" · ", parts);
+    }
+
+    private string Where(Rect window)
+    {
+        var hit = _screens.Where(s => s.Label.Length > 0 && Rect.Intersect(new Rect(s.X, s.Y, s.Width, s.Height), window) is { IsEmpty: false, Width: > 0, Height: > 0 }).ToList();
+        return hit.Count switch
+        {
+            1 => $" on display {hit[0].Label}",
+            > 1 => $" across {SimRacing.Race.RaceFormat.Count(hit.Count, "display")}",
+            _ => "",
+        };
+    }
+
+    private static string? StyleOf(WindowProfile p) => (p.RemoveBorders, p.HideTitleBar) switch
+    {
+        (true, true) => "borders removed, title bar hidden",
+        (true, false) => "borders removed",
+        (false, true) => "title bar hidden",
+        _ => null,
     };
 
     private string ApplyingOf(WindowProfile p) =>
-        !p.Auto ? "By hand"
-        : !S.AutoApply ? "By hand (automatic is off)"
-        : p.DelayMs > 0 ? $"When it starts · {p.DelayMs / 1000.0:0.##} s" : "When it starts";
+        !p.Auto ? "by hand"
+        : !S.AutoApply ? "by hand (automatic is off)"
+        : p.DelayMs > 0 ? $"when it starts, after {p.DelayMs / 1000.0:0.##} {Units.S}" : "when it starts";
 
     private static string Keys(string? hotkey) => hotkey is null ? "" : $" ({Hotkeys.Hotkey.Display(hotkey)})";
 
@@ -273,12 +258,12 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
         head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         head.ColumnDefinitions.Add(new ColumnDefinition());
         head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var badge = Ui.Badge("I.Folder", "AccentSoft", "AccentText", 40, 0, 20);
+        var badge = Ui.Badge("I.Folder", "AccentSoft", "AccentText", 32, 0, 16);
         badge.VerticalAlignment = VerticalAlignment.Center;
         head.Children.Add(badge);
-        var text = new StackPanel { Margin = new Thickness(14, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
+        var text = new StackPanel { Margin = new Thickness(11, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
         var title = new TrimRow();
-        title.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = g.Name, Style = Ui.Res<Style>("H3"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) }));
+        title.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = g.Name, Style = Ui.Res<Style>("H3"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) }));
         if (g.Hotkey is not null)
         {
             var keys = Ui.Chip(Hotkeys.Hotkey.Display(g.Hotkey));
@@ -291,30 +276,27 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
         Grid.SetColumn(text, 1);
         head.Children.Add(text);
         var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        var apply = Ui.LabeledButton("I.Zap", "Apply all", () => _ = _app.WindowProfiles.ApplyGroupAsync(g), members.Any(Running) ? "PrimaryButton" : "GhostButton");
+        var apply = Ui.LabeledButton("I.Zap", "Apply all", () => _ = _app.WindowProfiles.ApplyGroupAsync(g));
         apply.ToolTip = "Move every program in the group that's running" + Keys(g.Hotkey);
         apply.IsEnabled = members.Count > 0;
         actions.Children.Add(apply);
         var add = Ui.LabeledButton("I.Plus", "Add profile", () => _ = EditAsync(new WindowProfile { GroupId = g.Id }, isNew: true), "SoftButton");
-        add.Margin = new Thickness(8, 0, 0, 0);
+        add.Margin = new Thickness(6, 0, 0, 0);
         actions.Children.Add(add);
         var edit = Ui.LabeledButton("I.Pencil", "Edit", () => _ = EditGroupAsync(g, isNew: false), "GhostButton");
-        edit.Margin = new Thickness(8, 0, 0, 0);
+        edit.Margin = new Thickness(6, 0, 0, 0);
         actions.Children.Add(edit);
-        var delete = Ui.IconButton("I.Trash", "Delete this group (its profiles stay)", () => _ = DeleteGroupAsync(g));
-        delete.Margin = new Thickness(6, 0, 0, 0);
-        actions.Children.Add(delete);
         Grid.SetColumn(actions, 2);
         head.Children.Add(actions);
         stack.Children.Add(head);
 
         if (members.Count > 0)
         {
-            var list = new ReorderGrid { MaxColumns = 1, MinCellWidth = 200, Gap = 6, Margin = new Thickness(0, 12, 0, 2) };
+            var list = new ReorderGrid { MaxColumns = 1, MinCellWidth = 162, Gap = 5, Margin = new Thickness(0, 10, 0, 2) };
             foreach (var m in members)
             {
                 var member = m;
-                var tile = new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(14, 12, 14, 14), Child = ProfileRow(member), ToolTip = "Drag to arrange within the group" };
+                var tile = new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(11, 8, 11, 8), Child = ProfileRow(member), ToolTip = "Drag to arrange within the group" };
                 tile.MouseLeftButtonUp += (_, e) => { if (e.OriginalSource is not DependencyObject d || !InButton(d)) _ = EditAsync(member, isNew: false); };
                 list.Children.Add(tile);
             }
@@ -322,7 +304,7 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
             PanelGrid.SetNoDrag(list, true);
             stack.Children.Add(list);
         }
-        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(16, 12, 16, 14), Child = stack, Cursor = System.Windows.Input.Cursors.Hand, ToolTip = "Click to edit the group, drag to arrange" };
+        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(13, 10, 13, 11), Child = stack, Cursor = System.Windows.Input.Cursors.Hand, ToolTip = "Click to edit the group, drag to arrange" };
     }
 
     private static bool InButton(DependencyObject d)
@@ -336,8 +318,13 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
 
     private async Task EditAsync(WindowProfile profile, bool isNew)
     {
-        var editor = new WindowProfileEditor(_app, _window, profile, isNew);
-        if (!await _window.ShowModal(editor.Card)) return;
+        bool deleteAsked = false;
+        var editor = new WindowProfileEditor(_app, _window, profile, isNew, isNew ? null : () => { deleteAsked = true; _window.CloseModal(false); });
+        if (!await _window.ShowModal(editor.Card))
+        {
+            if (deleteAsked && !await DeleteAsync(profile)) await EditAsync(profile, false);
+            return;
+        }
         if (isNew) S.Profiles.Add(profile);
         S.Normalize();
         _app.WindowProfiles.RaiseChanged();
@@ -346,27 +333,34 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
 
     private async Task EditGroupAsync(WindowGroup group, bool isNew)
     {
-        var editor = new WindowGroupEditor(_app, _window, group, isNew);
-        if (!await _window.ShowModal(editor.Card)) return;
+        bool deleteAsked = false;
+        var editor = new WindowGroupEditor(_app, _window, group, isNew, isNew ? null : () => { deleteAsked = true; _window.CloseModal(false); });
+        if (!await _window.ShowModal(editor.Card))
+        {
+            if (deleteAsked && !await DeleteGroupAsync(group)) await EditGroupAsync(group, false);
+            return;
+        }
         if (isNew) S.Groups.Add(group);
         S.Normalize();
         _app.WindowProfiles.RaiseChanged();
     }
 
-    private async Task DeleteAsync(WindowProfile profile)
+    private async Task<bool> DeleteAsync(WindowProfile profile)
     {
-        if (!await _window.Confirm($"Delete “{profile.Name}”?", "The profile is removed. Windows stay where they are now.", "Delete", danger: true)) return;
+        if (!await _window.Confirm($"Delete “{profile.Name}”?", "The profile is removed. Windows stay where they are now.", "Delete", danger: true)) return false;
         S.Profiles.Remove(profile);
         S.Normalize();
         _app.WindowProfiles.RaiseChanged();
+        return true;
     }
 
-    private async Task DeleteGroupAsync(WindowGroup group)
+    private async Task<bool> DeleteGroupAsync(WindowGroup group)
     {
-        if (!await _window.Confirm($"Delete the group “{group.Name}”?", "Its profiles stay, outside any group.", "Delete", danger: true)) return;
+        if (!await _window.Confirm($"Delete the group “{group.Name}”?", "Its profiles stay, outside any group.", "Delete", danger: true)) return false;
         S.Remove(group);
         S.Normalize();
         _app.WindowProfiles.RaiseChanged();
+        return true;
     }
 
     public IEnumerable<(string Name, Func<Task> Enter)> ScreenshotStates()

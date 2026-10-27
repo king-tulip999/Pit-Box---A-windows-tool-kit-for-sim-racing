@@ -67,6 +67,9 @@ internal sealed class CompanionAppSection : Tile
         var spec = app.Spec;
         var s = app.Settings;
 
+        var heading = Ui.Text(spec.Name, "H2");
+        heading.Margin = new Thickness(0, 0, 0, 8);
+        _stack.Children.Add(heading);
         var info = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         var (text, soft, deep) = status switch
         {
@@ -81,7 +84,7 @@ internal sealed class CompanionAppSection : Tile
         var where = new TextBlock
         {
             Text = app.ExePath ?? $"{CompanionApp.Upper(spec.Program)} wasn't found on this PC. {_about} Install it from the official website, then come back here.",
-            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 12, 0), MaxWidth = 560, HorizontalAlignment = HorizontalAlignment.Left,
+            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 10, 0), MaxWidth = 454, HorizontalAlignment = HorizontalAlignment.Left,
         };
         TextCase.SetVerbatim(where, app.ExePath is not null);
         info.Children.Add(where);
@@ -89,7 +92,7 @@ internal sealed class CompanionAppSection : Tile
         var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         var visit = Ui.LabeledButton("I.External", spec.Host, () => Ui.OpenUrl(spec.Site), "GhostButton");
         visit.ToolTip = $"Open {spec.Site}";
-        visit.Margin = new Thickness(0, 0, 8, 0);
+        visit.Margin = new Thickness(0, 0, 6, 0);
         actions.Children.Add(visit);
         if (status == CompanionStatus.NotInstalled)
         {
@@ -98,13 +101,13 @@ internal sealed class CompanionAppSection : Tile
                 if (ProgramPicker.BrowseExe() is { } path) app.SetCustomPath(path);
             }));
             var site = Ui.LabeledButton("I.Download", $"Open the {spec.Name} website", () => Ui.OpenUrl(spec.Website), "PrimaryButton");
-            site.Margin = new Thickness(8, 0, 0, 0);
+            site.Margin = new Thickness(6, 0, 0, 0);
             actions.Children.Add(site);
         }
         else
         {
             var check = Ui.IconButton("I.Refresh", "Check again", app.Refresh);
-            check.Margin = new Thickness(0, 0, 8, 0);
+            check.Margin = new Thickness(0, 0, 6, 0);
             actions.Children.Add(check);
             bool running = status == CompanionStatus.Running;
             var launch = Ui.LabeledButton(running ? "I.Check" : "I.Play", running ? "Running" : $"Launch {spec.Name}", () =>
@@ -119,25 +122,28 @@ internal sealed class CompanionAppSection : Tile
                 Button stop = null!;
                 stop = Ui.LabeledButton("I.Stop", "Stop", async () =>
                 {
+                    if (Window.GetWindow(this) is MainWindow window
+                        && !await window.Confirm($"Stop {spec.Program}?", "Goodie Bag closes it, and ends it if it doesn't close by itself. Anything it's doing now is cut off.", "Stop", danger: true))
+                        return;
                     stop.IsEnabled = false;
                     await app.CloseAsync();
                 }, "DangerButton");
                 stop.ToolTip = $"Close {spec.Program}";
-                stop.Margin = new Thickness(8, 0, 0, 0);
+                stop.Margin = new Thickness(Ui.GroupGap, 0, 0, 0);
                 actions.Children.Add(stop);
             }
         }
-        _stack.Children.Add(Ui.SplitRow(info, actions, 12, stackLeft: true));
+        _stack.Children.Add(Ui.SplitRow(info, actions, 9.5, stackLeft: true));
 
-        _stack.Children.Add(new Border { Height = 1, Background = Ui.Res<System.Windows.Media.Brush>("Line"), Margin = new Thickness(0, 14, 0, 4) });
-        _stack.Children.Add(Ui.SettingRow($"Launch {spec.Name} with Goodie Bag", "Starts it when Goodie Bag starts (skipped if it's already running).",
+        _stack.Children.Add(Hairline.Rule(new Border { Background = Ui.Res<System.Windows.Media.Brush>("Line"), Margin = new Thickness(0, 11, 0, 3) }));
+        _stack.Children.Add(Ui.SettingRow("Start with Goodie Bag", "When Goodie Bag starts (skipped if it's already running).",
             Ui.Switch(s.LaunchWithGoodieBag, v => { s.LaunchWithGoodieBag = v; _app.Save(); })));
-        _stack.Children.Add(Ui.SettingRow("Launch when iRacing starts", null,
+        _stack.Children.Add(Ui.SettingRow("Start with iRacing", "When iRacing starts (skipped if it's already running).",
             Ui.Switch(s.LaunchWithIracing, v => { s.LaunchWithIracing = v; _app.Save(); app.UpdateWatch(); })));
         _stack.Children.Add(new TextBlock
         {
-            Text = $"Goodie Bag starts {spec.Program} the normal way and never changes or updates it. It keeps running after Goodie Bag exits; Stop closes it.",
-            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0),
+            Text = $"Goodie Bag starts {spec.Program} the normal way and never changes or updates it. It keeps running after Goodie Bag quits.",
+            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 5, 0, 0),
         });
     }
 }

@@ -32,8 +32,8 @@ internal static class AudioPicker
     public static StackPanel Volume(int? initial, Action<int?> set)
     {
         var panel = new StackPanel { Orientation = Orientation.Horizontal };
-        var on = new CheckBox { Content = "Set to", IsChecked = initial is not null, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0) };
-        var slider = Ui.SliderWithValue(0, 100, initial ?? 50, "{0:0}%", v => { if (on.IsChecked == true) set((int)v); }, 180, 1);
+        var on = new CheckBox { Content = "Set to", IsChecked = initial is not null, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+        var slider = Ui.SliderWithValue(0, 100, initial ?? 50, "{0:0}%", v => { if (on.IsChecked == true) set((int)v); }, 146, 1);
         slider.IsEnabled = initial is not null;
         on.Click += (_, _) =>
         {

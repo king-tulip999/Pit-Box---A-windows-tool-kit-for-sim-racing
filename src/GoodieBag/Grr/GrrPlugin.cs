@@ -14,7 +14,7 @@ internal sealed class GrrPlugin : Plugin
 
     public override string Id => PluginId;
     public override string Name => "GRR League";
-    public override string Description => "Your GRR league's next race, championship standings, results and schedule from the GRR website.";
+    public override string Description => "Your GRR league's next race, standings, results and schedule.";
     public const string LogoIcon = "F.GrrLogo";
 
     public override string Icon => LogoIcon;

@@ -59,6 +59,7 @@ internal sealed class HudHost : IDisposable
         app.Telemetry.SimStarted += OnSimStarted;
         SystemEvents.DisplaySettingsChanged += OnDisplaysChanged;
         Theme.ThemeManager.Changed += OnThemeChanged;
+        TakeThemeAccent();
     }
 
     private void OnStatusChanged(SimStatus status)
@@ -117,6 +118,7 @@ internal sealed class HudHost : IDisposable
 
     public void SettingsChanged(bool save = true)
     {
+        _palette = null;
         if (save) Save();
         foreach (var s in _slots.Values) s.Dirty = true;
         Refresh();
@@ -270,7 +272,7 @@ internal sealed class HudHost : IDisposable
         if (!_holding) return;
         var frame = _app.Telemetry.Take();
         Race.Update(frame);
-        _tickPalette = HudPalette.Of(Settings.Appearance);
+        _tickPalette = CurrentPalette();
         ResolveLayout(force: false);
         bool show = !_app.Demo && (_editing || _preview || Settings.Enabled && !_hidden && ShowWhen(frame));
         int fastest = 0;
@@ -323,7 +325,21 @@ internal sealed class HudHost : IDisposable
 
     private HudPalette? _tickPalette;
 
-    private HudPalette Palette => _tickPalette ?? HudPalette.Of(Settings.Appearance);
+    private HudPalette Palette => _tickPalette ?? CurrentPalette();
+
+    private HudPalette? _palette;
+    private (HudAppearance? Look, HudColors Colors, HudCustomColors? Custom) _paletteFor;
+
+    private HudPalette CurrentPalette()
+    {
+        var look = Settings.Appearance;
+        if (_palette is null || !ReferenceEquals(_paletteFor.Look, look) || _paletteFor.Colors != look.Colors || !ReferenceEquals(_paletteFor.Custom, look.Custom))
+        {
+            _palette = HudPalette.Of(look);
+            _paletteFor = (look, look.Colors, look.Custom);
+        }
+        return _palette;
+    }
 
     private void Draw(Slot s, TelemetryFrame frame)
     {
@@ -357,7 +373,9 @@ internal sealed class HudHost : IDisposable
             painter.Background = s.Config.Background;
             var view = new HudView { Frame = frame, Race = Race, Settings = Settings, Config = s.Config, Options = s.Options, Def = s.Def };
             s.Widget.Draw(painter, view);
+            painter.FinishPanels();
             if (_editing) EditFrame(painter, s, _picked == s.Config.Id);
+            painter.End(window.SurfaceDc, size);
             if (!window.Visible) window.Show();
             window.Present(new Point((int)Math.Round(rect.X), (int)Math.Round(rect.Y)), (byte)Math.Round(s.Config.Opacity * 2.55));
             if (Stopwatch.GetElapsedTime(s.LastTop).TotalSeconds >= 3) { s.LastTop = Stopwatch.GetTimestamp(); window.KeepOnTop(); }
@@ -455,7 +473,14 @@ internal sealed class HudHost : IDisposable
 
     private void OnThemeChanged()
     {
+        TakeThemeAccent();
         foreach (var s in _slots.Values) s.Dirty = true;
+    }
+
+    private static void TakeThemeAccent()
+    {
+        var c = Theme.ThemeManager.ColorOf("Accent", System.Windows.Media.Color.FromArgb(0, 0, 0, 0));
+        HudPalette.ThemeAccent = c.A == 0 ? null : Color.FromArgb(c.R, c.G, c.B);
     }
 
     private static float DpiScale(Rectangle bounds)
@@ -637,12 +662,22 @@ internal sealed class HudHost : IDisposable
 
     private void Save()
     {
+        var defaultLayout = Settings.Layouts.FirstOrDefault(l => RaceHudSettings.IsDefaultName(l.Name));
         if (HudPresets.Fork(Settings) is { } custom)
         {
+            if (defaultLayout is not null && Settings.Layout(custom) is { } forked) Retarget(defaultLayout, forked);
             if (RaceHudSettings.IsDefaultName(_layoutName)) _layoutName = custom;
             Changed?.Invoke();
         }
         _app.Save();
+    }
+
+    private void Retarget(HudLayout from, HudLayout to)
+    {
+        foreach (var list in new[] { _undo, _redo })
+            for (int i = 0; i < list.Count; i++)
+                if (ReferenceEquals(list[i].Layout, from)) list[i] = list[i] with { Layout = to };
+        if (_editStart.Remove(from, out var start)) _editStart[to] = start with { Layout = to };
     }
 
     public void ResetLayout(string name)
@@ -715,7 +750,7 @@ internal sealed class HudHost : IDisposable
         n = 0;
         for (float y = 0; y < size.Height; y += step, n++) g.DrawLine(n % 4 == 0 ? major : minor, 0, y, size.Width, y);
         string text = $"Snap grid · {setting} px";
-        using var font = new Font("Segoe UI Semibold", 26, FontStyle.Regular, GraphicsUnit.Pixel);
+        using var font = new Font(GoodieBag.Overlay.SharpText.Family + " SemiBold", 26, FontStyle.Regular, GraphicsUnit.Pixel);
         var box = g.MeasureString(text, font);
         var r = new RectangleF((size.Width - box.Width) / 2 - 18, (size.Height - box.Height) / 2 - 10, box.Width + 36, box.Height + 20);
         using (var bg = new SolidBrush(Color.FromArgb(235, p.Surface))) g.FillRectangle(bg, r);
@@ -747,20 +782,29 @@ internal sealed class HudHost : IDisposable
             bitmap?.Dispose();
             bitmap = new Bitmap(w, h, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
         }
-        using var g = Graphics.FromImage(bitmap);
-        g.Clear(Color.Transparent);
+        var g = _previewSurface.Ensure(new Size(w, h));
         painter.Simulated = race.Frame.Simulated;
         painter.MarkSimulated = false;
         painter.IsPreview = true;
         painter.Begin(g, scale, new SizeF((float)config.W, (float)config.H), Palette, Settings.Appearance);
         painter.Background = config.Background;
-        var view = new HudView { Frame = race.Frame, Race = race, Settings = Settings, Config = config, Options = new HudOptions(def, config), Def = def };
-        string key = config.Id + "|" + config.Kind;
-        if (!_previewWidgets.TryGetValue(key, out var widget)) _previewWidgets[key] = widget = def.Create();
+        var key = (config.Id, config.Kind);
+        if (!_previewWidgets.TryGetValue(key, out var preview)) preview = (config, def.Create(), new HudOptions(def, config));
+        else if (!ReferenceEquals(preview.Config, config)) preview = (config, preview.Widget, new HudOptions(def, config));
+        _previewWidgets[key] = preview;
+        var widget = preview.Widget;
+        var view = new HudView { Frame = race.Frame, Race = race, Settings = Settings, Config = config, Options = preview.Options, Def = def };
         widget.Draw(painter, view);
+        painter.FinishPanels();
+        painter.End(_previewSurface.Dc, _previewSurface.Size);
+        using var copy = Graphics.FromImage(bitmap);
+        copy.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceCopy;
+        copy.DrawImageUnscaled(_previewSurface.Bitmap!, 0, 0);
     }
 
-    private readonly Dictionary<string, HudWidget> _previewWidgets = new();
+    private readonly GoodieBag.Overlay.DibSurface _previewSurface = new();
+
+    private readonly Dictionary<(string Id, string Kind), (HudWidgetConfig Config, HudWidget Widget, HudOptions Options)> _previewWidgets = new();
 
     public void Dispose()
     {
@@ -778,6 +822,7 @@ internal sealed class HudHost : IDisposable
         _timer.Dispose();
         HideGrid();
         CloseWindows();
+        _previewSurface.Dispose();
         _toolbar = null;
         if (_holding) { _holding = false; _app.Telemetry.Release(Consumer); }
     }

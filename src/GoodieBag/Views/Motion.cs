@@ -229,6 +229,11 @@ internal interface IRevealAnchor
     bool Reveal(string anchor);
 }
 
+internal interface IShowAnchor
+{
+    void ShowAnchor(DependencyObject target);
+}
+
 internal interface IPageHistory
 {
     object? HistoryState { get; }

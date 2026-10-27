@@ -13,7 +13,7 @@ internal sealed class WindowProfilesPlugin : Plugin
 
     public override string Id => PluginIds.WindowProfiles;
     public override string Name => "Window Profiles";
-    public override string Description => "Pick a program and give its window an exact size and spot: a game stretched across triple screens, a fixed resolution, borderless. Applied when the program starts, with a keybind, from the tray or by one click; groups move several programs at once.";
+    public override string Description => "Give a program's window an exact size and spot, e.g. a game stretched across triples.";
     public override string Icon => PageIcon;
     public override (string Soft, string Deep) Colors => ("AccentSoft", "AccentText");
     public override int Order => 20;
@@ -53,7 +53,7 @@ internal sealed class WindowProfilesPlugin : Plugin
         {
             var p = profile;
             bool on = WindowProfileService.IsRunning(p, running);
-            menu.DropDownItems.Add(new WinForms.ToolStripMenuItem(p.Name, null, (_, _) => _ = app.WindowProfiles.ApplyAsync(p))
+            menu.DropDownItems.Add(new WinForms.ToolStripMenuItem(on ? p.Name : p.Name + " (not running)", null, (_, _) => _ = app.WindowProfiles.ApplyAsync(p))
             {
                 ShortcutKeyDisplayString = GoodieBag.Hotkeys.Hotkey.Display(p.Hotkey),
                 Enabled = on,

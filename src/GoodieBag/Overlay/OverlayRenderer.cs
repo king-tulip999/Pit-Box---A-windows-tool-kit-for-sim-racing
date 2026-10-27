@@ -5,6 +5,7 @@ using GoodieBag.Hardware;
 using GoodieBag.Network;
 using System.Drawing;
 
+using Units = GoodieBag.Services.CapsUnits;
 using GoodieBag.SimRacing.Hud;
 
 namespace GoodieBag.Overlay;
@@ -65,27 +66,26 @@ internal sealed class OverlayRenderer : IDisposable
 
     public Bitmap Render(OverlayLayout layout, OverlayData data, float scale)
     {
-        Bitmap? bitmap = null;
-        Graphics? graphics = null;
-        try
-        {
-            Render(layout, data, scale, size =>
-            {
-                bitmap = new Bitmap(size.Width, size.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-                return graphics = Graphics.FromImage(bitmap);
-            });
-            return bitmap!;
-        }
-        catch
-        {
-            bitmap?.Dispose();
-            throw;
-        }
-        finally
-        {
-            graphics?.Dispose();
-        }
+        using var surface = new DibSurface();
+        var size = Render(layout, data, scale, surface.Ensure);
+        End(surface.Dc, size);
+        var bitmap = new Bitmap(size.Width, size.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        using var copy = Graphics.FromImage(bitmap);
+        copy.CompositingMode = CompositingMode.SourceCopy;
+        copy.DrawImageUnscaled(surface.Bitmap!, 0, 0);
+        return bitmap;
     }
+
+    private readonly SharpText _sharp = new();
+    private Graphics? _drawn;
+
+    public void End(IntPtr dc, Size size)
+    {
+        _drawn?.Flush(FlushIntention.Sync);
+        _sharp.Render(dc, size);
+    }
+
+    private int WeightOf(Font font) => ReferenceEquals(font, _labelFont) ? SharpText.Bold : ReferenceEquals(font, _valueFont) ? SharpText.Semibold : SharpText.Regular;
 
     private const float Spacing = 0.5f;
 
@@ -117,6 +117,8 @@ internal sealed class OverlayRenderer : IDisposable
         int height = Math.Max(20, (int)Math.Ceiling(pad * 2 + textHeight + (graph ? graphHeight + (rows.Count > 0 ? 6 * scale : 0) : 0)));
 
         var g = surface(new Size(width, height));
+        _drawn = g;
+        _sharp.Clear();
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.Clear(Color.Transparent);
 
@@ -210,15 +212,15 @@ internal sealed class OverlayRenderer : IDisposable
                 case OverlayMetric.Fps: group.Cells.Add(new(Tag(""), Num(f?.Fps), "", "0000", Tone.Fps)); break;
                 case OverlayMetric.AverageFps: group.Cells.Add(new(Tag("avg"), Num(f?.AverageFps), "", "0000")); break;
                 case OverlayMetric.OnePercentLow: group.Cells.Add(new(Tag("1%"), Num(f?.OnePercentLowFps), "", "0000")); break;
-                case OverlayMetric.FrameTime: group.Cells.Add(new(Tag(""), f is null ? Missing : f.FrameTimeMs.ToString("0.0"), "ms", "00.0")); break;
+                case OverlayMetric.FrameTime: group.Cells.Add(new(Tag(""), f is null ? Missing : f.FrameTimeMs.ToString("0.0"), Units.Ms, "00.0")); break;
 
                 case OverlayMetric.GpuTemp: group.Cells.Add(new(Tag(""), Num(hw?.GpuTemp), "°C", "100", TempTone(hw?.GpuTemp, 80, 90))); break;
                 case OverlayMetric.AverageGpuTemp: group.Cells.Add(new(Tag("avg"), Num(d.AverageGpuTemp), "°C", "100", TempTone(d.AverageGpuTemp, 80, 90))); break;
                 case OverlayMetric.GpuLoad: group.Cells.Add(new(Tag(""), Num(hw?.GpuLoad), "%", "100")); break;
                 case OverlayMetric.GpuHotSpot: group.Cells.Add(new(Tag("hotspot"), Num(hw?.GpuHotSpot), "°C", "100", TempTone(hw?.GpuHotSpot, 95, 105))); break;
-                case OverlayMetric.GpuClock: group.Cells.Add(new(Tag(""), Num(hw?.GpuClockMhz), "MHz", "0000")); break;
+                case OverlayMetric.GpuClock: group.Cells.Add(new(Tag(""), Num(hw?.GpuClockMhz), Units.MHz, "0000")); break;
                 case OverlayMetric.GpuPower: group.Cells.Add(new(Tag(""), Num(hw?.GpuPower), "W", "000")); break;
-                case OverlayMetric.GpuFan: group.Cells.Add(new(Tag("fan"), Num(hw?.GpuFanRpm), "rpm", "0000")); break;
+                case OverlayMetric.GpuFan: group.Cells.Add(new(Tag("fan"), Num(hw?.GpuFanRpm), Units.Rpm, "0000")); break;
                 case OverlayMetric.Vram:
                     group.Cells.Add(new(Tag(""), hw?.VramUsedMb is { } vu ? (vu / 1024).ToString("0.0") : Missing, hw?.VramTotalMb is { } vt ? $"/ {vt / 1024:0} GB" : "GB", "00.0"));
                     break;
@@ -226,7 +228,7 @@ internal sealed class OverlayRenderer : IDisposable
                 case OverlayMetric.CpuTemp: group.Cells.Add(new(Tag(""), Num(hw?.CpuTemp), "°C", "100", TempTone(hw?.CpuTemp, 80, 90))); break;
                 case OverlayMetric.AverageCpuTemp: group.Cells.Add(new(Tag("avg"), Num(d.AverageCpuTemp), "°C", "100", TempTone(d.AverageCpuTemp, 80, 90))); break;
                 case OverlayMetric.CpuLoad: group.Cells.Add(new(Tag(""), Num(hw?.CpuLoad), "%", "100")); break;
-                case OverlayMetric.CpuClock: group.Cells.Add(new(Tag(""), hw?.CpuClockMhz is { } mhz ? (mhz / 1000).ToString("0.00") : Missing, "GHz", "0.00")); break;
+                case OverlayMetric.CpuClock: group.Cells.Add(new(Tag(""), hw?.CpuClockMhz is { } mhz ? (mhz / 1000).ToString("0.00") : Missing, Units.GHz, "0.00")); break;
                 case OverlayMetric.CpuPower: group.Cells.Add(new(Tag(""), Num(hw?.CpuPower), "W", "000")); break;
 
                 case OverlayMetric.Ram:
@@ -235,7 +237,7 @@ internal sealed class OverlayRenderer : IDisposable
 
                 case OverlayMetric.Ping:
                     var ping = d.Network?.PingMs;
-                    group.Cells.Add(new(Tag(""), Num(ping), "ms", "000", ping is > 100 ? Tone.Critical : ping is > 60 ? Tone.Warning : Tone.Normal));
+                    group.Cells.Add(new(Tag(""), Num(ping), Units.Ms, "000", ping is > 100 ? Tone.Critical : ping is > 60 ? Tone.Warning : Tone.Normal));
                     break;
                 case OverlayMetric.Network:
                     group.Cells.Add(new(Tag("↓"), d.Network is { } n1 ? Mbps(n1.DownBytesPerSec) : Missing, "Mbit/s", "000.0"));
@@ -387,7 +389,7 @@ internal sealed class OverlayRenderer : IDisposable
             : null;
         if (cache is not null && cache.TryGetValue(text, out float width))
             return width;
-        width = _measure.MeasureString(Upper(text), font, PointF.Empty, _format).Width;
+        width = SharpText.Measure(Upper(text), font.Size, WeightOf(font)) is var sharp and >= 0 ? sharp : _measure.MeasureString(Upper(text), font, PointF.Empty, _format).Width;
         if (cache is not null)
         {
             if (cache.Count >= MaxCachedWidths)
@@ -397,8 +399,15 @@ internal sealed class OverlayRenderer : IDisposable
         return width;
     }
 
-    private void DrawText(Graphics g, string text, Font font, Color color, float x, float y) =>
+    private void DrawText(Graphics g, string text, Font font, Color color, float x, float y)
+    {
+        if (SharpText.Available)
+        {
+            _sharp.Add(Upper(text), font.Size, WeightOf(font), color, new RectangleF(MathF.Round(x), MathF.Round(y), Measure(text, font) + 4, font.GetHeight(g) + 2), TextAlign.Left);
+            return;
+        }
         g.DrawString(Upper(text), font, BrushFor(color), MathF.Round(x), MathF.Round(y), _format);
+    }
 
     private SolidBrush BrushFor(Color color)
     {
@@ -427,9 +436,9 @@ internal sealed class OverlayRenderer : IDisposable
         _labelFont?.Dispose(); _valueFont?.Dispose(); _unitFont?.Dispose();
         _labelWidths.Clear(); _valueWidths.Clear(); _unitWidths.Clear();
         _fontScale = scale;
-        _labelFont = new Font("Segoe UI", 11.5f * scale, FontStyle.Bold, GraphicsUnit.Pixel);
-        _valueFont = new Font("Segoe UI Semibold", 15f * scale, FontStyle.Regular, GraphicsUnit.Pixel);
-        _unitFont = new Font("Segoe UI", 11f * scale, FontStyle.Regular, GraphicsUnit.Pixel);
+        _labelFont = new Font(SharpText.Family, 11.5f * scale, FontStyle.Bold, GraphicsUnit.Pixel);
+        _valueFont = new Font(SharpText.Family + " SemiBold", 15f * scale, FontStyle.Regular, GraphicsUnit.Pixel);
+        _unitFont = new Font(SharpText.Family, 11f * scale, FontStyle.Regular, GraphicsUnit.Pixel);
     }
 
     private static GraphicsPath RoundedRect(RectangleF r, float radius)
@@ -450,6 +459,7 @@ internal sealed class OverlayRenderer : IDisposable
         ClearBrushes();
         _baselinePen?.Dispose(); _graphPen?.Dispose(); _rulePen?.Dispose(); _backPath?.Dispose();
         _format.Dispose();
+        _sharp.Dispose();
         _measure.Dispose();
         _measureBitmap.Dispose();
     }

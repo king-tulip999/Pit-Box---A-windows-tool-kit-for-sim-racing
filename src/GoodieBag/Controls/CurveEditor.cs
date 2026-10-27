@@ -11,7 +11,7 @@ namespace GoodieBag.Controls;
 public sealed class CurveEditor : FrameworkElement
 {
     private const double MinTemp = 20, MaxTemp = 105;
-    private const double PointRadius = 6.5;
+    private const double PointRadius = 5;
 
     public static readonly DependencyProperty LiveTempProperty = DependencyProperty.Register(nameof(LiveTemp), typeof(double), typeof(CurveEditor),
         new FrameworkPropertyMetadata(double.NaN, FrameworkPropertyMetadataOptions.AffectsRender));
@@ -58,7 +58,7 @@ public sealed class CurveEditor : FrameworkElement
     {
         Focusable = false;
         Cursor = Cursors.Arrow;
-        MinHeight = 220;
+        MinHeight = 178;
     }
 
     public bool ReadOnly { get; init; }
@@ -74,8 +74,8 @@ public sealed class CurveEditor : FrameworkElement
     }
 
     private Rect Plot => ReadOnly
-        ? new(34, 6, Math.Max(10, ActualWidth - 34 - 10), Math.Max(10, ActualHeight - 6 - 20))
-        : new(46, 12, Math.Max(10, ActualWidth - 46 - 16), Math.Max(10, ActualHeight - 12 - 30));
+        ? new(28, 5, Math.Max(8, ActualWidth - 28 - 8), Math.Max(8, ActualHeight - 5 - 16))
+        : new(37, 10, Math.Max(8, ActualWidth - 37 - 13), Math.Max(8, ActualHeight - 10 - 24));
 
     internal IReadOnlyList<CurvePoint> Points => _points;
 
@@ -242,23 +242,22 @@ public sealed class CurveEditor : FrameworkElement
     private void DrawGraph(DrawingContext dc, Rect plot, double dpi)
     {
         var label = _label;
-        var gridPen = new Pen(_grid, 1);
-        var axisPen = new Pen(_axis, 1);
-        gridPen.Freeze();
-        axisPen.Freeze();
+        double px = Hairline.ScaleOf(this);
+        var gridPen = Hairline.Pen(_grid, px);
+        var axisPen = Hairline.Pen(_axis, px);
         for (int pct = 0; pct <= 100; pct += ReadOnly ? 50 : 20)
         {
-            double y = ToScreen(MinTemp, pct).Y;
+            double y = Hairline.Snap(ToScreen(MinTemp, pct).Y, px);
             dc.DrawLine(pct == 0 ? axisPen : gridPen, new Point(plot.Left, y), new Point(plot.Right, y));
-            var t = Text($"{pct}%", 10.5, label, dpi);
-            dc.DrawText(t, new Point(plot.Left - t.Width - 8, y - t.Height / 2));
+            var t = Text($"{pct}%", 8.5, label, dpi);
+            dc.DrawText(t, new Point(plot.Left - t.Width - 6, y - t.Height / 2));
         }
         for (int t = 20; t <= 100; t += ReadOnly ? 20 : 10)
         {
-            double x = ToScreen(t, 0).X;
+            double x = Hairline.Snap(ToScreen(t, 0).X, px);
             dc.DrawLine(t == 20 ? axisPen : gridPen, new Point(x, plot.Top), new Point(x, plot.Bottom));
-            var text = Text($"{t}°", 10.5, label, dpi);
-            dc.DrawText(text, new Point(x - text.Width / 2, plot.Bottom + 6));
+            var text = Text($"{t}°", 8.5, label, dpi);
+            dc.DrawText(text, new Point(x - text.Width / 2, plot.Bottom + 5));
         }
 
         if (_points.Count == 0)
@@ -321,11 +320,11 @@ public sealed class CurveEditor : FrameworkElement
         }
         if (_liveText is null || _liveTextKey != (caption, live, dpi))
         {
-            _liveText = Text(caption, 11, live, dpi, Bold);
+            _liveText = Text(caption, 9, live, dpi, Bold);
             _liveTextKey = (caption, live, dpi);
         }
         var t = _liveText;
-        double tx = x + 6 + t.Width > plot.Right ? x - 6 - t.Width : x + 6;
+        double tx = x + 5 + t.Width > plot.Right ? x - 5 - t.Width : x + 5;
         dc.DrawText(t, new Point(tx, plot.Top + 2));
     }
 
@@ -344,7 +343,7 @@ public sealed class CurveEditor : FrameworkElement
             if (active)
             {
                 string label = $"{_points[i].Temp:0} °C → {_points[i].Percent:0}%";
-                var t = Text(label, 11.5, ThemeManager.Brush("TooltipText", Brushes.White), dpi, Bold);
+                var t = Text(label, 9.5, ThemeManager.Brush("TooltipText", Brushes.White), dpi, Bold);
                 double bx = Math.Max(plot.Left, Math.Min(s.X - t.Width / 2 - 8, plot.Right - t.Width - 16));
                 double by = s.Y - r - t.Height - 14 < plot.Top ? s.Y + r + 8 : s.Y - r - t.Height - 14;
                 dc.DrawGeometry(ThemeManager.Brush("TooltipBg", Brushes.DimGray), null, Tile.Shape(new Rect(bx, by, t.Width + 16, t.Height + 6), ThemeManager.Round(6)));

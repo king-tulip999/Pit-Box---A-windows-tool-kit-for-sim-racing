@@ -14,10 +14,10 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
 {
     private readonly AppServices _app;
     private readonly MainWindow _window;
-    private readonly StackPanel _body = new() { Margin = new Thickness(28, 0, 28, 28) };
+    private readonly StackPanel _body = new() { Margin = new Thickness(23, 0, 23, 23) };
     private readonly ArrangementCanvas _canvas = new();
     private readonly StackPanel _details = new();
-    private readonly WrapPanel _offMonitors = new() { Margin = new Thickness(14, 0, 4, 4), HorizontalAlignment = HorizontalAlignment.Center };
+    private readonly WrapPanel _offMonitors = new() { Margin = new Thickness(11, 0, 3, 3), HorizontalAlignment = HorizontalAlignment.Center };
     private readonly Border _pendingBar;
     private readonly TextBlock _pendingText = new() { VerticalAlignment = VerticalAlignment.Center, FontWeight = FontWeights.SemiBold };
     private readonly DisplayProfilesView _profiles;
@@ -46,17 +46,17 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
             UpdatePending();
         };
 
-        var revert = new Button { Content = "Discard", Margin = new Thickness(0, 0, 8, 0) };
+        var revert = new Button { Content = "Discard", Margin = new Thickness(0, 0, 6, 0) };
         revert.Click += (_, _) => Reload();
         var apply = Ui.LabeledButton("I.Check", "Apply changes", () => _ = ApplyAsync(), "PrimaryButton");
         var bar = new Grid();
         bar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         bar.ColumnDefinitions.Add(new ColumnDefinition());
         bar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var dot = new Tile { Width = 30, Height = 30, CornerRadius = ThemeManager.Round(9), Background = Ui.Res<Brush>("ApricotSoft"),
-            Child = new Icon { Data = Ui.Res<Geometry>("I.Info"), Width = 16, Height = 16, Foreground = Ui.Res<Brush>("ApricotDeep") } };
+        var dot = new Tile { Width = 24, Height = 24, CornerRadius = ThemeManager.Round(9), Background = Ui.Res<Brush>("ApricotSoft"),
+            Child = new Icon { Data = Ui.Res<Geometry>("I.Info"), Width = 13, Height = 13, Foreground = Ui.Res<Brush>("ApricotDeep") } };
         bar.Children.Add(dot);
-        _pendingText.Margin = new Thickness(12, 0, 0, 0);
+        _pendingText.Margin = new Thickness(10, 0, 0, 0);
         Grid.SetColumn(_pendingText, 1);
         bar.Children.Add(_pendingText);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal };
@@ -65,7 +65,7 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         Grid.SetColumn(buttons, 2);
         bar.Children.Add(buttons);
         _profiles = new DisplayProfilesView(app, window, () => HasPending);
-        _pendingBar = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(14, 10, 12, 10), Margin = new Thickness(0, 0, 0, 16), Child = bar, Visibility = Visibility.Collapsed, BorderBrush = Ui.Res<Brush>("Apricot") };
+        _pendingBar = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(11, 8, 10, 8), Margin = new Thickness(0, 0, 0, 13), Child = bar, Visibility = Visibility.Collapsed, BorderBrush = Ui.Res<Brush>("Apricot") };
 
         BuildPage();
     }
@@ -77,6 +77,8 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         _shown = true;
         if (!HasPending)
             Reload();
+        else if (ChangedUnderneath())
+            ClearStaleEdits();
         _profiles.Refresh();
         _app.Displays.Changed += OnDisplaysChanged;
         _app.DisplayProfiles.Changed += QueueProfiles;
@@ -99,8 +101,26 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         {
             if (!_reloadQueued) return;
             _reloadQueued = false;
-            if (_shown && !HasPending) Reload();
+            if (!_shown || _changing) return;
+            if (!HasPending) Reload();
+            else if (ChangedUnderneath()) ClearStaleEdits();
         });
+    }
+
+    private void ClearStaleEdits()
+    {
+        Reload();
+        _app.Notify("Displays changed", "Your arrangement changes weren't applied and were cleared: the displays changed meanwhile.", NoticeKind.Info);
+    }
+
+    private bool ChangedUnderneath()
+    {
+        List<MonitorInfo> now;
+        try { now = _app.Displays.GetMonitors(); }
+        catch { return false; }
+        static string Shape(IEnumerable<MonitorInfo> monitors) => string.Join(";", monitors.OrderBy(m => m.Key, StringComparer.Ordinal)
+            .Select(m => $"{m.Key},{m.Active},{m.X},{m.Y},{m.Landscape.W},{m.Landscape.H},{m.Hz},{m.Rotation},{m.Primary}"));
+        return Shape(now) != Shape(_monitors);
     }
 
     private void QueueProfiles()
@@ -114,7 +134,7 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
 
     private void BuildPage()
     {
-        var titles = new StackPanel { Margin = new Thickness(0, 0, 0, Ui.HeaderGap) };
+        var titles = new StackPanel { Margin = Ui.HeaderMargin };
         titles.Children.Add(Ui.PluginTitle(Plugins.PluginIds.Displays, "Displays"));
         _body.Children.Add(titles);
         _body.Children.Add(_profiles);
@@ -126,14 +146,14 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         title.VerticalAlignment = VerticalAlignment.Center;
         arrangeHead.Children.Add(title);
         var identify = Ui.LabeledButton("I.Hash", "Identify", () => IdentifyDisplays.Show(_app), "GhostButton");
-        identify.Margin = new Thickness(14, 0, 0, 0);
+        identify.Margin = new Thickness(11, 0, 0, 0);
         arrangeHead.Children.Add(identify);
         var refresh = Ui.IconButton("I.Refresh", "Re-read displays", Reload);
-        refresh.Margin = new Thickness(6, 0, 0, 0);
+        refresh.Margin = new Thickness(5, 0, 0, 0);
         arrangeHead.Children.Add(refresh);
         var open = Ui.LabeledButton("I.Settings", "Windows display settings", () => Ui.OpenUrl("ms-settings:display"), "GhostButton");
         open.ToolTip = "Text and app scaling (100%, 125%, 150%…) has no supported Windows API, so it stays in Windows Settings. Night light and color profiles live there too.";
-        open.Margin = new Thickness(12, 0, 0, 0);
+        open.Margin = new Thickness(10, 0, 0, 0);
         DockPanel.SetDock(open, Dock.Right);
         arrangeHead.Children.Add(open);
         var hint = new TextBlock { Text = "Monitors snap together edge to edge", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center };
@@ -143,19 +163,22 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         var canvasArea = new StackPanel();
         canvasArea.Children.Add(_canvas);
         canvasArea.Children.Add(_offMonitors);
-        var canvasBox = new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(0), Margin = new Thickness(0, 12, 0, 0), Child = canvasArea, ClipToBounds = true };
+        var canvasBox = new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(0), Margin = new Thickness(0, 10, 0, 0), Child = canvasArea, ClipToBounds = true };
         canvasBox.Background = Ui.Res<Brush>("SurfaceAlt");
         arrange.Children.Add(canvasBox);
-        _details.Margin = new Thickness(0, 18, 0, 0);
+        _details.Margin = new Thickness(0, 15, 0, 0);
         Ui.Anchor(_details, "displays.details");
         arrange.Children.Add(_details);
-        var arrangeCard = new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, 16), Child = arrange };
+        var arrangeCard = new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, 13), Child = arrange };
         Ui.Anchor(arrangeCard, "displays.arrange");
 
         _body.Children.Add(arrangeCard);
     }
 
-    private bool HasPending => _edits.Any(IsEdited);
+    private bool HasPending => _edits.Any(IsEdited) || _pendingHdr.Count > 0 || _pendingShow is not null;
+
+    private readonly Dictionary<string, bool> _pendingHdr = new();
+    private (MonitorInfo Monitor, MonitorInfo? With)? _pendingShow;
 
     private bool IsEdited(MonitorEdit e)
     {
@@ -166,6 +189,8 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
     private void Reload()
     {
         _reloadQueued = false;
+        _pendingHdr.Clear();
+        _pendingShow = null;
         try
         {
             _monitors = _app.Displays.GetMonitors();
@@ -190,7 +215,7 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
             {
                 Key = m.Key, Number = string.Join(" + ", g.Select(x => x.Label)), Name = string.Join(" + ", g.Select(x => x.Name)),
                 X = m.X, Y = m.Y, Width = m.Width, Height = m.Height, Primary = g.Any(x => x.Primary),
-                Detail = $"{m.Width}×{m.Height} · {m.Hz} Hz",
+                Detail = $"{m.Width}×{m.Height} · {m.Hz} {Units.Hz}",
             };
         }).ToList();
 
@@ -214,9 +239,9 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         _offMonitors.Visibility = off.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         foreach (var m in off)
         {
-            var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 10, 12, 10) };
+            var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 8, 10, 8) };
             stack.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = m.Name, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis }));
-            var state = new TextBlock { Style = Ui.Res<Style>("Caption"), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 2, 0, 8) };
+            var state = new TextBlock { Style = Ui.Res<Style>("Caption"), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 2, 0, 6) };
             state.Inlines.Add(new System.Windows.Documents.Run("Off"));
             if (m.Connector.Length > 0) state.Inlines.Add(new System.Windows.Documents.Run(" · " + m.Connector));
             stack.Children.Add(state);
@@ -224,9 +249,9 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
             var on = Ui.LabeledButton("I.Power", "Turn on", () => _ = SetEnabledAsync(monitor, true), "SoftButton");
             on.HorizontalAlignment = HorizontalAlignment.Center;
             stack.Children.Add(on);
-            var outline = new System.Windows.Shapes.Rectangle { StrokeThickness = 1.5, StrokeDashArray = new DoubleCollection { 4, 3 }, SnapsToDevicePixels = true };
+            var outline = new System.Windows.Shapes.Rectangle { StrokeThickness = 1.22, StrokeDashArray = new DoubleCollection { 4, 3 }, SnapsToDevicePixels = true };
             outline.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, "LineStrong");
-            var ghost = new Grid { Width = 200, Margin = new Thickness(0, 0, 10, 10), ToolTip = "This display is connected but off" };
+            var ghost = new Grid { Width = 162, Margin = new Thickness(0, 0, 8, 8), ToolTip = "This display is connected but off" };
             ghost.Children.Add(outline);
             ghost.Children.Add(stack);
             _offMonitors.Children.Add(ghost);
@@ -241,7 +266,20 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         if (name.Length == 0 || name == monitor.HardwareName) _app.Config.Displays.Names.Remove(monitor.Key);
         else _app.Config.Displays.Names[monitor.Key] = name;
         _app.Save();
-        Reload();
+        if (!HasPending)
+        {
+            Reload();
+            return;
+        }
+        _tiles = _tiles.Select(t => new ArrangeTile
+        {
+            Key = t.Key, Number = t.Number, Name = string.Join(" + ", _monitors.Where(m => m.Active && TileKey(m.Key) == t.Key).Select(m => m.Name)),
+            X = t.X, Y = t.Y, Width = t.Width, Height = t.Height, Primary = t.Primary, Detail = t.Detail,
+        }).ToList();
+        _canvas.SetTiles(_tiles, TileKey(_selected));
+        BuildOffMonitors();
+        BuildDetails();
+        UpdatePending();
     }
 
     private void BuildDetails()
@@ -255,7 +293,7 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
             return;
         }
 
-        var divider = new Border { Height = 1, Margin = new Thickness(0, 0, 0, 16) };
+        var divider = Hairline.Rule(new Border { Margin = new Thickness(0, 0, 0, 13) });
         divider.SetResourceReference(Border.BackgroundProperty, "Line");
         _details.Children.Add(divider);
 
@@ -265,25 +303,26 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var number = new Tile
         {
-            Width = 34, Height = 34, BorderThickness = new Thickness(1.5), CornerRadius = ThemeManager.Round(6), VerticalAlignment = VerticalAlignment.Center,
+            Width = 28, Height = 28, BorderThickness = new Thickness(1.5), CornerRadius = ThemeManager.Round(6), VerticalAlignment = VerticalAlignment.Center,
             Background = Ui.Res<Brush>("AccentSoft"), BorderBrush = Ui.Res<Brush>("Accent"),
-            Child = new TextBlock { Text = monitor.Label, FontSize = 16, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>("AccentText"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+            Child = new TextBlock { Text = monitor.Label, FontSize = 13, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>("AccentText"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
             ToolTip = "The selected tile above",
         };
         head.Children.Add(number);
-        var names = new StackPanel { Margin = new Thickness(12, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
+        var names = new StackPanel { Margin = new Thickness(10, 0, 13, 0), VerticalAlignment = VerticalAlignment.Center };
         var nameRow = new StackPanel { Orientation = Orientation.Horizontal };
         nameRow.Children.Add(Ui.Text(monitor.Name, "H2"));
         var rename = Ui.IconButton("I.Pencil", "Rename this display (just a label in Goodie Bag, e.g. Left monitor or Dash)", () => _ = RenameAsync(monitor), "QuietIconButton");
-        rename.Width = rename.Height = 28;
+        rename.Width = rename.Height = 23;
         rename.MinHeight = 0;
-        rename.Margin = new Thickness(6, 0, 0, 0);
+        rename.Margin = new Thickness(5, 0, 0, 0);
         rename.VerticalAlignment = VerticalAlignment.Center;
         nameRow.Children.Add(rename);
         names.Children.Add(nameRow);
         var bits = new List<string>();
         if (monitor.Connector.Length > 0) bits.Add(monitor.Connector);
-        bits.Add($"currently {monitor.Width}×{monitor.Height} at {monitor.Hz} Hz");
+        bits.Add($"currently {monitor.Width}×{monitor.Height} at {monitor.Hz} {Units.Hz}");
+        if (!_app.Demo && Display.DisplayScale.Percent(monitor) is { } scale) bits.Add($"{scale}% scale");
         names.Children.Add(Ui.Text(string.Join(" · ", bits), "Caption"));
         Grid.SetColumn(names, 1);
         head.Children.Add(names);
@@ -291,8 +330,8 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         var headTools = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         if (edit.Primary)
         {
-            var chip = Ui.Chip("Main display", "AccentSoft", "AccentText");
-            chip.Margin = new Thickness(0, 0, 10, 0);
+            var chip = Ui.Chip("Main display");
+            chip.Margin = new Thickness(0, 0, 8, 0);
             chip.VerticalAlignment = VerticalAlignment.Center;
             chip.ToolTip = "Taskbar and new windows open here";
             headTools.Children.Add(chip);
@@ -308,7 +347,7 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
                 BuildDetails();
             }, "GhostButton");
             makeMain.ToolTip = "Taskbar and new windows open here (applies with Apply changes)";
-            makeMain.Margin = new Thickness(0, 0, 8, 0);
+            makeMain.Margin = new Thickness(0, 0, Ui.GroupGap, 0);
             headTools.Children.Add(makeMain);
         }
         var off = Ui.LabeledButton("I.Power", "Turn off", () => _ = SetEnabledAsync(monitor, false), "DangerButton");
@@ -321,23 +360,23 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         _details.Children.Add(head);
 
         _details.Children.Add(Ui.SubHeader("Picture"));
-        var picture = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
+        var picture = new WrapPanel { Margin = new Thickness(0, 5, 0, 0) };
         _details.Children.Add(picture);
         _details.Children.Add(Ui.SubHeader("Desktop"));
-        var desktop = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
+        var desktop = new WrapPanel { Margin = new Thickness(0, 5, 0, 0) };
         _details.Children.Add(desktop);
 
         var resolutions = monitor.Modes.Select(m => (m.Width, m.Height)).Distinct().ToList();
         if (resolutions.Count == 0)
             resolutions.Add((edit.Width, edit.Height));
         var largest = resolutions.OrderByDescending(r => r.Width * r.Height).First();
-        var resBox = new ComboBox { MinWidth = 220 };
+        var resBox = new ComboBox { MinWidth = 178 };
         foreach (var r in resolutions)
-            resBox.Items.Add(new Option<(int, int)>((r.Width, r.Height), $"{r.Width} × {r.Height}" + (r == largest ? "  (native)" : "")));
+            resBox.Items.Add(new Option<(int, int)>((r.Width, r.Height), $"{r.Width}×{r.Height}" + (r == largest ? "  (native)" : "")));
         Select(resBox, (edit.Width, edit.Height));
         picture.Children.Add(Field("Resolution", resBox));
 
-        var hzBox = new ComboBox { MinWidth = 220 };
+        var hzBox = new ComboBox { MinWidth = 178 };
         void FillHz()
         {
             hzBox.Items.Clear();
@@ -345,7 +384,7 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
             if (rates.Count == 0) rates.Add(edit.Hz);
             if (!rates.Contains(edit.Hz)) edit.Hz = rates[0];
             foreach (var hz in rates)
-                hzBox.Items.Add(new Option<int>(hz, $"{hz} Hz" + (hz == rates[0] ? "  (highest)" : "")));
+                hzBox.Items.Add(new Option<int>(hz, $"{hz} {Units.Hz}" + (hz == rates[0] ? "  (highest)" : "")));
             Select(hzBox, edit.Hz);
         }
         FillHz();
@@ -365,7 +404,7 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
             SyncTile(edit);
         };
 
-        var orientation = new ComboBox { MinWidth = 220 };
+        var orientation = new ComboBox { MinWidth = 178 };
         foreach (var deg in new[] { 0, 90, 270, 180 })
             orientation.Items.Add(new Option<int>(deg, deg switch { 90 => "Portrait", 270 => "Portrait (flipped)", 180 => "Landscape (flipped)", _ => "Landscape" }));
         Select(orientation, edit.Rotation);
@@ -379,31 +418,32 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
 
         var twins = _monitors.Where(m => m.Active && m.Key != monitor.Key && TileKey(m.Key) == TileKey(monitor.Key)).ToList();
         var others = _monitors.Where(m => m.Active && m.Key != monitor.Key && m.Adapter.Equals(monitor.Adapter)).ToList();
-        var show = new ComboBox { MinWidth = 220 };
+        var show = new ComboBox { MinWidth = 178 };
         show.Items.Add(new Option<string>("", "Its own desktop (extend)"));
         foreach (var o in others)
             show.Items.Add(new Option<string>(o.Key, $"Duplicate {o.Name} ({o.Label})"));
-        Select(show, twins.FirstOrDefault()?.Key ?? "");
+        string? pendingShow = _pendingShow is { } ps && ps.Monitor.Key == monitor.Key ? ps.With?.Key ?? "" : null;
+        Select(show, pendingShow ?? twins.FirstOrDefault()?.Key ?? "");
         show.IsEnabled = others.Count > 0;
         show.SelectionChanged += (_, _) =>
         {
             if (show.SelectedItem is not Option<string> o) return;
-            if (o.Value.Length == 0 ? twins.Count == 0 : twins.Any(t => t.Key == o.Value)) return;
-            var with = o.Value.Length == 0 ? null : _monitors.FirstOrDefault(m => m.Key == o.Value);
-            _ = SetDuplicateAsync(monitor, with);
+            bool same = o.Value.Length == 0 ? twins.Count == 0 : twins.Any(t => t.Key == o.Value);
+            _pendingShow = same ? null : (monitor, o.Value.Length == 0 ? null : _monitors.FirstOrDefault(m => m.Key == o.Value));
+            UpdatePending();
         };
         string showHelp = others.Count == 0
             ? (_monitors.Count(m => m.Active) > 1 ? "Windows can only duplicate displays on the same graphics card." : "Turn on another display to duplicate it.")
-            : twins.Count > 0 ? $"Same picture as {string.Join(", ", twins.Select(t => t.Name))}." : "Applies right away (you'll be asked to keep the change).";
+            : twins.Count > 0 ? $"Same picture as {string.Join(", ", twins.Select(t => t.Name))}." : "Pick Duplicate to show the same picture as another display.";
         desktop.Children.Add(Field("Show", show, showHelp));
         if (twins.Count > 0)
         {
-            var switchTo = new WrapPanel { Margin = new Thickness(0, 0, 0, 14), VerticalAlignment = VerticalAlignment.Bottom };
+            var switchTo = new WrapPanel { Margin = new Thickness(0, 0, 0, 11), VerticalAlignment = VerticalAlignment.Bottom };
             foreach (var t in twins)
             {
                 var twin = t;
                 var b = Ui.LabeledButton("I.Monitor", $"Settings for {twin.Name} ({twin.Label})", () => { _selected = twin.Key; BuildDetails(); }, "GhostButton");
-                b.Margin = new Thickness(0, 0, 8, 0);
+                b.Margin = new Thickness(0, 0, 6, 0);
                 switchTo.Children.Add(b);
             }
             desktop.Children.Add(switchTo);
@@ -411,24 +451,17 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
 
         if (monitor.HdrSupported)
         {
-            var hdr = new CheckBox { Style = Ui.Res<Style>("Switch"), IsChecked = monitor.HdrOn, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 7, 0, 7) };
+            bool hdrWanted = _pendingHdr.TryGetValue(monitor.Key, out var wanted) ? wanted : monitor.HdrOn;
+            var hdr = new CheckBox { Style = Ui.Res<Style>("Switch"), IsChecked = hdrWanted, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 6, 0, 6) };
             System.Windows.Automation.AutomationProperties.SetName(hdr, "HDR");
-            hdr.Click += async (_, _) =>
+            hdr.Click += (_, _) =>
             {
                 bool on = hdr.IsChecked == true;
-                hdr.IsEnabled = false;
-                try
-                {
-                    await _app.DisplayProfiles.ChangeByHandAsync(() => _app.Displays.SetHdr(monitor, on));
-                    _app.Notify(on ? "HDR on" : "HDR off", monitor.Name, NoticeKind.Success);
-                }
-                catch (Exception ex)
-                {
-                    _app.Notify("HDR not changed", ex.Message, NoticeKind.Warning, important: true);
-                }
-                finally { hdr.IsEnabled = true; }
+                if (on == monitor.HdrOn) _pendingHdr.Remove(monitor.Key);
+                else _pendingHdr[monitor.Key] = on;
+                UpdatePending();
             };
-            picture.Children.Add(Field("HDR", hdr, "Applies right away"));
+            picture.Children.Add(Field("HDR", hdr));
         }
     }
 
@@ -442,12 +475,12 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
 
     private static StackPanel Field(string label, FrameworkElement control, string? help = null)
     {
-        var panel = new StackPanel { Width = 240, Margin = new Thickness(0, 0, 24, 14) };
-        panel.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("H3"), Margin = new Thickness(0, 0, 0, 6) });
+        var panel = new StackPanel { Width = 194, Margin = new Thickness(0, 0, 19, 11) };
+        panel.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("H3"), Margin = new Thickness(0, 0, 0, 5) });
         control.HorizontalAlignment = control is ComboBox ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
         panel.Children.Add(control);
         if (help is not null)
-            panel.Children.Add(new TextBlock { Text = help, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 5, 0, 0), TextWrapping = TextWrapping.Wrap });
+            panel.Children.Add(new TextBlock { Text = help, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 4, 0, 0), TextWrapping = TextWrapping.Wrap });
         return panel;
     }
 
@@ -470,14 +503,16 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         }
         tile.Width = edit.DesktopWidth;
         tile.Height = edit.DesktopHeight;
-        tile.Detail = $"{edit.DesktopWidth}×{edit.DesktopHeight} · {edit.Hz} Hz";
+        tile.Detail = $"{edit.DesktopWidth}×{edit.DesktopHeight} · {edit.Hz} {Units.Hz}";
         _canvas.Refresh();
         UpdatePending();
     }
 
     private void UpdatePending()
     {
-        int count = _edits.Count(IsEdited);
+        var changed = _edits.Where(IsEdited).Select(e => e.Key).Concat(_pendingHdr.Keys).ToHashSet();
+        if (_pendingShow is { } show) changed.Add(show.Monitor.Key);
+        int count = changed.Count;
         bool pending = count > 0;
         _pendingText.Text = count == 1 ? "1 display has unsaved changes" : $"{count} displays have unsaved changes";
         if (pending && _pendingBar.Visibility != Visibility.Visible)
@@ -499,9 +534,14 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         _changing = true;
         var undo = _app.Displays.CaptureForUndo();
         var edits = _edits.Select(e => e.Copy()).ToList();
+        bool layout = _edits.Any(IsEdited);
+        var show = _pendingShow;
+        var hdr = _pendingHdr.Select(p => (Monitor: _monitors.FirstOrDefault(m => m.Key == p.Key), On: p.Value)).Where(p => p.Monitor is not null).ToList();
+        bool nothingChanged = false;
         try
         {
-            await _app.DisplayProfiles.ChangeByHandAsync(() => _app.Displays.ApplyLayout(edits));
+            if (layout) await _app.DisplayProfiles.ChangeByHandAsync(() => _app.Displays.ApplyLayout(edits));
+            if (show is { } s) await _app.DisplayProfiles.ChangeByHandAsync(() => _app.Displays.SetDuplicate(s.Monitor, s.With));
         }
         catch (LayoutApplyException ex) when (ex.Restored)
         {
@@ -512,10 +552,30 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         catch (Exception ex)
         {
             _app.Notify("Some display changes didn't apply", ex.Message, NoticeKind.Warning, important: true);
+            nothingChanged = undo is not null && _app.Displays.CaptureForUndo() is { } after && after.Paths == undo.Paths && after.Modes == undo.Modes;
         }
+        var hdrDone = new List<(MonitorInfo Monitor, bool On)>();
+        foreach (var (monitor, on) in hdr)
+        {
+            try
+            {
+                await _app.DisplayProfiles.ChangeByHandAsync(() => _app.Displays.SetHdr(monitor!, on));
+                hdrDone.Add((monitor!, on));
+            }
+            catch (Exception ex)
+            {
+                _app.Notify("HDR not changed", $"{monitor!.Name}: {ex.Message}", NoticeKind.Warning, important: true);
+            }
+        }
+        if (show is not null) await Task.Delay(400);
         _changing = false;
+        if (show is { } shown) _selected = shown.Monitor.Key;
         Reload();
-        await ConfirmKeepAsync(undo);
+        await ConfirmKeepAsync((layout || show is not null) && !nothingChanged ? undo : null, hdrDone.Count == 0 ? null : async () =>
+        {
+            foreach (var (monitor, on) in hdrDone)
+                await _app.DisplayProfiles.ChangeByHandAsync(() => _app.Displays.SetHdr(monitor, !on));
+        });
     }
 
     private async Task SetEnabledAsync(MonitorInfo monitor, bool on)
@@ -536,36 +596,15 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         await Task.Delay(400);
         _changing = false;
         if (on) _selected = monitor.Key;
+        bool dropped = HasPending;
         Reload();
+        if (dropped) _app.Notify("Arrangement changes cleared", $"They weren't applied before “{monitor.Name}” was turned {(on ? "on" : "off")}.", NoticeKind.Info);
         await ConfirmKeepAsync(undo);
     }
 
-    private async Task SetDuplicateAsync(MonitorInfo monitor, MonitorInfo? with)
+    private async Task ConfirmKeepAsync(DisplaySnapshot? undo, Func<Task>? alsoRevert = null)
     {
-        if (_changing) return;
-        _changing = true;
-        var undo = _app.Displays.CaptureForUndo();
-        try
-        {
-            await _app.DisplayProfiles.ChangeByHandAsync(() => _app.Displays.SetDuplicate(monitor, with));
-        }
-        catch (Exception ex)
-        {
-            _changing = false;
-            _app.Notify(with is null ? "Couldn't extend the display" : "Couldn't duplicate the display", ex.Message, NoticeKind.Warning, important: true);
-            BuildDetails();
-            return;
-        }
-        await Task.Delay(400);
-        _changing = false;
-        _selected = monitor.Key;
-        Reload();
-        await ConfirmKeepAsync(undo);
-    }
-
-    private async Task ConfirmKeepAsync(DisplaySnapshot? undo)
-    {
-        if (undo is null)
+        if (undo is null && alsoRevert is null)
             return;
 
         int seconds = 15;
@@ -573,9 +612,9 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         bool superseded = false;
         var card = _window.DialogCard("Keep these display settings?", "", out var buttons);
         var message = (TextBlock)((StackPanel)card.Child).Children[1];
-        void SetText() => message.Text = $"If you can see this, choose Keep. Otherwise everything goes back to how it was in {seconds} seconds.";
+        void SetText() => message.Text = $"If you can see this, choose Keep. Otherwise everything goes back to how it was in {SimRacing.Race.RaceFormat.Count(seconds, "second")}.";
         SetText();
-        var revert = new Button { Content = "Revert", Margin = new Thickness(0, 0, 8, 0) };
+        var revert = new Button { Content = "Revert", Margin = new Thickness(0, 0, 6, 0) };
         var keep = new Button { Content = "Keep changes", Style = Ui.Res<Style>("PrimaryButton") };
         revert.Click += (_, _) => _window.CloseModal(false);
         keep.Click += (_, _) => _window.CloseModal(true);
@@ -607,7 +646,8 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         {
             try
             {
-                await _app.DisplayProfiles.ChangeByHandAsync(() => _app.Displays.Restore(undo));
+                if (undo is not null) await _app.DisplayProfiles.ChangeByHandAsync(() => _app.Displays.Restore(undo));
+                if (alsoRevert is not null) await alsoRevert();
                 _app.Notify("Display settings reverted", "Everything is back the way it was.", NoticeKind.Info);
             }
             catch (Exception ex)

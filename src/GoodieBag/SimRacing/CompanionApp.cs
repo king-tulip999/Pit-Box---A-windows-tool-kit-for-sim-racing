@@ -204,9 +204,11 @@ internal sealed class CompanionApp
         Refresh();
     }
 
+    private static readonly HashSet<string> LaunchedThisRun = new(StringComparer.OrdinalIgnoreCase);
+
     public void Start()
     {
-        if (Settings.LaunchWithGoodieBag)
+        if (Settings.LaunchWithGoodieBag && LaunchedThisRun.Add(Spec.Name))
             System.Windows.Threading.Dispatcher.CurrentDispatcher.InvokeAsync(() => { if (!_off && Settings.LaunchWithGoodieBag) Launch(quiet: true); },
                 System.Windows.Threading.DispatcherPriority.ApplicationIdle);
         UpdateWatch();
@@ -214,6 +216,7 @@ internal sealed class CompanionApp
 
     public void Stop()
     {
+        _off = true;
         WatchStatus(false);
         StopIracingWatch();
     }

@@ -7,7 +7,7 @@ namespace GoodieBag.Views.HudSettings;
 
 internal sealed class SettingGroup : StackPanel
 {
-    private readonly Border _body = new() { Padding = new Thickness(4, 2, 0, 8) };
+    private readonly Border _body = new() { Padding = new Thickness(3, 2, 0, 6) };
     private readonly StackPanel _rows = new();
     private readonly Icon? _chevron;
     private readonly Action<bool>? _toggled;
@@ -18,12 +18,12 @@ internal sealed class SettingGroup : StackPanel
         _body.Child = _rows;
         if (title is not null)
         {
-            _chevron = new Icon { Width = 14, Height = 14, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+            _chevron = new Icon { Width = 11, Height = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
             _chevron.SetResourceReference(Control.ForegroundProperty, "TextMuted");
             var line = new DockPanel { LastChildFill = true };
             line.Children.Add(_chevron);
             line.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("Eyebrow"), VerticalAlignment = VerticalAlignment.Center });
-            var bar = new Button { Style = Ui.Res<Style>("QuietButton"), Content = line, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(6, 7, 10, 7), Margin = new Thickness(0, 4, 0, 0) };
+            var bar = new Button { Style = Ui.Res<Style>("QuietButton"), Content = line, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(5, 6, 8, 6), Margin = new Thickness(0, 3, 0, 0) };
             ClickGuard.SetAllowRepeat(bar, true);
             System.Windows.Automation.AutomationProperties.SetName(bar, title);
             bar.Click += (_, _) =>

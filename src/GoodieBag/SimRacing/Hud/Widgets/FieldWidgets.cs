@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Globalization;
+using Units = GoodieBag.Services.CapsUnits;
 using GoodieBag.SimRacing.Race;
 using GoodieBag.SimRacing.Telemetry;
 
@@ -17,12 +18,12 @@ internal sealed record Column(string Id, string Header, string Template, HAlign 
     public Action<HudPainter, int, RectangleF, bool>? Draw { get; init; }
 }
 
-internal readonly record struct RowStyle(bool PositionBlock = true, bool NumberFill = true, bool NumberEdge = true)
+internal readonly record struct RowStyle(bool PositionBlock = true)
 {
     public static RowStyle Of(HudView v)
     {
         bool B(string key, bool fallback) => v.Def.Option(key) is not null ? v.Options.Bool(key) : fallback;
-        return new RowStyle(B("posBlock", true), B("numFill", true), B("numEdge", true));
+        return new RowStyle(B("posBlock", true));
     }
 }
 
@@ -102,9 +103,9 @@ internal static class HudTable
     public static void Row(HudPainter p, List<(Column Col, float Width)> cols, RectangleF row, int car, Color classColor, int emphasis, bool dim, Font font, Color? tint = null, bool alternate = false, RowStyle style = default)
     {
         var pal = p.P;
-        var fill = HudPalette.Mix(pal.Surface, pal.Bg, alternate ? 0.85 : 0.35);
-        if (emphasis == 1) fill = HudPalette.Mix(fill, pal.Player, 0.26);
-        p.Fill(row, p.Solid(fill, 185));
+        if (emphasis == 1) p.Fill(row, p.Solid(HudPalette.Mix(pal.Surface, pal.Player, 0.26), 185));
+        else if (alternate) p.Fill(row, HudPalette.Alpha(pal.Heading, 7));
+        p.Fill(new RectangleF(row.X, row.Y, ClassEdge + 1, row.Height), dim ? HudPalette.Alpha(classColor, 150) : classColor);
         Color? over = emphasis == 1 ? pal.PlayerText : tint;
         Color Shade(Color c)
         {
@@ -125,9 +126,6 @@ internal static class HudTable
             x = block.Right;
             start = 1;
         }
-        bool numbered = false;
-        foreach (var (c, _) in cols) if (c.Id == "num") numbered = true;
-        if (!numbered || !(style.NumberFill || style.NumberEdge)) p.Fill(new RectangleF(x + 2, row.Y + 3, ClassEdge, row.Height - 6), Shade(classColor));
         x += StripeLead;
         if (emphasis == 2) p.Outline(new RectangleF(row.X + 0.75f, row.Y + 0.75f, row.Width - 1.5f, row.Height - 1.5f), pal.Accent, 1.5f);
         for (int i = start; i < cols.Count; i++)
@@ -136,15 +134,6 @@ internal static class HudTable
             var box = new RectangleF(x, row.Y, w, row.Height);
             if (col.Draw is { } draw) { draw(p, car, box, dim); x += w + Gap; continue; }
             var cell = col.Value(car);
-            if (col.Id == "num" && cell.Text != RaceFormat.Missing && (style.NumberFill || style.NumberEdge))
-            {
-                var tag = new RectangleF(box.X - 4, row.Y, w + 8, row.Height);
-                if (style.NumberFill) p.Fade(tag, classColor, dim ? 45 : 80);
-                if (style.NumberEdge) p.Fill(new RectangleF(tag.X, tag.Y, 2, tag.Height), dim ? HudPalette.Alpha(classColor, 150) : classColor);
-                p.Text(cell.Text, font, Shade(pal.Muted), new RectangleF(tag.X + 3, tag.Y, tag.Width - 3, tag.Height), HAlign.Center, VAlign.Center, false);
-                x += w + Gap;
-                continue;
-            }
             if (cell.Pill is { } pill && cell.Text.Length > 0)
             {
                 float pw = Math.Min(w, p.Measure(cell.Text, p.SmallBold) + 8);
@@ -205,6 +194,12 @@ internal static class HudTable
         p.G.DrawLine(pen, cx, cy, cx + r * 0.42f, cy - r * 0.42f);
     }
 
+    private static readonly string[] LicenseSamples = BadgeSamples("RDCBAP", " 0.00", " 4.44", " 8.88");
+    private static readonly string[] RatingSamples = BadgeSamples("", "0.0k", "4.4k", "8.8k", "000", "444", "888");
+
+    private static string[] BadgeSamples(string letters, params string[] numbers) =>
+        letters.Length == 0 ? numbers : letters.SelectMany(l => numbers.Select(n => l + n)).ToArray();
+
     public static void Badge(HudPainter p, RectangleF box, string license, int? irating, string format, bool dim)
     {
         float h = Math.Min(box.Height - 4, p.LineHeight(p.Tiny) + 6), y = box.Y + (box.Height - h) / 2, x = box.X;
@@ -212,7 +207,7 @@ internal static class HudTable
         if (format != "rating" && license.Length > 0)
         {
             string text = RaceFormat.License(license);
-            float w = p.Measure(text, p.Tiny) + 10;
+            float w = Math.Max(p.Widest(LicenseSamples, p.Tiny), p.Measure(text, p.Tiny)) + 10;
             var r = new RectangleF(x, y, w, h);
             p.Fill(r, HudPalette.Alpha(Color.White, dim ? 16 : 26), 2);
             p.Text(text, p.Tiny, HudPalette.Alpha(Color.White, alpha), r, HAlign.Center, VAlign.Center, false);
@@ -221,7 +216,7 @@ internal static class HudTable
         if (format != "license" && irating is > 0)
         {
             string text = RaceFormat.IRating(irating);
-            float w = p.Measure(text, p.Tiny) + 10;
+            float w = Math.Max(p.Widest(RatingSamples, p.Tiny), p.Measure(text, p.Tiny)) + 10;
             var r = new RectangleF(x, y, Math.Min(w, box.Right - x), h);
             p.Fill(r, HudPalette.Alpha(Color.White, dim ? 16 : 26), 2);
             p.Text(text, p.Tiny, HudPalette.Alpha(Color.White, alpha), r, HAlign.Center, VAlign.Center, false);
@@ -286,7 +281,7 @@ internal static class FieldColumns
 
     public static readonly HudOption NameFormat = HudOption.Choice("nameFormat", "Names", "full",
         new HudChoice("full", "Full name"), new HudChoice("initial", "First initial and last name"), new HudChoice("last", "Last name only"), new HudChoice("first", "First name and last initial"));
-    public static readonly HudOption NoDigits = HudOption.Bool("noDigits", "No numbers in names", false, "Some drivers have a number after their name (“Max Verstappen2”)");
+    public static readonly HudOption NoDigits = HudOption.Bool("noDigits", "No numbers in names", false, "Some drivers have a number after their name (“Chris Walker2”)");
     public static readonly HudOption TimeFormat = HudOption.Choice("timeFormat", "Lap times", "full",
         new HudChoice("full", "1:42.123"), new HudChoice("mixed", "1:42.1"), new HudChoice("minutes", "1:42"),
         new HudChoice("sfull", "42.123"), new HudChoice("smixed", "42.1"), new HudChoice("s", "42"));
@@ -298,15 +293,13 @@ internal static class FieldColumns
     public static readonly HudOption PitTime = HudOption.Bool("pitTime", "Time in the pit lane", true, "Seconds in the pit lane beside PIT, counting while a car is in it");
     public static readonly HudOption AvgLaps = HudOption.Int("avgLaps", "Laps in the average", 5, 3, 10);
     public static readonly HudOption PositionBlock = HudOption.Bool("posBlock", "Your position on a colored block", true);
-    public static readonly HudOption NumberFill = HudOption.Bool("numFill", "Class color fading behind the number", true);
-    public static readonly HudOption NumberEdge = HudOption.Bool("numEdge", "Class color edge by the number", true);
     public static readonly HudOption FlagEdgeOption = HudOption.Bool("flagEdge", "Flag color around the widget", false, "A border in the color of a yellow, red, blue, white or checkered flag while it's out");
     public static readonly HudOption FlagWidth = HudOption.Int("flagWidth", "Flag border width", 4, 1, 10, "px");
 
     public static readonly HudOption[] Shared =
     {
         NameFormat, NoDigits, TimeFormat, Decimals, BadgeFormat, PitShow, PitTime, AvgLaps,
-        PositionBlock, NumberFill, NumberEdge, FlagEdgeOption, FlagWidth,
+        PositionBlock, FlagEdgeOption, FlagWidth,
     };
 
     private static void Marks(HudPalette pal, TelemetryFrame f, int car, List<(string, Color, Color, FlagKind)> list)
@@ -405,6 +398,8 @@ internal static class FieldColumns
                 bool pitTime = Flag(PitTime);
                 return new Column(id, "PIT", pitTime ? "PIT 00" : "L00", HAlign.Center, car =>
                 {
+                    if (r.Towing(car))
+                        return new Cell(pitTime && r.TowLeft(car) is { } towLeft ? $"TOW {Math.Ceiling(towLeft):0}" : "TOW", pal.Text, Pill: pal.Danger);
                     if (f.CarOnPitRoad[car])
                         return new Cell(pitTime && r.PitLaneTime(car) is { } inLane ? $"PIT {inLane:0}" : "PIT", pal.Text, Pill: pal.Warn);
                     if (r.OnOutLap(car)) return new Cell("OUT", pal.Text, Pill: pal.Slate);
@@ -456,13 +451,13 @@ internal sealed class RelativeWidget : HudWidget
         Editors.HudClassFilter.List,
         HudOption.Choice("hidePits", "Cars in the pits", "false", new HudChoice("false", "Show them"),
             new HudChoice("stall", "Hide cars parked in their pit stall", "Cars driving down the pit lane still show"), new HudChoice("true", "Hide every car in the pit lane")),
-        HudOption.Number("close", "Close gap", 1.0, 0, 5, 0.1, "s", "Same-class cars within this gap are highlighted (battles)."),
+        HudOption.Number("close", "Close gap", 1.0, 0, 5, 0.1, Units.S, "Same-class cars within this gap are highlighted (battles)."),
         HudOption.Bool("lapColors", "Lap colors", true, "Red: lapping you. Blue: a lap or more behind you"),
         FieldColumns.MarksOption,
         HudOption.Columns("header", "Header", "session,remain,inc,bias", Strips.Header),
         HudOption.Columns("footer", "Footer", "lap,clock,wetness,air,track", Strips.Footer),
         HudOption.Bool("showHeader", "Column headings", false),
-        HudOption.Bool("highlightMe", "Highlight my row", true, "Your row tinted amber, your position in a block"),
+        HudOption.Bool("highlightMe", "Highlight my row", true, "Your row tinted in the accent color, your position in a block"),
         HudOption.Bool("stripes", "Row shading", true, "Every other row a shade darker"),
         HudFlags.BannerOption,
     }.Concat(FieldColumns.Shared).ToArray();
@@ -612,7 +607,7 @@ internal sealed class StandingsWidget : HudWidget
             new HudChoice("gapme", "Gap to you"), FieldColumns.LapsDone, FieldColumns.Last, FieldColumns.Best, FieldColumns.AvgLap, FieldColumns.PaceDelta,
             FieldColumns.Pit, FieldColumns.OutLap, FieldColumns.Stint, FieldColumns.Incidents),
         HudOption.Bool("group", "Group by class", true, "Multiclass: one block per class, positions within the class."),
-        HudOption.Choice("classOrder", "Class order", "position", new HudChoice("position", "By their leader's position"), new HudChoice("fastest", "Fastest class first")),
+        HudOption.Choice("classOrder", "Class order", "fastest", new HudChoice("position", "By their leader's position"), new HudChoice("fastest", "Fastest class first")),
         HudOption.Set("classInfo", "Class headings", "cars,sof", null,
             new HudChoice("cars", "Cars in the class"), new HudChoice("sof", "Strength of field"), new HudChoice("laps", "Laps the leader will do", "Timed races: from the class leader's recent pace")),
         HudOption.Choice("divider", "Break in the list", "line", new HudChoice("line", "A line"), new HudChoice("accent", "An accent line"), new HudChoice("none", "Nothing"))
@@ -629,7 +624,7 @@ internal sealed class StandingsWidget : HudWidget
         HudOption.Bool("showHeader", "Column headings", true),
         HudOption.Columns("header", "Header", "", Strips.Header),
         HudOption.Columns("footer", "Footer", "inc,sof,fastest", Strips.Footer),
-        HudOption.Bool("highlightMe", "Highlight my row", true, "Your row tinted amber, your position in a block"),
+        HudOption.Bool("highlightMe", "Highlight my row", true, "Your row tinted in the accent color, your position in a block"),
         HudOption.Bool("stripes", "Row shading", true, "Every other row a shade darker"),
     }.Concat(FieldColumns.Shared).ToArray();
 
@@ -744,7 +739,8 @@ internal sealed class StandingsWidget : HudWidget
                 .ThenBy(g => g.Min(s => s.Position > 0 ? s.Position : 999)).Select(g => g.ToList()).ToList()
             : new List<List<StandingRow>> { standings };
         float classHead = group ? p.LineHeight(p.SmallBold) + 9 * p.Density : 0;
-        float perBlock = group ? classHead + blockGap + blockPad * 2 : 0;
+        float underHead = group ? blockPad : 0;
+        float perBlock = group ? classHead + underHead + blockGap + blockPad * 2 : 0;
         int otherRows = o.Int("otherRows");
         var pickFrom = group && otherRows > 0
             ? blocks.Select(b => b.Any(s => s.CarIdx == me) ? b : b.Take(otherRows).ToList()).ToList()
@@ -776,27 +772,24 @@ internal sealed class StandingsWidget : HudWidget
                     rowsH += rowH;
                     lastI = idx;
                 }
-                rowsH = Math.Min(rowsH, area.Bottom - y - classHead - blockPad * 2);
-                p.Panel(new RectangleF(box.X, y, box.Width, classHead + rowsH + blockPad * 2));
+                rowsH = Math.Min(rowsH, area.Bottom - y - classHead - underHead - blockPad * 2);
+                p.Panel(new RectangleF(box.X, y, box.Width, classHead + underHead + rowsH + blockPad * 2));
                 y += blockPad;
-                var hr = new RectangleF(area.X, y + 2, area.Width, classHead - 4);
-                p.Region("classhead", hr);
-                float radius = p.CornerRadius(2);
-                string name = (d?.ClassName is { Length: > 0 } cn ? cn : "Class").ToUpperInvariant();
-                var tag = new RectangleF(hr.X, hr.Y, Math.Min(hr.Width * 0.6f, p.Measure(name, p.SmallBold) + 16), hr.Height);
-                var fade = new RectangleF(tag.X, tag.Y, tag.Width * 2.2f, tag.Height);
-                using (var lg = new System.Drawing.Drawing2D.LinearGradientBrush(fade, HudPalette.Alpha(cc, 95), HudPalette.Alpha(cc, 0), System.Drawing.Drawing2D.LinearGradientMode.Horizontal))
-                    p.G.FillRectangle(lg, p.Snap(fade));
-                p.Fill(new RectangleF(tag.X, tag.Y, 3, tag.Height), cc);
-                p.Text(name, p.SmallBold, p.P.Heading, new RectangleF(tag.X + 3, tag.Y, tag.Width - 3, tag.Height), HAlign.Center, VAlign.Center);
-                p.Text(ClassInfo(v, blocks[b]), p.Small, p.P.Text, new RectangleF(tag.Right + 6, hr.Y, hr.Right - tag.Right - 12, hr.Height), HAlign.Right, VAlign.Center);
-                y += classHead;
                 if (firstBlock && headH > 0)
                 {
                     HudTable.Header(p, fitted, new RectangleF(area.X, y, area.Width, headH));
                     p.Region("headings", new RectangleF(area.X, y, area.Width, headH));
                     y += headH;
                 }
+                var hr = new RectangleF(area.X, y + 2, area.Width, classHead - 4);
+                p.Region("classhead", hr);
+                float radius = p.CornerRadius(2);
+                string name = (d?.ClassName is { Length: > 0 } cn ? cn : "Class").ToUpperInvariant();
+                var tag = new RectangleF(hr.X, hr.Y, Math.Min(hr.Width * 0.6f, p.Measure(name, p.SmallBold) + 16), hr.Height);
+                p.Fill(new RectangleF(tag.X, tag.Y, 3, tag.Height), cc);
+                p.Text(name, p.SmallBold, p.P.Heading, new RectangleF(tag.X + 3, tag.Y, tag.Width - 3, tag.Height), HAlign.Center, VAlign.Center);
+                p.Text(ClassInfo(v, blocks[b]), p.Small, p.P.Text, new RectangleF(tag.Right + 6, hr.Y, hr.Right - tag.Right - 12, hr.Height), HAlign.Right, VAlign.Center);
+                y += classHead + underHead;
                 firstBlock = false;
             }
             int last = -1;
@@ -830,6 +823,7 @@ internal sealed class StandingsWidget : HudWidget
             }
             if (group) y += blockPad + blockGap;
         }
+        if (group && y < box.Bottom - 1) p.Panel(RectangleF.FromLTRB(box.X, y, box.Right, box.Bottom));
         HudTable.Track(p, fitted, RectangleF.FromLTRB(area.X, area.Y, area.Right, Math.Max(y, area.Y + rowH)));
         if (o.Bool("flagEdge")) HudTable.FlagEdge(p, f, o.Int("flagWidth"));
     }
@@ -850,7 +844,7 @@ internal sealed class StandingsWidget : HudWidget
         foreach (var id in show)
             switch (id)
             {
-                case "cars": parts.Add($"{block.Count} car{(block.Count == 1 ? "" : "s")}"); break;
+                case "cars": parts.Add($"{RaceFormat.Count(block.Count, "car")}"); break;
                 case "sof": if (Strips.StrengthOfField(f.Session, classId) is { } sof) parts.Add("SOF " + RaceFormat.IRating(sof)); break;
                 case "laps":
                     int leader = block[0].CarIdx;
@@ -1002,7 +996,7 @@ internal static class Strips
                     string classFl = (f.Session.Player?.ClassName is { Length: > 0 } pcn ? pcn.ToUpperInvariant() : "CLASS") + " FL";
                     items.Add(f.Session.Player is { } pl && FieldOrder.FastestLap(f, pl.ClassId) is { } cfl ? (classFl, RaceFormat.LapTime(cfl.Time), p.P.Fastest) : (classFl, missing, p.P.Faint));
                     break;
-                case "fuel": items.Add(("FUEL", v.Race.Fuel is { } plan ? $"{plan.LapsOfFuel:0.0} laps" : missing, null)); break;
+                case "fuel": items.Add(("FUEL", v.Race.Fuel is { } plan ? string.Create(CultureInfo.InvariantCulture, $"{plan.LapsOfFuel:0.0} LAPS") : missing, null)); break;
                 case "inc":
                     if (f.Incidents is { } inc)
                     {
@@ -1029,9 +1023,9 @@ internal static class Strips
                     items.Add(("WIND", f.WindSpeed is { } ws ? $"{RaceFormat.SpeedValue(ws, u):0} {RaceFormat.SpeedUnit(u)} {RaceFormat.Compass(to)}" : missing, null));
                     break;
                 case "humidity": items.Add(("HUMIDITY", f.Humidity is { } h ? $"{h * 100:0}%" : missing, null)); break;
-                case "wetness": items.Add(("SURFACE", f.TrackWetness is { } w ? RaceFormat.Wetness(w) : missing, f.TrackWetness is > 1 ? p.P.WarnText : null)); break;
+                case "wetness": items.Add(("SURFACE", f.TrackWetness is { } w and > 0 ? RaceFormat.Wetness(w) : missing, f.TrackWetness is > 1 ? p.P.WarnText : null)); break;
                 case "clock": items.Add(("", RaceFormat.TimeOfDay(DateTime.Now), null)); break;
-                case "bias": items.Add(("BB", f.BrakeBias is { } bb ? $"{bb:0.0}%" : missing, null)); break;
+                case "bias": items.Add(("BB", f.BrakeBias is { } bb ? string.Create(CultureInfo.InvariantCulture, $"{bb:0.0}%") : missing, null)); break;
                 case "trackname": items.Add(("", f.Session.TrackDisplayName is { Length: > 0 } tn ? tn : f.Session.TrackName is { Length: > 0 } tn2 ? tn2 : missing, null)); break;
                 case "fuellevel": items.Add(("FUEL", f.Fuel is { } inTank ? RaceFormat.Fuel(inTank, u) : missing, null)); break;
                 case "rain": items.Add(("RAIN", f.Precipitation is { } pr ? $"{pr * 100:0}%" : missing, f.Precipitation is > 0 ? p.P.AccentText : null)); break;

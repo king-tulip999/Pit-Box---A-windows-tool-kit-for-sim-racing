@@ -15,11 +15,11 @@ internal sealed record PanelDef(string Id, string Label, Func<PanelSize, Framewo
 {
     public IReadOnlyList<PanelTier> Tiers { get; init; } = new[] { new PanelTier(PanelSize.Medium, 0) };
 
-    public double DefaultWidth { get; init; } = 470;
+    public double DefaultWidth { get; init; } = 381;
 
-    public double MinWidth { get; init; } = 260;
+    public double MinWidth { get; init; } = 211;
 
-    public double MaxWidth { get; init; } = 470;
+    public double MaxWidth { get; init; } = 381;
 
     public Func<double>? MaxWidthFor { get; init; }
 
@@ -44,9 +44,9 @@ internal sealed record PanelDef(string Id, string Label, Func<PanelSize, Framewo
 
 internal sealed class PanelGrid : Panel
 {
-    public double MinColumnWidth { get; init; } = 38;
-    public double RowHeight { get; init; } = 12;
-    public double Gap { get; init; } = 16;
+    public double MinColumnWidth { get; init; } = 30.78;
+    public double RowHeight { get; init; } = 9.72;
+    public double Gap { get; init; } = 13;
     public int MinColumns { get; init; } = 2;
 
     public double PanelSpacing { get; init; }
@@ -85,7 +85,7 @@ internal sealed class PanelGrid : Panel
     private readonly List<Item> _added = new();
     private readonly GhostOutline _ghost = new() { Visibility = Visibility.Collapsed, IsHitTestVisible = false };
     private int _columns = 1;
-    private double _columnWidth = 100;
+    private double _columnWidth = 81;
     private double _width;
     private int _usedRows;
     private bool _editing;
@@ -287,13 +287,13 @@ internal sealed class PanelGrid : Panel
         veil.Background = new SolidColorBrush(Color.FromArgb(130, surface.R, surface.G, surface.B));
 
         var tag = new StackPanel { Orientation = Orientation.Horizontal };
-        tag.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = def.Label, FontSize = 13.5, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>("AccentText"), Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis }));
+        tag.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = def.Label, FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>("AccentText"), Margin = new Thickness(0, 0, 5, 0), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis }));
         if (def.VeilExtra?.Invoke() is { } extra) tag.Children.Add(extra);
         var layers = new Grid();
         layers.Children.Add(new Tile
         {
-            Background = Ui.Res<Brush>("AccentSoft"), BorderBrush = Ui.Res<Brush>("Accent"), BorderThickness = new Thickness(1), CornerRadius = ThemeManager.Round(12),
-            Padding = new Thickness(12, 4, 4, 4), Margin = new Thickness(8), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Child = tag,
+            Background = Ui.Res<Brush>("AccentSoft"), BorderBrush = Ui.Res<Brush>("Accent"), BorderThickness = Hairline.Edges(), CornerRadius = ThemeManager.Round(12),
+            Padding = new Thickness(10, 3, 3, 3), Margin = new Thickness(6), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Child = tag,
         });
         if (def.Resizable)
             layers.Children.Add(Grip(item));
@@ -305,10 +305,10 @@ internal sealed class PanelGrid : Panel
     {
         var grip = new Tile
         {
-            Width = 30, Height = 30, CornerRadius = ThemeManager.Round(10, 4, 14, 4), Margin = new Thickness(0, 0, 3, 3),
+            Width = 24, Height = 24, CornerRadius = ThemeManager.Round(10, 4, 14, 4), Margin = new Thickness(0, 0, 2, 2),
             HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom,
             Background = Ui.Res<Brush>("Accent"), Cursor = Cursors.SizeNWSE, ToolTip = "Drag to resize: bigger shows more",
-            Child = new Icon { Data = Ui.Res<Geometry>("I.Resize"), Width = 16, Height = 16, Foreground = Ui.Res<Brush>("OnAccent") },
+            Child = new Icon { Data = Ui.Res<Geometry>("I.Resize"), Width = 13, Height = 13, Foreground = Ui.Res<Brush>("OnAccent") },
         };
         grip.MouseLeftButtonDown += (_, e) =>
         {
@@ -417,7 +417,7 @@ internal sealed class PanelGrid : Panel
         };
     }
 
-    private const double GripZone = 46;
+    private const double GripZone = 37;
 
     private void HookLive(Item item)
     {
@@ -427,7 +427,7 @@ internal sealed class PanelGrid : Panel
             var grip = Grip(item);
             grip.Opacity = 0;
             grip.IsHitTestVisible = false;
-            grip.Margin = new Thickness(0, 0, -6, -6);
+            grip.Margin = new Thickness(0, 0, -5, -5);
             Panel.SetZIndex(grip, 10);
             item.LiveGrip = grip;
             host.Children.Add(grip);
@@ -442,6 +442,8 @@ internal sealed class PanelGrid : Panel
         host.PreviewMouseMove += (_, e) =>
         {
             ShowGrip(item, e.GetPosition(host));
+            if (item.Def.VeilClick is null && _drag is null && e.LeftButton != MouseButtonState.Pressed)
+                host.Cursor = IsControl(e.OriginalSource as DependencyObject, host) ? null : Cursors.SizeAll;
             if (_pressed != item || e.LeftButton != MouseButtonState.Pressed || _resize is not null) return;
             var p = e.GetPosition(this);
             if (_drag is null)
@@ -675,13 +677,14 @@ internal sealed class PanelGrid : Panel
         if (!_editing) DrawDividers(dc);
         if (!_editing || ActualHeight <= 0) return;
         var line = Ui.Res<Brush>("Line");
-        if (_columnPen is null || _columnPen.Brush != line)
+        double px = Hairline.ScaleOf(this);
+        if (_columnPen is null || _columnPen.Brush != line || _columnPen.Thickness != Hairline.Pixels(1, px))
         {
-            _columnPen = new Pen(line, 1) { DashStyle = new DashStyle(new double[] { 2, 3 }, 0) };
+            _columnPen = new Pen(line, Hairline.Pixels(1, px)) { DashStyle = new DashStyle(new double[] { 2, 3 }, 0) };
             _columnPen.Freeze();
         }
         for (int c = 0; c < _columns; c++)
-            dc.DrawGeometry(null, _columnPen, Tile.CardShape(new Rect(c * ColStep, 0, _columnWidth, ActualHeight), 10));
+            dc.DrawGeometry(null, _columnPen, Tile.CardShape(Hairline.SnapBox(new Rect(c * ColStep, 0, _columnWidth, ActualHeight), px), 8));
     }
 
     private Pen? _columnPen;
@@ -741,10 +744,10 @@ internal sealed class PanelGrid : Panel
                     _solidPen = new Pen(Stroke, 1.5) { LineJoin = PenLineJoin.Miter };
                     _solidPen.Freeze();
                 }
-                dc.DrawGeometry(null, _solidPen, Tile.CardShape(new Rect(0.75, 0.75, ActualWidth - 1.5, ActualHeight - 1.5), 16));
+                dc.DrawGeometry(null, _solidPen, Tile.CardShape(new Rect(0.75, 0.75, ActualWidth - 1.5, ActualHeight - 1.5), 13));
                 return;
             }
-            var shape = Tile.CardShape(new Rect(1, 1, ActualWidth - 2, ActualHeight - 2), 16);
+            var shape = Tile.CardShape(new Rect(1, 1, ActualWidth - 2, ActualHeight - 2), 13);
             var size = new Size(ActualWidth, ActualHeight);
             if (_pen is null || _pen.Brush != Stroke || _penFor != size)
             {

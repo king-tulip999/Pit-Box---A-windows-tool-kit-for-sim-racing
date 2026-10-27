@@ -55,7 +55,7 @@ internal static class CarPictures
         return picture;
     }
 
-    public static FrameworkElement Beside(FrameworkElement content, string? car, double height, double gap = 10, bool slot = true)
+    public static FrameworkElement Beside(FrameworkElement content, string? car, double height, double gap = 8, bool slot = true)
     {
         if ((slot ? Slotted(car, height) : Picture(car, height, height * 4)) is not { } picture) return content;
         picture.Margin = new Thickness(0, 0, gap, 0);

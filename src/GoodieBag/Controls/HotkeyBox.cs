@@ -5,6 +5,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using GoodieBag.Services;
+using GoodieBag.Theme;
 
 namespace GoodieBag.Controls;
 
@@ -14,7 +15,7 @@ public sealed class HotkeyBox : TextBox
     private bool _paused, _recording;
     private Window? _window;
     private readonly Popup _hint;
-    private readonly TextBlock _hintText = new() { FontSize = 12, TextWrapping = TextWrapping.Wrap, MaxWidth = 280 };
+    private readonly TextBlock _hintText = new() { FontSize = 9.5, TextWrapping = TextWrapping.Wrap, MaxWidth = 227 };
 
     public string? Hotkey { get; private set; }
 
@@ -30,17 +31,17 @@ public sealed class HotkeyBox : TextBox
         IsReadOnlyCaretVisible = false;
         Cursor = Cursors.Hand;
         Tag = EmptyHint;
-        Width = 190;
+        Width = 154;
         InputMethod.SetIsInputMethodEnabled(this, false);
         SetResourceReference(StyleProperty, typeof(TextBox));
         _hintText.SetResourceReference(TextBlock.ForegroundProperty, "TooltipText");
-        var border = new Border { Padding = new Thickness(10, 6, 10, 7), CornerRadius = Theme.ThemeManager.Round(6), Child = _hintText };
+        var border = new Border { Padding = new Thickness(8, 5, 8, 6), CornerRadius = Theme.ThemeManager.Round(6), Child = _hintText };
         border.SetResourceReference(Border.BackgroundProperty, "TooltipBg");
         border.SetResourceReference(Border.BorderBrushProperty, "TooltipEdge");
-        border.BorderThickness = new Thickness(1);
+        Hairline.Frame(border);
         _hint = new Popup
         {
-            PlacementTarget = this, Placement = PlacementMode.Bottom, VerticalOffset = 4, AllowsTransparency = true,
+            PlacementTarget = this, Placement = PlacementMode.Bottom, VerticalOffset = 3, AllowsTransparency = true,
             StaysOpen = true, Focusable = false, IsHitTestVisible = false, Child = border,
         };
         RenderOptions.SetClearTypeHint(border, ClearTypeHint.Enabled);
@@ -71,6 +72,7 @@ public sealed class HotkeyBox : TextBox
             : $"Press the new keys to replace {GoodieBag.Hotkeys.Hotkey.Display(Hotkey)}.\nEsc deletes this keybind · click anywhere else to cancel.";
         _hint.IsOpen = true;
         if (NumpadByPosition) ComponentDispatcher.ThreadPreprocessMessage += OnRawKey;
+        else GoodieBag.Hotkeys.ControllerButtons.Shared.Record(OnButton);
         _window = Window.GetWindow(this);
         if (_window is not null)
         {
@@ -109,6 +111,7 @@ public sealed class HotkeyBox : TextBox
             _window = null;
         }
         _hint.IsOpen = false;
+        if (_recording && !NumpadByPosition) GoodieBag.Hotkeys.ControllerButtons.Shared.StopRecording();
         ComponentDispatcher.ThreadPreprocessMessage -= OnRawKey;
         if (_paused)
         {
@@ -150,6 +153,13 @@ public sealed class HotkeyBox : TextBox
             Update(hotkey.ToString());
             Cancel();
         }
+    }
+
+    private void OnButton(GoodieBag.Hotkeys.ControllerButton button)
+    {
+        if (!_recording) return;
+        Update(button.ToString());
+        Cancel();
     }
 
     private void OnRawKey(ref System.Windows.Interop.MSG msg, ref bool handled)

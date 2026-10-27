@@ -98,8 +98,8 @@ internal static class FuelPlanner
     internal static string? Warning(FuelConsumptionEstimate e) => e.Reliability switch
     {
         EstimateReliability.Unavailable => "No clean laps measured yet.",
-        EstimateReliability.Learning => $"Learning: {e.UsedLapCount} clean lap{(e.UsedLapCount == 1 ? "" : "s")} so far. Treat the plan as a rough guide." + (e.HasStatisticalBound ? "" : " No safety reserve yet (needs 2+ clean laps); only your margin is added."),
-        EstimateReliability.Low => $"Low confidence: {e.UsedLapCount} clean laps, the figures may still move.",
+        EstimateReliability.Learning => $"Learning: {RaceFormat.Count(e.UsedLapCount, "clean lap")} so far. Treat the plan as a rough guide." + (e.HasStatisticalBound ? "" : " No safety reserve yet (needs 2+ clean laps); only your margin is added."),
+        EstimateReliability.Low => $"Low confidence: {RaceFormat.Count(e.UsedLapCount, "clean lap")}, the figures may still move.",
         _ => null,
     };
 

@@ -39,10 +39,8 @@ internal sealed class CustomThemeSection : StackPanel
         Children.Add(coloursRow);
         if (!oled)
         {
-            nameRow.IsEnabled = false;
-            nameRow.Opacity = 0.5;
-            coloursRow.IsEnabled = false;
-            coloursRow.Opacity = 0.5;
+            nameRow.Visibility = Visibility.Collapsed;
+            coloursRow.Visibility = Visibility.Collapsed;
             return;
         }
         if (!C.Enabled) return;
@@ -50,12 +48,12 @@ internal sealed class CustomThemeSection : StackPanel
         var editor = new StackPanel();
         editor.Children.Add(Toolbar());
         editor.Children.Add(Grid());
-        Children.Add(new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(14, 12, 14, 6), Margin = new Thickness(0, 0, 0, 10), Child = editor });
+        Children.Add(new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(11, 10, 11, 5), Margin = new Thickness(0, 0, 0, 8), Child = editor });
     }
 
     private TextBox NameBox()
     {
-        var name = new TextBox { Text = C.Name ?? "", Width = 190, MaxLength = 24, Tag = Themes.DefaultCustomName, VerticalAlignment = VerticalAlignment.Center };
+        var name = new TextBox { Text = C.Name ?? "", Width = 154, MaxLength = 24, Tag = Themes.DefaultCustomName, VerticalAlignment = VerticalAlignment.Center };
         void CommitName()
         {
             string v = name.Text.Trim();
@@ -76,10 +74,10 @@ internal sealed class CustomThemeSection : StackPanel
 
     private UIElement Toolbar()
     {
-        var bar = new WrapPanel { Margin = new Thickness(0, 0, 0, 10) };
+        var bar = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
 
         var colours = Ui.LabeledButton("I.Palette", "Colors", () => { }, "Btn");
-        ((StackPanel)colours.Content).Children.Add(new Controls.Icon { Data = Ui.Res<Geometry>("I.ChevronDown"), Width = 12, Height = 12, Margin = new Thickness(6, 0, 0, 0) });
+        ((StackPanel)colours.Content).Children.Add(new Controls.Icon { Data = Ui.Res<Geometry>("I.ChevronDown"), Width = 10, Height = 10, Margin = new Thickness(5, 0, 0, 0) });
         colours.ToolTip = "The theme's own colors or one of your saved sets";
         colours.Click += (_, _) => OpenMenu(colours);
         bar.Children.Add(Spaced(colours));
@@ -109,13 +107,13 @@ internal sealed class CustomThemeSection : StackPanel
 
     private void OpenMenu(Button anchor)
     {
-        var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom, MinWidth = 240 };
+        var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom, MinWidth = 194 };
+        Ui.DropBelow(menu);
 
         var reset = new MenuItem { Header = Labelled("Default colors", ThemeColors.Default), ToolTip = "The Custom theme's own colors" };
         reset.Click += (_, _) =>
         {
-            C.Colors = new ThemeColors();
-            C.EditingProfile = null;
+            _app.ReplaceOledColors(() => { C.Colors = new ThemeColors(); C.EditingProfile = null; });
             _app.OledCustomChanged();
         };
         menu.Items.Add(reset);
@@ -132,9 +130,7 @@ internal sealed class CustomThemeSection : StackPanel
             var edit = new MenuItem { Header = "Edit", ToolTip = "Use these colors and save every change into them" };
             edit.Click += (_, _) =>
             {
-                C.Colors = p.Colors.Copy();
-                C.Name = p.Name;
-                C.EditingProfile = p.Name;
+                _app.ReplaceOledColors(() => { C.Colors = p.Colors.Copy(); C.Name = p.Name; C.EditingProfile = p.Name; });
                 _app.OledCustomChanged();
             };
             var delete = new MenuItem { Header = "Delete" };
@@ -158,12 +154,12 @@ internal sealed class CustomThemeSection : StackPanel
     private static UIElement Labelled(string name, ThemeColors colors)
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal };
-        var chip = new Border { CornerRadius = ThemeManager.Round(3), Padding = new Thickness(3), Margin = new Thickness(0, 0, 10, 0), Background = Brush(colors.Background, Brushes.Black), VerticalAlignment = VerticalAlignment.Center };
+        var chip = new Border { CornerRadius = ThemeManager.Round(3), Padding = new Thickness(2), Margin = new Thickness(0, 0, 8, 0), Background = Brush(colors.Background, Brushes.Black), VerticalAlignment = VerticalAlignment.Center };
         chip.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
-        chip.BorderThickness = new Thickness(1);
+        Hairline.Frame(chip);
         var dots = new StackPanel { Orientation = Orientation.Horizontal };
         foreach (var hex in new[] { colors.Accent, colors.Highlight, colors.Text })
-            dots.Children.Add(new Ellipse { Width = 8, Height = 8, Margin = new Thickness(1, 0, 1, 0), Fill = Brush(hex, Brushes.Gray) });
+            dots.Children.Add(new Ellipse { Width = 6, Height = 6, Margin = new Thickness(1, 0, 1, 0), Fill = Brush(hex, Brushes.Gray) });
         chip.Child = dots;
         row.Children.Add(chip);
         row.Children.Add(new TextBlock { Text = name, VerticalAlignment = VerticalAlignment.Center });
@@ -174,18 +170,23 @@ internal sealed class CustomThemeSection : StackPanel
 
     private void Use(ThemeColors colors, string? name)
     {
-        C.Colors = colors;
-        C.Name = name ?? C.Name;
-        C.EditingProfile = null;
+        _app.ReplaceOledColors(() => { C.Colors = colors; C.Name = name ?? C.Name; C.EditingProfile = null; });
         _app.OledCustomChanged();
     }
 
     private async Task SaveAsNewAsync()
     {
-        string suggestion = string.IsNullOrWhiteSpace(C.Name) ? "My colors" : C.Name!;
-        for (int n = 2; C.Profile(suggestion) is not null; n++) suggestion = $"{(string.IsNullOrWhiteSpace(C.Name) ? "My colors" : C.Name)} {n}";
+        string start = string.IsNullOrWhiteSpace(C.Name) ? "My colors" : C.Name!;
+        string suggestion = start;
+        for (int n = 2; C.Profile(suggestion) is not null; n++)
+        {
+            string suffix = $" {n}";
+            suggestion = start[..Math.Min(start.Length, Ui.NameLength - suffix.Length)].TrimEnd() + suffix;
+        }
         var name = await _window.Prompt("Save colors", "A name for these colors (Colors → My colors).", suggestion,
-            v => v.Trim().Length == 0 ? "Give it a name." : C.Profile(v.Trim()) is not null ? "There's already a set with that name." : null);
+            v => v.Trim().Length == 0 ? "Give it a name."
+                : string.Equals(v.Trim(), Themes.OledDefaultSet, StringComparison.OrdinalIgnoreCase) ? "Pick another name."
+                : C.Profile(v.Trim()) is not null ? "There's already a set with that name." : null);
         if (name is null) return;
         name = name.Trim();
         C.Profiles.Add(new ThemeColorProfile { Name = name, Colors = C.Colors.Copy() });
@@ -208,7 +209,7 @@ internal sealed class CustomThemeSection : StackPanel
             ("Warning", "Cautions", () => c.Warning, v => c.Warning = v),
             ("Error", "Problems and deleting", () => c.Error, v => c.Error = v),
         };
-        var grid = new WrapPanel { ItemWidth = 152 };
+        var grid = new WrapPanel { ItemWidth = 123 };
         foreach (var (label, help, get, set) in rows)
             grid.Children.Add(Cell(label, help, get, set));
         return grid;
@@ -223,8 +224,8 @@ internal sealed class CustomThemeSection : StackPanel
             _app.OledCustomChanged();
             return true;
         }, help);
-        var cell = new StackPanel { Margin = new Thickness(0, 0, 10, 10) };
-        cell.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 4), ToolTip = help });
+        var cell = new StackPanel { Margin = new Thickness(0, 0, 8, 8) };
+        cell.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 3), ToolTip = help });
         cell.Children.Add(field);
         return cell;
     }

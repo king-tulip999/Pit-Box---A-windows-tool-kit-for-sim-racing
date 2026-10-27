@@ -18,6 +18,10 @@ internal static class Dates
 
     public static string Short(DateTime t) => t.ToString(ShortPattern, C);
 
+    public static string Day(DateTime t) => Day(t, System.DateTime.Now);
+
+    public static string Day(DateTime t, DateTime now) => t.Year == now.Year ? Short(t) : Short(t) + " " + t.Year.ToString(C);
+
     public static string Weekday(DateTime t) => t.ToString("ddd", C);
 
     public static string ShortWithDay(DateTime t) => t.ToString("dddd", C) + " " + Short(t);

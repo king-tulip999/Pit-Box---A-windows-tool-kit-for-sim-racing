@@ -6,7 +6,7 @@ namespace GoodieBag.Views;
 
 internal sealed class CardFace : Panel
 {
-    private const double IconGap = 14, BarGap = 10, BarHeight = 2;
+    private const double IconGap = 11, BarGap = 8, BarHeight = 2;
     private readonly StackPanel _titles;
     private readonly TextBlock _title;
     private readonly NavIcon _icon;

@@ -1,4 +1,5 @@
 using System.Globalization;
+using GoodieBag.Services;
 
 namespace GoodieBag.SessionStats;
 
@@ -32,7 +33,7 @@ internal sealed record StatDef(string Id, string Category, string Label, StatKin
 
 internal static class StatRegistry
 {
-    public const string Time = "Time", CarsTracks = "Cars & tracks", Pace = "Pace", Racing = "Racing", Incidents = "Incidents", Style = "Driving style", Conditions = "Conditions";
+    public const string Time = "Time", CarsTracks = "Cars and tracks", Pace = "Pace", Racing = "Racing", Incidents = "Incidents", Style = "Driving style", Conditions = "Conditions";
 
     private const string Combo = "s.car || ' · ' || s.track";
 
@@ -77,8 +78,8 @@ internal static class StatRegistry
         new("race.league", Racing, "League / public races", StatKind.Text,
             "SELECT SUM({league}) || ' / ' || SUM(NOT {league}) FROM s WHERE session_type = 'Race' AND start_pos > 0") { League = true },
 
-        new("inc.total", Incidents, "Total incidents", StatKind.Count, "SELECT SUM(incidents) FROM s") { ZeroWhenEmpty = true },
-        new("inc.zero", Incidents, "Clean races (0x)", StatKind.Count, "SELECT COUNT(*) FROM s WHERE session_type = 'Race' AND finished = 1 AND incidents = 0"),
+        new("inc.total", Incidents, "Total incidents", StatKind.Count, "SELECT CASE WHEN COUNT(*) = 0 THEN 0 ELSE SUM(incidents) END FROM s"),
+        new("inc.zero", Incidents, "Clean races", StatKind.Count, "SELECT COUNT(*) FROM s WHERE session_type = 'Race' AND finished = 1 AND incidents = 0"),
 
         new("style.fuel", Style, "Fuel used", StatKind.Fuel, "SELECT SUM(fuel_used) FROM l") { Help = "Counted lap by lap" },
         new("style.pits", Style, "Pit stops", StatKind.Count, "SELECT SUM(pit_stops) FROM s") { ZeroWhenEmpty = true },
@@ -207,13 +208,13 @@ internal static class StatFormat
     {
         StatKind.Duration => Duration(v),
         StatKind.Count => Math.Round(v).ToString("N0", C),
-        StatKind.Distance => imperial ? $"{v * 0.621371:N0} mi" : $"{v:N0} km",
-        StatKind.Speed => imperial ? $"{v * 0.621371:0} mph" : $"{v:0} km/h",
-        StatKind.Fuel => imperial ? $"{v * 0.264172:N1} gal" : $"{v:N1} L",
+        StatKind.Distance => imperial ? $"{v * 0.621371:N0} {Units.Mi}" : $"{v:N0} {Units.Km}",
+        StatKind.Speed => imperial ? $"{v * 0.621371:0} {Units.Mph}" : $"{v:0} {Units.Kmh}",
+        StatKind.Fuel => imperial ? $"{v * 0.264172:N1} {Units.Gal}" : $"{v:N1} {Units.L}",
         StatKind.Temp => imperial ? $"{v * 9 / 5 + 32:0} °F" : $"{v:0} °C",
         StatKind.LapTime => LapTime(v),
-        StatKind.LapDelta => (v < 0 ? "−" : "+") + Math.Abs(v).ToString("0.000", C) + " s",
-        StatKind.Seconds => v.ToString(v < 10 ? "0.000" : "0.0", C) + " s",
+        StatKind.LapDelta => (v < 0 ? "−" : "+") + Math.Abs(v).ToString("0.000", C) + " " + Units.S,
+        StatKind.Seconds => v.ToString(v < 10 ? "0.000" : "0.0", C) + " " + Units.S,
         StatKind.Percent => $"{v:0}%",
         StatKind.Position => "P" + v.ToString("0.0", C),
         StatKind.Signed => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.Abs(Math.Round(v)).ToString("N0", C),

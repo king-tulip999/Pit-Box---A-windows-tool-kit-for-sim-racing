@@ -22,18 +22,18 @@ internal static class ThemeMenu
             ? $"{Themes.For(AppTheme.Custom).Name} · {(pick.Set == Themes.OledDefaultSet ? "Default" : pick.Set)}"
             : Themes.For(pick.Theme).Name;
 
-    public static Button OverlayButton(Func<Pick> current, Action<Pick> picked, bool followApp, string? customLabel, double minWidth = 200)
+    public static Button OverlayButton(Func<Pick> current, Action<Pick> picked, bool followApp, string? customLabel, double minWidth = 162)
     {
         var text = TextFit.TipWhenTrimmed(new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
         var row = new DockPanel { LastChildFill = true };
-        var chevron = new Icon { Data = Ui.Res<Geometry>("I.ChevronDown"), Width = 12, Height = 12, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        var chevron = new Icon { Data = Ui.Res<Geometry>("I.ChevronDown"), Width = 10, Height = 10, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         DockPanel.SetDock(chevron, Dock.Right);
         row.Children.Add(chevron);
-        var dots = new ContentControl { Focusable = false, Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
+        var dots = new ContentControl { Focusable = false, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center };
         DockPanel.SetDock(dots, Dock.Left);
         row.Children.Add(dots);
         row.Children.Add(text);
-        var button = new Button { Style = Ui.Res<Style>("Btn"), Content = row, MinWidth = minWidth, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(10, 3, 10, 3) };
+        var button = new Button { Style = Ui.Res<Style>("Btn"), Content = row, MinWidth = minWidth, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(8, 2, 8, 2) };
         void Show()
         {
             var pick = current();
@@ -45,6 +45,7 @@ internal static class ThemeMenu
         {
             var pick = current();
             var menu = new ContextMenu { PlacementTarget = button, Placement = PlacementMode.Bottom, MinWidth = Math.Max(220, button.ActualWidth) };
+            Ui.DropBelow(menu);
             MenuItem Item(string header, ThemeSpec? spec, bool on, Pick choice)
             {
                 var item = new MenuItem { Header = Header(header, spec), IsCheckable = false, IsChecked = on };
@@ -84,6 +85,7 @@ internal static class ThemeMenu
     {
         var c = Oled;
         var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom, MinWidth = Math.Max(220, anchor.ActualWidth) };
+        Ui.DropBelow(menu);
         bool usingCustom = c?.InUse == true;
         var own = new MenuItem { Header = Header("Default", Themes.Custom), IsChecked = ThemeManager.Current.Id == AppTheme.Custom && !usingCustom };
         own.Click += (_, _) => use(null);
@@ -128,7 +130,7 @@ internal static class ThemeMenu
         if (spec is null) return text;
         var row = new StackPanel { Orientation = Orientation.Horizontal };
         row.Children.Add(Dots(spec));
-        row.Children.Add(new TextBlock { Text = text, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
+        row.Children.Add(new TextBlock { Text = text, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
         return row;
     }
 
@@ -138,8 +140,8 @@ internal static class ThemeMenu
         Brush B(string key) => new SolidColorBrush(c.TryGetValue(key, out var v) ? v : Colors.Gray);
         var dots = new StackPanel { Orientation = Orientation.Horizontal };
         foreach (var key in new[] { "Accent", "ActiveModeFg", "Heading" })
-            dots.Children.Add(new Ellipse { Width = 8, Height = 8, Margin = new Thickness(1, 0, 1, 0), Fill = B(key) });
-        var chip = new Border { Child = dots, Padding = new Thickness(3), CornerRadius = ThemeManager.Round(3), Background = B("Bg"), BorderThickness = new Thickness(1), VerticalAlignment = VerticalAlignment.Center };
+            dots.Children.Add(new Ellipse { Width = 6, Height = 6, Margin = new Thickness(1, 0, 1, 0), Fill = B(key) });
+        var chip = Hairline.Frame(new Border { Child = dots, Padding = new Thickness(2), CornerRadius = ThemeManager.Round(3), Background = B("Bg"), VerticalAlignment = VerticalAlignment.Center });
         chip.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
         return chip;
     }

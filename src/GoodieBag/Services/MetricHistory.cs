@@ -5,7 +5,7 @@ internal sealed class MetricHistory
     public const int Capacity = 120;
     private readonly Dictionary<string, List<double?>> _series = new();
 
-    public static readonly string[] Keys = { "cpuTemp", "cpuLoad", "gpuTemp", "gpuLoad", "ram", "vram", "fps", "cpuClock", "gpuClock", "power", "gpuFan", "diskBusy" };
+    public static readonly string[] Keys = { "cpuTemp", "cpuLoad", "gpuTemp", "gpuLoad", "ram", "vram", "fps" };
 
     public MetricHistory()
     {
@@ -34,11 +34,6 @@ internal sealed class MetricHistory
         into[4] = hw?.RamUsedGb is { } u && hw.RamTotalGb is { } t && t > 0 ? u / t * 100 : null;
         into[5] = hw?.VramUsedMb is { } vu && hw.VramTotalMb is { } vt && vt > 0 ? vu / vt * 100 : null;
         into[6] = app.Frames.GetMostActive()?.Stats.Fps;
-        into[7] = hw?.CpuClockMhz / 1000;
-        into[8] = hw?.GpuClockMhz;
-        into[9] = hw?.CpuPower is null && hw?.GpuPower is null ? null : (hw?.CpuPower ?? 0) + (hw?.GpuPower ?? 0);
-        into[10] = hw?.GpuFanRpm;
-        into[11] = hw?.DiskActivePercent;
     }
 
     public void Clear()

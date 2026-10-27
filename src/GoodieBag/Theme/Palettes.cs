@@ -36,8 +36,8 @@ internal static class Palettes
 
     public static readonly IReadOnlyDictionary<string, Color> Dark = new Dictionary<string, Color>
     {
-        ["Bg"] = Hex("#000000"), ["Panel"] = Hex("#0E0E0E"), ["Surface"] = Hex("#151515"), ["SurfaceAlt"] = Hex("#1B1B1B"),
-        ["TileRaised"] = Hex("#222222"), ["Hover"] = Hex("#2A2A2A"), ["HoverRaised"] = Hex("#303030"),
+        ["Bg"] = Hex("#000000"), ["Panel"] = Hex("#121417"), ["Surface"] = Hex("#171A1E"), ["SurfaceAlt"] = Hex("#1C2024"),
+        ["TileRaised"] = Hex("#23272C"), ["SidebarBg"] = Hex("#121417"), ["Hover"] = Hex("#2A2A2A"), ["HoverRaised"] = Hex("#303030"),
         ["TileHighlight"] = Hex("#2A2A2A"), ["TileEdge"] = Hex("#3A3A3A"),
         ["Line"] = Hex("#2E2E2E"), ["LineStrong"] = Hex("#3C3C3C"),
         ["Heading"] = Hex("#E6E6E6"), ["Text"] = Hex("#D2D2D2"), ["TextMuted"] = Hex("#A0A0A0"), ["TextFaint"] = Hex("#8A8A8A"),
@@ -63,7 +63,7 @@ internal static class Palettes
         ["ActiveModeBg"] = Hex("#DC1A78"), ["ActiveModeFg"] = Hex("#FFFFFF"), ["ActiveModeEdge"] = Hex("#F02D91"), ["ActiveModeHover"] = Hex("#C4146A"),
         ["LogoBg"] = Hex("#DC1A78"), ["LogoFg"] = Hex("#FFFFFF"), ["LogoEdge"] = Hex("#DC1A78"),
         ["SidebarEdge"] = Hex("#242424"),
-        ["InputEdge"] = Hex("#646464"), ["InputEdgeHover"] = Hex("#808080"), ["FocusEdge"] = Hex("#49C8F5"), ["OnDanger"] = Hex("#1A0808"),
+        ["InputEdge"] = Hex("#686868"), ["InputEdgeHover"] = Hex("#808080"), ["FocusEdge"] = Hex("#49C8F5"), ["OnDanger"] = Hex("#1A0808"),
         ["SegmentBg"] = Hex("#1B1B1B"), ["SegmentEdge"] = Hex("#333333"), ["QuietEdge"] = Hex("#3A3A3A"), ["EyebrowText"] = Hex("#7FBFD6"),
     };
 
@@ -115,12 +115,20 @@ internal static class Palettes
         ["ChipBorder"] = "Transparent", ["MetricText"] = "Heading",
         ["Meter2"] = "Tile8", ["Meter3"] = "Tile16", ["Meter4"] = "Tile32", ["Meter5"] = "Tile64",
         ["LogoBg"] = "Gold", ["LogoFg"] = "OnGold", ["LogoEdge"] = "GoldEdge",
-        ["SidebarEdge"] = "Transparent", ["SidebarBg"] = "Surface", ["TopoLine"] = "Slate", ["BgGlow"] = "Bg",
+        ["SidebarEdge"] = "Transparent", ["SidebarBg"] = "Surface", ["TopoLine"] = "Slate", ["BgGlow"] = "Bg", ["LiftedBg"] = "Surface",
         ["InputEdge"] = "Line", ["InputEdgeHover"] = "LineStrong", ["FocusEdge"] = "Accent", ["FocusGap"] = "Transparent",
         ["SegmentBg"] = "Transparent", ["SegmentEdge"] = "BtnOutline", ["EyebrowText"] = "TextFaint", ["TooltipEdge"] = "LineStrong",
     };
 
     public static Color Hex(string hex) => (Color)ColorConverter.ConvertFromString(hex);
+
+    public static bool TryHex(string? hex, out Color color)
+    {
+        color = default;
+        if (string.IsNullOrWhiteSpace(hex)) return false;
+        try { color = Hex(hex.Trim()); return true; }
+        catch (FormatException) { return false; }
+    }
 
     public static string ToHex(Color c) => c.A == 255 ? $"#{c.R:X2}{c.G:X2}{c.B:X2}" : $"#{c.A:X2}{c.R:X2}{c.G:X2}{c.B:X2}";
 }

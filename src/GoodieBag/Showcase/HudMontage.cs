@@ -37,6 +37,7 @@ internal sealed partial class HudMontage : IDisposable
     private readonly TelemetryFrame _frame = new();
     private readonly List<Item> _items = new();
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 16 };
+    private readonly DibSurface _surface = new();
     private readonly Stopwatch _clock = new();
     private long _seq, _fadeFrom = -1, _lastTick;
     private double _since = 0.25;
@@ -102,8 +103,8 @@ internal sealed partial class HudMontage : IDisposable
                 break;
             }
         }
-        _nameFont = new Font("Segoe UI Semibold", 15.5f * _scale, GraphicsUnit.Pixel);
-        _textFont = new Font("Segoe UI", 13f * _scale, GraphicsUnit.Pixel);
+        _nameFont = new Font(SharpText.Family + " SemiBold", 15.5f * _scale, GraphicsUnit.Pixel);
+        _textFont = new Font(SharpText.Family, 13f * _scale, GraphicsUnit.Pixel);
     }
 
     internal static string Short(string description)
@@ -170,13 +171,18 @@ internal sealed partial class HudMontage : IDisposable
     {
         int widgetHeight = item.Box.Height - _labelHeight;
         if (item.Content is null) item.Content = new Bitmap(item.Box.Width, widgetHeight, PixelFormat.Format32bppPArgb);
-        using (var g = Graphics.FromImage(item.Content))
+        var g = _surface.Ensure(item.Content.Size);
         {
             item.Painter.Simulated = true;
             item.Painter.MarkSimulated = false;
             item.Painter.Begin(g, item.Box.Width / (float)item.Config.W, new SizeF((float)item.Config.W, (float)item.Config.H), _palette, _settings.Appearance);
             var view = new HudView { Frame = _race.Frame, Race = _race, Settings = _settings, Config = item.Config, Options = item.Options, Def = item.Def };
             item.Widget.Draw(item.Painter, view);
+            item.Painter.FinishPanels();
+            item.Painter.End(_surface.Dc, _surface.Size);
+            using var copy = Graphics.FromImage(item.Content);
+            copy.CompositingMode = CompositingMode.SourceCopy;
+            copy.DrawImageUnscaled(_surface.Bitmap!, 0, 0);
         }
         var s = item.Window.Surface(item.Box.Size);
         s.ResetTransform();
@@ -205,5 +211,6 @@ internal sealed partial class HudMontage : IDisposable
         }
         _nameFont?.Dispose();
         _textFont?.Dispose();
+        _surface.Dispose();
     }
 }

@@ -8,6 +8,7 @@ using System.Windows.Shapes;
 using GoodieBag.Controls;
 using GoodieBag.SimRacing.Hud;
 using GoodieBag.SimRacing.Hud.Editors;
+using GoodieBag.Theme;
 
 namespace GoodieBag.Views.HudSettings;
 
@@ -44,17 +45,22 @@ internal sealed class ItemPicker : StackPanel
         _lanes = lanes;
         _save = save;
         _model = new ItemPickerModel(choices, lanes.Select(l => ItemPickerModel.Split(l.Value)));
-        Margin = new Thickness(0, 4, 0, 10);
+        Margin = new Thickness(0, 3, 0, 8);
 
-        var head = new DockPanel { LastChildFill = true, Margin = new Thickness(0, 0, 0, 8) };
+        var head = new DockPanel { LastChildFill = true, Margin = new Thickness(0, 0, 0, 6) };
         var tools = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         _add = Ui.LabeledButton("I.Plus", "Add", () => { }, "SoftButton");
         _add.Click += (_, _) => OpenAdd();
         System.Windows.Automation.AutomationProperties.SetName(_add, "Add to " + title);
         var more = Ui.IconButton("I.More", "All, none or default", () => { });
         more.Click += (_, _) => OpenMore(more);
-        more.Margin = new Thickness(6, 0, 0, 0);
-        if (help is not null && !showTitle) tools.Children.Add(HelpTip.For(help, title));
+        more.Margin = new Thickness(5, 0, 0, 0);
+        if (help is not null && !showTitle)
+        {
+            var tip = HelpTip.For(help, title);
+            tip.Margin = new Thickness(0, 0, 10, 0);
+            tools.Children.Add(tip);
+        }
         tools.Children.Add(_add);
         tools.Children.Add(more);
         DockPanel.SetDock(tools, Dock.Right);
@@ -109,12 +115,12 @@ internal sealed class ItemPicker : StackPanel
         for (int lane = 0; lane < _lanes.Count; lane++)
         {
             if (_lanes.Count > 1)
-                _lanesHost.Children.Add(new TextBlock { Text = _lanes[lane].Name, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, lane == 0 ? 0 : 10, 0, 4) });
-            var panel = new WrapPanel { Tag = lane, MinHeight = 32 };
+                _lanesHost.Children.Add(new TextBlock { Text = _lanes[lane].Name, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, lane == 0 ? 0 : 8, 0, 4) });
+            var panel = new WrapPanel { Tag = lane, MinHeight = 26 };
             foreach (var id in _model.Lanes[lane]) panel.Children.Add(Chip(lane, id));
             if (_model.Lanes[lane].Count == 0)
             {
-                var empty = new Border { BorderThickness = new Thickness(1), Padding = new Thickness(10, 6, 10, 6), Margin = new Thickness(0, 0, 0, 6), Tag = "empty" };
+                var empty = Hairline.Frame(new Border { Padding = new Thickness(8, 5, 8, 5), Margin = new Thickness(0, 0, 0, 5), Tag = "empty" });
                 empty.SetResourceReference(Border.BorderBrushProperty, "Line");
                 empty.Child = new TextBlock { Text = _lanes.Count > 1 ? "Empty: drag items here, or Add" : "Nothing shown: Add some", Style = Ui.Res<Style>("Caption") };
                 panel.Children.Add(empty);
@@ -134,23 +140,23 @@ internal sealed class ItemPicker : StackPanel
     {
         var choice = _model.Choice(id);
         bool hidden = Hidden(lane, id);
-        var grip = new Icon { Data = Ui.Res<Geometry>("I.Grip"), Width = 12, Height = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0), Opacity = 0.7 };
+        var grip = new Icon { Data = Ui.Res<Geometry>("I.Grip"), Width = 10, Height = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 3, 0), Opacity = 0.7 };
         grip.SetResourceReference(Control.ForegroundProperty, "AccentText");
         var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         row.Children.Add(grip);
-        row.Children.Add(new TextBlock { Text = choice.Label, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0) });
-        if (hidden) row.Children.Add(new TextBlock { Text = "doesn't fit", FontStyle = FontStyles.Italic, Opacity = 0.85, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0) });
-        var x = new Button { Style = Ui.Res<Style>("QuietButton"), Padding = new Thickness(4), ToolTip = "Take out", Focusable = false, Content = new Icon { Data = Ui.Res<Geometry>("I.X"), Width = 10, Height = 10 } };
+        row.Children.Add(new TextBlock { Text = choice.Label, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 3, 0) });
+        if (hidden) row.Children.Add(new TextBlock { Text = "doesn't fit", FontStyle = FontStyles.Italic, Opacity = 0.85, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 3, 0) });
+        var x = new Button { Style = Ui.Res<Style>("QuietButton"), Padding = new Thickness(3), ToolTip = "Take out", Focusable = false, Content = new Icon { Data = Ui.Res<Geometry>("I.X"), Width = 8, Height = 8 } };
         System.Windows.Automation.AutomationProperties.SetName(x, "Take out " + choice.Label);
         x.Click += (_, _) => { _model.Remove(lane, id); Save(); };
         row.Children.Add(x);
         var chip = new Tile
         {
-            Style = Ui.Res<Style>("Chip"), Child = row, Tag = id, Margin = new Thickness(0, 0, 6, 6), Padding = new Thickness(6, 0, 2, 0), MinHeight = 30,
+            Style = Ui.Res<Style>("Chip"), Child = row, Tag = id, Margin = new Thickness(0, 0, 5, 5), Padding = new Thickness(5, 0, 2, 0), MinHeight = 24,
             Cursor = Cursors.SizeAll, Focusable = true, FocusVisualStyle = Ui.Res<Style>("FocusRing"), Opacity = hidden ? 0.6 : 1,
             ToolTip = hidden ? "Doesn't fit at this width: widen the widget, or drag it earlier" : choice.Help,
         };
-        chip.SetValue(TextElement.FontSizeProperty, 12.5);
+        chip.SetValue(TextElement.FontSizeProperty, 10.0);
         chip.SetResourceReference(Border.BackgroundProperty, "AccentSoft");
         chip.SetResourceReference(TextElement.ForegroundProperty, "AccentText");
         System.Windows.Automation.AutomationProperties.SetName(chip, choice.Label + (_lanes.Count > 1 ? $" ({_lanes[lane].Name})" : "") + ". Drag, or Ctrl+arrows to move; Delete to take out");
@@ -208,11 +214,11 @@ internal sealed class ItemPicker : StackPanel
             _dragging = true;
             _body.CaptureMouse();
             press.Chip.Opacity = 0.35;
-            _ghost = new Border { Padding = new Thickness(10, 5, 10, 5), BorderThickness = new Thickness(1.5), Child = new TextBlock { Text = _model.Choice(press.Id).Label, FontSize = 12.5 } };
+            _ghost = new Border { Padding = new Thickness(8, 4, 8, 4), BorderThickness = new Thickness(1.5), Child = new TextBlock { Text = _model.Choice(press.Id).Label, FontSize = 10 } };
             _ghost.SetResourceReference(Border.BackgroundProperty, "AccentSoft");
             _ghost.SetResourceReference(Border.BorderBrushProperty, "AccentText");
             _ghost.SetResourceReference(TextElement.ForegroundProperty, "AccentText");
-            _marker = new Rectangle { Width = 2, Height = 28 };
+            _marker = new Rectangle { Width = 2, Height = 23 };
             _marker.SetResourceReference(Shape.FillProperty, "AccentText");
             _overlay.Children.Add(_marker);
             _overlay.Children.Add(_ghost);
@@ -290,6 +296,7 @@ internal sealed class ItemPicker : StackPanel
     {
         bool full = _marks.Values.Any(m => m.Hidden.Count > 0 || m.Blocked.Count > 0);
         var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom };
+        Ui.DropBelow(menu);
         void Item(string header, string tip, Action act, bool enabled = true)
         {
             var item = new MenuItem { Header = header, ToolTip = tip, IsEnabled = enabled };
@@ -305,26 +312,26 @@ internal sealed class ItemPicker : StackPanel
 
     private void OpenAdd()
     {
-        var search = new TextBox { Tag = "Search…", Padding = new Thickness(28, 6, 8, 6), MinWidth = 280 };
+        var search = new TextBox { Tag = "Search…", Padding = new Thickness(23, 5, 6, 5), MinWidth = 227 };
         System.Windows.Automation.AutomationProperties.SetName(search, "Search " + _title);
-        var searchIcon = new Icon { Data = Ui.Res<Geometry>("I.Search"), Width = 13, Height = 13, IsHitTestVisible = false, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(10, 0, 0, 0) };
+        var searchIcon = new Icon { Data = Ui.Res<Geometry>("I.Search"), Width = 11, Height = 11, IsHitTestVisible = false, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(8, 0, 0, 0) };
         searchIcon.SetResourceReference(Control.ForegroundProperty, "TextFaint");
         var card = new StackPanel();
         card.Children.Add(new Grid { Children = { search, searchIcon } });
         if (_lanes.Count > 1)
         {
             var lane = Ui.Segmented(_lanes.Select(l => "Add to " + l.Name).ToList(), _addLane, i => _addLane = i, "addlane");
-            lane.Margin = new Thickness(0, 8, 0, 0);
+            lane.Margin = new Thickness(0, 6, 0, 0);
             card.Children.Add(lane);
         }
-        var list = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+        var list = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
         KeyboardNavigation.SetDirectionalNavigation(list, KeyboardNavigationMode.Contained);
-        card.Children.Add(new ScrollViewer { MaxHeight = 340, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = list, Focusable = false });
+        card.Children.Add(new ScrollViewer { MaxHeight = 275, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = list, Focusable = false });
         var popup = new Popup
         {
             PlacementTarget = _add, Placement = PlacementMode.Custom, StaysOpen = false, AllowsTransparency = true,
             CustomPopupPlacementCallback = (size, target, _) => new[] { new CustomPopupPlacement(new Point(target.Width - size.Width + 40, target.Height), PopupPrimaryAxis.Horizontal) },
-            Child = new Tile { Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(10), Margin = new Thickness(0, 4, 0, 0), Child = card, MaxWidth = 380 },
+            Child = new Tile { Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(8), Margin = new Thickness(0, 3, 0, 0), Child = card, MaxWidth = 308 },
         };
         RenderOptions.SetClearTypeHint(popup.Child, ClearTypeHint.Enabled);
         Ui.FollowTarget(popup);
@@ -336,10 +343,10 @@ internal sealed class ItemPicker : StackPanel
             foreach (var (title, items) in groups)
             {
                 if (title is not null)
-                    list.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(6, list.Children.Count == 0 ? 2 : 10, 0, 4) });
+                    list.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(6, list.Children.Count == 0 ? 2 : 8, 0, 4) });
                 foreach (var c in items) list.Children.Add(Option(c));
             }
-            if (groups.Count == 0) list.Children.Add(new TextBlock { Text = "Nothing matches", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(6, 4, 0, 4) });
+            if (groups.Count == 0) list.Children.Add(new TextBlock { Text = "Nothing matches", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(5, 3, 0, 3) });
         }
 
         Button Option(HudChoice c)
@@ -348,7 +355,7 @@ internal sealed class ItemPicker : StackPanel
             var line = new DockPanel { LastChildFill = true };
             if (added)
             {
-                var tag = new TextBlock { Text = "Added", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
+                var tag = new TextBlock { Text = "Added", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
                 DockPanel.SetDock(tag, Dock.Right);
                 line.Children.Add(tag);
             }
@@ -357,7 +364,7 @@ internal sealed class ItemPicker : StackPanel
             line.Children.Add(label);
             var b = new Button
             {
-                Style = Ui.Res<Style>("QuietButton"), Content = line, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(8, 6, 8, 6),
+                Style = Ui.Res<Style>("QuietButton"), Content = line, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(6, 5, 6, 5),
                 IsEnabled = !added && !blocked, Opacity = added || blocked ? 0.5 : 1,
                 ToolTip = blocked ? "No room: take one out first, or widen the widget" : c.Help,
             };

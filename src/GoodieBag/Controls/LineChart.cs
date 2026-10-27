@@ -42,7 +42,7 @@ public sealed class LineChart : FrameworkElement
             return cached;
         if (_labels.Count > 64)
             _labels.Clear();
-        var formatted = new FormattedText(ThemeManager.Case(text), CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, Face, 10.5, brush, dpi);
+        var formatted = new FormattedText(ThemeManager.Case(text), CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, Face, 8.5, brush, dpi);
         _labels[(text, brush, dpi)] = formatted;
         return formatted;
     }
@@ -93,15 +93,13 @@ public sealed class LineChart : FrameworkElement
         if (w < 40 || h < 40 || Series.Count == 0)
             return;
         var gridBrush = ThemeManager.Brush("GridLine", Brushes.LightGray);
-        if (_gridPen is null || _gridPen.Brush != gridBrush)
-        {
-            _gridPen = new Pen(gridBrush, 1);
-            _gridPen.Freeze();
-        }
+        double px = Hairline.ScaleOf(this);
+        if (_gridPen is null || _gridPen.Brush != gridBrush || _gridPen.Thickness != Hairline.Pixels(1, px))
+            _gridPen = Hairline.Pen(gridBrush, px);
         var gridPen = _gridPen;
         var labelBrush = ThemeManager.Brush("TextFaint", Brushes.Gray);
 
-        const double gutter = 38, labelGap = 6, top = 8, bottom = 20;
+        const double gutter = 38, labelGap = 5, top = 8, bottom = 20;
         double dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
 
         if (_ranges.Length < Series.Count)

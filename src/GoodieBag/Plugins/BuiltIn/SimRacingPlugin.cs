@@ -10,16 +10,16 @@ internal sealed class SimRacingPlugin : Plugin
 {
     public override string Id => PluginIds.SimRacing;
     public override string Name => "Sim Racing Tools";
-    public override string Description => "iRacing Overlay (in-game widgets from iRacing's live telemetry: Relative, Standings, fuel, delta, alerts and more), FOV and triple-screen calculator, iRacing Controller for iRacing's settings (plain-language editing, health check, backups), the iRacing Setup Manager for car setups and launchers for Trading Paints and Garage 61.";
+    public override string Description => "iRacing overlay, setups, fuel, FOV and iRacing settings.";
     public override string Icon => "I.FormulaWheel";
     public override (string Soft, string Deep) Colors => ("CoralSoft", "CoralDeep");
     public override int Order => 10;
     public override string Reads =>
-        "With the iRacing Overlay on: iRacing's live telemetry (its shared memory, read only) while iRacing runs, and whether iRacing is running. iRacing's settings files and setups folder, and recent setups in Downloads, while its page is open. With “Launch when iRacing starts” on: whether iRacing is running.";
+        "With the iRacing Overlay on: iRacing's live telemetry (its shared memory, read only) while iRacing runs, and whether iRacing is running. With a keybind set to a wheel or button box button: that controller's button presses. iRacing's settings files and setups folder, and recent setups in Downloads, while its page is open. With “Launch when iRacing starts” on: whether iRacing is running.";
     public override string BackgroundWork =>
-        "With the iRacing Overlay switched on: waits for iRacing to start (process events), then reads its telemetry about 60 times a second and draws the widgets at their own rates; while iRacing is closed it only waits. Turning a tool off in Settings → Plugins turns it off like a plugin (its background work and keybinds go with it). Only with “Launch when iRacing starts” on for Trading Paints or Garage 61: watches for iRacing starting (process events, no polling). While the Setup Manager is open on screen: file events for the setups folder and Downloads. Otherwise never.";
+        "With the iRacing Overlay switched on: waits for iRacing to start (process events), then reads its telemetry about 60 times a second and draws the widgets at their own rates; while iRacing is closed it only waits. Turning a tool off in Settings → Tools also stops its background work and keybinds. Only with “Launch when iRacing starts” on for Trading Paints or Garage 61: watches for iRacing starting (process events, no polling). While the Setup Manager is open on screen: file events for the setups folder and Downloads. Otherwise never.";
     public override string Changes =>
-        "The iRacing Overlay draws its own windows on top of the game; nothing is injected into iRacing or written to it (track outlines it records are saved in Goodie Bag's folder). Only when you ask: iRacing's settings files when you save in iRacing Controller or write the FOV (backed up first), setup files and folders you import, rename, move, delete (to the Recycle Bin) or export in the Setup Manager, and starting or closing Trading Paints / Garage 61.";
+        "The iRacing Overlay draws its own windows on top of the game; nothing is injected into iRacing or written to it. Only when you ask: iRacing's settings files when you save in iRacing Controller or write the FOV (backed up first), setup files and folders you import, rename, move, delete (to the Recycle Bin) or export in the Setup Manager, and starting or closing Trading Paints / Garage 61.";
 
     public static bool FeatureOn(AppServices app, string panel) =>
         app.Plugins.IsActive(PluginIds.SimRacing) && !app.Config.SimRacing.IsPanelHidden(panel);
@@ -65,7 +65,7 @@ internal sealed class SimRacingPlugin : Plugin
     {
         if (!FeatureOn(app, "hud")) return;
         var h = app.Config.SimRacing.Hud;
-        var item = new WinForms.ToolStripMenuItem("iRacing Overlay") { Checked = h.Enabled, ShortcutKeyDisplayString = GoodieBag.Hotkeys.Hotkey.Display(h.ToggleHotkey) };
+        var item = new WinForms.ToolStripMenuItem("Show iRacing Overlay") { Checked = h.Enabled, ShortcutKeyDisplayString = GoodieBag.Hotkeys.Hotkey.Display(h.ToggleHotkey) };
         item.Click += (_, _) => Hud?.SetEnabled(!h.Enabled);
         items.Add(item);
     }

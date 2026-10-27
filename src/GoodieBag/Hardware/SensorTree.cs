@@ -1,3 +1,5 @@
+using GoodieBag.Services;
+
 namespace GoodieBag.Hardware;
 
 internal enum SensorKind
@@ -101,7 +103,7 @@ internal static class SensorFormat
         {
             SensorKind.Temperature => $"{v:0.0} °C",
             SensorKind.Load or SensorKind.Control or SensorKind.Level => $"{v:0.0}%",
-            SensorKind.Clock => v >= 1000 ? $"{v / 1000:0.00} GHz" : $"{v:0} MHz",
+            SensorKind.Clock => v >= 1000 ? $"{v / 1000:0.00} {Units.GHz}" : $"{v:0} {Units.MHz}",
             SensorKind.Power => v < 10 ? $"{v:0.00} W" : $"{v:0.0} W",
             SensorKind.Voltage => $"{v:0.000} V",
             SensorKind.Current => $"{v:0.00} A",
@@ -109,7 +111,7 @@ internal static class SensorFormat
             SensorKind.Data => v >= 1024 ? $"{v / 1024:0.00} TB" : $"{v:0.0} GB",
             SensorKind.SmallData => v >= 1024 ? $"{v / 1024:0.00} GB" : $"{v:0} MB",
             SensorKind.Throughput => Rate(v),
-            SensorKind.Frequency => $"{v:0} Hz",
+            SensorKind.Frequency => $"{v:0} {Units.Hz}",
             SensorKind.Factor => $"{v:0.000}",
             SensorKind.TimeSpan => System.TimeSpan.FromSeconds(v).ToString(@"d\.hh\:mm\:ss"),
             SensorKind.Energy => $"{v:0} mWh",

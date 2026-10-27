@@ -49,9 +49,7 @@ public partial class MainWindow : Window
         TextFit.TipWhenTrimmed(QuoteText);
         QuoteBar.MouseLeftButtonDown += OnQuoteBarDown;
         _quoteTimer.Tick += (_, _) => NextQuote(animate: true);
-        ApplySidebarSide();
-        ApplyInterfaceScale();
-        Width = 1280 + SidebarDips(_app.Config.Ui.ScaleFactor);
+        Width = 1280 + SidebarDips;
         Topmost = _app.Config.Ui.AlwaysOnTop;
         ApplySavedBounds();
         LocationChanged += (_, _) => RememberBounds();
@@ -79,6 +77,7 @@ public partial class MainWindow : Window
         Loaded += (_, _) => FitThemeLogo();
         SourceInitialized += (_, _) =>
         {
+            Hairline.Use(VisualTreeHelper.GetDpi(this).DpiScaleX);
             SquareCorners();
             ApplyBackdrop();
             (PresentationSource.FromVisual(this) as HwndSource)?.AddHook(WatchSizeMove);
@@ -91,7 +90,7 @@ public partial class MainWindow : Window
         PreviewMouseDown += OnMouseHistoryButton;
         KeyDown += OnEscapeEdit;
         _app.IsWindowVisible = () => IsVisible && WindowState != WindowState.Minimized;
-        _app.Notice += (title, message, kind) => ShowToast(title, message, kind);
+        _app.Notice += (title, message, kind, action) => ShowToast(title, message, kind, action);
         _app.Updates.Changed += UpdateBadgeState;
         UpdateBadge.Click += (_, _) => _ = _app.Updates.InstallAsync();
 
@@ -204,17 +203,9 @@ public partial class MainWindow : Window
         CurrentSectioned?.ShowSection(section);
     }
 
-    internal static double SidebarDips(double scale) => (Sidebar.PanelWidth + 16) * scale;
+    internal static double SidebarDips => Sidebar.PanelWidth + 13;
 
     internal const double MinWindowWidth = 1280, MinWindowHeight = 720;
-
-    internal void ApplySidebarSide()
-    {
-        bool right = _app.Config.Ui.SidebarRight;
-        Grid.SetColumn(SidebarHost, right ? 2 : 0);
-        SidebarHost.Margin = right ? new Thickness(0, 14, 16, 16) : new Thickness(16, 14, 0, 16);
-        _sidebar.SetSide(right);
-    }
 
     private void StepPage(int by)
     {
@@ -299,7 +290,7 @@ public partial class MainWindow : Window
         if (PcClass.Effects) PageContent.Opacity = fromOpacity;
         if (effects)
         {
-            SwipeBlur.Radius = 8;
+            SwipeBlur.Radius = 6;
             PageContent.Effect = SwipeBlur;
         }
         if (!ScreenshotRunner.Active) (Motion.PageAnimatesFrom, Motion.PageSettlesAt) = (long.MaxValue / 2, now + 2000);
@@ -413,10 +404,9 @@ public partial class MainWindow : Window
         var pages = new List<SidebarPage>();
         foreach (var plugin in _app.Plugins.Active)
             foreach (var page in plugin.Pages.Where(p => _nav.ContainsKey(p.Key)))
-                pages.Add(new SidebarPage(page.Key, page.Title, page.Icon, Hues.Tool(plugin.Id, plugin.Colors)));
+                pages.Add(new SidebarPage(page.Key, page.Title, page.Icon));
         pages = pages.OrderBy(p => keys.IndexOf(p.Key)).ToList();
-        _sidebar.Build(pages, new SidebarPage("settings", "Settings", "I.Tune", Hues.Accent), _searchButton, _searchHost, ThemeButton());
-        _sidebar.SetSide(_app.Config.Ui.SidebarRight);
+        _sidebar.Build(pages, new SidebarPage("settings", "Settings", "I.Tune"), _searchButton, _searchHost, ThemeButton());
         SyncSidebar(animate: false);
     }
 
@@ -454,15 +444,6 @@ public partial class MainWindow : Window
         if (PresentationSource.FromVisual(this) is HwndSource { CompositionTarget: { } target })
             target.RenderMode = _app.Light ? RenderMode.SoftwareOnly : RenderMode.Default;
         Motion.Refresh();
-    }
-
-    internal void ApplyInterfaceScale(bool rebuild = false)
-    {
-        double scale = _app.Config.Ui.ScaleFactor;
-        Root.LayoutTransform = Math.Abs(scale - 1) < 0.001 ? Transform.Identity : new ScaleTransform(scale, scale);
-        MinWidth = MinWindowWidth;
-        MinHeight = MinWindowHeight;
-        if (rebuild) Dispatcher.BeginInvoke(new Action(OnThemeChanged), DispatcherPriority.Background);
     }
 
     private void ApplyThemeIcon()
@@ -580,6 +561,7 @@ public partial class MainWindow : Window
             if (PageFor(page) is { } p && Ui.FindAnchor(p, anchor) is { } target)
             {
                 if (p is ISectionedPage sectioned) sectioned.ShowSectionOf(target);
+                if (p is IShowAnchor shows) shows.ShowAnchor(target);
                 for (DependencyObject? cur = target; cur is not null; cur = LogicalTreeHelper.GetParent(cur))
                     if (cur is Collapsible { Expanded: false } section) section.Toggle();
                 target.UpdateLayout();
@@ -591,7 +573,7 @@ public partial class MainWindow : Window
         }), DispatcherPriority.ContextIdle);
     }
 
-    private const double TitleButtonHeight = 34;
+    private const double TitleButtonHeight = 28;
 
     private readonly Button _searchButton;
     private readonly Border _searchHost = new() { Visibility = Visibility.Collapsed };
@@ -623,7 +605,7 @@ public partial class MainWindow : Window
 
     private void UpdateQuoteTimer()
     {
-        if (OnScreen)
+        if (OnScreen && _app.Config.Ui.Quotes)
         {
             if (_quoteTimer.IsEnabled) return;
             NextQuote(animate: false);
@@ -632,8 +614,24 @@ public partial class MainWindow : Window
         else _quoteTimer.Stop();
     }
 
+    internal void RefreshQuotes()
+    {
+        if (!_app.Config.Ui.Quotes)
+        {
+            _quoteTimer.Stop();
+            QuoteText.Text = "";
+            return;
+        }
+        UpdateQuoteTimer();
+    }
+
     private void NextQuote(bool animate)
     {
+        if (!_app.Config.Ui.Quotes)
+        {
+            QuoteText.Text = "";
+            return;
+        }
         if (Quotes.Next() is not { } quote)
         {
             QuoteBar.Visibility = Visibility.Collapsed;
@@ -662,19 +660,10 @@ public partial class MainWindow : Window
     }
 
     internal List<SearchEntry> Search(string query) => SettingsIndex.Find(
-        SettingsIndex.With(_app.Plugins.Active).Concat(SettingsIndex.Keybinds(_app.Hotkeys.Catalog().Where(e => e.Locked is null && _app.Hotkeys.IsAvailable(e)))),
-        query, e => _nav.ContainsKey(e.Page));
+        SettingsIndex.With(_app.Plugins.Active),
+        query, e => _nav.ContainsKey(e.Page) && (Pages.SimRacingPage.ToolOfAnchor(e.Anchor) is not { } tool || Pages.SimRacingPage.IsToolOn(_app, tool)));
 
-    internal void OpenSearchResult(SearchEntry entry)
-    {
-        if (entry.Keybind is { } label)
-        {
-            Navigate("settings");
-            if (PageFor("settings") is SettingsPage settings) settings.ShowKeybind(label);
-            return;
-        }
-        GoTo(entry.Page, entry.Anchor);
-    }
+    internal void OpenSearchResult(SearchEntry entry) => GoTo(entry.Page, entry.Anchor);
 
     internal FrameworkElement? PageFor(string key) => _pages.GetValueOrDefault(key);
 
@@ -704,7 +693,7 @@ public partial class MainWindow : Window
 
     private void OnStateChanged()
     {
-        Root.Margin = WindowState == WindowState.Maximized ? new Thickness(7) : new Thickness(0);
+        Root.Margin = WindowState == WindowState.Maximized ? new Thickness(6) : new Thickness(0);
         MaxIcon.Kind = WindowState == WindowState.Maximized ? CaptionKind.Restore : CaptionKind.Maximize;
         MaxButton.ToolTip = WindowState == WindowState.Maximized ? "Restore" : "Maximize";
     }
@@ -741,29 +730,16 @@ public partial class MainWindow : Window
         _quitAsked = true;
         try
         {
-            if (!IsVisible) ShowFromTray(null);
+            ShowFromTray(null);
             if (SetupOpen) CloseSetup();
-            var card = DialogCard("Fan control is on",
-                "Goodie Bag is driving your fans. Keep them on your curves after it closes, or hand them back to the BIOS / graphics driver?", out var buttons);
             int choice = 0;
-            var cancel = new Button { Content = "Cancel", Margin = new Thickness(0, 0, 8, 0), IsCancel = true };
-            var stop = new Button { Content = "Stop and quit", Style = (Style)FindResource("GhostButton"), Margin = new Thickness(0, 0, 8, 0) };
-            var keep = new Button { Content = "Keep running", Style = (Style)FindResource("PrimaryButton"), IsDefault = true };
-            keep.ToolTip = "Goodie Bag closes; a small background helper (tray icon) keeps your fan curves running until you stop it or open Goodie Bag again";
-            stop.ToolTip = "Goodie Bag closes and the fans go back to the BIOS / graphics driver";
-            cancel.Click += (_, _) => CloseModal(false);
-            stop.Click += (_, _) => { choice = 2; CloseModal(true); };
-            keep.Click += (_, _) => { choice = 1; CloseModal(true); };
-            buttons.Children.Add(cancel);
-            buttons.Children.Add(stop);
-            buttons.Children.Add(keep);
-            card.Width = 520;
+            var card = FanQuitCard(picked => choice = picked, out var keep);
             var shown = ShowModal(card);
             keep.Focus();
             await shown;
             if (choice == 1 && !FanService.Start())
             {
-                _app.Notify("Couldn't keep fan control running", "The background helper didn't start, so Goodie Bag stays open. Quit again and pick Stop to close it.", NoticeKind.Error, important: true);
+                _app.Notify("Couldn't keep fan control running", "The background helper didn't start, so Goodie Bag stays open. Quit again and pick Give fans back to close it.", NoticeKind.Error, important: true);
                 return;
             }
             if (choice != 0) App.Quit();
@@ -772,6 +748,25 @@ public partial class MainWindow : Window
     }
 
     private bool _quitAsked;
+
+    internal Border FanQuitCard(Action<int> picked, out Button keep)
+    {
+        var card = DialogCard("Fan control is on",
+            "Goodie Bag is driving your fans. Keep them on your curves after it closes, or hand them back to the BIOS / graphics driver?", out var buttons);
+        var cancel = new Button { Content = "Cancel", Margin = Ui.AfterButton, IsCancel = true };
+        var stop = new Button { Content = "Give fans back and quit", Style = (Style)FindResource("GhostButton"), Margin = Ui.AfterButton };
+        keep = new Button { Content = "Keep my curves and quit", Style = (Style)FindResource("PrimaryButton"), IsDefault = true };
+        keep.ToolTip = "Goodie Bag closes; a small background helper (tray icon) keeps your fan curves running until you stop it or open Goodie Bag again";
+        stop.ToolTip = "Goodie Bag closes and the fans go back to the BIOS / graphics driver";
+        cancel.Click += (_, _) => CloseModal(false);
+        stop.Click += (_, _) => { picked(2); CloseModal(true); };
+        keep.Click += (_, _) => { picked(1); CloseModal(true); };
+        buttons.Children.Add(cancel);
+        buttons.Children.Add(stop);
+        buttons.Children.Add(keep);
+        card.Width = 500;
+        return card;
+    }
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
@@ -821,6 +816,12 @@ public partial class MainWindow : Window
         return (wanted.Modifiers & chord) != 0 || Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase;
     }
 
+    protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+    {
+        base.OnDpiChanged(oldDpi, newDpi);
+        Hairline.Use(newDpi.DpiScaleX);
+    }
+
     private bool Remembers => !_app.Demo && !ScreenshotRunner.Active;
 
     private void ApplySavedBounds()
@@ -829,7 +830,7 @@ public partial class MainWindow : Window
         if (_app.Config.Ui.SidebarVersion < 1)
         {
             _app.Config.Ui.SidebarVersion = 1;
-            if (!b.Maximized) b.Width = Math.Min(b.Width + SidebarDips(_app.Config.Ui.ScaleFactor), SystemParameters.VirtualScreenWidth);
+            if (!b.Maximized) b.Width = Math.Min(b.Width + SidebarDips, SystemParameters.VirtualScreenWidth);
             _app.Save();
         }
         double width = Math.Max(MinWidth, b.Width), height = Math.Max(MinHeight, b.Height);
@@ -926,7 +927,7 @@ public partial class MainWindow : Window
             + (self ? "Click to download it, close Goodie Bag, swap the file and start it again; your settings stay." : "Click to open the release page and download it.");
     }
 
-    internal void ShowToast(string title, string message, NoticeKind kind)
+    internal void ShowToast(string title, string message, NoticeKind kind, NoticeAction? action = null)
     {
         var (icon, fg, bg) = kind switch
         {
@@ -936,9 +937,9 @@ public partial class MainWindow : Window
             _ => ("I.Info", "AccentText", "AccentSoft"),
         };
 
-        var badge = Ui.Badge(icon, bg, fg, 30, 9, 16);
+        var badge = Ui.Badge(icon, bg, fg, 24, 7.5, 13);
         badge.VerticalAlignment = VerticalAlignment.Top;
-        var text = new StackPanel { Margin = new Thickness(12, 0, 0, 0) };
+        var text = new StackPanel { Margin = new Thickness(10, 0, 0, 0) };
         text.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
         if (!string.IsNullOrWhiteSpace(message))
             text.Children.Add(new TextBlock { Text = message, Style = (Style)FindResource("Caption"), Margin = new Thickness(0, 2, 0, 0) });
@@ -950,10 +951,10 @@ public partial class MainWindow : Window
         grid.Children.Add(text);
         if (kind == NoticeKind.Success && ThemeManager.Current.RacingDecor)
         {
-            var flag = Ui.CheckerStrip(48, 12, 0.35);
+            var flag = Ui.CheckerStrip(39, 9.5, 0.35);
             flag.HorizontalAlignment = HorizontalAlignment.Right;
             flag.VerticalAlignment = VerticalAlignment.Top;
-            flag.Margin = new Thickness(0, -12, -16, 0);
+            flag.Margin = new Thickness(0, -10, -13, 0);
             Grid.SetColumn(flag, 1);
             grid.Children.Add(flag);
             if (Motion.Enabled)
@@ -969,8 +970,8 @@ public partial class MainWindow : Window
         var toast = new Tile
         {
             Style = (Style)FindResource("LiftedCard"),
-            Padding = new Thickness(14, 12, 16, 12),
-            Margin = new Thickness(0, 8, 0, 0),
+            Padding = new Thickness(11, 10, 13, 10),
+            Margin = new Thickness(0, 6, 0, 0),
             Child = grid,
             Cursor = Cursors.Hand,
         };
@@ -983,14 +984,28 @@ public partial class MainWindow : Window
             heading.Foreground = (Brush)FindResource("DangerDeep");
             heading.FontWeight = FontWeights.Bold;
         }
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(kind is NoticeKind.Warning or NoticeKind.Error ? 8 : 4) };
+        bool stays = kind == NoticeKind.Error;
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(kind == NoticeKind.Warning || action is not null ? 8 : 4) };
         timer.Tick += (_, _) => { timer.Stop(); Dismiss(toast); };
-        toast.MouseLeftButtonUp += (_, _) => { timer.Stop(); Dismiss(toast); };
+        if (action is not null)
+        {
+            var run = new Button { Content = action.Label, Style = (Style)FindResource("GhostButton"), HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 7, 0, 0) };
+            run.Click += (_, _) => { timer.Stop(); action.Run(); Dismiss(toast); };
+            text.Children.Add(run);
+        }
+        if (stays)
+        {
+            var hint = new TextBlock { Text = "Click to close", Style = (Style)FindResource("Caption"), Margin = new Thickness(0, 4, 0, 0) };
+            text.Children.Add(hint);
+        }
+        toast.MouseLeftButtonUp += (_, e) => { if (e.Handled) return; timer.Stop(); Dismiss(toast); };
+        toast.MouseEnter += (_, _) => timer.Stop();
+        toast.MouseLeave += (_, _) => { if (!stays && toast.Parent is not null) timer.Start(); };
         Toasts.Children.Add(toast);
         while (Toasts.Children.Count > 3)
             Toasts.Children.RemoveAt(0);
         Motion.Enter(toast, distance: 16);
-        timer.Start();
+        if (!stays) timer.Start();
     }
 
     private void Dismiss(Border toast) =>
@@ -1074,7 +1089,7 @@ public partial class MainWindow : Window
 
     private void FitBrand()
     {
-        Ui.FitLockup(LogoTile, LogoGlyph, Wordmark, maxHeight: TitleButtonHeight, width: 260, gap: 10);
+        Ui.FitLockup(LogoTile, LogoGlyph, Wordmark, maxHeight: TitleButtonHeight, width: 211, gap: 8);
         ShowThemeLink(ThemeManager.Current.Link);
         FitThemeLogo();
     }
@@ -1155,7 +1170,7 @@ public partial class MainWindow : Window
     internal Task<bool> Confirm(string title, string message, string confirmText, bool danger = false)
     {
         var card = DialogCard(title, message, out var buttons);
-        var cancel = new Button { Content = "Cancel", Margin = new Thickness(0, 0, 8, 0) };
+        var cancel = new Button { Content = "Cancel", Margin = Ui.AfterButton };
         var ok = danger
             ? new Button { Content = Ui.IconLabel("I.Alert", confirmText), Style = (Style)FindResource("DangerConfirmButton") }
             : new Button { Content = confirmText, Style = (Style)FindResource("PrimaryButton") };
@@ -1171,12 +1186,12 @@ public partial class MainWindow : Window
     internal async Task<string?> Prompt(string title, string message, string initial, Func<string, string?> validate, int maxLength = Ui.NameLength)
     {
         var card = DialogCard(title, message, out var buttons);
-        var box = new TextBox { Text = initial, MaxLength = maxLength, Margin = new Thickness(0, 14, 0, 0) };
-        var error = new TextBlock { Foreground = (Brush)FindResource("Danger"), FontSize = 12.5, Margin = new Thickness(0, 6, 0, 0), Visibility = Visibility.Collapsed };
+        var box = new TextBox { Text = maxLength > 0 && initial.Length > maxLength ? initial[..maxLength].TrimEnd() : initial, MaxLength = maxLength, Margin = new Thickness(0, 11, 0, 0) };
+        var error = new TextBlock { Foreground = (Brush)FindResource("Danger"), FontSize = 10, Margin = new Thickness(0, 5, 0, 0), Visibility = Visibility.Collapsed };
         ((StackPanel)card.Child).Children.Insert(2, box);
         ((StackPanel)card.Child).Children.Insert(3, error);
 
-        var cancel = new Button { Content = "Cancel", Margin = new Thickness(0, 0, 8, 0) };
+        var cancel = new Button { Content = "Cancel", Margin = Ui.AfterButton };
         var ok = new Button { Content = "Save", Style = (Style)FindResource("PrimaryButton"), IsDefault = true };
         cancel.Click += (_, _) => CloseModal(false);
         ok.Click += (_, _) =>
@@ -1202,14 +1217,14 @@ public partial class MainWindow : Window
     {
         var stack = new StackPanel();
         stack.Children.Add(new TextBlock { Text = title, Style = (Style)FindResource("H2") });
-        stack.Children.Add(new TextBlock { Text = message, Style = (Style)FindResource("Muted"), Margin = new Thickness(0, 6, 0, 0) });
-        buttons = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 22, 0, 2) };
+        stack.Children.Add(new TextBlock { Text = message, Style = (Style)FindResource("Muted"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, Ui.DialogTitleGap, 0, 0) });
+        buttons = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, Ui.DialogFooterGap, 0, 0) };
         stack.Children.Add(buttons);
         return new Tile
         {
             Style = (Style)FindResource("LiftedCard"),
-            Width = 440,
-            Padding = new Thickness(24, 22, 24, 18),
+            Width = 356,
+            Padding = Ui.DialogPadding,
             Child = stack,
         };
     }

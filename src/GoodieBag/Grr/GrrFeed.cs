@@ -165,8 +165,10 @@ public static class GrrFeed
     {
         if (Arr(root, "schedule") is not { } items) return null;
         var rounds = new List<GrrRound>();
+        int rows = 0;
         foreach (var r in items)
         {
+            rows++;
             if (!DateTime.TryParseExact(Str(r, "date"), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day)) continue;
             var at = DateTime.SpecifyKind(day + time, DateTimeKind.Unspecified);
             if (zone.IsInvalidTime(at)) at = at.AddHours(1);
@@ -187,7 +189,14 @@ public static class GrrFeed
                 Done = state is "done" || status is "completed" || winners.Count > 0,
             });
         }
-        return rounds.OrderBy(r => r.Start).ToList();
+        return rows > 0 && rounds.Count == 0 ? null : rounds.OrderBy(r => r.Start).ToList();
+    }
+
+    public static bool LostWhatItHad(GrrLeagueData? before, GrrLeagueData now)
+    {
+        if (before is null || now.Season is { } season && before.Season is { } was && !string.Equals(season, was, StringComparison.OrdinalIgnoreCase)) return false;
+        return before.Schedule is { Count: > 0 } && now.Schedule is not { Count: > 0 }
+               || before.Standings is { Count: > 0 } && now.Standings is not { Count: > 0 };
     }
 
     private static Dictionary<string, IReadOnlyList<GrrStanding>>? Standings(JsonElement root)

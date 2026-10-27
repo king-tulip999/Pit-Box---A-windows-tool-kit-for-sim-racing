@@ -14,7 +14,7 @@ internal static class RelativeEditor
                 O("badgeFormat") with { ShowIf = Has("columns", "badge") }),
             new("timing", "Timing", HudTab.Layout, false, O("timeFormat"), O("decimals"), O("avgLaps") with { ShowIf = Has("columns", "avglap") }),
             new("pit", "Pit", HudTab.Layout, false, O("pitShow") with { ShowIf = Has("columns", "pit") }, O("pitTime") with { ShowIf = Has("columns", "pit") }),
-            new("colors", "Colors & flags", HudTab.Layout, false, ClassStyle, FlagBorder, O("flagBanner"), O("marks")),
+            new("colors", "Colors and flags", HudTab.Layout, false, FlagBorder, O("flagBanner"), O("marks")),
             new("columns", "Columns", HudTab.Content, true, new PickerSetting("columns", ColumnCategories)),
             new("infobars", "Info bars", HudTab.Content, true, InfoBars),
             new("cars", "Which cars", HudTab.Content, true, new ClassFilterSetting(), O("hidePits")),

@@ -11,6 +11,8 @@ float strength : register(c6);
 
 static const float Density = 17.0;
 static const float Brightness = 0.15;
+static const float UnitDips = 312.0;
+static const float EdgeDips = 36.0;
 
 float3 m289(float3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 float4 m289(float4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -70,7 +72,10 @@ float4 main(float2 uv : TEXCOORD) : COLOR
     float a = lerp(minor * 0.45, major, isMajor);
     a *= 1.0 - smoothstep(0.35, 0.8, fw);
     float vig = 1.0 - smoothstep(0.25, 0.85, length(uv - 0.5));
-    float amount = saturate(((h * 0.5 + 0.5) * 0.05 * haze + a * Brightness * strength) * (0.35 + 0.65 * vig));
+    float2 px = uv * size;
+    float edge = min(min(px.x, size.x - px.x), min(px.y, size.y - px.y));
+    float fade = smoothstep(0.0, EdgeDips * unit / UnitDips, edge);
+    float amount = saturate(((h * 0.5 + 0.5) * 0.05 * haze + a * Brightness * strength) * (0.35 + 0.65 * vig)) * fade;
     float3 rgb = lerp(background.rgb, lineColor.rgb, amount);
     return float4(rgb, 1.0) * tex2D(input, uv).a;
 }

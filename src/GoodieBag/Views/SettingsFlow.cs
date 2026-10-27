@@ -10,11 +10,11 @@ internal sealed class SettingDivider : Border;
 
 internal sealed class SettingsFlow : StackPanel
 {
-    public double MinColumnWidth { get; init; } = 340;
+    public double MinColumnWidth { get; init; } = 275;
     public int MaxColumns { get; init; } = 3;
-    public double ColumnGap { get; init; } = 32;
+    public double ColumnGap { get; init; } = 26;
 
-    private const double RuleSpace = 5;
+    private const double RuleSpace = 4;
 
     private readonly List<(UIElement Child, Rect Place)> _places = new();
     private readonly List<Rect> _rules = new();
@@ -55,16 +55,17 @@ internal sealed class SettingsFlow : StackPanel
             int cols = (int)Math.Ceiling(run.Count / (double)rows);
             int share = cols;
             double cell = (width - ColumnGap * (share - 1)) / share, top = y;
+            var bottoms = new double[cols];
             for (int r = 0; r < rows; r++)
             {
+                var line = run.Skip(r * cols).Take(cols).ToList();
                 if (r > 0)
                 {
-                    for (int c = 0; c < cols; c++)
+                    for (int c = 0; c < line.Count; c++)
                         _rules.Add(new Rect(c * (cell + ColumnGap), y + 2, cell, 1));
                     y += RuleSpace;
                 }
                 double height = 0;
-                var line = run.Skip(r * cols).Take(cols).ToList();
                 foreach (var child in line)
                 {
                     if (measure) child.Measure(new Size(cell, double.PositiveInfinity));
@@ -73,9 +74,11 @@ internal sealed class SettingsFlow : StackPanel
                 for (int c = 0; c < line.Count; c++)
                     _places.Add((line[c], new Rect(c * (cell + ColumnGap), y + (height - line[c].DesiredSize.Height) / 2, cell, line[c].DesiredSize.Height)));
                 y += height;
+                for (int c = 0; c < line.Count; c++)
+                    bottoms[c] = y;
             }
             for (int c = 1; c < cols; c++)
-                _columnRules.Add((Math.Floor(c * (cell + ColumnGap) - ColumnGap / 2), top, y));
+                _columnRules.Add((Math.Floor(c * (cell + ColumnGap) - ColumnGap / 2), top, bottoms[c]));
             run.Clear();
         }
 
@@ -114,7 +117,7 @@ internal sealed class SettingsFlow : StackPanel
         base.OnRender(dc);
         if (!_flowing || TryFindResource("Line") is not Brush line) return;
         foreach (var (x, top, bottom) in _columnRules)
-            Dividers.DrawVertical(dc, x, top, bottom);
+            if (bottom - top > 9) dc.DrawRectangle(line, null, new Rect(x, top + 4, 1, bottom - top - 8));
         foreach (var rule in _rules)
             dc.DrawRectangle(line, null, rule);
     }

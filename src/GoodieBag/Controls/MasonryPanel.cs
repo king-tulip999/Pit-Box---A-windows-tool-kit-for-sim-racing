@@ -5,13 +5,16 @@ namespace GoodieBag.Controls;
 
 public sealed class MasonryPanel : Panel
 {
-    public double MinColumnWidth { get; set; } = 460;
+    public double MinColumnWidth { get; set; } = 373;
     public int MaxColumns { get; set; } = 3;
-    public double Gap { get; set; } = 16;
+    public double Gap { get; set; } = 13;
     public bool CenterFew { get; set; }
     public bool Stable { get; set; }
+    public Func<int, int, int?>? ColumnOf { get; set; }
 
-    private int ColumnFor(double[] heights, int index) => Stable ? index % heights.Length : Array.IndexOf(heights, heights.Min());
+    private int ColumnFor(double[] heights, int index) =>
+        ColumnOf?.Invoke(heights.Length, index) is int fixedColumn && fixedColumn >= 0 && fixedColumn < heights.Length ? fixedColumn
+        : Stable ? index % heights.Length : Array.IndexOf(heights, heights.Min());
 
     private int Used(int columns) =>
         CenterFew ? Math.Clamp(InternalChildren.Cast<UIElement>().Count(c => c.Visibility != Visibility.Collapsed), 1, columns) : columns;

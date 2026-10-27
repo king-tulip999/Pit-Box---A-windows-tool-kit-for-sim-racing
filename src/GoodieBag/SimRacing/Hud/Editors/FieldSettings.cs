@@ -19,7 +19,7 @@ internal static class FieldSettings
         new("Session", "session", "remain", "lapsleft", "lap", "clock", "trackname", "cars"),
         new("Position", "pos", "cpos", "classpos", "leader", "ahead", "behind"),
         new("Lap times", "last", "best", "delta", "fastest", "classFastest"),
-        new("Car & fuel", "fuel", "fuellevel", "bias", "inc"),
+        new("Car and fuel", "fuel", "fuellevel", "bias", "inc"),
         new("Field", "sof", "csof"),
         new("Weather", "air", "track", "wind", "humidity", "wetness", "rain"),
     };
@@ -28,19 +28,11 @@ internal static class FieldSettings
 
     public static readonly LanesSetting InfoBars = new("infobars", "Info bars", new[] { ("header", "Top"), ("footer", "Bottom") }, StripCategories);
 
-    public static readonly MergedSetting ClassStyle = new("classStyle", "Class color by number", new[] { "numFill", "numEdge" }, new MergedChoice[]
-    {
-        new("Edge", V(("numFill", false), ("numEdge", true)), "A thin class-color edge by the car number"),
-        new("Fade", V(("numFill", true), ("numEdge", false)), "Class color fading behind the car number"),
-        new("Both", V(("numFill", true), ("numEdge", true)), "Fade and edge"),
-        new("Stripe", V(("numFill", false), ("numEdge", false)), "A thin class-color stripe at the start of the row; the number plain"),
-    });
-
     public static readonly MergedSetting MyRow = new("myRow", "My row", new[] { "highlightMe", "posBlock" }, new MergedChoice[]
     {
         new("Off", V(("highlightMe", false)), "Your row looks like the others"),
-        new("Tint", V(("highlightMe", true), ("posBlock", false)), "Your row tinted amber"),
-        new("Tint + block", V(("highlightMe", true), ("posBlock", true)), "Your row tinted amber, your position on an amber block"),
+        new("Tint", V(("highlightMe", true), ("posBlock", false)), "Your row tinted in the accent color"),
+        new("Tint + block", V(("highlightMe", true), ("posBlock", true)), "Your row tinted in the accent color, your position on an accent block"),
     });
 
     public static readonly MergedSetting FlagBorder = new("flagBorder", "Flag border", new[] { "flagEdge", "flagWidth" }, new MergedChoice[]

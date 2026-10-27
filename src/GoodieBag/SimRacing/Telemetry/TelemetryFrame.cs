@@ -86,6 +86,7 @@ internal sealed class TelemetryFrame
     public int? PitStatus;
     public bool PitstopActive, InPitStall;
     public int? FastRepairsAvailable;
+    public double? TowTime;
 
     public readonly double?[] TyreColdPressure = new double?[4];
     public readonly double?[] TyreTempInner = new double?[4], TyreTempMiddle = new double?[4], TyreTempOuter = new double?[4];
@@ -152,6 +153,7 @@ internal sealed class TelemetryFrame
         PitStatus = null;
         PitstopActive = InPitStall = false;
         FastRepairsAvailable = null;
+        TowTime = null;
         for (int i = 0; i < 4; i++)
             TyreColdPressure[i] = TyreTempInner[i] = TyreTempMiddle[i] = TyreTempOuter[i] = TyreWearInner[i] = TyreWearMiddle[i] = TyreWearOuter[i] = null;
         TyreCompound = null;

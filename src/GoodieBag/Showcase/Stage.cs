@@ -7,6 +7,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using GoodieBag.Controls;
 using GoodieBag.Views;
+using GoodieBag.Theme;
 
 namespace GoodieBag.Showcase;
 
@@ -218,7 +219,7 @@ internal sealed class Stage : IDisposable
             DockPanel.SetDock(bar, Dock.Left);
             row.Children.Add(bar);
             row.Children.Add(stack);
-            var card = new Border { Padding = new Thickness(0, 14, 26, 14), BorderThickness = new Thickness(1), Child = row, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom };
+            var card = Hairline.Frame(new Border { Padding = new Thickness(0, 14, 26, 14), Child = row, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom });
             card.SetResourceReference(Border.BackgroundProperty, "Surface");
             card.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
             return card;

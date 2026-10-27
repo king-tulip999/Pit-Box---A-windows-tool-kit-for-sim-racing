@@ -4,6 +4,7 @@ using System.Windows.Media;
 using GoodieBag.Controls;
 using GoodieBag.Services;
 using GoodieBag.SimRacing.IracingFiles;
+using GoodieBag.Theme;
 
 namespace GoodieBag.Views.Pages;
 
@@ -24,14 +25,21 @@ internal static class IracingKeybindsView
         keys.Refresh();
 
         var info = new StackPanel();
-        info.Children.Add(new TextBlock { Text = "iRacing keybinds", Style = Ui.Res<Style>("H3") });
-        info.Children.Add(new TextBlock
+        var heading = new TrimRow();
+        var title = new TextBlock { Text = "iRacing keybinds", Style = Ui.Res<Style>("H3"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
+        Ui.AddInfo(title, "iRacing saves its own copy of the keys when it exits, so changes here only work while it's closed. Wheel and button-box bindings are shown but set in iRacing. To bind a number-pad key, turn Num Lock off first.");
+        heading.Children.Add(title);
+        var saved = Ui.Chip("Saved as you change them", "SageSoft", "SageDeep");
+        saved.VerticalAlignment = VerticalAlignment.Center;
+        heading.Children.Add(saved);
+        info.Children.Add(heading);
+        var about = new TextBlock
         {
-            Text = "The keys iRacing listens for, read from its controls file" + (keys.FilePath is { } path ? $" ({path})" : "") +
-                   ". A change is saved straight away (a backup is made first) and only while iRacing is closed, because iRacing saves its own copy when it exits. " +
-                   "Wheel and button-box bindings are shown but set in iRacing. To bind a number-pad key, turn Num Lock off first.",
-            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0),
-        });
+            Text = "Only while iRacing is closed; a backup is made first.",
+            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 3, 0, 0),
+        };
+        if (keys.FilePath is { } path) about.ToolTip = TextCase.VerbatimTip(path);
+        info.Children.Add(about);
         if (ProfileRow(app, rebuild) is { } row) info.Children.Add(row);
         if (keys.CarFiles > 0)
             info.Children.Add(Note($"{keys.CarFiles} car{(keys.CarFiles == 1 ? " uses its" : "s use their")} own controls (setups folder); those aren't changed here."));
@@ -39,7 +47,7 @@ internal static class IracingKeybindsView
             info.Children.Add(Note("iRacing is running: close it to change keybinds.", warning: true));
         if (keys.Error is { } error)
             info.Children.Add(Note(error, warning: true));
-        stack.Children.Add(new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(18, 14, 18, 14), Margin = new Thickness(0, 0, 0, 12), Child = info });
+        stack.Children.Add(new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(15, 11, 15, 11), Margin = new Thickness(0, 0, 0, 10), Child = info });
 
         if (keys.File is not null)
             stack.Children.Add(new KeybindTree(app, e => e.Owner == HotkeyOwner.Iracing, skip: 1));
@@ -57,9 +65,9 @@ internal static class IracingKeybindsView
             keys.SelectProfile(c.Id == keys.DefaultProfile ? null : c.Id);
             app.Save();
             changed();
-        }, 260);
-        var row = new DockPanel { Margin = new Thickness(0, 10, 0, 0) };
-        var label = new TextBlock { Text = "Control profile", FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0) };
+        }, 211);
+        var row = new DockPanel { Margin = new Thickness(0, 8, 0, 0) };
+        var label = new TextBlock { Text = "Control profile", FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
         DockPanel.SetDock(label, Dock.Left);
         row.Children.Add(label);
         DockPanel.SetDock(pick, Dock.Left);
@@ -67,14 +75,14 @@ internal static class IracingKeybindsView
         row.Children.Add(new TextBlock
         {
             Text = "Each iRacing control profile has its own keys, and cars can use different profiles. Changes go to the profile picked here.",
-            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0),
+            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0),
         });
         return row;
     }
 
     private static TextBlock Note(string text, bool warning = false) => new()
     {
-        Text = text, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0),
+        Text = text, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 5, 0, 0),
         Foreground = Ui.Res<Brush>(warning ? "ApricotDeep" : "TextMuted"),
     };
 }

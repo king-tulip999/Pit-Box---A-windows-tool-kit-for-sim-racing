@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
+using GoodieBag.Services;
 using GoodieBag.SimRacing;
 using GoodieBag.Theme;
 
@@ -63,7 +64,7 @@ internal sealed class RigDiagram : FrameworkElement
         wedge.Freeze();
         var wedgeFill = new SolidColorBrush(Color.FromArgb(40, accentColor.R, accentColor.G, accentColor.B));
         dc.DrawGeometry(wedgeFill, null, wedge);
-        var rayPen = new Pen(accent, 1) { DashStyle = new DashStyle(new double[] { 4, 3 }, 0) };
+        var rayPen = new Pen(accent, Hairline.Pixels(1, Hairline.ScaleOf(this))) { DashStyle = new DashStyle(new double[] { 4, 3 }, 0) };
         dc.DrawLine(rayPen, eye, P(r.RightEdge));
         dc.DrawLine(rayPen, eye, P(left));
 
@@ -79,7 +80,7 @@ internal sealed class RigDiagram : FrameworkElement
 
         double fw = r.FootprintWidthCm / 2;
         var footprint = new Rect(P(new V2(-fw, back)), P(new V2(fw, back - r.FootprintDepthCm)));
-        dc.DrawGeometry(null, new Pen(line, 1) { DashStyle = new DashStyle(new double[] { 2, 3 }, 0) }, Tile.Shape(footprint, ThemeManager.Round(4)));
+        dc.DrawGeometry(null, new Pen(line, Hairline.Pixels(1, Hairline.ScaleOf(this))) { DashStyle = new DashStyle(new double[] { 2, 3 }, 0) }, Tile.Shape(footprint, ThemeManager.Round(4)));
 
         var screenPen = new Pen(text, Math.Max(3, 5 * scale / 4)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round };
         foreach (var screen in r.Screens)
@@ -88,7 +89,7 @@ internal sealed class RigDiagram : FrameworkElement
         if (r.Triple && r.SideAngle > 0.5 && r.Screens[1].Count > 1)
         {
             var hinge = P(r.Screens[1][0]);
-            double radius = 22;
+            double radius = 18;
             double a = r.SideAngle * Math.PI / 180;
             var start = new Point(hinge.X + radius, hinge.Y);
             var end = new Point(hinge.X + radius * Math.Cos(a), hinge.Y + radius * Math.Sin(a));
@@ -99,19 +100,19 @@ internal sealed class RigDiagram : FrameworkElement
                 g.ArcTo(end, new Size(radius, radius), 0, r.SideAngle > 180, SweepDirection.Clockwise, true, false);
             }
             arc.Freeze();
-            dc.DrawLine(new Pen(faint, 1) { DashStyle = new DashStyle(new double[] { 2, 2 }, 0) }, hinge, new Point(hinge.X + radius + 10, hinge.Y));
+            dc.DrawLine(new Pen(faint, Hairline.Pixels(1, Hairline.ScaleOf(this))) { DashStyle = new DashStyle(new double[] { 2, 2 }, 0) }, hinge, new Point(hinge.X + radius + 10, hinge.Y));
             dc.DrawGeometry(null, new Pen(peach, 1.6), arc);
-            Label(dc, $"{r.SideAngle:0.0}°", new Point(hinge.X + radius + 6, hinge.Y + 6), peach, 11.5, bold: true);
+            Label(dc, $"{r.SideAngle:0.0}°", new Point(hinge.X + radius + 6, hinge.Y + 6), peach, 9.5, bold: true);
         }
 
         dc.DrawEllipse(ThemeManager.Brush("Surface", Brushes.White), new Pen(text, 1.6), eye, 9, 9);
         dc.DrawEllipse(text, null, new Point(eye.X - 3.2, eye.Y - 1.5), 1.6, 1.6);
         dc.DrawEllipse(text, null, new Point(eye.X + 3.2, eye.Y - 1.5), 1.6, 1.6);
 
-        Label(dc, $"{r.HorizontalFovTotal:0.0}° horizontal", new Point(eye.X, eye.Y + 14), accent, 12, bold: true, centre: true);
-        string unit = _imperial ? "in" : "cm";
+        Label(dc, $"{r.HorizontalFovTotal:0.0}° horizontal", new Point(eye.X, eye.Y + 14), accent, 9.5, bold: true, centre: true);
+        string unit = _imperial ? Units.In : Units.Cm;
         double k = _imperial ? 1 / 2.54 : 1;
-        Label(dc, $"Dotted box: ≈ {r.FootprintWidthCm * k:0} × {r.FootprintDepthCm * k:0} {unit} footprint", new Point(w - 2, 0), muted, 11, alignRight: true);
+        Label(dc, $"Dotted box: ≈ {r.FootprintWidthCm * k:0} × {r.FootprintDepthCm * k:0} {unit} footprint", new Point(w - 2, 0), muted, 9, alignRight: true);
     }
 
     private static void DrawPolyline(DrawingContext dc, Pen pen, IReadOnlyList<Point> points)

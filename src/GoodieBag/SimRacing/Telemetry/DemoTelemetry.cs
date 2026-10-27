@@ -6,17 +6,23 @@ namespace GoodieBag.SimRacing.Telemetry;
 internal sealed class DemoTelemetry
 {
     private const double TrackKm = 5.2, RaceSeconds = 45 * 60, StartOffset = 14 * 60;
-    private const int Player = 12, Cars = 23;
+    private const int Player = 12, Cars = 28, FirstLmp2 = 23;
+    private const int TowedCar = 14;
+    private const double TowFrom = 810, TowTo = 900;
     private static readonly string[] Names =
     {
-        "Pace Car", "Max Verstappen", "Lewis Hamilton", "Ayrton Senna", "Michael Schumacher", "Dale Earnhardt", "Jeff Gordon", "Danica Patrick",
-        "Fernando Alonso", "John Doe", "Jane Doe", "Joe Bloggs", "You", "Richard Petty", "Jimmie Johnson", "Kimi Räikkönen", "Niki Lauda",
-        "Ricky Bobby", "Mario Andretti", "James Hunt", "Daniel Ricciardo", "Jenson Button", "Average Joe",
+        "Pace Car", "Daniel Morales", "Chris Walker", "Lucía Fernández", "Mike Turner", "José García", "Sarah Collins", "Pablo Ruiz",
+        "Emily Carter", "Javier Navarro", "Tom Reynolds", "Ana Martínez", "You", "Kevin Brooks", "Carlos Jiménez", "Rachel Adams", "Miguel Ángel Torres",
+        "Jake Sullivan", "Sofía Delgado", "Ryan Mitchell", "Alejandro Castillo", "Laura Bennett", "Diego Herrera",
+        "Marta Romero", "Ben Harris", "Iván Ortega", "Megan Price", "Raúl Vega",
     };
 
     private long _start = Stopwatch.GetTimestamp();
     private readonly SessionInfo _session;
     private readonly double[] _dist = new double[Cars];
+    private readonly double[] _best = new double[Cars];
+    private readonly int[] _bestLaps = new int[Cars];
+    private readonly int[] _order = Enumerable.Range(1, Cars - 1).ToArray();
 
     public DemoTelemetry() => _session = BuildSession();
 
@@ -27,7 +33,7 @@ internal sealed class DemoTelemetry
         var drivers = new List<DriverEntry>();
         for (int i = 0; i < Cars; i++)
         {
-            bool proto = i is >= 1 and <= 8;
+            bool proto = i is >= 1 and <= 8, lmp2 = i >= FirstLmp2;
             drivers.Add(new DriverEntry
             {
                 CarIdx = i,
@@ -36,13 +42,13 @@ internal sealed class DemoTelemetry
                 TeamName = i == 0 ? "" : $"Team {Names[i].Split(' ')[^1]}",
                 UserId = 1000 + i,
                 CarNumber = i == 0 ? "0" : (i * 7 % 97 + 2).ToString(),
-                CarName = i == 0 ? "Safety Car" : proto ? "Prototype LMDh" : i % 3 == 0 ? "GT3 Coupé" : i % 3 == 1 ? "GT3 Evo" : "GT3 R",
-                CarShortName = i == 0 ? "Safety" : proto ? "LMDh" : i % 3 == 0 ? "GT3 C" : i % 3 == 1 ? "GT3 E" : "GT3 R",
-                CarPath = proto ? "demoproto" : "demogt3",
-                ClassId = i == 0 ? 11 : proto ? 4029 : 2708,
-                ClassName = i == 0 ? "" : proto ? "GTP" : "GT3",
-                ClassColor = i == 0 ? 0xffffff : proto ? 0xffda59 : 0x33ceff,
-                ClassEstLapTime = proto ? 98.0 : 108.5,
+                CarName = i == 0 ? "Safety Car" : proto ? "Prototype LMDh" : lmp2 ? "Prototype LMP2" : i % 3 == 0 ? "GT3 Coupé" : i % 3 == 1 ? "GT3 Evo" : "GT3 R",
+                CarShortName = i == 0 ? "Safety" : proto ? "LMDh" : lmp2 ? "LMP2" : i % 3 == 0 ? "GT3 C" : i % 3 == 1 ? "GT3 E" : "GT3 R",
+                CarPath = proto ? "demoproto" : lmp2 ? "demolmp2" : "demogt3",
+                ClassId = i == 0 ? 11 : proto ? 4029 : lmp2 ? 2523 : 2708,
+                ClassName = i == 0 ? "" : proto ? "GTP" : lmp2 ? "LMP2" : "GT3",
+                ClassColor = i == 0 ? 0xffffff : proto ? 0xffda59 : lmp2 ? 0x53ff77 : 0x33ceff,
+                ClassEstLapTime = proto ? 98.0 : lmp2 ? 103.0 : 108.5,
                 IRating = i == 0 ? null : 1400 + i * 137 % 2600,
                 License = i == 0 ? "" : (i % 4) switch { 0 => "A 3.12", 1 => "B 2.87", 2 => "A 4.01", _ => "C 3.55" },
                 IsPaceCar = i == 0,
@@ -60,7 +66,7 @@ internal sealed class DemoTelemetry
             TrackLengthKm = TrackKm,
             PitSpeedLimitKph = 60,
             IncidentLimit = 17,
-            NumCarClasses = 2,
+            NumCarClasses = 3,
             Sessions = new[]
             {
                 new SessionEntry(0, SessionKind.Practice, "Practice", "PRACTICE", null, 1800),
@@ -87,27 +93,40 @@ internal sealed class DemoTelemetry
         return (h % 2001) / 1000.0 - 1;
     }
 
-    private static double LapTime(int car) => car is >= 1 and <= 8 ? 97.4 + car * 0.05 : 107.2 + (car - 9) * 0.045;
+    private static double LapTime(int car) => car is >= 1 and <= 8 ? 97.4 + car * 0.05 : car >= FirstLmp2 ? 101.0 + (car - FirstLmp2) * 0.06 : 107.2 + (car - 9) * 0.045;
 
     private static double LapOf(int car, int lap) => LapTime(car) + 0.3 + 0.7 * Noise(car, lap) - 0.035 * Math.Min(lap, 40);
 
     private static double Dist(int car, double t)
     {
         double lap = LapTime(car);
-        double grid = -(car - 1) * 0.006;
+        double grid = -(car >= FirstLmp2 ? car - FirstLmp2 + 3 : car - 1) * 0.006;
         double swing = 0.03 * Math.Sin(t / 40 + car * 1.7) + 0.008 * Math.Sin(t / 14 + car * 2.9);
         double cycle = t + car * 97;
         double stopped = Math.Floor(cycle / 1500) * 40 + Math.Clamp(cycle % 1500, 0, 40) - Math.Clamp(car * 97 % 1500, 0, 40);
         return Math.Max(0, (t - stopped) / lap + grid + swing);
     }
 
+    private double BestLap(int car, int laps)
+    {
+        if (laps < _bestLaps[car] || _bestLaps[car] == 0)
+        {
+            _bestLaps[car] = 0;
+            _best[car] = double.MaxValue;
+        }
+        for (int l = _bestLaps[car] + 1; l <= laps; l++) _best[car] = Math.Min(_best[car], LapOf(car, l));
+        _bestLaps[car] = laps;
+        return _best[car];
+    }
+
     private static bool InPits(int car, double t) => (t + car * 97) % 1500 < 40 && t > 60;
+
+    private static readonly (double At, double Depth, double Width)[] Corners = { (0.08, 42, 0.02), (0.21, 30, 0.025), (0.33, 22, 0.03), (0.47, 48, 0.018), (0.6, 26, 0.03), (0.74, 35, 0.022), (0.9, 30, 0.025) };
 
     private static double SpeedAt(double pct)
     {
         double v = 72;
-        (double At, double Depth, double Width)[] corners = { (0.08, 42, 0.02), (0.21, 30, 0.025), (0.33, 22, 0.03), (0.47, 48, 0.018), (0.6, 26, 0.03), (0.74, 35, 0.022), (0.9, 30, 0.025) };
-        foreach (var (at, depth, width) in corners)
+        foreach (var (at, depth, width) in Corners)
         {
             double d = FieldOrder.Wrap(pct, at) / width;
             v -= depth * Math.Exp(-d * d);
@@ -152,23 +171,42 @@ internal sealed class DemoTelemetry
             f.CarF2Time[i] = (leaderDist - d) * 100;
             int laps = (int)Math.Floor(d);
             f.CarLastLap[i] = laps > 0 ? LapOf(i, laps) : -1;
-            double best = double.MaxValue;
-            for (int l = 1; l <= laps; l++) best = Math.Min(best, LapOf(i, l));
-            f.CarBestLap[i] = laps > 0 ? best : -1;
+            f.CarBestLap[i] = laps > 0 ? BestLap(i, laps) : -1;
             f.CarTyreCompound[i] = 0;
             f.CarFlags[i] = i == 5 ? RaceFlags.Repair : i == 9 ? RaceFlags.Black : RaceFlags.None;
         }
         f.CarLapDistPct[0] = -1;
-        var order = Enumerable.Range(1, Cars - 1).OrderByDescending(i => dist[i]).ToArray();
-        int gtp = 0, gt3 = 0;
+        var order = _order;
+        for (int a = 1; a < order.Length; a++)
+        {
+            int car = order[a], b = a - 1;
+            while (b >= 0 && (dist[order[b]] < dist[car] || dist[order[b]] == dist[car] && order[b] > car))
+            {
+                order[b + 1] = order[b];
+                b--;
+            }
+            order[b + 1] = car;
+        }
+        int gtp = 0, lmp2 = 0, gt3 = 0;
         for (int p = 0; p < order.Length; p++)
         {
             int car = order[p];
             f.CarPosition[car] = p + 1;
-            f.CarClassPosition[car] = car <= 8 ? ++gtp : ++gt3;
+            f.CarClassPosition[car] = car <= 8 ? ++gtp : car >= FirstLmp2 ? ++lmp2 : ++gt3;
         }
         f.CarSurface[22] = TrackSurface.NotInWorld;
         f.CarLapDistPct[22] = -1;
+        if (raceT is >= TowFrom and < TowTo)
+        {
+            f.CarSurface[TowedCar] = TrackSurface.NotInWorld;
+            f.CarLapDistPct[TowedCar] = -1;
+            f.CarOnPitRoad[TowedCar] = false;
+        }
+        else if (raceT is >= TowTo and < TowTo + 25)
+        {
+            f.CarSurface[TowedCar] = TrackSurface.InPitStall;
+            f.CarOnPitRoad[TowedCar] = true;
+        }
 
         double pd = dist[Player], ppct = pd - Math.Floor(pd);
         double v = SpeedAt(ppct), ahead = SpeedAt(ppct + 0.004);
@@ -254,7 +292,7 @@ internal sealed class DemoTelemetry
             if (i == Player || f.CarSurface[i] == TrackSurface.NotInWorld || f.CarOnPitRoad[i] != f.OnPitRoad) continue;
             double m = FieldOrder.Wrap(f.CarLapDistPct[i], ppct) * length;
             if (Math.Abs(m) < 5.5) { if (i % 2 == 0) left = true; else right = true; }
-            if (i <= 8 && m < 0 && m > -60) flags |= RaceFlags.Blue;
+            if ((i <= 8 || i >= FirstLmp2) && m < 0 && m > -60) flags |= RaceFlags.Blue;
         }
         f.Flags = flags;
         f.Sides = left && right ? CarSides.LeftRight : left ? CarSides.Left : right ? CarSides.Right : CarSides.Clear;

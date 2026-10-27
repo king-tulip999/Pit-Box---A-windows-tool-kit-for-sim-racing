@@ -131,7 +131,7 @@ internal sealed class UpdateService
                 if (manual || S.NotifiedVersion != Latest.Tag)
                 {
                     S.NotifiedVersion = Latest.Tag;
-                    _app.Notify("Update available", "Install it from the title bar or Settings → About & updates.", NoticeKind.Info, important: true);
+                    _app.Notify("Update available", "Install it from the title bar or Settings → About and updates.", NoticeKind.Info, important: true);
                 }
             }
             else
@@ -164,6 +164,7 @@ internal sealed class UpdateService
         }
         var current = Environment.ProcessPath!;
         var download = Path.Combine(App.ScratchFolder(current), $"GoodieBag-{Show(release.Version)}.download");
+        string? installedBefore = S.InstalledTag;
         try
         {
             Set(UpdateState.Downloading);
@@ -205,6 +206,11 @@ internal sealed class UpdateService
         catch (Exception ex)
         {
             try { File.Delete(download); } catch { }
+            if (S.InstalledTag != installedBefore)
+            {
+                S.InstalledTag = installedBefore;
+                _app.SaveNow();
+            }
             Error = ex.Message;
             Set(UpdateState.Available);
             _app.Notify("Update didn't install", ex.Message + " You can download it from the release page instead.", NoticeKind.Warning, important: true);

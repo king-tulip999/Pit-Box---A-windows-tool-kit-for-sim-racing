@@ -66,6 +66,7 @@ public sealed class NavIcon : Viewbox
     {
         Stretch = Stretch.Uniform;
         Child = _canvas;
+        CacheMode = StillCache;
         IsHitTestVisible = false;
         IsVisibleChanged += (_, _) => Update();
         Loaded += (_, _) =>
@@ -159,6 +160,14 @@ public sealed class NavIcon : Viewbox
 
     private const double Hold = double.PositiveInfinity;
 
+    private static readonly BitmapCache StillCache = Frozen(new BitmapCache(2));
+
+    private static BitmapCache Frozen(BitmapCache cache)
+    {
+        cache.Freeze();
+        return cache;
+    }
+
     private void Start()
     {
         var clock = _timeline!.CreateClock();
@@ -170,6 +179,7 @@ public sealed class NavIcon : Viewbox
             target.BeginAnimation(property, _capturing ? null
                 : new DoubleAnimation(still, running, IntroTime) { EasingFunction = EaseOut, FillBehavior = FillBehavior.Stop });
         }
+        CacheMode = null;
         _started?.Invoke();
         _clock = clock;
     }
@@ -194,6 +204,7 @@ public sealed class NavIcon : Viewbox
         if (settle)
             for (int i = 0; i < _targets.Count; i++)
                 SettleFrom(_targets[i].Target, _targets[i].Property, _targets[i].Wrap, now[i]);
+        CacheMode = StillCache;
         _stopped?.Invoke();
         _clock = null;
     }
@@ -278,6 +289,7 @@ public sealed class NavIcon : Viewbox
             case "I.Checkered": Flag(); break;
             case "I.Palette": Palette(); break;
             case "I.Keyboard": Keyboard(); break;
+            case "I.Headset": Headset(); break;
             case { } key when key.StartsWith("F.", StringComparison.Ordinal): Draw(Res(key), fill: true); break;
             case { } key: Draw(Res(key)); break;
         }
@@ -317,6 +329,17 @@ public sealed class NavIcon : Viewbox
         }
         _canvas.Children.Add(path);
         return path;
+    }
+
+    private void DrawWithoutLayout(Geometry data)
+    {
+        var pen = new Pen { Thickness = Stroke, StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round };
+        BindingOperations.SetBinding(pen, Pen.BrushProperty, new Binding(nameof(Foreground)) { Source = this });
+        var brush = new DrawingBrush(new GeometryDrawing(null, pen, data))
+        {
+            Viewbox = new Rect(0, 0, 24, 24), ViewboxUnits = BrushMappingMode.Absolute, Stretch = Stretch.Fill,
+        };
+        _canvas.Children.Add(new Rectangle { Width = 24, Height = 24, Fill = brush, IsHitTestVisible = false });
     }
 
     private void Loop(double seconds)
@@ -683,6 +706,21 @@ public sealed class NavIcon : Viewbox
         Animate(sweep, TranslateTransform.XProperty, Keys(null, (0, 0), (Period, Repeat)), Hold);
     }
 
+    private void Headset()
+    {
+        const double Period = 2.6;
+        Loop(Period);
+        const string Left = "M4 14h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H5a1 1 0 0 1-1-1z", Right = "M20 14h-2a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h1a1 1 0 0 0 1-1z";
+        Draw(G("M4 14v-2a8 8 0 0 1 16 0v2" + Left + Right + "M6 20c0 1.4 1.6 2 4 2h1.5"));
+        var left = Draw(G(Left), fill: true);
+        var right = Draw(G(Right), fill: true);
+        var tip = Draw(G("M13 22h0.01"));
+        left.Opacity = right.Opacity = tip.Opacity = 0;
+        Animate(left, UIElement.OpacityProperty, Keys(InOut, (0, 0), (0.2, 0.55), (0.45, 0.1), (0.7, 0.5), (1.0, 0), (Period, 0)));
+        Animate(right, UIElement.OpacityProperty, Keys(InOut, (0, 0), (0.12, 0), (0.32, 0.55), (0.58, 0.1), (0.82, 0.5), (1.1, 0), (Period, 0)));
+        Animate(tip, UIElement.OpacityProperty, Keys(InOut, (0, 0), (0.1, 1), (1.1, 1), (1.3, 0), (Period, 0)));
+    }
+
     private void Chip()
     {
         const double Period = 2.4;
@@ -716,7 +754,7 @@ public sealed class NavIcon : Viewbox
             var top = new LineSegment(new Point(hinge + side * 6, 7), true);
             var bottom = new LineSegment(new Point(hinge + side * 6, 16), true);
             var figure = new PathFigure { StartPoint = new Point(hinge, 7), IsClosed = true, Segments = { top, bottom, new LineSegment(new Point(hinge, 16), true) } };
-            Draw(new PathGeometry { Figures = { figure } });
+            DrawWithoutLayout(new PathGeometry { Figures = { figure } });
             Point Outer(double t, double edge)
             {
                 double angle = Eased(t, fold) * Math.PI / 180;

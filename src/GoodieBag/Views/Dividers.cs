@@ -69,7 +69,7 @@ internal sealed class DividerLine : FrameworkElement
     public DividerLine()
     {
         IsHitTestVisible = false;
-        Height = 11;
+        Height = 9;
     }
 
     protected override void OnRender(DrawingContext dc) => Dividers.Draw(dc, 0, ActualWidth, Math.Floor(ActualHeight / 2));

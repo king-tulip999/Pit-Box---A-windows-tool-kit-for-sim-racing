@@ -126,8 +126,9 @@ public sealed class Sparkline : FrameworkElement
 
 public sealed class Meter : FrameworkElement
 {
-    public const double Pad = 3;
+    public const double Pad = 2;
     private const double Edge = 1.5;
+    private const double TieredWarnFrom = 0.75;
 
     static Meter()
     {
@@ -154,7 +155,7 @@ public sealed class Meter : FrameworkElement
 
     public Meter()
     {
-        Height = 6;
+        Height = 5;
     }
 
     private (double W, double H, double Cut) _trackKey;
@@ -178,7 +179,7 @@ public sealed class Meter : FrameworkElement
         double value = Math.Clamp(Value, 0, 1);
         Brush edge = Steps > 0
             ? StepsUseFill ? Fill : ThemeManager.StepBrush(Math.Max(1, Math.Ceiling(value * Steps)) / Steps)
-            : Tiered ? ThemeManager.RampBrush(value) : Fill;
+            : Tiered ? (value < TieredWarnFrom ? ThemeManager.Brush("LineStrong", Brushes.Gray) : ThemeManager.RampBrush(value)) : Fill;
         double cut = Tile.ControlCut(w, h, ThemeManager.Current.ControlChamfer);
         double r = Math.Min(h / 2, ThemeManager.Round(3).TopLeft), ri = Math.Max(0, Math.Min((h - 2 * Pad) / 2, r - Pad / 2));
         var inner = new Rect(Pad, Pad, w - 2 * Pad, h - 2 * Pad);

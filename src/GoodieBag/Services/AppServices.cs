@@ -13,6 +13,8 @@ namespace GoodieBag.Services;
 
 internal enum NoticeKind { Info, Success, Warning, Error }
 
+internal sealed record NoticeAction(string Label, Action Run);
+
 internal sealed class AppServices : IDisposable
 {
     public static AppServices Current { get; private set; } = null!;
@@ -49,7 +51,7 @@ internal sealed class AppServices : IDisposable
 
     public event Action? Tick;
 
-    public event Action<string, string, NoticeKind>? Notice;
+    public event Action<string, string, NoticeKind, NoticeAction?>? Notice;
 
     public event Action? OverlayChanged;
     public event Action? FansChanged;
@@ -178,12 +180,12 @@ internal sealed class AppServices : IDisposable
         }
     }
 
-    public void Notify(string title, string message, NoticeKind kind = NoticeKind.Info, bool important = false)
+    public void Notify(string title, string message, NoticeKind kind = NoticeKind.Info, bool important = false, NoticeAction? action = null)
     {
-        if (!important && !Config.ShowNotifications && kind is NoticeKind.Info or NoticeKind.Success)
+        if (!important && action is null && !Config.ShowNotifications && kind is NoticeKind.Info or NoticeKind.Success)
             return;
         if (IsWindowVisible())
-            Notice?.Invoke(title, message, kind);
+            Notice?.Invoke(title, message, kind, action);
         else if (Tray is not null && (important || Config.ShowNotifications))
             Tray.ShowBalloon(title, message, kind);
     }
@@ -223,7 +225,7 @@ internal sealed class AppServices : IDisposable
         if (set is null) c.Enabled = false;
         else
         {
-            if (set.Length > 0 && c.Profile(set) is { } profile) { c.Colors = profile.Colors.Copy(); c.Name = profile.Name; }
+            if (set.Length > 0 && c.Profile(set) is { } profile) ReplaceOledColors(() => { c.Colors = profile.Colors.Copy(); c.Name = profile.Name; });
             c.Enabled = true;
         }
         c.EditingProfile = null;
@@ -232,6 +234,22 @@ internal sealed class AppServices : IDisposable
         Save();
         Theme.ThemeManager.Apply(Config.Ui.Theme);
         Overlay.InvalidateColors();
+    }
+
+    public void ReplaceOledColors(Action replace)
+    {
+        var c = Config.Ui.OledCustom;
+        bool unsaved = c.EditingProfile is null && !c.Colors.IsDefault && !c.Profiles.Any(p => p.Colors.SameAs(c.Colors));
+        var (colors, name) = (c.Colors.Copy(), c.Name);
+        replace();
+        if (!unsaved || c.Colors.SameAs(colors)) return;
+        Notify("Your custom colors were replaced", "They weren't saved as a set.", NoticeKind.Info, action: new NoticeAction("Undo", () =>
+        {
+            c.Colors = colors;
+            c.Name = name;
+            c.EditingProfile = null;
+            OledCustomChanged();
+        }));
     }
 
     public void OledCustomChanged()
@@ -309,6 +327,7 @@ internal sealed class AppServices : IDisposable
 
     public void FanSettingsChanged()
     {
+        _fanSpeeds = null;
         PushFanSettings();
         Save();
         FansChanged?.Invoke();
@@ -325,15 +344,23 @@ internal sealed class AppServices : IDisposable
         return raw.Replace("Fan Control #", "Fan ");
     }
 
+    private sealed record FanSpeeds(HardwareCatalog Catalog, IReadOnlyList<(string Name, float? Rpm)> Speeds);
+
+    private FanSpeeds? _fanSpeeds;
+
     public IReadOnlyList<(string Name, float? Rpm)> VisibleFanSpeeds()
     {
         var catalog = Hardware.Catalog;
         if (catalog is null)
             return Array.Empty<(string, float?)>();
-        return catalog.Fans
+        if (_fanSpeeds is { } cached && ReferenceEquals(cached.Catalog, catalog))
+            return cached.Speeds;
+        var speeds = catalog.Fans
             .Where(f => f.HasRpm && !(Config.Fans.Hardware.FirstOrDefault(h => h.ControlId == f.ControlId)?.Hidden ?? false))
             .Select(f => (FanName(f), f.Rpm))
             .ToList();
+        _fanSpeeds = new FanSpeeds(catalog, speeds);
+        return speeds;
     }
 
     public void FlushPendingSave()

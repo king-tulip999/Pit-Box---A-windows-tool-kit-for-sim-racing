@@ -93,7 +93,7 @@ internal sealed class HudEditorDef
     public IReadOnlyList<HudPreset> Presets { get; init; } = Array.Empty<HudPreset>();
     public IReadOnlyList<string> PresetKeeps { get; init; } = Array.Empty<string>();
     public IReadOnlyDictionary<string, string> Regions { get; init; } = new Dictionary<string, string>();
-    public string ContentTitle { get; init; } = "Columns & info";
+    public string ContentTitle { get; init; } = "Columns and info";
 
     public IEnumerable<HudSetting> Settings => Groups.SelectMany(g => g.Settings);
 

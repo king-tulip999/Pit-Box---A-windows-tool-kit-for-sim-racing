@@ -11,6 +11,7 @@ using GoodieBag.Services;
 using GoodieBag.SimRacing.Hud;
 using GoodieBag.SimRacing.Telemetry;
 using GoodieBag.Views.Pages;
+using GoodieBag.Theme;
 
 namespace GoodieBag.Views;
 
@@ -25,7 +26,7 @@ internal sealed class HudQuickEditor : Window, IHudEditorHost
     private readonly Grid _modal = new() { Visibility = Visibility.Collapsed };
     private readonly TextBlock _layout = new();
     private readonly Button _undo, _redo, _snap;
-    private readonly ComboBox _layoutPick = new() { MinWidth = 150, VerticalAlignment = VerticalAlignment.Center, ToolTip = "The layout on screen (and edited here)" };
+    private readonly ComboBox _layoutPick = new() { MinWidth = 122, VerticalAlignment = VerticalAlignment.Center, ToolTip = "The layout on screen (and edited here)" };
     private string _layoutsShown = "";
     private bool _fillingLayouts;
     private readonly IntPtr _returnTo;
@@ -56,21 +57,20 @@ internal sealed class HudQuickEditor : Window, IHudEditorHost
         UseLayoutRounding = true;
         SetResourceReference(FontFamilyProperty, "UiFont");
         SetResourceReference(ForegroundProperty, "Text");
-        FontSize = 13.5;
-        TextOptions.SetTextFormattingMode(this, TextFormattingMode.Ideal);
+        FontSize = 11;
+        TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
         Topmost = true;
         ShowInTaskbar = true;
         WindowStartupLocation = WindowStartupLocation.Manual;
-        double scale = app.Config.Ui.ScaleFactor;
-        Width = Math.Min(1080 * scale, SystemParameters.PrimaryScreenWidth * 0.9);
-        Height = Math.Min(780 * scale, SystemParameters.PrimaryScreenHeight * 0.85);
+        Width = Math.Min(875, SystemParameters.PrimaryScreenWidth * 0.9);
+        Height = Math.Min(632, SystemParameters.PrimaryScreenHeight * 0.85);
         MinWidth = 640;
         MinHeight = 400;
         Left = (SystemParameters.PrimaryScreenWidth - Width) / 2;
         Top = (SystemParameters.PrimaryScreenHeight - Height) / 2;
         SetResourceReference(BackgroundProperty, "Bg");
         SetResourceReference(BorderBrushProperty, "LineStrong");
-        BorderThickness = new Thickness(1);
+        Hairline.Frame(this);
 
         _undo = Ui.IconButton("I.Undo", "Undo the last move or resize", () => { _hud.Undo(); Refresh(); });
         _redo = Ui.IconButton("I.Redo", "Redo", () => { _hud.Redo(); Refresh(); });
@@ -93,14 +93,14 @@ internal sealed class HudQuickEditor : Window, IHudEditorHost
         titleText.Children.Add(_layout);
         var tools = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         foreach (var b in new[] { _undo, _redo }) tools.Children.Add(b);
-        _snap.Margin = new Thickness(6, 0, 8, 0);
+        _snap.Margin = new Thickness(5, 0, 6, 0);
         tools.Children.Add(_snap);
         tools.Children.Add(_layoutPick);
-        add.Margin = new Thickness(6, 0, 8, 0);
+        add.Margin = new Thickness(5, 0, 6, 0);
         tools.Children.Add(add);
         tools.Children.Add(done);
         var bar = Ui.SplitRow(titleText, tools);
-        var barHost = new Border { Padding = new Thickness(16, 10, 12, 10), Child = bar, BorderThickness = new Thickness(0, 0, 0, 1) };
+        var barHost = Hairline.Frame(new Border { Padding = new Thickness(13, 8, 10, 8), Child = bar }, Sides.Bottom);
         barHost.SetResourceReference(Border.BackgroundProperty, "Surface");
         barHost.SetResourceReference(Border.BorderBrushProperty, "Line");
         barHost.MouseLeftButtonDown += (_, e) => { if (e.ButtonState == MouseButtonState.Pressed) DragMove(); };
@@ -108,7 +108,7 @@ internal sealed class HudQuickEditor : Window, IHudEditorHost
         var hint = new TextBlock
         {
             Text = "Drag a widget on screen to move it; drag its right or bottom edge or its corner to resize. Click one on screen to open its settings here.",
-            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(18, 10, 18, 2),
+            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(15, 8, 15, 2),
         };
         _widgets = new RaceHudWidgets(app, this);
         var body = new DockPanel();
@@ -118,7 +118,6 @@ internal sealed class HudQuickEditor : Window, IHudEditorHost
         body.Children.Add(hint);
         body.Children.Add(_widgets.Root);
         var root = new Grid { Children = { body, _modal } };
-        if (Math.Abs(scale - 1) > 0.001) root.LayoutTransform = new ScaleTransform(scale, scale);
         RenderOptions.SetClearTypeHint(root, ClearTypeHint.Enabled);
         Content = root;
 
@@ -190,16 +189,16 @@ internal sealed class HudQuickEditor : Window, IHudEditorHost
         _confirm = new TaskCompletionSource<bool>();
         var stack = new StackPanel();
         stack.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("H3"), TextWrapping = TextWrapping.Wrap });
-        stack.Children.Add(new TextBlock { Text = message, Style = Ui.Res<Style>("Muted"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 14) });
+        stack.Children.Add(new TextBlock { Text = message, Style = Ui.Res<Style>("Muted"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 5, 0, 11) });
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        var cancel = new Button { Content = "Cancel", Margin = new Thickness(0, 0, 8, 0) };
+        var cancel = new Button { Content = "Cancel", Margin = new Thickness(0, 0, 6, 0) };
         cancel.Click += (_, _) => EndConfirm(false);
         var ok = new Button { Content = confirmText, Style = Ui.Res<Style>(danger ? "DangerConfirmButton" : "PrimaryButton") };
         ok.Click += (_, _) => EndConfirm(true);
         buttons.Children.Add(cancel);
         buttons.Children.Add(ok);
         stack.Children.Add(buttons);
-        var card = new Tile { Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(20, 18, 20, 16), MaxWidth = 420, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Child = stack };
+        var card = new Tile { Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(16, 15, 16, 13), MaxWidth = 340, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Child = stack };
         _modal.Children.Clear();
         var dim = new Border();
         dim.SetResourceReference(Border.BackgroundProperty, "Dim");

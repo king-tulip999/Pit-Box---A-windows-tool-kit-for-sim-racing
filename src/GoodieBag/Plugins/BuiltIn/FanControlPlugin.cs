@@ -8,7 +8,7 @@ internal sealed class FanControlPlugin : Plugin
 {
     public override string Id => PluginIds.FanControl;
     public override string Name => "Fan Control";
-    public override string Description => "Control case, CPU and GPU fans with curves, presets and calibration, with an emergency full-speed failsafe.";
+    public override string Description => "Fan curves and presets for case, CPU and GPU fans. Motherboard fans need a small driver, asked for when needed.";
     public override string Icon => "I.Fan";
     public override (string Soft, string Deep) Colors => ("SageSoft", "SageDeep");
     public override int Order => 30;
@@ -16,7 +16,7 @@ internal sealed class FanControlPlugin : Plugin
     public override string BackgroundWork =>
         "While fan control is switched on: reads temperatures once a second and drives your fans. Switched off: never.";
     public override string Changes =>
-        "Fan speeds, while fan control is switched on. Turning the plugin (or fan control) off hands every fan back to the BIOS / GPU driver.";
+        "Fan speeds, while fan control is switched on. Turning the tool (or fan control) off hands every fan back to the BIOS / GPU driver.";
 
     public override IEnumerable<PluginHotkey> Hotkeys(AppServices app)
     {

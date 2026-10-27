@@ -59,7 +59,8 @@ internal readonly record struct Hotkey(uint Modifiers, Keys Key)
     }
 
     public static bool SameKey(string? a, string? b) =>
-        TryParse(a, out var x) && TryParse(b, out var y) && x == y;
+        ControllerButtons.TryParse(a, out var ca) ? ControllerButtons.TryParse(b, out var cb) && ca == cb
+            : TryParse(a, out var x) && TryParse(b, out var y) && x == y;
 
     public override string ToString()
     {
@@ -75,6 +76,7 @@ internal readonly record struct Hotkey(uint Modifiers, Keys Key)
     public static string Display(string? text)
     {
         if (string.IsNullOrWhiteSpace(text)) return "";
+        if (ControllerButtons.TryParse(text, out var button)) return ControllerButtons.Display(button);
         var parts = text.Split('+', StringSplitOptions.TrimEntries);
         if (text.EndsWith("++", StringComparison.Ordinal)) parts = parts[..^2].Append("+").ToArray();
         return string.Join("+", parts.Where(p => p.Length > 0 || parts.Length == 1).Select(KeyLabel));

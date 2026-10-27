@@ -44,39 +44,47 @@ internal static class TraceSettings
     private static void Open(AppServices app, SessionStatsService stats, MainWindow window, FrameworkElement anchor)
     {
         var settings = stats.Settings;
-        var body = new StackPanel { Width = 380 };
+        var body = new StackPanel { Width = 308 };
         var popup = new Popup
         {
             PlacementTarget = anchor, Placement = PlacementMode.Custom, StaysOpen = false, AllowsTransparency = true,
             CustomPopupPlacementCallback = (size, target, _) => new[] { new CustomPopupPlacement(new Point(target.Width - size.Width, target.Height), PopupPrimaryAxis.Horizontal) },
-            Child = new Tile { Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(18, 14, 18, 16), Margin = new Thickness(0, 4, 0, 0), Child = body },
+            Child = new Tile { Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(15, 11, 15, 13), Margin = new Thickness(0, 3, 0, 0), Child = body },
         };
         RenderOptions.SetClearTypeHint(popup.Child, ClearTypeHint.Enabled);
         Ui.FollowTarget(popup);
         _open = popup;
         popup.Closed += (_, _) => { if (ReferenceEquals(_open, popup)) _open = null; };
 
-        async void Changed(Action? undo = null)
+        bool reverting = false;
+
+        async void Changed(Action apply, Action? undo = null, Action? showOld = null)
         {
+            apply();
             settings.Normalize();
             if (undo is not null && stats.Traces is { } traces)
             {
                 var keep = stats.Retention;
+                undo();
+                settings.Normalize();
                 int drop = 0;
                 try { drop = await Task.Run(() => TraceStore.Pruned(traces.All(), keep, DateTime.UtcNow, null).Count); }
                 catch (Exception ex) { App.LogError(ex); }
                 if (drop > 0)
                 {
                     popup.IsOpen = false;
-                    if (!await window.Confirm($"Remove {drop:N0} lap trace{(drop == 1 ? "" : "s")}?",
-                            "They no longer fit what you chose to keep, so their lines and inputs are deleted now. Lap times and stats stay. Laps still in iRacing's telemetry files come back if you keep more later.",
+                    if (!await window.Confirm($"Remove {SimRacing.Race.RaceFormat.Count(drop, "lap trace")}?",
+                            "They no longer fit what you chose to keep, so their lines and inputs are deleted now. Lap times and stats stay.",
                             "Remove", danger: true))
                     {
-                        undo();
-                        settings.Normalize();
+                        reverting = true;
+                        try { showOld?.Invoke(); }
+                        finally { reverting = false; }
                         return;
                     }
                 }
+                apply();
+                settings.Normalize();
             }
             app.Save();
             _settle ??= new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
@@ -88,27 +96,31 @@ internal static class TraceSettings
         }
 
         body.Children.Add(Ui.Text("Lap traces", "H3"));
-        body.Children.Add(new TextBlock { Text = "Every lap's line and inputs, recorded while you drive or read from iRacing's telemetry files, for lap analysis.", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 10) });
-        var usage = new TextBlock { Text = "Working out the space used…", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8) };
+        body.Children.Add(new TextBlock { Text = "Every lap's line and inputs, recorded while you drive or read from iRacing's telemetry files, for lap analysis.", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 8) });
+        var usage = new TextBlock { Text = "Working out the space used…", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) };
 
-        var keepFor = Ui.Combo(Config.SessionStatsSettings.KeepDayChoices.Select(d => new Choice(d.ToString(CultureInfo.InvariantCulture), DaysName(d))),
+        static void Show(ComboBox box, int value) =>
+            box.SelectedItem = box.Items.Cast<Choice>().FirstOrDefault(c => c.Id == value.ToString(CultureInfo.InvariantCulture));
+        ComboBox? keepFor = null, perSession = null;
+        keepFor = Ui.Combo(Config.SessionStatsSettings.KeepDayChoices.Select(d => new Choice(d.ToString(CultureInfo.InvariantCulture), DaysName(d))),
             settings.TraceKeepDays.ToString(CultureInfo.InvariantCulture), c =>
             {
-                int old = settings.TraceKeepDays;
-                settings.TraceKeepDays = int.Parse(c.Id!, CultureInfo.InvariantCulture);
-                Changed(() => settings.TraceKeepDays = old);
-            }, 170);
-        var perSession = Ui.Combo(Config.SessionStatsSettings.LapChoices.Select(n => new Choice(n.ToString(CultureInfo.InvariantCulture), n switch { 0 => "All laps", 1 => "Fastest only", _ => $"Fastest {n}" })),
+                if (reverting) return;
+                int old = settings.TraceKeepDays, now = int.Parse(c.Id!, CultureInfo.InvariantCulture);
+                Changed(() => settings.TraceKeepDays = now, () => settings.TraceKeepDays = old, () => Show(keepFor!, old));
+            }, 138);
+        perSession = Ui.Combo(Config.SessionStatsSettings.LapChoices.Select(n => new Choice(n.ToString(CultureInfo.InvariantCulture), n switch { 0 => "All laps", 1 => "Fastest only", _ => $"Fastest {n}" })),
             settings.TraceLapsPerSession.ToString(CultureInfo.InvariantCulture), c =>
             {
-                int old = settings.TraceLapsPerSession;
-                settings.TraceLapsPerSession = int.Parse(c.Id!, CultureInfo.InvariantCulture);
-                Changed(() => settings.TraceLapsPerSession = old);
-            }, 170);
+                if (reverting) return;
+                int old = settings.TraceLapsPerSession, now = int.Parse(c.Id!, CultureInfo.InvariantCulture);
+                Changed(() => settings.TraceLapsPerSession = now, () => settings.TraceLapsPerSession = old, () => Show(perSession!, old));
+            }, 138);
         perSession.ToolTip = "Per session, clean laps first";
-        var record = Ui.Switch(settings.TraceRecord, on => { settings.TraceRecord = on; keepFor.IsEnabled = perSession.IsEnabled = on; Changed(); });
+        var record = Ui.Switch(settings.TraceRecord, on => { keepFor!.IsEnabled = perSession!.IsEnabled = on; Changed(() => settings.TraceRecord = on); });
         keepFor.IsEnabled = perSession.IsEnabled = settings.TraceRecord;
-        var bests = Ui.Switch(settings.TraceKeepBests, on => { settings.TraceKeepBests = on; Changed(() => settings.TraceKeepBests = !on); });
+        CheckBox? bests = null;
+        bests = Ui.Switch(settings.TraceKeepBests, on => Changed(() => settings.TraceKeepBests = on, () => settings.TraceKeepBests = !on, () => bests!.IsChecked = !on));
 
         body.Children.Add(Row("Keep lap traces", record, "Off: no new traces are kept. Back on: sessions driven meanwhile get theirs from their files"));
         body.Children.Add(Row("Keep for", keepFor, null));
@@ -123,7 +135,7 @@ internal static class TraceSettings
             stats.DeleteAllTraces();
         }, "DangerButton");
         delete.HorizontalAlignment = HorizontalAlignment.Left;
-        delete.Margin = new Thickness(0, 6, 0, 0);
+        delete.Margin = new Thickness(0, 5, 0, 0);
         body.Children.Add(delete);
 
         popup.IsOpen = true;
@@ -141,7 +153,7 @@ internal static class TraceSettings
             double lapsPerMonth = Convert.ToDouble(store.Db.Scalar("SELECT COUNT(*) FROM laps l JOIN sessions s ON s.id = l.session_id WHERE s.start_utc >= ?1", since) ?? 0L) / 3;
             return (u.Bytes, u.Laps, u.AverageBytes, lapsPerMonth);
         });
-        usage.Text = $"Using {Size(bytes)} · {laps:N0} lap{(laps == 1 ? "" : "s")}";
+        usage.Text = $"Using {Size(bytes)} · {SimRacing.Race.RaceFormat.Count(laps, "lap")}";
         if (laps < 20 || perMonth <= 0) return;
         usage.Text += $"\nAt your pace a year of traces takes about {Size(average * perMonth * 12)}";
     }
@@ -160,13 +172,13 @@ internal static class TraceSettings
 
     private static FrameworkElement Row(string label, FrameworkElement control, string? help)
     {
-        var row = new DockPanel { Margin = new Thickness(0, 0, 0, 10), ToolTip = help };
+        var row = new DockPanel { Margin = new Thickness(0, 0, 0, 8), ToolTip = help };
         control.VerticalAlignment = VerticalAlignment.Center;
         DockPanel.SetDock(control, Dock.Right);
         row.Children.Add(control);
         var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        text.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Body"), FontSize = 13 });
-        if (help is not null) text.Children.Add(new TextBlock { Text = help, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 1, 12, 0) });
+        text.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Body"), FontSize = 10.5 });
+        if (help is not null) text.Children.Add(new TextBlock { Text = help, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 1, 10, 0) });
         row.Children.Add(text);
         return row;
     }

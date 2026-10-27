@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using GoodieBag.Config;
+using GoodieBag.Services;
 using static GoodieBag.Display.Ccd;
 
 namespace GoodieBag.Display;
@@ -191,7 +192,7 @@ internal static class DisplayManager
 
         var refresh = path.TargetInfo.RefreshRate;
         if (refresh.Denominator != 0)
-            parts.Add($"{Math.Round((double)refresh.Numerator / refresh.Denominator)} Hz");
+            parts.Add($"{Math.Round((double)refresh.Numerator / refresh.Denominator)} {Units.Hz}");
 
         if (primary)
             parts.Add("primary");

@@ -10,8 +10,8 @@ internal sealed record ThemeSpec
     public required bool Dark { get; init; }
     public required IReadOnlyDictionary<string, System.Windows.Media.Color> Colors { get; init; }
 
-    public string DisplayFont { get; init; } = "Segoe UI Variable Display, Segoe UI";
-    public string UiFont { get; init; } = "Segoe UI Variable Text, Segoe UI";
+    public string DisplayFont { get; init; } = "Bahnschrift, Segoe UI";
+    public string UiFont { get; init; } = "Bahnschrift, Segoe UI";
     public string MonoFont { get; init; } = "Consolas, Segoe UI";
     public string? MetricFont { get; init; }
     public FontWeight HeadingWeight { get; init; } = FontWeights.Bold;
@@ -23,9 +23,11 @@ internal sealed record ThemeSpec
     public ThemeLink? Link { get; init; }
 
     public double Radius { get; init; }
+    public double PanelOpacity { get; init; } = 0.85;
     public double SwitchRadius { get; init; } = 11;
     public double KnobRadius { get; init; } = 8;
     public double ChipRadius { get; init; }
+    public double ControlRadius { get; init; } = 5;
     public Thickness CardEdge { get; init; } = new(0, 1, 0, 2);
     public bool TileEdge => CardEdge.Bottom > CardEdge.Top;
     public Thickness ButtonEdge { get; init; } = new(1);

@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using GoodieBag.Services;
 
 namespace GoodieBag.Config;
 
@@ -56,7 +57,7 @@ public sealed class PerformanceSettings
         _ => "Balanced",
     };
 
-    public static string Describe(int ms) => ms < 1000 ? $"{ms} ms" : $"{ms / 1000.0:0.##} s";
+    public static string Describe(int ms) => ms < 1000 ? $"{ms} {Units.Ms}" : $"{ms / 1000.0:0.##} {Units.S}";
 
     public static int LoopWaitMs(long untilNextReadMs, int monitorMs, bool fanControl, bool calibrating = false)
     {

@@ -11,7 +11,7 @@ namespace GoodieBag.Views;
 
 internal sealed class ThemePicker : UniformGrid
 {
-    public ThemePicker(AppTheme selected, Action<AppTheme> pick, int columns = 3, double height = 64, Action<string?>? oled = null)
+    public ThemePicker(AppTheme selected, Action<AppTheme> pick, int columns = 3, double height = 52, Action<string?>? oled = null)
     {
         Columns = columns;
         foreach (var theme in Themes.All)
@@ -28,12 +28,12 @@ internal sealed class ThemePicker : UniformGrid
 
         var dots = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Right };
         foreach (var key in new[] { "Accent", "ActiveModeBg", "Sage" })
-            dots.Children.Add(new Rectangle { Width = 10, Height = 10, RadiusX = theme.ChipRadius > 6 ? 5 : 2, RadiusY = theme.ChipRadius > 6 ? 5 : 2, Fill = Of(key), Margin = new Thickness(4, 0, 0, 0) });
+            dots.Children.Add(new Rectangle { Width = 8, Height = 8, RadiusX = theme.ChipRadius > 6 ? 5 : 2, RadiusY = theme.ChipRadius > 6 ? 5 : 2, Fill = Of(key), Margin = new Thickness(3, 0, 0, 0) });
 
         var name = TextFit.TipWhenTrimmed(new TextBlock
         {
             Text = theme.Caps ? theme.Name.ToUpperInvariant() : theme.Name,
-            FontFamily = ThemeManager.Family(theme.DisplayFont), FontWeight = theme.HeadingWeight, FontStyle = theme.HeadingStyle, FontSize = 14,
+            FontFamily = ThemeManager.Family(theme.DisplayFont), FontWeight = theme.HeadingWeight, FontStyle = theme.HeadingStyle, FontSize = 11.5,
             Foreground = Of("Heading"), VerticalAlignment = VerticalAlignment.Bottom, TextTrimming = TextTrimming.CharacterEllipsis,
         });
         FrameworkElement label = theme.Link is { } link && Logo(link.Logo) is { } logo
@@ -47,7 +47,7 @@ internal sealed class ThemePicker : UniformGrid
         if (label is Image) RenderOptions.SetBitmapScalingMode(label, BitmapScalingMode.HighQuality);
         var card = new Border
         {
-            Background = Of("Surface"), BorderBrush = Of(theme.TileEdge ? "TileEdge" : "Line"), BorderThickness = theme.TileEdge ? new Thickness(0, 0, 0, 2) : new Thickness(1),
+            Background = Of("Surface"), BorderBrush = Of(theme.TileEdge ? "TileEdge" : "Line"), BorderThickness = theme.TileEdge ? new Thickness(0, 0, 0, 2) : Hairline.Edges(),
             CornerRadius = new CornerRadius(8 * theme.Radius),
             Child = new Grid { Children = { label, dots } },
         };
@@ -56,20 +56,20 @@ internal sealed class ThemePicker : UniformGrid
         if (menu is not null)
             face.Children.Add(new Icon
             {
-                Data = Ui.Res<Geometry>("I.ChevronDown"), Width = 11, Height = 11, Foreground = Of("Heading"), StrokeThickness = 2.2,
-                HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, selected ? 18 : 8, 8),
+                Data = Ui.Res<Geometry>("I.ChevronDown"), Width = 9, Height = 9, Foreground = Of("Heading"), StrokeThickness = 1.78,
+                HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, selected ? 15 : 6, 8),
             });
         if (selected)
             face.Children.Add(new Border
             {
-                Width = 20, Height = 20, CornerRadius = new CornerRadius(10), Background = Ui.Res<Brush>("Accent"),
-                HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, -6, -6),
-                Child = new Icon { Data = Ui.Res<Geometry>("I.Check"), Width = 11, Height = 11, StrokeThickness = 3, Foreground = Ui.Res<Brush>("OnAccent") },
+                Width = 16, Height = 16, CornerRadius = new CornerRadius(8), Background = Ui.Res<Brush>("Accent"),
+                HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, -5, -5),
+                Child = new Icon { Data = Ui.Res<Geometry>("I.Check"), Width = 9, Height = 9, StrokeThickness = 2.43, Foreground = Ui.Res<Brush>("OnAccent") },
             });
 
         var button = new Button
         {
-            Style = Ui.Res<Style>("Btn"), Height = height, Margin = new Thickness(0, 0, 10, 10), Padding = new Thickness(5),
+            Style = Ui.Res<Style>("Btn"), Height = height, Margin = new Thickness(0, 0, 8, 8), Padding = new Thickness(4),
             HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch,
             Background = Of("Bg"), BorderBrush = selected ? Ui.Res<Brush>("Accent") : Ui.Res<Brush>("LineStrong"),
             BorderThickness = new Thickness(selected ? 2 : 1), Content = face, ToolTip = theme.Name,

@@ -11,7 +11,7 @@ namespace GoodieBag.Views;
 internal sealed class SettingsSearchBox : Grid
 {
     private readonly MainWindow _window;
-    private readonly TextBox _box = new() { Tag = "Search settings and keybinds", Padding = new Thickness(32, 7, 9, 7) };
+    private readonly TextBox _box = new() { Tag = "Search settings and keybinds", Padding = new Thickness(26, 6, 7, 6) };
     private readonly Popup _popup;
     private readonly StackPanel _results = new();
     private List<SearchEntry> _found = new();
@@ -23,8 +23,8 @@ internal sealed class SettingsSearchBox : Grid
         Children.Add(_box);
         var icon = new Icon
         {
-            Data = (Geometry)Application.Current.FindResource("I.Search"), Width = 14, Height = 14,
-            HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(12, 0, 0, 0),
+            Data = (Geometry)Application.Current.FindResource("I.Search"), Width = 11, Height = 11,
+            HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(10, 0, 0, 0),
             IsHitTestVisible = false,
         };
         icon.SetResourceReference(Control.ForegroundProperty, "TextFaint");
@@ -32,7 +32,7 @@ internal sealed class SettingsSearchBox : Grid
         _popup = new Popup
         {
             PlacementTarget = _box, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true,
-            Child = new Tile { Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(6), Margin = new Thickness(0, 0, 14, 14), Child = _results },
+            Child = new Tile { Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(5), Margin = new Thickness(0, 0, 11, 11), Child = _results },
         };
         RenderOptions.SetClearTypeHint(_popup.Child, ClearTypeHint.Enabled);
         Children.Add(_popup);
@@ -67,7 +67,7 @@ internal sealed class SettingsSearchBox : Grid
         _results.Children.Clear();
         if (_found.Count == 0)
         {
-            _results.Children.Add(new TextBlock { Text = "No settings or keybinds match", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(10, 8, 10, 8) });
+            _results.Children.Add(new TextBlock { Text = "No settings or keybinds match", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(8, 6, 8, 6) });
             return;
         }
         for (int i = 0; i < _found.Count; i++)
@@ -79,7 +79,7 @@ internal sealed class SettingsSearchBox : Grid
             var row = new Tile
             {
                 CornerRadius = ThemeManager.Round(8),
-                Padding = new Thickness(10, 7, 10, 7),
+                Padding = new Thickness(8, 6, 8, 6),
                 Cursor = Cursors.Hand,
                 Background = i == _selected ? Ui.Res<Brush>("AccentSoft") : Brushes.Transparent,
                 Child = text,

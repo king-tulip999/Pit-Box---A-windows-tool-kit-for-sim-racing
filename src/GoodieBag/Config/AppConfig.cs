@@ -182,7 +182,6 @@ public sealed class UiSettings
 
     public Dictionary<string, string> PageSections { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
-    public bool SidebarRight { get; set; }
 
     public bool SidebarAllOpen { get; set; }
 
@@ -202,6 +201,8 @@ public sealed class UiSettings
 
     public bool TopoBackground { get; set; } = true;
 
+    public bool Quotes { get; set; } = true;
+
     public string? TopoColor { get; set; }
 
     public bool TrayTipShown { get; set; }
@@ -218,14 +219,6 @@ public sealed class UiSettings
 
     public bool? DarkMode { get; set; }
 
-    public int InterfaceScale { get; set; } = 100;
-
-    public int InterfaceScaleVersion { get; set; }
-
-    public static readonly int[] InterfaceScales = { 90, 100, 110 };
-
-    public const double BaseScale = 0.81;
-
     private static readonly AppTheme OldPastelTheme = new("OledPastel");
 
     internal static void DropPastelTheme(UiSettings ui)
@@ -240,11 +233,6 @@ public sealed class UiSettings
         }
         ui.PastelPreset = null;
     }
-
-    internal static int MigrateScale(int old) => new[] { 80, 90, 100 }.OrderBy(o => Math.Abs(o - old)).First() switch { 80 => 90, 90 => 100, _ => 110 };
-
-    [System.Text.Json.Serialization.JsonIgnore]
-    public double ScaleFactor => InterfaceScales.OrderBy(o => Math.Abs(o - InterfaceScale)).First() / 100.0 * BaseScale;
 
     public List<string> NavOrder { get; set; } = new();
 
@@ -286,6 +274,7 @@ public sealed class FanSettings
 
     public List<LegacyFanAssignment>? Fans { get; set; }
 
+    [System.Text.Json.Serialization.JsonIgnore]
     public FanPreset? Active => Presets.FirstOrDefault(p => p.Name == ActivePreset) ?? Presets.FirstOrDefault();
 
     public FanHardware HardwareFor(string controlId)

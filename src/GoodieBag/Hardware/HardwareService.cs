@@ -1,8 +1,9 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using LibreHardwareMonitor.Hardware;
 using GoodieBag.Config;
 using GoodieBag.Fans;
+using GoodieBag.Services;
 
 namespace GoodieBag.Hardware;
 
@@ -70,12 +71,18 @@ internal sealed class HardwareService : IDisposable
     private SnapshotSensors? _snapshotSensors;
     private List<(ISensor Sensor, string Id, string Name, string Hardware)>? _tempSensors;
     private int _sensorSignature = -1;
+    private volatile bool _sensorsChanged = true;
     private Computer? _computer;
     private IHardware? _cpu;
     private IHardware? _gpu;
     private readonly List<IHardware> _memory = new();
     private readonly DiskActivity _disk = new();
     private FanController? _fans;
+    private System.Threading.Timer? _fanWatchdog;
+    private Thread? _fanHandBack;
+    private long _fanPassMs;
+    private volatile bool _fanLoopRunning;
+    private volatile bool _fanWatchdogTripped;
     private volatile FanSettings _pendingFanSettings;
     private int _reads;
 
@@ -350,7 +357,7 @@ internal sealed class HardwareService : IDisposable
         if (_thread is not { IsAlive: true }) return null;
         Post(() => { try { done.TrySetResult(_fans is null ? null : read(_fans)); } catch (Exception ex) { done.TrySetResult(ex.Message); } });
         try { return await done.Task.WaitAsync(TimeSpan.FromSeconds(15)); }
-        catch (TimeoutException) { return "no answer from the hardware thread in 15 s"; }
+        catch (TimeoutException) { return $"no answer from the hardware thread in 15 {Units.S}"; }
     }
 
     public void SetOverride(string controlId, float percent)
@@ -433,17 +440,25 @@ internal sealed class HardwareService : IDisposable
         }
     }
 
-    private static void KeepNoHistory(IComputer computer)
+    private void KeepNoHistory(IComputer computer)
     {
-        static void Sensor(ISensor sensor) => sensor.ValuesTimeWindow = TimeSpan.Zero;
-        static void Device(IHardware hw)
+        static void Quiet(ISensor sensor) => sensor.ValuesTimeWindow = TimeSpan.Zero;
+        void Sensor(ISensor sensor)
         {
-            foreach (var sensor in hw.Sensors) Sensor(sensor);
+            Quiet(sensor);
+            _sensorsChanged = true;
+        }
+        void Device(IHardware hw)
+        {
+            foreach (var sensor in hw.Sensors) Quiet(sensor);
             hw.SensorAdded += Sensor;
+            hw.SensorRemoved += _ => _sensorsChanged = true;
             foreach (var sub in hw.SubHardware) Device(sub);
+            _sensorsChanged = true;
         }
         foreach (var hw in computer.Hardware) Device(hw);
         computer.HardwareAdded += Device;
+        computer.HardwareRemoved += _ => _sensorsChanged = true;
     }
 
     private bool RunSensors()
@@ -464,9 +479,7 @@ internal sealed class HardwareService : IDisposable
             KeepNoHistory(computer);
             _computer = computer;
             PickHardware();
-            fans = new FanController(computer, _pendingFanSettings);
-            fans.Problem += Raise;
-            _fans = fans;
+            fans = NewFanController(computer);
             OpenError = null;
         }
         catch (Exception ex)
@@ -490,6 +503,9 @@ internal sealed class HardwareService : IDisposable
         var clock = Stopwatch.StartNew();
         double lastSeconds = 0;
         long nextReadMs = 0, nextDeepMs = 0;
+        Volatile.Write(ref _fanPassMs, AwakeMs);
+        _fanWatchdogTripped = false;
+        _fanWatchdog = new System.Threading.Timer(_ => CheckFanWatchdog(), null, FanWatchdogCheckMs, FanWatchdogCheckMs);
 
         while (!_stopping)
         {
@@ -520,7 +536,9 @@ internal sealed class HardwareService : IDisposable
                 if (quick) UpdateSnapshotDevices();
                 else UpdateDevices(computer);
 
-                int signature = quick ? _sensorSignature : SensorSignature(computer);
+                bool recount = !quick && _sensorsChanged;
+                if (recount) _sensorsChanged = false;
+                int signature = recount ? SensorSignature(computer) : _sensorSignature;
                 if (signature != _sensorSignature)
                 {
                     PickDevices(computer);
@@ -547,10 +565,17 @@ internal sealed class HardwareService : IDisposable
                 LogOnce("read", ex);
             }
 
+            if (_fanWatchdogTripped) fans = RetakeFans(computer, fans);
+
             double now = clock.Elapsed.TotalSeconds;
-            try { fans.Tick(Math.Clamp(now - lastSeconds, 0.05, 5), snapshot?.CpuTemp, snapshot?.GpuTemp); }
+            float? cpuTemp = _cpu is not null && DeviceStale(_cpu) ? null : snapshot?.CpuTemp;
+            float? gpuTemp = _gpu is not null && DeviceStale(_gpu) ? null : snapshot?.GpuTemp;
+            try { fans.Tick(Math.Clamp(now - lastSeconds, 0.05, 5), cpuTemp, gpuTemp); }
             catch (Exception ex) { LogOnce("fans", ex); }
+            if (_fanWatchdogTripped) fans = RetakeFans(computer, fans);
             lastSeconds = now;
+            _fanLoopRunning = fanLoop;
+            Volatile.Write(ref _fanPassMs, AwakeMs);
 
             if (snapshot is not null && (publish || fanLoop))
             {
@@ -574,6 +599,11 @@ internal sealed class HardwareService : IDisposable
             _wake.Reset();
         }
 
+        _fanWatchdog?.Dispose();
+        _fanWatchdog = null;
+        _fanLoopRunning = false;
+        _fanHandBack?.Join(8000);
+        _fanHandBack = null;
         try { _slowRead?.Wait(2000); } catch { }
         try { fans.RestoreAll(); } catch { }
         try { SyncExtra(false, finishing: true); } catch (Exception ex) { LogOnce("close storage / network", ex); }
@@ -586,11 +616,74 @@ internal sealed class HardwareService : IDisposable
         _memory.Clear();
         InvalidateSensorCache();
         _sensorSignature = -1;
+        _sensorsChanged = true;
         _disk.Dispose();
         _sourceCache.Clear();
         ClearPublished();
         return true;
     }
+
+    private const int FanWatchdogMs = 10_000;
+    private const int FanWatchdogCheckMs = 2_000;
+    private const int StaleReadMs = 15_000;
+
+    private FanController RetakeFans(IComputer computer, FanController old)
+    {
+        bool handedBack = _fanHandBack?.Join(8000) ?? true;
+        _fanHandBack = null;
+        _fanWatchdogTripped = false;
+        if (handedBack) old.Dispose();
+        LogOnce("fan watchdog retake", new TimeoutException("the hardware thread answered again; fan control resumed"));
+        return NewFanController(computer);
+    }
+
+    private FanController NewFanController(IComputer computer)
+    {
+        var fans = new FanController(computer, _pendingFanSettings) { DeviceStale = DeviceStale };
+        fans.Problem += Raise;
+        _fans = fans;
+        return fans;
+    }
+
+    internal static bool FanLoopHung(bool fanLoop, long lastPassMs, long nowMs) => fanLoop && nowMs - lastPassMs >= FanWatchdogMs;
+
+    internal static bool ReadHung(bool reading, long startedMs, long nowMs) => reading && nowMs - startedMs >= StaleReadMs;
+
+    private bool DeviceStale(IHardware hw) =>
+        _slowRead is { IsCompleted: false } && Array.IndexOf(_slowReading, hw) >= 0 && ReadHung(true, _slowStartedMs, AwakeMs);
+
+    private void CheckFanWatchdog()
+    {
+        if (_stopping || _fanWatchdogTripped || !FanLoopHung(_fanLoopRunning, Volatile.Read(ref _fanPassMs), AwakeMs)) return;
+        var fans = _fans;
+        if (fans is null) return;
+        var handBack = new Thread(() => HandBackFans(fans)) { IsBackground = true, Name = "Goodie Bag fan hand-back" };
+        _fanHandBack = handBack;
+        handBack.Start();
+        _fanWatchdogTripped = true;
+    }
+
+    private void HandBackFans(FanController fans)
+    {
+        bool done;
+        try { done = fans.RestoreAll(); }
+        catch { done = false; }
+        if (done)
+        {
+            LogOnce("fan watchdog", new TimeoutException($"no fan pass for {FanWatchdogMs / 1000} seconds; fans handed back to the BIOS / driver"));
+            Raise("Fans handed back", $"The hardware stopped answering for {FanWatchdogMs / 1000} {Units.S}, so the fans went back to the BIOS / driver. Goodie Bag takes them again once it answers.");
+        }
+        else
+        {
+            LogOnce("fan watchdog stuck", new TimeoutException($"no fan pass for {FanWatchdogMs / 1000} seconds and the fans couldn't be handed back"));
+            Raise("Fans stuck at their last speed", $"The hardware stopped answering for {FanWatchdogMs / 1000} {Units.S} and the fans couldn't be handed back to the BIOS / driver. Save your work and restart the PC if temperatures climb.");
+        }
+    }
+
+    private static long AwakeMs => QueryUnbiasedInterruptTime(out ulong ticks) ? (long)(ticks / 10_000) : Environment.TickCount64;
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    private static extern bool QueryUnbiasedInterruptTime(out ulong unbiasedTime);
 
     private const int SlowUpdateMs = 250;
     private const int SuspendedMs = 30_000;
@@ -601,6 +694,7 @@ internal sealed class HardwareService : IDisposable
     private Task<(IHardware Hw, double Ms)[]>? _slowRead;
     private IHardware[] _slowReading = [];
     private long _slowNextMs;
+    private long _slowStartedMs;
 
     private int UserIntervalMs => PerformanceSettings.Effective(_monitorMs, _reduced ? BackgroundUsage.Reduced : BackgroundUsage.Standard, _windowHidden);
 
@@ -639,6 +733,7 @@ internal sealed class HardwareService : IDisposable
         long now = Environment.TickCount64;
         if (_slow.Count == 0 || now < _slowNextMs || _slowRead is { IsCompleted: false }) return;
         _slowNextMs = now + SlowIntervalMs;
+        _slowStartedMs = AwakeMs;
         var slow = _slowReading = _slow.ToArray();
         _slowRead = Task.Run(() =>
         {
@@ -1047,22 +1142,22 @@ internal sealed class HardwareService : IDisposable
         return found.ToArray();
     }
 
-    private static float? First(ISensor[] candidates)
+    internal static float? First(ISensor[] candidates)
     {
         foreach (var s in candidates)
         {
-            if (s.Value is { } v)
+            if (s.Value is { } v && float.IsFinite(v))
                 return v;
         }
         return null;
     }
 
-    private static float? MaxPositive(ISensor[] sensors)
+    internal static float? MaxPositive(ISensor[] sensors)
     {
         float? max = null;
         foreach (var s in sensors)
         {
-            if (s.Value is { } v && v > 0 && (max is null || v > max))
+            if (s.Value is { } v && float.IsFinite(v) && v > 0 && (max is null || v > max))
                 max = v;
         }
         return max;
@@ -1074,7 +1169,7 @@ internal sealed class HardwareService : IDisposable
         int count = 0;
         foreach (var s in sensors)
         {
-            if (s.Value is { } v && v > 0)
+            if (s.Value is { } v && float.IsFinite(v) && v > 0)
             {
                 sum += v;
                 count++;

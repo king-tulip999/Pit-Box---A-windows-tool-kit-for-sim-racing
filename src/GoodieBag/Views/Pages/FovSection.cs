@@ -21,6 +21,13 @@ internal sealed class FovSection : StackPanel
     private string? _iracingFolder;
     private double? _iracingFov;
 
+    public void OnShown()
+    {
+        var (folder, fov) = (_iracingFolder, _iracingFov);
+        ReadIracing();
+        if (folder != _iracingFolder || fov != _iracingFov) Recalculate();
+    }
+
     private void ReadIracing()
     {
         try
@@ -35,7 +42,7 @@ internal sealed class FovSection : StackPanel
         }
     }
     private readonly StackPanel _inputs = new(), _numbers = new(), _compare = new(), _measure = new(), _warnings = new();
-    private readonly RigDiagram _diagram = new() { MinHeight = 300 };
+    private readonly RigDiagram _diagram = new() { MinHeight = 243 };
     private readonly Stack<FovSetup> _undo = new();
     private DateTime _lastUndoPush;
     private Button? _undoButton;
@@ -45,15 +52,15 @@ internal sealed class FovSection : StackPanel
 
     private static readonly (string Label, Func<FovSetup> Make)[] Presets =
     {
-        ("Triple 27\" 16:9 1440p · 70 cm", () => Setup("Triple 27\"", true, 27, 2560, 1440, 70, 20)),
-        ("Triple 32\" 16:9 1440p · 80 cm", () => Setup("Triple 32\"", true, 32, 2560, 1440, 80, 22)),
-        ("Triple 24\" 16:9 1080p · 60 cm", () => Setup("Triple 24\"", true, 24, 1920, 1080, 60, 18)),
-        ("Triple 32\" 16:9 4K · 75 cm", () => Setup("Triple 32\" 4K", true, 32, 3840, 2160, 75, 20)),
-        ("Triple 27\" with bezel-free kit · 70 cm", () => Setup("Triple 27\" bezel-free", true, 27, 2560, 1440, 70, -2)),
-        ("Single 27\" 16:9 1440p · 65 cm", () => Setup("Single 27\"", false, 27, 2560, 1440, 65, 20)),
-        ("Single 34\" 21:9 1500R · 70 cm", () => Setup("Single 34\" ultrawide", false, 34, 3440, 1440, 70, 20, 1500)),
-        ("Single 49\" 32:9 1800R · 80 cm", () => Setup("Single 49\" super ultrawide", false, 49, 5120, 1440, 80, 20, 1800)),
-        ("Single 55\" TV 4K · 110 cm", () => Setup("55\" TV", false, 55, 3840, 2160, 110, 30)),
+        ("Triple 27\" 16:9 1440p · 70 CM", () => Setup("Triple 27\"", true, 27, 2560, 1440, 70, 20)),
+        ("Triple 32\" 16:9 1440p · 80 CM", () => Setup("Triple 32\"", true, 32, 2560, 1440, 80, 22)),
+        ("Triple 24\" 16:9 1080p · 60 CM", () => Setup("Triple 24\"", true, 24, 1920, 1080, 60, 18)),
+        ("Triple 32\" 16:9 4K · 75 CM", () => Setup("Triple 32\" 4K", true, 32, 3840, 2160, 75, 20)),
+        ("Triple 27\" with bezel-free kit · 70 CM", () => Setup("Triple 27\" bezel-free", true, 27, 2560, 1440, 70, -2)),
+        ("Single 27\" 16:9 1440p · 65 CM", () => Setup("Single 27\"", false, 27, 2560, 1440, 65, 20)),
+        ("Single 34\" 21:9 1500R · 70 CM", () => Setup("Single 34\" ultrawide", false, 34, 3440, 1440, 70, 20, 1500)),
+        ("Single 49\" 32:9 1800R · 80 CM", () => Setup("Single 49\" super ultrawide", false, 49, 5120, 1440, 80, 20, 1800)),
+        ("Single 55\" TV 4K · 110 CM", () => Setup("55\" TV", false, 55, 3840, 2160, 110, 30)),
     };
 
     private static readonly (int W, int H)[] Resolutions =
@@ -74,10 +81,10 @@ internal sealed class FovSection : StackPanel
         _window = window;
         BuildTools();
 
-        foreach (var w in new[] { new GridLength(400), new GridLength(16), new GridLength(1, GridUnitType.Star), new GridLength(16), new GridLength(250) })
+        foreach (var w in new[] { new GridLength(324), new GridLength(13), new GridLength(1, GridUnitType.Star), new GridLength(13), new GridLength(202) })
             _top.ColumnDefinitions.Add(new ColumnDefinition { Width = w });
         for (int i = 0; i < 3; i++) _top.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        var inputsCard = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(18, 14, 18, 14), Child = _inputs };
+        var inputsCard = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(15, 11, 15, 11), Child = _inputs };
         var left = new Grid();
         left.Children.Add(inputsCard);
         _top.Children.Add(left);
@@ -88,19 +95,19 @@ internal sealed class FovSection : StackPanel
         DockPanel.SetDock(_warnings, Dock.Bottom);
         diagramStack.Children.Add(_warnings);
         diagramStack.Children.Add(_diagram);
-        var diagramCard = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(18, 14, 18, 14), Child = diagramStack };
+        var diagramCard = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(15, 11, 15, 11), Child = diagramStack };
         Grid.SetColumn(diagramCard, 2);
         _top.Children.Add(diagramCard);
         Grid.SetColumn(_numbers, 4);
         _top.Children.Add(_numbers);
         Children.Add(_top);
 
-        foreach (var w in new[] { new GridLength(1, GridUnitType.Star), new GridLength(16), new GridLength(1.25, GridUnitType.Star) })
+        foreach (var w in new[] { new GridLength(1, GridUnitType.Star), new GridLength(13), new GridLength(1.25, GridUnitType.Star) })
             _bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = w });
         _bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         _bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        _bottom.Margin = new Thickness(0, 16, 0, 0);
-        var iracingCard = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(18, 14, 18, 16), Child = _iracing };
+        _bottom.Margin = new Thickness(0, 13, 0, 0);
+        var iracingCard = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(15, 11, 15, 13), Child = _iracing };
         Ui.Anchor(iracingCard, "simracing.fov.iracing");
         _bottom.Children.Add(iracingCard);
         var right = new StackPanel();
@@ -108,7 +115,7 @@ internal sealed class FovSection : StackPanel
         Ui.Anchor(_compareCard, "simracing.compare");
         right.Children.Add(_compareCard);
         _measureCard = Card("Measure your rig", "I.Ruler", _measure);
-        ((Tile)_measureCard).Padding = new Thickness(16, 12, 16, 12);
+        ((Tile)_measureCard).Padding = new Thickness(13, 10, 13, 10);
         Grid.SetColumn(right, 2);
         _bottom.Children.Add(right);
         Children.Add(_bottom);
@@ -123,8 +130,8 @@ internal sealed class FovSection : StackPanel
     private FovSetup C => S.Current;
     private bool Imperial => S.Imperial;
 
-    private string LenUnit => Imperial ? "in" : "cm";
-    private string BezelUnit => Imperial ? "in" : "mm";
+    private string LenUnit => Imperial ? Units.In : Units.Cm;
+    private string BezelUnit => Imperial ? Units.In : Units.Mm;
     private double ToLen(double cm) => Imperial ? cm / 2.54 : cm;
     private double FromLen(double v) => Imperial ? v * 2.54 : v;
     private double ToBezel(double mm) => Imperial ? mm / 25.4 : mm;
@@ -140,27 +147,27 @@ internal sealed class FovSection : StackPanel
         _mode = mode;
         _bottomWide = bottomWide;
         var cols = _top.ColumnDefinitions;
-        cols[0].Width = mode == 2 ? new GridLength(400) : mode == 1 ? new GridLength(380) : new GridLength(1, GridUnitType.Star);
-        cols[1].Width = new GridLength(mode > 0 ? 16 : 0);
+        cols[0].Width = mode == 2 ? new GridLength(324) : mode == 1 ? new GridLength(308) : new GridLength(1, GridUnitType.Star);
+        cols[1].Width = new GridLength(mode > 0 ? 13 : 0);
         cols[2].Width = mode > 0 ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
-        cols[3].Width = new GridLength(mode == 2 ? 16 : 0);
-        cols[4].Width = mode == 2 ? new GridLength(250) : new GridLength(0);
+        cols[3].Width = new GridLength(mode == 2 ? 13 : 0);
+        cols[4].Width = mode == 2 ? new GridLength(202) : new GridLength(0);
         var diagram = (FrameworkElement)_top.Children[1];
         Grid.SetColumn(diagram, mode > 0 ? 2 : 0);
         Grid.SetRow(diagram, mode > 0 ? 0 : 2);
-        diagram.Margin = new Thickness(0, mode > 0 ? 0 : 16, 0, 0);
+        diagram.Margin = new Thickness(0, mode > 0 ? 0 : 13, 0, 0);
         Grid.SetColumn(_numbers, mode == 2 ? 4 : 0);
         Grid.SetColumnSpan(_numbers, mode == 1 ? 3 : 1);
         Grid.SetRow(_numbers, mode == 2 ? 0 : 1);
-        _numbers.Margin = new Thickness(0, mode == 2 ? 0 : 16, 0, 0);
+        _numbers.Margin = new Thickness(0, mode == 2 ? 0 : 13, 0, 0);
 
         var b = _bottom.ColumnDefinitions;
-        b[1].Width = new GridLength(bottomWide ? 16 : 0);
+        b[1].Width = new GridLength(bottomWide ? 13 : 0);
         b[2].Width = bottomWide ? new GridLength(1.25, GridUnitType.Star) : new GridLength(0);
         var right = (FrameworkElement)_bottom.Children[1];
         Grid.SetColumn(right, bottomWide ? 2 : 0);
         Grid.SetRow(right, bottomWide ? 0 : 1);
-        right.Margin = new Thickness(0, bottomWide ? 0 : 16, 0, 0);
+        right.Margin = new Thickness(0, bottomWide ? 0 : 13, 0, 0);
         ArrangeTools();
         if (numbersMoved) Recalculate();
     }
@@ -182,7 +189,7 @@ internal sealed class FovSection : StackPanel
             _presets.SelectedIndex = 0;
         };
         _tools.Children.Add(_presets);
-        var units = Ui.Segmented(new[] { "cm", "in" }, Imperial ? 1 : 0, i => { S.Imperial = i == 1; _app.Save(); BuildInputs(); Recalculate(); }, "Units", new[] { "Centimetres", "Inches" });
+        var units = Ui.Segmented(new[] { Units.Cm, Units.In }, Imperial ? 1 : 0, i => { S.Imperial = i == 1; _app.Save(); BuildInputs(); Recalculate(); }, "Units", new[] { "Centimetres", "Inches" });
         units.ToolTip = "Units for distances and sizes";
         DockPanel.SetDock(units, Dock.Left);
         _toolRow.Children.Add(units);
@@ -202,12 +209,12 @@ internal sealed class FovSection : StackPanel
         bool column = _mode == 2;
         _tools.Orientation = column ? Orientation.Vertical : Orientation.Horizontal;
         _tools.HorizontalAlignment = column ? HorizontalAlignment.Stretch : HorizontalAlignment.Right;
-        _tools.Margin = new Thickness(column ? 6 : 0, 0, 6, 12);
+        _tools.Margin = new Thickness(column ? 5 : 0, 0, 6, 12);
         _presets.Width = column ? double.NaN : 230;
-        _toolRow.Margin = column ? new Thickness(0, 8, 0, 0) : new Thickness(8, 0, 0, 0);
+        _toolRow.Margin = column ? new Thickness(0, 6, 0, 0) : new Thickness(6, 0, 0, 0);
         _toolRow.HorizontalAlignment = column ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
         var units = (FrameworkElement)_toolRow.Children[0];
-        units.Margin = new Thickness(0, 0, column ? 0 : 8, 0);
+        units.Margin = new Thickness(0, 0, column ? 0 : 6, 0);
     }
 
     private void Change(Action mutate, bool rebuild = false)
@@ -312,13 +319,13 @@ internal sealed class FovSection : StackPanel
 
         if (!measured)
         {
-            var diagonal = new NumberBox(screen.DiagonalIn, "in", 56) { Minimum = 10, Maximum = 120, Step = 0.5, Decimals = 1 };
+            var diagonal = new NumberBox(screen.DiagonalIn, Units.In, 56) { Minimum = 10, Maximum = 120, Step = 0.5, Decimals = 1 };
             diagonal.ValueChanged += v => Change(() => screen.DiagonalIn = v);
-            var aspect = new ComboBox { MinWidth = 160, ToolTip = "Aspect ratio of the picture" };
+            var aspect = new ComboBox { MinWidth = 130, ToolTip = "Aspect ratio of the picture" };
             foreach (var (_, label) in Aspects) aspect.Items.Add(label);
             aspect.SelectedIndex = Math.Max(0, Array.FindIndex(Aspects, a => a.Id == screen.Aspect));
             aspect.SelectionChanged += (_, _) => Change(() => screen.Aspect = Aspects[aspect.SelectedIndex].Id, rebuild: true);
-            _inputs.Children.Add(Row("Diagonal", diagonal, $"Corner to corner of the picture ({screen.DiagonalIn * 2.54:0.#} cm)."));
+            _inputs.Children.Add(Row("Diagonal", diagonal, $"Corner to corner of the picture ({screen.DiagonalIn * 2.54:0.#} {Units.Cm})."));
             _inputs.Children.Add(Row("Aspect", aspect,
                 $"“From resolution” uses {FovCalculator.AspectOf(screen):0.000}:1; “21:9” panels are really 2.39:1 (3440×1440) or 2.37:1 (2560×1080)."));
             if (screen.Aspect == "custom")
@@ -343,16 +350,16 @@ internal sealed class FovSection : StackPanel
             _inputs.Children.Add(Row("Picture height", height, "Top to bottom of the lit picture."));
         }
 
-        var resolution = new ComboBox { Width = 150 };
-        foreach (var (w, h) in Resolutions) resolution.Items.Add($"{w} × {h}");
+        var resolution = new ComboBox { Width = 122 };
+        foreach (var (w, h) in Resolutions) resolution.Items.Add($"{w}×{h}");
         resolution.Items.Add("Other…");
         int known = Array.FindIndex(Resolutions, r => r.W == screen.ResolutionW && r.H == screen.ResolutionH);
         resolution.SelectedIndex = known >= 0 ? known : Resolutions.Length;
         var resRow = new StackPanel { Orientation = Orientation.Horizontal };
         resRow.Children.Add(resolution);
-        var typed = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(8, 0, 0, 0), Visibility = known >= 0 ? Visibility.Collapsed : Visibility.Visible };
-        var tw = new TextBox { Width = 56, Text = screen.ResolutionW.ToString(), VerticalContentAlignment = VerticalAlignment.Center };
-        var th = new TextBox { Width = 56, Text = screen.ResolutionH.ToString(), VerticalContentAlignment = VerticalAlignment.Center };
+        var typed = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(6, 0, 0, 0), Visibility = known >= 0 ? Visibility.Collapsed : Visibility.Visible };
+        var tw = new TextBox { Width = 45, Text = screen.ResolutionW.ToString(), VerticalContentAlignment = VerticalAlignment.Center };
+        var th = new TextBox { Width = 45, Text = screen.ResolutionH.ToString(), VerticalContentAlignment = VerticalAlignment.Center };
         void Commit(TextBox box, int lo, int hi, Func<int> get, Action<int> set)
         {
             if (int.TryParse(box.Text.Trim(), out var v) && v >= lo && v <= hi) { if (v != get()) Change(() => set(v)); }
@@ -366,7 +373,7 @@ internal sealed class FovSection : StackPanel
         Wire(tw, 320, 15360, () => screen.ResolutionW, v => screen.ResolutionW = v);
         Wire(th, 200, 8640, () => screen.ResolutionH, v => screen.ResolutionH = v);
         typed.Children.Add(tw);
-        typed.Children.Add(new TextBlock { Text = "×", Margin = new Thickness(6, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center, Foreground = Ui.Res<Brush>("TextMuted") });
+        typed.Children.Add(new TextBlock { Text = "×", Margin = new Thickness(5, 0, 5, 0), VerticalAlignment = VerticalAlignment.Center, Foreground = Ui.Res<Brush>("TextMuted") });
         typed.Children.Add(th);
         resRow.Children.Add(typed);
         resolution.SelectionChanged += (_, _) =>
@@ -385,12 +392,12 @@ internal sealed class FovSection : StackPanel
         curve.Children.Add(Ui.Switch(screen.Curved, v => Change(() => screen.Curved = v, rebuild: true)));
         if (screen.Curved)
         {
-            var radius = new ComboBox { Width = 96, Margin = new Thickness(10, 0, 0, 0) };
+            var radius = new ComboBox { Width = 78, Margin = new Thickness(8, 0, 0, 0) };
             foreach (var r in Radii) radius.Items.Add($"{r}R");
             radius.Items.Add("Other");
             int index = Array.IndexOf(Radii, (int)screen.RadiusMm);
             radius.SelectedIndex = index >= 0 ? index : Radii.Length;
-            var custom = new NumberBox(screen.RadiusMm, "mm", 56) { Minimum = 300, Maximum = 10000, Step = 50, Margin = new Thickness(8, 0, 0, 0) };
+            var custom = new NumberBox(screen.RadiusMm, Units.Mm, 56) { Minimum = 300, Maximum = 10000, Step = 50, Margin = new Thickness(6, 0, 0, 0) };
             custom.Visibility = index >= 0 ? Visibility.Collapsed : Visibility.Visible;
             custom.ValueChanged += v => Change(() => screen.RadiusMm = v);
             radius.SelectionChanged += (_, _) =>
@@ -414,7 +421,7 @@ internal sealed class FovSection : StackPanel
 
         _numbers.Children.Clear();
         _numbers.Children.Add(_tools);
-        var numbers = _mode == 2 ? (Panel)_numbers : new UniformGrid { Columns = 3, Margin = new Thickness(-6, 0, -6, 0) };
+        var numbers = _mode == 2 ? (Panel)_numbers : new UniformGrid { Columns = 3, Margin = new Thickness(-5, 0, -5, 0) };
         const string HorizontalGames = "Games that take a horizontal FOV: iRacing, AMS2, LFS, RaceRoom";
         const string VerticalGames = "Games that take a vertical FOV: AC, ACC, LMU, rF2, AMS1, BeamNG";
         numbers.Children.Add(Number("Horizontal FOV", $"{r.HorizontalFovTotal:0.0}°", r.Triple ? $"All three screens · center {r.HorizontalFovCentre:0.0}°" : "For horizontal-FOV games", "I.Eye", "SageSoft", "SageDeep", HorizontalGames));
@@ -425,7 +432,7 @@ internal sealed class FovSection : StackPanel
                 offIdeal ? $"{Math.Abs(r.SideAngle - r.OptimalSideAngle):0.0}° {(r.SideAngle > r.OptimalSideAngle ? "more" : "less")} than the angle that faces you square-on. Side angle → Ideal uses it." : null, warn: offIdeal)
             : Number("Detail", $"{r.PixelsPerDegree:0.0}", "Pixels per degree (horizontal)", "I.Rotate", "ApricotSoft", "ApricotDeep"));
         if (numbers != _numbers) _numbers.Children.Add(numbers);
-        _measureCard.Margin = _mode == 2 ? new Thickness(6, 0, 6, 12) : new Thickness(0);
+        _measureCard.Margin = _mode == 2 ? new Thickness(5, 0, 5, 10) : new Thickness(0);
         _numbers.Children.Add(_measureCard);
 
         _warnings.Children.Clear();
@@ -461,29 +468,28 @@ internal sealed class FovSection : StackPanel
         var write = Ui.LabeledButton("I.Download", "Write into iRacing", () => _ = ExportIntoIracing(), "PrimaryButton");
         write.ToolTip = $"FOV {target:0.#}° into app.ini and the screen setup into rendererDX11Monitor.ini (iRacing must be closed)";
         write.IsEnabled = folder is not null;
-        var statusRow = Ui.SplitRow(statusText, write, 16, stackLeft: true);
-        statusRow.Margin = new Thickness(0, 10, 0, 12);
-        _iracing.Children.Add(statusRow);
+        statusText.Margin = new Thickness(0, 8, 0, 10);
+        _iracing.Children.Add(statusText);
         string[] steps =
         {
-            "Import reads the screen size, distance, bezel, side angle and curve iRacing has now, so you start from your current setup.",
+            "Import starts from the screen size, distance, bezel, side angle and curve iRacing has now.",
             "Adjust the rig above until it matches your seat and screens.",
-            "Write puts this FOV and the triple-screen setup into iRacing. Close iRacing first; its files are backed up (iRacing Controller → Overview and Backups). Or save copies to a folder and copy them in yourself.",
+            "Write with iRacing closed; its files are backed up first (iRacing Controller → Health and backups). Or save copies and copy them in yourself.",
         };
         for (int i = 0; i < steps.Length; i++)
         {
-            var line = new DockPanel { Margin = new Thickness(0, 0, 0, 4) };
-            var n = new TextBlock { Text = $"{i + 1}.", Width = 18, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>("AccentText") };
+            var line = new DockPanel { Margin = new Thickness(0, 0, 0, 3) };
+            var n = new TextBlock { Text = $"{i + 1}.", Width = 15, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>("AccentText") };
             DockPanel.SetDock(n, Dock.Left);
             line.Children.Add(n);
             line.Children.Add(new TextBlock { Text = steps[i], Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap });
             _iracing.Children.Add(line);
         }
-        var buttons = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
+        var buttons = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
         Button B(string icon, string label, Action run, string style, string tip)
         {
             var b = Ui.LabeledButton(icon, label, run, style);
-            b.Margin = new Thickness(0, 0, 8, 8);
+            b.Margin = new Thickness(0, 0, 6, 6);
             b.ToolTip = tip;
             buttons.Children.Add(b);
             return b;
@@ -491,7 +497,10 @@ internal sealed class FovSection : StackPanel
         B("I.Folder", "Import from iRacing", ImportFromIracingFolder, "SoftButton", "Read rendererDX11Monitor.ini in Documents\\iRacing").IsEnabled = folder is not null;
         B("I.Folder", "Import a file…", ImportFromFile, "GhostButton", "Read a rendererDX11Monitor.ini you saved somewhere else");
         B("I.Save", "Save copies…", ExportCopies, "GhostButton", "Updated app.ini and rendererDX11Monitor.ini plus _backup copies, in a folder you pick").IsEnabled = folder is not null;
-        _iracing.Children.Add(buttons);
+        write.VerticalAlignment = VerticalAlignment.Top;
+        write.Margin = new Thickness(0, 6, 0, 6);
+        var actions = Ui.SplitRow(buttons, write, 16, stackLeft: true);
+        _iracing.Children.Add(actions);
     }
 
     private void FillCompare(FovResult current, IReadOnlyList<FovResult> others)
@@ -500,7 +509,7 @@ internal sealed class FovSection : StackPanel
         var table = new Grid();
         foreach (var w in new[] { 2.2, 1, 1, 1, 1.4, 0.8 })
             table.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(w, GridUnitType.Star) });
-        table.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) });
+        table.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(38) });
         int row = 0;
         void Cell(UIElement e, int col)
         {
@@ -510,7 +519,7 @@ internal sealed class FovSection : StackPanel
         }
         TextBlock T(string text, bool head = false) => new()
         {
-            Text = text, VerticalAlignment = head ? VerticalAlignment.Bottom : VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 4, 8, 4),
+            Text = text, VerticalAlignment = head ? VerticalAlignment.Bottom : VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 3, 6, 3),
             Style = head ? Ui.Res<Style>("Eyebrow") : Ui.Res<Style>("Body"), ToolTip = head ? null : text, TextWrapping = head ? TextWrapping.Wrap : TextWrapping.NoWrap,
         };
         table.RowDefinitions.Add(new RowDefinition());
@@ -530,8 +539,8 @@ internal sealed class FovSection : StackPanel
             var idle = edit is null ? Ui.Res<Brush>("AccentSoft") : Ui.Res<Brush>("Surface");
             var band = new Tile
             {
-                Background = idle, CornerRadius = ThemeManager.Round(8), Margin = new Thickness(-10, 4, -4, 4),
-                BorderThickness = new Thickness(1), BorderBrush = Ui.Res<Brush>(edit is null ? "Accent" : "LineStrong"),
+                Background = idle, CornerRadius = ThemeManager.Round(8), Margin = new Thickness(-8, 3, 0, 3),
+                BorderThickness = Hairline.Edges(), BorderBrush = Ui.Res<Brush>(edit is null ? "Accent" : "LineStrong"),
                 Cursor = edit is null ? null : System.Windows.Input.Cursors.Hand,
                 ToolTip = edit is null ? "The setup you're editing" : "Click to edit this setup (the one you're editing now joins the comparison)",
             };
@@ -546,8 +555,8 @@ internal sealed class FovSection : StackPanel
             Grid.SetColumnSpan(band, 7);
             table.Children.Add(band);
             int firstCell = table.Children.Count;
-            var who = new DockPanel { Margin = new Thickness(20, 12, 8, 12) };
-            var detail = (edit is null ? "Editing · " : "") + $"{(setup.Triple ? "3 × " : "")}{Describe(setup.Centre)} · {Len(setup.DistanceCm, 0)}";
+            var who = new DockPanel { Margin = new Thickness(16, 10, 6, 10) };
+            var detail = $"{(setup.Triple ? "3 × " : "")}{Describe(setup.Centre)} · {Len(setup.DistanceCm, 0)}";
             var label = new StackPanel { VerticalAlignment = VerticalAlignment.Center, ToolTip = $"{setup.Name}\n{detail}" };
             label.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = setup.Name, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis }));
             label.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = detail, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.NoWrap, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 2, 0, 0) }));
@@ -560,8 +569,11 @@ internal sealed class FovSection : StackPanel
             Cell(T($"{r.PixelsPerDegree:0.0}"), 5);
             for (int c = firstCell; c < table.Children.Count; c++) table.Children[c].IsHitTestVisible = false;
             Cell(ColorButton(setup, color), 0);
-            Cell(Ui.IconButton("I.Trash", edit is not null ? "Delete this setup"
-                : S.Compare.Count > 0 ? "Delete this setup (the next one in the list becomes the one you edit)" : "Delete this setup (back to a default rig)", remove), 6);
+            var bin = Ui.IconButton("I.Trash", edit is not null ? "Delete this setup"
+                : S.Compare.Count > 0 ? "Delete this setup (the next one in the list becomes the one you edit)" : "Delete this setup (back to a default rig)", remove);
+            bin.HorizontalAlignment = HorizontalAlignment.Right;
+            bin.Margin = new Thickness(0, 0, 6, 0);
+            Cell(bin, 6);
         }
 
         foreach (var i in S.ValidCompareRows())
@@ -584,20 +596,21 @@ internal sealed class FovSection : StackPanel
         }
         _compare.Children.Add(table);
 
-        var items = new List<(string, Action?)> { ("A copy of the setup being edited", () => AddCompare(C.Copy(), C.Name + " copy")), ("", null) };
+        var items = new List<(string, Action?)> { ("A copy of the setup being edited", () => AddCompare(C.Copy(), C.Name[..Math.Min(C.Name.Length, Ui.NameLength - 5)].TrimEnd() + " copy")), ("", null) };
         foreach (var (label, make) in Presets)
             items.Add((label, () => AddCompare(make(), null)));
         var add = Menu("I.Plus", "Compare with…", items.ToArray());
         add.IsEnabled = S.Compare.Count < SimRacingSettings.MaxCompare;
+        if (!add.IsEnabled) add.ToolTip = $"Up to {SimRacing.Race.RaceFormat.Count(SimRacingSettings.MaxCompare, "setup")}; delete one to add another";
         add.HorizontalAlignment = HorizontalAlignment.Left;
-        add.Margin = new Thickness(0, 10, 0, 0);
+        add.Margin = new Thickness(0, 8, 0, 0);
         _compare.Children.Add(add);
         _compare.Children.Add(new TextBlock
         {
             Text = S.Compare.Count == 0
                 ? "Add setups to see them in the top-down view in their own color, with their numbers next to yours. Tip: compare a copy of your rig, then change your rig."
-                : $"Drawn in the top-down view in their color (click a color to change it, the bin to remove a setup). Click a row to edit that setup. Up to {SimRacingSettings.MaxCompare}.",
-            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0),
+                : $"Drawn in the top-down view in their color. Click a row to edit that setup. Up to {SimRacingSettings.MaxCompare}.",
+            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 5, 0, 0),
         });
     }
 
@@ -607,14 +620,14 @@ internal sealed class FovSection : StackPanel
     {
         var ring = new Tile
         {
-            Child = new Tile { Width = 12, Height = 12, CornerRadius = ThemeManager.Round(3), Background = color },
-            Padding = new Thickness(2), Margin = new Thickness(-3, 0, 0, 0), BorderThickness = new Thickness(1), BorderBrush = Brushes.Transparent,
+            Child = new Tile { Width = 10, Height = 10, CornerRadius = ThemeManager.Round(3), Background = color },
+            Padding = new Thickness(2), Margin = new Thickness(-2, 0, 0, 0), BorderThickness = Hairline.Edges(), BorderBrush = Ui.Res<Brush>("LineStrong"),
             Background = Brushes.Transparent, CornerRadius = ThemeManager.Round(5), Cursor = System.Windows.Input.Cursors.Hand,
             HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center,
             ToolTip = "Change this setup's color",
         };
-        ring.MouseEnter += (_, _) => ring.BorderBrush = Ui.Res<Brush>("LineStrong");
-        ring.MouseLeave += (_, _) => ring.BorderBrush = Brushes.Transparent;
+        ring.MouseEnter += (_, _) => ring.BorderBrush = Ui.Res<Brush>("AccentText");
+        ring.MouseLeave += (_, _) => ring.BorderBrush = Ui.Res<Brush>("LineStrong");
         ring.MouseLeftButtonUp += (_, e) => { e.Handled = true; PickColor(ring, setup); };
         Motion.Pressable(ring);
         return ring;
@@ -623,8 +636,9 @@ internal sealed class FovSection : StackPanel
     private void PickColor(FrameworkElement anchor, FovSetup setup)
     {
         var popup = new Popup { PlacementTarget = anchor, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true, PopupAnimation = PopupAnimation.Fade };
+        Ui.DropBelow(popup);
         Ui.FollowTarget(popup);
-        var swatches = new WrapPanel { MaxWidth = 4 * 30 };
+        var swatches = new WrapPanel { MaxWidth = 3 * 30 };
         var seen = new List<Color>();
         var everyone = S.Compare.Prepend(C).ToList();
         foreach (var key in SimRacingSettings.ColorChoices)
@@ -636,7 +650,7 @@ internal sealed class FovSection : StackPanel
             var owner = everyone.FirstOrDefault(other => other != setup && other.Color == key);
             var choice = new Tile
             {
-                Child = new Tile { Width = 18, Height = 18, CornerRadius = ThemeManager.Round(4), Background = Ui.Res<Brush>(key) },
+                Child = new Tile { Width = 15, Height = 15, CornerRadius = ThemeManager.Round(4), Background = Ui.Res<Brush>(key) },
                 Padding = new Thickness(2), Margin = new Thickness(2), BorderThickness = new Thickness(2), CornerRadius = ThemeManager.Round(6),
                 BorderBrush = mine ? Ui.Res<Brush>("Heading") : Brushes.Transparent, Background = Brushes.Transparent,
                 Cursor = System.Windows.Input.Cursors.Hand,
@@ -661,13 +675,13 @@ internal sealed class FovSection : StackPanel
             swatches.Children.Add(choice);
         }
         var stack = new StackPanel();
-        stack.Children.Add(new TextBlock { Text = "Color", Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(2, 0, 0, 6) });
+        stack.Children.Add(new TextBlock { Text = "Color", Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(2, 0, 0, 5) });
         stack.Children.Add(swatches);
         popup.Child = new Tile
         {
             Style = Ui.Res<Style>("LiftedCard"),
-            Padding = new Thickness(10),
-            Margin = new Thickness(8, 4, 8, 16),
+            Padding = new Thickness(8),
+            Margin = new Thickness(6, 3, 6, 13),
             Child = stack,
         };
         popup.IsOpen = true;
@@ -712,12 +726,12 @@ internal sealed class FovSection : StackPanel
     private void FillMeasure(FovResult r)
     {
         _measure.Children.Clear();
-        var grid = new UniformGrid { Columns = _mode == 2 ? 1 : 3, Margin = new Thickness(-8, 0, -8, 0) };
+        var grid = new UniformGrid { Columns = _mode == 2 ? 1 : 3, Margin = new Thickness(-6, 0, -6, 0) };
         void M(string label, string value, string? help)
         {
-            var cell = new StackPanel { Margin = new Thickness(8, 4, 8, 4), ToolTip = help };
+            var cell = new StackPanel { Margin = new Thickness(6, 3, 6, 3), ToolTip = help };
             cell.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), TextTrimming = TextTrimming.CharacterEllipsis }));
-            cell.Children.Add(new TextBlock { Text = value, FontSize = 15, FontWeight = FontWeights.SemiBold });
+            cell.Children.Add(new TextBlock { Text = value, FontSize = 12, FontWeight = FontWeights.SemiBold });
             grid.Children.Add(cell);
         }
         if (r.Triple)
@@ -787,8 +801,9 @@ internal sealed class FovSection : StackPanel
         }
         var r = FovCalculator.Calculate(C);
         string values = string.Join(", ", FovExchange.IracingValues(C, r).Select(v => $"{v.Key} {v.Value}"));
+        string differs = FovExchange.Approximations(C, r) is { Count: > 0 } notes ? "\n\n" + string.Join(" ", notes) + " The FOV is still the one for your rig." : "";
         if (!await _window.Confirm("Write this rig into iRacing?",
-                $"FOV {FovExchange.IracingFov(r):0.#}° in app.ini, and in rendererDX11Monitor.ini [MonitorSetup]: {values}.\n\niRacing's files are backed up first (iRacing Controller → Overview and Backups).", "Write"))
+                $"FOV {FovExchange.IracingFov(r):0.#}° in app.ini, and in rendererDX11Monitor.ini [MonitorSetup]: {values}.{differs}\n\niRacing's files are backed up first (iRacing Controller → Health and backups).", "Write"))
             return;
         try
         {
@@ -843,6 +858,7 @@ internal sealed class FovSection : StackPanel
     {
         var button = Ui.LabeledButton(icon, label, () => { }, "SoftButton");
         var menu = new ContextMenu { PlacementTarget = button, Placement = PlacementMode.Bottom };
+        Ui.DropBelow(menu);
         foreach (var (text, run) in items)
         {
             if (run is null) { menu.Items.Add(new Separator()); continue; }
@@ -856,13 +872,13 @@ internal sealed class FovSection : StackPanel
 
     private static Grid Row(string label, UIElement control, string? help)
     {
-        var grid = new Grid { Margin = new Thickness(0, 4, 0, 4) };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(148) });
+        var grid = new Grid { Margin = new Thickness(0, 3, 0, 3) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
         grid.ColumnDefinitions.Add(new ColumnDefinition());
-        var name = new TextBlock { Foreground = Ui.Res<Brush>("TextMuted"), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 8, 0), Background = Brushes.Transparent, ToolTip = help };
+        var name = new TextBlock { Foreground = Ui.Res<Brush>("TextMuted"), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 6, 0), Background = Brushes.Transparent, ToolTip = help };
         name.Inlines.Add(new System.Windows.Documents.Run(label));
         if (help is not null)
-            name.Inlines.Add(new System.Windows.Documents.InlineUIContainer(new Icon { Data = Ui.Res<Geometry>("I.Info"), Width = 12, Height = 12, Margin = new Thickness(5, 0, 0, 0), Foreground = Ui.Res<Brush>("TextFaint") }) { BaselineAlignment = BaselineAlignment.Center });
+            name.Inlines.Add(new System.Windows.Documents.InlineUIContainer(new Icon { Data = Ui.Res<Geometry>("I.Info"), Width = 10, Height = 10, Margin = new Thickness(4, 0, 0, 0), Foreground = Ui.Res<Brush>("TextFaint") }) { BaselineAlignment = BaselineAlignment.Center });
         grid.Children.Add(name);
         if (control is FrameworkElement fe) { fe.HorizontalAlignment = HorizontalAlignment.Left; fe.VerticalAlignment = VerticalAlignment.Center; }
         Grid.SetColumn(control, 1);
@@ -870,17 +886,17 @@ internal sealed class FovSection : StackPanel
         return grid;
     }
 
-    private static TextBlock Section(string title) => new() { Text = title, Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 12, 0, 2) };
+    private static TextBlock Section(string title) => new() { Text = title, Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 10, 0, 2) };
 
     private static StackPanel Heading(string title, string icon)
     {
-        var head = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
+        var head = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
         head.Children.Add(new Tile
         {
-            Style = Ui.Res<Style>("IconBadge"), Width = 28, Height = 28, CornerRadius = ThemeManager.Round(8),
-            Child = new Icon { Data = Ui.Res<Geometry>(icon), Width = 15, Height = 15 },
+            Style = Ui.Res<Style>("IconBadge"), Width = 23, Height = 23, CornerRadius = ThemeManager.Round(8),
+            Child = new Icon { Data = Ui.Res<Geometry>(icon), Width = 12, Height = 12 },
         });
-        head.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("H3"), Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
+        head.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("H3"), Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
         return head;
     }
 
@@ -889,7 +905,7 @@ internal sealed class FovSection : StackPanel
         var stack = new StackPanel();
         stack.Children.Add(Heading(title, icon));
         stack.Children.Add(body);
-        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(18, 14, 18, 14), Child = stack };
+        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(15, 11, 15, 11), Child = stack };
     }
 
     private static Tile Number(string title, string value, string note, string icon, string soft, string deep, string? tip = null, bool warn = false)
@@ -898,15 +914,15 @@ internal sealed class FovSection : StackPanel
         var head = new StackPanel { Orientation = Orientation.Horizontal };
         head.Children.Add(new Tile
         {
-            Width = 24, Height = 24, CornerRadius = ThemeManager.Round(7), Background = Ui.Res<Brush>(soft),
-            Child = new Icon { Data = Ui.Res<Geometry>(icon), Width = 13, Height = 13, Foreground = Ui.Res<Brush>(deep) },
+            Width = 19, Height = 19, CornerRadius = ThemeManager.Round(7), Background = Ui.Res<Brush>(soft),
+            Child = new Icon { Data = Ui.Res<Geometry>(icon), Width = 11, Height = 11, Foreground = Ui.Res<Brush>(deep) },
         });
-        head.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
+        head.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
         stack.Children.Add(head);
-        stack.Children.Add(new TextBlock { Text = value, FontSize = 28, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>(warn ? "WarnDeep" : "Text"), Margin = new Thickness(0, 4, 0, 0) });
+        stack.Children.Add(new TextBlock { Text = value, FontSize = 22.5, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>(warn ? "WarnDeep" : "Text"), Margin = new Thickness(0, 3, 0, 0) });
         var noteText = new TextBlock { Text = note, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap };
         stack.Children.Add(warn ? Ui.IconText("I.Alert", noteText, "WarnDeep") : noteText);
-        var tile = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(16, 12, 16, 12), Margin = new Thickness(6, 0, 6, 12), Child = stack, ToolTip = tip };
+        var tile = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(13, 10, 13, 10), Margin = new Thickness(5, 0, 5, 10), Child = stack, ToolTip = tip };
         if (warn) tile.BorderBrush = Ui.Res<Brush>("Warn");
         return tile;
     }
@@ -914,7 +930,7 @@ internal sealed class FovSection : StackPanel
     private static Tile Banner(string soft, string text)
     {
         var banner = Ui.Notice(soft.Replace("Soft", ""), soft == "AccentSoft" ? "I.Info" : "I.Alert", null, text);
-        banner.Margin = new Thickness(0, 8, 0, 0);
+        banner.Margin = new Thickness(0, 6, 0, 0);
         return banner;
     }
 

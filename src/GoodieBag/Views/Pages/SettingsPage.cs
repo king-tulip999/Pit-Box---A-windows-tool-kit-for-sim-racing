@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Automation;
 using GoodieBag.Config;
@@ -14,41 +13,43 @@ using GoodieBag.Theme;
 
 namespace GoodieBag.Views.Pages;
 
-internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICancelEdit, ISectionedPage, IPageHistory
+internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISectionedPage, IPageHistory
 {
-    private const string PageKey = "settings", GeneralId = "general", KeybindsId = "keybinds";
+    private const string GeneralId = "general";
 
     private readonly AppServices _app;
     private readonly MainWindow _window;
     private readonly PanelStack _body;
-    private readonly MasonryPanel _sections = new() { MinColumnWidth = 440, MaxColumns = 3 };
-    private readonly ScrollViewer _scroll;
-    private FrameworkElement? _heading, _keybindsView;
+    private readonly MasonryPanel _sections = new() { MinColumnWidth = 356, MaxColumns = 3, ColumnOf = SectionColumn };
 
-    public event Action? SectionsChanged;
+    private static readonly int[] ThreeColumns = { 0, 1, 2, 2, 1, 2 }, TwoColumns = { 0, 1, 1, 0, 1, 0 };
+
+    private static int? SectionColumn(int columns, int index)
+    {
+        var plan = columns switch { 3 => ThreeColumns, 2 => TwoColumns, _ => null };
+        return plan is not null && index < plan.Length ? plan[index] : null;
+    }
+    private readonly ScrollViewer _scroll;
+
+    public event Action? SectionsChanged { add { } remove { } }
 
     private static readonly (PageSection Section, string Anchor)[] Cards =
     {
-        (new("app", "Application", "I.Power", Hues.Accent), "settings.app"),
-        (new("plugins", "Plugins", "I.Plug", Hues.Accent), "settings.plugins"),
-        (new("look", "Appearance", "I.Palette", Hues.Accent), "settings.look"),
-        (new("performance", "Performance", "I.Gauge", Hues.Accent), "settings.performance"),
-        (new("access", "Hardware access", "I.Cpu", Hues.Accent), "settings.access"),
-        (new("data", "Data & Configuration", "I.Folder", Hues.Accent), "settings.data"),
-        (new("updates", "About & updates", "I.Info", Hues.Accent), "settings.updates"),
+        (new("app", "Application", "I.Power"), "settings.app"),
+        (new("plugins", "Tools", "I.Plug"), "settings.plugins"),
+        (new("look", "Appearance", "I.Palette"), "settings.look"),
+        (new("performance", "Performance", "I.Gauge"), "settings.performance"),
+        (new("access", "Hardware access", "I.Cpu"), "settings.access"),
+        (new("data", "Data and configuration", "I.Folder"), "settings.data"),
+        (new("updates", "About and updates", "I.Info"), "settings.updates"),
     };
 
     private static readonly PageSection[] SidebarViews =
     {
-        new(GeneralId, "General", "I.Tune", Hues.Accent),
-        new(KeybindsId, "Keybinds", "I.Keyboard", Hues.Accent),
+        new(GeneralId, "General", "I.Tune"),
     };
 
-    internal static SectionList SectionsFor(AppServices app)
-    {
-        string? saved = app.Config.Ui.PageSections.GetValueOrDefault(PageKey);
-        return new SectionList(SidebarViews, saved == KeybindsId ? KeybindsId : GeneralId, Movable: false);
-    }
+    internal static SectionList SectionsFor(AppServices app) => new(SidebarViews, GeneralId, Movable: false);
 
     public IReadOnlyList<PageSection> Sections => SectionsFor(_app).Sections;
 
@@ -68,72 +69,33 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
     public void ShowSection(string id)
     {
         string? anchor = Cards.FirstOrDefault(c => c.Section.Id == id).Anchor;
-        if (id != GeneralId && id != KeybindsId && anchor is null) return;
-        string view = id == KeybindsId ? KeybindsId : GeneralId;
-        bool changed = CurrentSection != view;
-        U.PageSections[PageKey] = view;
-        if (changed) _app.Save();
-        bool wasKeybinds = _keybindsView?.Visibility == Visibility.Visible;
-        ApplyView();
-        if (id == KeybindsId)
+        if (anchor is null)
         {
-            _scroll.ScrollToTop();
-            if (!wasKeybinds && _shown && _keybindsView is not null) Motion.Enter(_keybindsView, distance: 12, durationMs: 240);
+            if (id == GeneralId) _scroll.ScrollToTop();
+            return;
         }
-        else
+        Dispatcher.BeginInvoke(new Action(() =>
         {
-            if (wasKeybinds && _shown) Motion.Enter(_sections, distance: 12, durationMs: 240);
-            if (anchor is null)
-            {
-                _scroll.ScrollToTop();
-                if (changed) SectionsChanged?.Invoke();
-                return;
-            }
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                if (Ui.FindAnchor(_sections, anchor) is not { } card || _scroll.Content is not UIElement frame) return;
-                _body.UpdateLayout();
-                double top = card.TranslatePoint(new Point(), frame).Y;
-                _scroll.ScrollToVerticalOffset(Math.Max(0, top - 12));
-            }), System.Windows.Threading.DispatcherPriority.Loaded);
-        }
-        if (changed) SectionsChanged?.Invoke();
+            if (Ui.FindAnchor(_body, anchor) is not { } card || _scroll.Content is not UIElement frame) return;
+            _body.UpdateLayout();
+            double top = card.TranslatePoint(new Point(), frame).Y;
+            _scroll.ScrollToVerticalOffset(Math.Max(0, top - 12));
+        }), System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     public bool ShowSectionOf(DependencyObject target)
     {
-        if (_keybindsView is not null && (ReferenceEquals(target, _keybindsView) || _keybindsView.IsAncestorOf(target)))
-        {
-            if (CurrentSection != KeybindsId) ShowSection(KeybindsId);
-            return true;
-        }
         foreach (var (_, anchor) in Cards)
-            if (Ui.FindAnchor(_sections, anchor) is { } card && (ReferenceEquals(card, target) || card.IsAncestorOf(target)))
-            {
-                if (CurrentSection == KeybindsId)
-                {
-                    U.PageSections[PageKey] = GeneralId;
-                    ApplyView();
-                    SectionsChanged?.Invoke();
-                }
+            if (Ui.FindAnchor(_body, anchor) is { } card && (ReferenceEquals(card, target) || card.IsAncestorOf(target)))
                 return true;
-            }
         return false;
-    }
-
-    private void ApplyView()
-    {
-        bool keybinds = CurrentSection == KeybindsId;
-        if (_heading is not null) _heading.Visibility = keybinds ? Visibility.Collapsed : Visibility.Visible;
-        _sections.Visibility = keybinds ? Visibility.Collapsed : Visibility.Visible;
-        if (_keybindsView is not null) _keybindsView.Visibility = keybinds ? Visibility.Visible : Visibility.Collapsed;
     }
 
     public SettingsPage(AppServices app, MainWindow window)
     {
         _app = app;
         _window = window;
-        _body = new PanelStack { Margin = new Thickness(28, 0, 28, 28), IsPanel = child => child == _sections };
+        _body = new PanelStack { Margin = new Thickness(23, 0, 23, 23), IsPanel = child => child == _sections };
         _scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = Ui.PageFrame(_body), Focusable = false };
         Content = _scroll;
     }
@@ -150,15 +112,6 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
             Build();
             Motion.Stagger(_body);
         }
-        else if (_keybindTree is { } tree && KeybindSignature() != _keybindsFor)
-            Dispatcher.BeginInvoke(new Action(() => { _keybindsFor = KeybindSignature(); tree.Rebuild(); }), System.Windows.Threading.DispatcherPriority.Background);
-        else if (_keybindHost is { Child: null } host && _keybindTree is { } kept)
-            AfterFirstFrame(() =>
-            {
-                if (!_shown || host.Child is not null || !ReferenceEquals(_keybindTree, kept)) return;
-                host.Child = kept;
-                host.MinHeight = 0;
-            });
         if (!s_pawnIoOffered)
         {
             s_pawnIoOffered = true;
@@ -183,7 +136,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
         Build();
     }), System.Windows.Threading.DispatcherPriority.Background);
 
-    private string? _builtFor, _keybindsFor;
+    private string? _builtFor;
 
     private string Signature()
     {
@@ -191,17 +144,9 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
         return string.Join("|", _app.Plugins.All.Select(x => x.IsActive ? "1" : "0")) + $"|{p.Rate}|{p.IntervalMs}|{p.Background}|{_app.Hardware.Ready}|{_app.Hardware.OpenError}|{_app.Hardware.PawnIoState}|{_app.Hardware.CpuTempMissing}|{_app.Hardware.Devices?.Count}|{_app.Demo}";
     }
 
-    private string KeybindSignature() => string.Join("\n", _app.Hotkeys.Catalog().Select(e => e.Id + "=" + e.Get()));
-
     public void OnHidden()
     {
         _shown = false;
-        if (_keybindTree is not null) _keybindTree.Arranging = false;
-        if (_keybindHost is { Child: FrameworkElement tree } host)
-        {
-            host.MinHeight = tree.ActualHeight;
-            host.Child = null;
-        }
         _app.Updates.Changed -= FillUpdates;
         _app.Plugins.Changed -= OnPluginsChanged;
     }
@@ -211,32 +156,19 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
     private void Build()
     {
         _body.Children.Clear();
-        var heading = Ui.Text("Settings", "H1");
-        heading.Margin = new Thickness(0, 0, 0, Ui.HeaderGap);
-        _heading = heading;
+        var heading = Ui.PageTitle("I.Tune", "Settings");
+        heading.Margin = Ui.HeaderMargin;
         _body.Children.Add(heading);
         _sections.Children.Clear();
         _body.Children.Add(_sections);
 
         BuildApplication();
-        BuildPlugins();
         BuildAppearance();
         BuildPerformance();
         BuildHardware();
         BuildData();
         BuildAboutAndUpdates();
-        _keybindsView = BuildKeybinds();
-        _body.Children.Add(_keybindsView);
-        ApplyView();
     }
-
-    internal void ShowKeybind(string label) => Dispatcher.BeginInvoke(new Action(() =>
-    {
-        if (_keybindSearch is null || _keybindFind is null) return;
-        ShowSection(KeybindsId);
-        if (_keybindSearch.Visibility != Visibility.Visible) _keybindFind.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
-        _keybindSearch.Text = label;
-    }), System.Windows.Threading.DispatcherPriority.Loaded);
 
     private StartupState? _startupState;
     private string? _startupError;
@@ -249,29 +181,47 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
         BuildStartup(startup);
         var window = Group(app, "Window", "settings.window");
         BuildWindow(window);
+        var plugins = PluginManager.InNavOrder(_app.Plugins.All, U.NavOrder).Where(p => p.Id != PluginIds.Overlay).ToList();
+        var jump = Ui.LabeledButton("I.Plug", "Choose tools", () => _ = ShowTools(), "GhostButton");
+        window.Children.Add(Ui.Divider());
+        var row = Ui.SettingRow("Tools", $"{plugins.Count(_app.Plugins.IsEnabled)} of {plugins.Count} on.", jump);
+        Ui.Anchor(row, "settings.plugins");
+        window.Children.Add(row);
     }
 
-    private void BuildPlugins()
+    private async Task ShowTools()
     {
-        var group = Section("Plugins", "I.Plug", "settings.plugins");
-        group.Children.Add(new TextBlock
+        var host = new ContentControl { Focusable = false, Content = BuildTools() };
+        void Refill() => Dispatcher.BeginInvoke(new Action(() => host.Content = BuildTools()));
+        var close = new StackPanel();
+        var ok = new Button { Content = "Done", Style = Ui.Res<Style>("PrimaryButton"), IsDefault = true };
+        ok.Click += (_, _) => _window.CloseModal(true);
+        close.Children.Add(ok);
+        _app.Plugins.Changed += Refill;
+        try
         {
-            Text = "Turn on the tools you use. One that's off leaves the sidebar and has no page, keybind or tray item, and runs nothing in the background; its settings are kept for when you turn it back on.",
-            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 4),
-        });
-        group.Children.Add(Ui.IconText("I.Info", new TextBlock
-        {
-            Text = "Drag a tool up or down in the sidebar to change its place; this list follows that order.",
-            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap,
-        }, "TextMuted"));
-        foreach (var plugin in PluginManager.InNavOrder(_app.Plugins.All, U.NavOrder))
+            await _window.ShowModal(Ui.Dialog(_window, "Tools",
+                "A tool that's off has no page, keybind, tray item or background work; its settings are kept. Drag tools in the sidebar to reorder them.",
+                host, close, null, ToolsDialogWidth));
+        }
+        finally { _app.Plugins.Changed -= Refill; }
+    }
+
+    private FrameworkElement BuildTools()
+    {
+        var plugins = PluginManager.InNavOrder(_app.Plugins.All, U.NavOrder).Where(p => p.Id != PluginIds.Overlay).ToList();
+        var group = new StackPanel();
+        var columns = new MasonryPanel { MinColumnWidth = PluginColumnWidth, Gap = 13, MaxColumns = 2 };
+        group.Children.Add(columns);
+        foreach (var plugin in plugins)
         {
             var p = plugin;
-            if (p.Id == PluginIds.Overlay) continue;
+            var block = new StackPanel();
+            columns.Children.Add(block);
             var head = new StackPanel { Orientation = Orientation.Horizontal };
             var (soft, deep) = p.Colors;
-            head.Children.Add(Ui.Badge(p.Pages.Count > 0 ? p.Pages[0].Icon : p.Icon, soft, deep, 28, 8, 15));
-            var titles = new StackPanel { Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            head.Children.Add(Ui.Badge(p.Pages.Count > 0 ? p.Pages[0].Icon : p.Icon, soft, deep, 22.5, 6.5, 12));
+            var titles = new StackPanel { Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
             titles.Children.Add(new TextBlock { Text = p.Name, FontWeight = FontWeights.SemiBold });
             head.Children.Add(titles);
             head.Children.Add(HudSettings.HelpTip.For($"Reads: {p.Reads}\n\nRuns in the background: {p.BackgroundWork}\n\nChanges on your PC: {p.Changes}", $"What {p.Name} reads and changes"));
@@ -281,37 +231,41 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
                 _app.Notify(on ? $"{p.Name} on" : $"{p.Name} off", on ? "It's in the sidebar." : "Its background work has stopped. Settings are kept.", NoticeKind.Success);
             });
             AutomationProperties.SetName(sw, p.Name);
-            var row = new Grid { Margin = new Thickness(0, 8, 0, 4) };
+            var row = new Grid { Margin = new Thickness(0, 0, 0, 3) };
             row.ColumnDefinitions.Add(new ColumnDefinition());
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var text = new StackPanel();
             text.Children.Add(head);
             if (p.Id is not (PluginIds.SimRacing or PluginIds.HardwareMonitor))
-                text.Children.Add(new TextBlock { Text = p.Description, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(38, 3, 16, 0) });
+                text.Children.Add(new TextBlock { Text = p.Description, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(31, 2, 13, 0) });
             row.Children.Add(text);
             sw.VerticalAlignment = VerticalAlignment.Center;
             Grid.SetColumn(sw, 1);
             row.Children.Add(sw);
-            group.Children.Add(row);
+            block.Children.Add(row);
             bool parentOn = _app.Plugins.IsEnabled(p);
             if (p.Id == PluginIds.HardwareMonitor)
             {
                 if (_app.Plugins.Find(PluginIds.Overlay) is { } overlay)
-                    group.Children.Add(SubRow(overlay.Name, "FPS, temperatures, load and fan speeds drawn on top of your game.", _app.Plugins.IsEnabled(overlay), true, on =>
+                    block.Children.Add(SubRow(overlay.Name, "FPS, temperatures, load and fan speeds drawn on top of your game.", _app.Plugins.IsEnabled(overlay), parentOn, on =>
                     {
                         _app.Plugins.SetEnabled(overlay, on);
                         _app.Notify(on ? $"{overlay.Name} on" : $"{overlay.Name} off", on ? "It's in Hardware Monitor → Performance Overlay." : "Its background work has stopped. Settings are kept.", NoticeKind.Success);
                     }));
                 foreach (var part in HardwareMonitorPage.Switchable)
-                    group.Children.Add(SubRow(part.Title, PartNotes.GetValueOrDefault(part.Id, ""), HardwareMonitorPage.IsSectionOn(_app, part.Id), parentOn,
+                    block.Children.Add(SubRow(part.Title, PartNotes.GetValueOrDefault(part.Id, ""), HardwareMonitorPage.IsSectionOn(_app, part.Id), parentOn,
                         on => HardwareMonitorPage.SetSectionOn(_app, part.Id, on)));
             }
             if (p.Id == PluginIds.SimRacing)
                 foreach (var tool in SimRacingPage.ToolsInOrder(_app))
-                    group.Children.Add(SubRow(tool.Title, PartNotes.GetValueOrDefault(tool.Id, ""), SimRacingPage.IsToolOn(_app, tool.Id), parentOn,
+                    block.Children.Add(SubRow(tool.Title, PartNotes.GetValueOrDefault(tool.Id, ""), SimRacingPage.IsToolOn(_app, tool.Id), parentOn,
                         on => SimRacingPage.SetToolOn(_app, tool.Id, on)));
         }
+
+        return group;
     }
+
+    private const double PluginColumnWidth = 340, ToolsDialogWidth = 790;
 
     private static readonly Dictionary<string, string> PartNotes = new()
     {
@@ -324,20 +278,21 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
         ["garage61"] = "Starts the Garage 61 Telemetry Agent by hand or with iRacing.",
     };
 
-    private static Grid SubRow(string title, string note, bool on, bool enabled, Action<bool> set)
+    private static Grid SubRow(string title, string note, bool on, bool enabled, Action<bool> set, bool beta = false)
     {
         var sw = Ui.Switch(on, set);
         sw.IsEnabled = enabled;
         AutomationProperties.SetName(sw, title);
-        var row = new Grid { Margin = new Thickness(38, 2, 0, 4), Opacity = enabled ? 1 : 0.55 };
+        var row = new Grid { Margin = new Thickness(31, 2, 0, 3), Opacity = enabled ? 1 : 0.55 };
         row.ColumnDefinitions.Add(new ColumnDefinition());
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var text = new Border { BorderThickness = new Thickness(2, 0, 0, 0), Padding = new Thickness(12, 2, 16, 2) };
+        var text = new Border { BorderThickness = new Thickness(2, 0, 0, 0), Padding = new Thickness(10, 2, 13, 2) };
         text.SetResourceReference(Border.BorderBrushProperty, "Line");
         var stack = new StackPanel();
-        stack.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold });
+        var name = new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+        stack.Children.Add(beta ? new TrimRow { Children = { name, Ui.BetaChip() } } : name);
         if (note.Length > 0)
-            stack.Children.Add(new TextBlock { Text = note, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 3, 0, 0) });
+            stack.Children.Add(new TextBlock { Text = note, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) });
         text.Child = stack;
         row.Children.Add(text);
         sw.VerticalAlignment = VerticalAlignment.Center;
@@ -348,8 +303,8 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
 
     private static StackPanel Group(StackPanel section, string title, string anchor)
     {
-        var group = new StackPanel { Margin = new Thickness(0, section.Children.Count > 1 ? 10 : 4, 0, 0) };
-        group.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 4, 0, 0) });
+        var group = new StackPanel { Margin = new Thickness(0, section.Children.Count > 1 ? 8 : 3, 0, 0) };
+        group.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 3, 0, 0) });
         Ui.Anchor(group, anchor);
         section.Children.Add(group);
         return group;
@@ -382,12 +337,12 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
             var banner = Ui.DangerBanner("Windows didn't let Goodie Bag change its startup task",
                 $"{_startupError}\n" +
                 $"To add it by hand: Task Scheduler → Create Task → tick “Run with highest privileges”, add an “At log on” trigger and the action “{Environment.ProcessPath}” with the argument --minimized.");
-            banner.Margin = new Thickness(0, 4, 0, 8);
+            banner.Margin = new Thickness(0, 3, 0, 6);
             var row = (Grid)banner.Child;
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var open = Ui.LabeledButton("I.ChevronRight", "Open Task Scheduler", () => Ui.OpenUrl("taskschd.msc"), "SoftButton");
+            var open = Ui.LabeledButton("I.External", "Open Task Scheduler", () => Ui.OpenUrl("taskschd.msc"), "SoftButton");
             open.VerticalAlignment = VerticalAlignment.Center;
-            open.Margin = new Thickness(12, 0, 0, 0);
+            open.Margin = new Thickness(10, 0, 0, 0);
             Grid.SetColumn(open, 2);
             row.Children.Add(open);
             startup.Children.Add(banner);
@@ -439,7 +394,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
             Ui.Switch(U.CloseToTray, v => { U.CloseToTray = v; _app.Save(); Build(); })));
         window.Children.Add(Ui.Divider());
         var pages = _app.NavPages().Prepend((Key: UiSettings.LastUsedPage, Title: "Last page used")).ToList();
-        var start = new ComboBox { MinWidth = 200, VerticalAlignment = VerticalAlignment.Center };
+        var start = new ComboBox { MinWidth = 162, VerticalAlignment = VerticalAlignment.Center };
         foreach (var (key, title) in pages) start.Items.Add(new ComboBoxItem { Content = title, Tag = key });
         int at = pages.FindIndex(p => p.Key == U.StartPage);
         start.SelectedIndex = Math.Max(0, at);
@@ -452,19 +407,6 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
         Ui.Anchor(startRow, "settings.startpage");
         window.Children.Add(startRow);
         window.Children.Add(Ui.Divider());
-        void SetSide(bool right)
-        {
-            if (U.SidebarRight == right) return;
-            U.SidebarRight = right;
-            _app.Save();
-            _window.ApplySidebarSide();
-        }
-        var side = Ui.Segmented(new[] { "Left", "Right" }, U.SidebarRight ? 1 : 0, i => SetSide(i == 1), "sidebar-side");
-        var sideRow = Ui.SettingRow("Sidebar", "Which side of the window the list of tools sits on. Drag tools and their sections in it to reorder them.", side,
-            new Ui.SettingDefault(() => !U.SidebarRight, () => { SetSide(false); Build(); }, "Left"));
-        Ui.Anchor(sideRow, "settings.sidebar");
-        window.Children.Add(sideRow);
-        window.Children.Add(Ui.Divider());
         void SetAllOpen(bool on)
         {
             if (U.SidebarAllOpen == on) return;
@@ -472,7 +414,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
             _app.Save();
             _window.RefreshSidebar();
         }
-        var allOpenRow = Ui.SettingRow("Show every tool's sections", "Off: only the open tool lists its sections in the sidebar.",
+        var allOpenRow = Ui.SettingRow("Show every tool's sections", "Off: only the open tool lists its sections in the sidebar. Drag tools and their sections in the sidebar to reorder them.",
             Ui.Switch(U.SidebarAllOpen, SetAllOpen),
             new Ui.SettingDefault(() => !U.SidebarAllOpen, () => { SetAllOpen(false); Build(); }, "Off"));
         Ui.Anchor(allOpenRow, "settings.sidebaropen");
@@ -488,7 +430,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
             Ui.Switch(_app.Config.ShowNotifications, v => { _app.Config.ShowNotifications = v; _app.Save(); }),
             new Ui.SettingDefault(() => _app.Config.ShowNotifications, () => { _app.Config.ShowNotifications = true; _app.Save(); Build(); }, "On")));
         window.Children.Add(Ui.Divider());
-        var quit = Ui.LabeledButton("I.Power", "Quit Goodie Bag", () => _ = _window.RequestQuitAsync(), "DangerButton");
+        var quit = Ui.LabeledButton("I.Power", "Quit Goodie Bag", () => _ = _window.RequestQuitAsync(), "GhostButton");
         quit.ToolTip = "Closes Goodie Bag: keybinds, the overlay and the tray icon stop";
         window.Children.Add(Ui.SettingRow("Quit", null, quit, more: "With fan control on, it asks first whether a small helper keeps your fan curves running or the fans go back to the BIOS / driver."));
     }
@@ -496,35 +438,15 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
     private void BuildAppearance()
     {
         var look = Section("Appearance", "I.Palette", "settings.look");
-        look.Children.Add(new TextBlock { Text = "Theme", Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 10, 0, 0) });
-        look.Children.Add(new Border { Height = 10 });
-        look.Children.Add(new ThemePicker(U.Theme, _app.SetTheme, columns: 2, height: 64, oled: _app.UseOledColors) { Margin = new Thickness(0, 0, -10, 4) });
+        look.Children.Add(new TextBlock { Text = "Theme", Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 8, 0, 0) });
+        look.Children.Add(new Border { Height = 8 });
+        look.Children.Add(new ThemePicker(U.Theme, _app.SetTheme, columns: 2, height: 52, oled: _app.UseOledColors) { Margin = new Thickness(0, 0, -8, 3) });
         look.Children.Add(Ui.Divider());
         var custom = new CustomThemeSection(_app, _window);
         Ui.Anchor(custom, "settings.customcolors");
         look.Children.Add(custom);
         look.Children.Add(Ui.Divider());
         AddTopography(look);
-        int scaleIndex = Array.IndexOf(UiSettings.InterfaceScales, UiSettings.InterfaceScales.OrderBy(o => Math.Abs(o - U.InterfaceScale)).First());
-        var size = Ui.Segmented(UiSettings.InterfaceScales.Select(p => $"{p}%").ToArray(), scaleIndex, i =>
-        {
-            U.InterfaceScale = UiSettings.InterfaceScales[i];
-            _app.Save();
-            _window.ApplyInterfaceScale(rebuild: true);
-        }, "Scale", UiSettings.InterfaceScales.Select(p => (string?)(p switch
-        {
-            90 => "90%: fits the most on a small or low-resolution screen",
-            100 => "100%: the normal size",
-            _ => "110%: larger text and controls",
-        })).ToList());
-        var sizeRow = Ui.SettingRow("Interface size", null, size, new Ui.SettingDefault(() => U.InterfaceScale == 100, () =>
-        {
-            U.InterfaceScale = 100;
-            _app.Save();
-            _window.ApplyInterfaceScale(rebuild: true);
-        }, "100%"));
-        Ui.Anchor(sizeRow, "settings.scale");
-        look.Children.Add(sizeRow);
         look.Children.Add(Ui.Divider());
 
         string animationNote = SystemParameters.ClientAreaAnimation
@@ -534,6 +456,11 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
         anim.IsEnabled = SystemParameters.ClientAreaAnimation;
         look.Children.Add(Ui.SettingRow("Animations", animationNote, anim,
             SystemParameters.ClientAreaAnimation ? new Ui.SettingDefault(() => U.Animations, () => { U.Animations = true; _app.Save(); NavIcon.RefreshAll(); _window.Topography.Refresh(); Build(); }, "On") : null));
+        look.Children.Add(Ui.Divider());
+        var quotes = Ui.SettingRow("Quotes in the title bar", "A new one every 30 seconds while the window is open.",
+            Ui.Switch(U.Quotes, v => { U.Quotes = v; _app.Save(); _window.RefreshQuotes(); }));
+        Ui.Anchor(quotes, "settings.quotes");
+        look.Children.Add(quotes);
     }
 
     private FrameworkElement? _topoRow;
@@ -575,7 +502,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
         }, "The contour lines' color");
         var controls = new StackPanel { Orientation = Orientation.Horizontal };
         controls.Children.Add(field);
-        controls.Children.Add(new Border { Width = 8 });
+        controls.Children.Add(new Border { Width = 6 });
         controls.Children.Add(reset);
         controls.IsEnabled = U.TopoBackground;
         var colorRow = Ui.SettingRow("Line color", null, controls);
@@ -607,19 +534,19 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
         _rateNote = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) };
         FillRateNote();
         var rateRow = RowWithNote("Sensor update rate", _rateNote, rate,
-            $"How often temperatures, loads, clocks and fan speeds are read for every page and the Hardware Monitor (its Update rate is this same setting). Fan control still checks its curves and the failsafe at least every {PerformanceSettings.FanLoopMs / 1000} s, and the overlay uses its own rate while it's showing. Applies at once.");
+            $"How often temperatures, loads, clocks and fan speeds are read for every page (the Sensor update rate at the top of the Dashboard is this same setting). Fan control still checks its curves and the failsafe at least every {PerformanceSettings.FanLoopMs / 1000} {Units.S}, and the overlay uses its own rate while it's showing. Applies at once.");
         Ui.Anchor(rateRow, "settings.sensorrate");
         section.Children.Add(rateRow);
 
         if (p.Rate == SensorRate.Custom)
         {
-            var custom = new NumberBox(p.CustomMs, "ms") { Minimum = PerformanceSettings.MinMs, Maximum = PerformanceSettings.MaxMs, Step = 50 };
+            var custom = new NumberBox(p.CustomMs, Units.Ms) { Minimum = PerformanceSettings.MinMs, Maximum = PerformanceSettings.MaxMs, Step = 50 };
             custom.ValueChanged += v =>
             {
                 _app.SetPerformance(SensorRate.Custom, (int)Math.Round(v));
                 FillRateNote();
             };
-            section.Children.Add(Ui.SettingRow("Custom interval", $"From {PerformanceSettings.MinMs} ms to {PerformanceSettings.MaxMs / 1000} s.", custom));
+            section.Children.Add(Ui.SettingRow("Custom interval", $"From {PerformanceSettings.MinMs} {Units.Ms} to {PerformanceSettings.MaxMs / 1000} {Units.S}.", custom));
         }
 
         section.Children.Add(Ui.Divider());
@@ -627,7 +554,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
             i => _app.SetPerformance(_app.Config.Performance.Rate, background: (BackgroundUsage)i), "Background", new[]
             {
                 "Standard: the same rate whether the window is open or not.",
-                $"Reduced: while the window is in the tray or minimized, sensors are read every {PerformanceSettings.ReducedHiddenMs / 1000} s at most.",
+                $"Reduced: while the window is in the tray or minimized, sensors are read every {PerformanceSettings.ReducedHiddenMs / 1000} {Units.S} at most.",
             });
         var backgroundRow = Ui.SettingRow("Background usage", "Fewer sensor reads while the window is hidden.", background,
             new Ui.SettingDefault(() => _app.Config.Performance.Background == BackgroundUsage.Reduced, () => { _app.SetPerformance(_app.Config.Performance.Rate, background: BackgroundUsage.Reduced); Build(); }, "Reduced"),
@@ -665,13 +592,13 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
         var section = new StackPanel();
         Ui.Anchor(section, "settings.diagnostics");
         parent.Children.Add(section);
-        section.Children.Add(new TextBlock { Text = ThemeManager.Case("Diagnostics"), Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 8, 0, 4) });
+        section.Children.Add(new TextBlock { Text = ThemeManager.Case("Diagnostics"), Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 6, 0, 3) });
         section.Children.Add(new TextBlock
         {
             Text = "Tools for troubleshooting hardware and app problems. Reports leave out personal details (user and PC names, folders, IP addresses).",
-            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 10),
+            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 8),
         });
-        var buttons = new WrapPanel();
+        var buttons = new System.Windows.Controls.Primitives.UniformGrid { Columns = 2 };
         var rescan = Ui.LabeledButton("I.Search", "Rescan hardware", Rescan);
         rescan.ToolTip = "Closes the sensor drivers and opens them again, so new or missing temperature sensors, fans and fan controllers are detected. Fans follow the BIOS for a moment meanwhile.";
         Ui.Anchor(rescan, "settings.rescan");
@@ -788,11 +715,11 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
 
     private void BuildData()
     {
-        var section = Section("Data & Configuration", "I.Folder", "settings.data");
+        var section = Section("Data and configuration", "I.Folder", "settings.data");
         var transfer = new StackPanel { Orientation = Orientation.Horizontal };
         var export = Ui.LabeledButton("I.Save", "Export…", () => ExportSettings());
         export.ToolTip = "Saves every setting (theme, window profiles, fan curves and presets, overlay, keybinds, plugins, layouts…) to a file";
-        export.Margin = new Thickness(0, 0, 8, 0);
+        export.Margin = new Thickness(0, 0, 6, 0);
         transfer.Children.Add(export);
         var import = Ui.LabeledButton("I.Download", "Import…", () => _ = ImportSettingsAsync());
         import.ToolTip = "Loads settings from an exported file (shows what's in it first; Goodie Bag then restarts)";
@@ -890,118 +817,6 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
         App.RelaunchAfterExit("");
     }
 
-    private KeybindTree? _keybindTree;
-    private int _keybindBuild;
-    private Border? _keybindHost;
-
-    private void AfterFirstFrame(Action action)
-    {
-        void OnFrame(object? sender, EventArgs e)
-        {
-            CompositionTarget.Rendering -= OnFrame;
-            Motion.AfterPageSettles(Dispatcher, action);
-        }
-        CompositionTarget.Rendering += OnFrame;
-    }
-    private Action? _syncArrange;
-    private Button? _keybindFind;
-    private TextBox? _keybindSearch;
-
-    public bool CancelEdit()
-    {
-        if (_keybindTree?.CancelArrange() != true) return false;
-        _syncArrange?.Invoke();
-        return true;
-    }
-
-    private FrameworkElement BuildKeybinds()
-    {
-        _keybindTree = null;
-        _keybindHost = null;
-        var arrange = new Button { Style = Ui.Res<Style>("GhostButton") };
-        var reset = Ui.LabeledButton("I.Undo", "Default order", () =>
-        {
-            if (_keybindTree is null) return;
-            _keybindTree.ResetOrder();
-            _app.Notify("Keybinds", "The categories are back in their default order.", NoticeKind.Info);
-        }, "GhostButton");
-        reset.ToolTip = "Put the main categories back in their default order (keys and the keybinds inside stay as they are)";
-        reset.Margin = new Thickness(8, 0, 0, 0);
-        var search = new TextBox { Width = 220, Tag = "Search keybinds", VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed, Margin = new Thickness(0, 0, 8, 0) };
-        AutomationProperties.SetName(search, "Search keybinds");
-        search.TextChanged += (_, _) => { if (_keybindTree is not null) _keybindTree.Query = search.Text; };
-        search.PreviewKeyDown += (_, e) =>
-        {
-            if (e.Key != Key.Escape || search.Text.Length == 0) return;
-            search.Clear();
-            e.Handled = true;
-        };
-        var find = new Button { Style = Ui.Res<Style>("GhostButton"), Margin = new Thickness(8, 0, 0, 0) };
-        void SyncFind()
-        {
-            bool open = search.Visibility == Visibility.Visible;
-            find.Content = Ui.IconLabel(open ? "I.X" : "I.Search", open ? "Close search" : "Search");
-            find.ToolTip = open ? "Clear the search and show every keybind" : "Find a keybind by its name, key or category";
-        }
-        find.Click += (_, _) =>
-        {
-            bool open = search.Visibility != Visibility.Visible;
-            search.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
-            if (open) Dispatcher.InvokeAsync(() => search.Focus(), System.Windows.Threading.DispatcherPriority.Input);
-            else search.Clear();
-            SyncFind();
-        };
-        void SyncArrange()
-        {
-            bool on = _keybindTree?.Arranging == true;
-            arrange.Content = Ui.IconLabel(on ? "I.Check" : "I.Layers", on ? "Done" : "Arrange");
-            arrange.Style = Ui.Res<Style>(on ? "PrimaryButton" : "GhostButton");
-            arrange.ToolTip = on ? "Finish arranging (Esc puts the order back)" : "Drag the main categories into your own order";
-        }
-        _syncArrange = SyncArrange;
-        arrange.Click += (_, _) =>
-        {
-            if (_keybindTree is null) return;
-            _keybindTree.Arranging = !_keybindTree.Arranging;
-            SyncArrange();
-        };
-        _keybindFind = find;
-        _keybindSearch = search;
-        var tools = new StackPanel { Orientation = Orientation.Horizontal, Children = { search, arrange, reset, find } };
-        var host = new Border { MinHeight = 120 };
-        _keybindHost = host;
-        int build = ++_keybindBuild;
-        AfterFirstFrame(() =>
-        {
-            if (build != _keybindBuild) return;
-            if (!_shown) { _builtFor = null; return; }
-            _keybindTree = new KeybindTree(_app, _ => true, navigate: _window.Navigate) { Query = search.Text };
-            _keybindsFor = KeybindSignature();
-            host.MinHeight = 0;
-            host.Child = _keybindTree;
-            SyncArrange();
-        });
-        var icon = new NavIcon { Glyph = "I.Keyboard", IsActive = true, Width = 34, Height = 34, Margin = new Thickness(0, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
-        icon.SetResourceReference(NavIcon.ForegroundProperty, "AccentText");
-        var title = Ui.Text("Keybinds", "H1");
-        title.VerticalAlignment = VerticalAlignment.Center;
-        title.SetResourceReference(TextBlock.ForegroundProperty, "AccentText");
-        var name = new StackPanel { Orientation = Orientation.Horizontal, Children = { icon, title } };
-        tools.VerticalAlignment = VerticalAlignment.Center;
-        var view = new StackPanel();
-        view.Children.Add(Ui.SplitRow(name, tools));
-        view.Children.Add(new TextBlock
-        {
-            Text = "Click a box and press the keys; Esc clears it. iRacing's keys are saved to its controls file. Keybinds of plugins that are off are hidden and kept.",
-            Style = Ui.Res<Style>("Muted"), TextWrapping = TextWrapping.Wrap, MaxWidth = 820, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 4, 0, Ui.HeaderGap),
-        });
-        view.Children.Add(host);
-        SyncArrange();
-        SyncFind();
-        Ui.Anchor(view, "settings.keybinds");
-        return view;
-    }
-
     private void BuildHardware()
     {
         var access = Section("Hardware access", "I.Cpu", "settings.access");
@@ -1036,10 +851,10 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
 
     private FrameworkElement Explainer()
     {
-        var details = new StackPanel { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 4, 0, 4), MaxWidth = 760, HorizontalAlignment = HorizontalAlignment.Left };
+        var details = new StackPanel { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 3, 0, 3), MaxWidth = 616, HorizontalAlignment = HorizontalAlignment.Left };
         void Para(string title, string text)
         {
-            details.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 8, 0, 2) });
+            details.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 6, 0, 2) });
             details.Children.Add(new TextBlock { Text = text, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap });
         }
         Para("What it is",
@@ -1069,18 +884,17 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
 
     private void BuildAboutAndUpdates()
     {
-        var section = Section("About & updates", "I.Info", "settings.updates");
+        var section = Section("About and updates", "I.Info", "settings.updates");
         Ui.Anchor(section, "settings.about");
-        var about = new Grid { Margin = new Thickness(0, 2, 0, 8) };
+        var about = new Grid { Margin = new Thickness(0, 2, 0, 6) };
         about.ColumnDefinitions.Add(new ColumnDefinition());
         about.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var text = new StackPanel { Margin = new Thickness(0, 0, 12, 0) };
+        var text = new StackPanel { Margin = new Thickness(0, 0, 10, 0) };
         text.Children.Add(new TextBlock { Text = $"Goodie Bag {UpdateService.Tag(_app.Updates.Installed)}" + (_app.Demo ? " · demo data" : ""), Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold });
-        text.Children.Add(new TextBlock { Text = "A PC control center for sim rigs: window profiles that size and place your games, display profiles, hardware monitoring, the overlay, fan control and sim racing tools.", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 2, 0, 0), TextWrapping = TextWrapping.Wrap });
         about.Children.Add(text);
-        var project = Ui.LabeledButton("I.ChevronRight", "Project page", () => Ui.OpenUrl(UpdateService.ProjectPage), "GhostButton");
-        var changelog = Ui.LabeledButton("I.ChevronRight", "Changelog", () => ChangelogDialog.Show(_window, _app.Updates, null, justUpdated: false), "GhostButton");
-        changelog.Margin = new Thickness(0, 0, 8, 0);
+        var project = Ui.LabeledButton("I.External", "Project page", () => Ui.OpenUrl(UpdateService.ProjectPage), "GhostButton");
+        var changelog = Ui.LabeledButton("I.FileText", "Changelog", () => ChangelogDialog.Show(_window, _app.Updates, null, justUpdated: false), "GhostButton");
+        changelog.Margin = new Thickness(0, 0, 6, 0);
         var links = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         links.Children.Add(changelog);
         links.Children.Add(project);
@@ -1097,23 +911,23 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
     {
         var u = _app.Updates;
         _updates.Children.Clear();
-        _updates.Children.Add(new TextBlock { Text = ThemeManager.Case("Updates"), Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 8, 0, 4) });
+        _updates.Children.Add(new TextBlock { Text = ThemeManager.Case("Updates"), Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 6, 0, 3) });
 
         if (u.Available && u.Latest is { } r)
         {
             var box = new StackPanel();
             var head = new StackPanel { Orientation = Orientation.Horizontal };
-            head.Children.Add(Ui.Badge("I.Download", "Accent", "Knob", 32, 10, 17));
-            var title = new StackPanel { Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            head.Children.Add(Ui.Badge("I.Download", "Accent", "Knob", 26, 8, 14));
+            var title = new StackPanel { Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
             title.Children.Add(new TextBlock { Text = "A new version of Goodie Bag is available", Style = Ui.Res<Style>("H3") });
             title.Children.Add(new TextBlock { Text = $"{UpdateService.Tag(u.Installed)} → {UpdateService.Tag(r.Version)}. Install it here; your settings stay.", Style = Ui.Res<Style>("Caption") });
             head.Children.Add(title);
             box.Children.Add(head);
-            var buttons = new WrapPanel { Margin = new Thickness(44, 12, 0, 0) };
+            var buttons = new WrapPanel { Margin = new Thickness(36, 10, 0, 0) };
             if (u.State == UpdateState.Downloading)
             {
-                buttons.Children.Add(new Meter { Width = 260, Height = 8, Steps = 8, Value = u.Progress, VerticalAlignment = VerticalAlignment.Center });
-                buttons.Children.Add(new TextBlock { Text = $"Downloading… {u.Progress:0%}", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
+                buttons.Children.Add(new Meter { Width = 211, Height = 6, Steps = 8, Value = u.Progress, VerticalAlignment = VerticalAlignment.Center });
+                buttons.Children.Add(new TextBlock { Text = $"Downloading… {u.Progress:0%}", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
             }
             else
             {
@@ -1124,7 +938,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
                 buttons.Children.Add(Spaced(install));
             }
             box.Children.Add(buttons);
-            _updates.Children.Add(new Tile { Background = Ui.Res<Brush>("AccentSoft"), BorderBrush = Ui.Res<Brush>("Accent"), BorderThickness = new Thickness(1.5), CornerRadius = ThemeManager.Round(12), Padding = new Thickness(14), Margin = new Thickness(0, 4, 0, 10), Child = box });
+            _updates.Children.Add(new Tile { Background = Ui.Res<Brush>("AccentSoft"), BorderBrush = Ui.Res<Brush>("Accent"), BorderThickness = new Thickness(1.5), CornerRadius = ThemeManager.Round(12), Padding = new Thickness(11), Margin = new Thickness(0, 3, 0, 8), Child = box });
         }
 
         string status = u.State switch
@@ -1151,21 +965,6 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
 
     public IEnumerable<(string Name, Func<Task> Enter)> ScreenshotStates()
     {
-        yield return ("sidebar-right", () =>
-        {
-            U.SidebarRight = true;
-            _window.ApplySidebarSide();
-            Build();
-            _window.GoTo("settings", "settings.sidebar", flash: false);
-            return Task.CompletedTask;
-        });
-        yield return ("sidebar-left", () =>
-        {
-            U.SidebarRight = false;
-            _window.ApplySidebarSide();
-            Build();
-            return Task.CompletedTask;
-        });
         yield return ("topography", () =>
         {
             U.TopoBackground = true;
@@ -1181,52 +980,20 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
             Build();
             return Task.CompletedTask;
         });
-        yield return ("keybinds", async () =>
+        yield return ("tools", () =>
         {
-            ShowSection(KeybindsId);
-            for (int i = 0; i < 40 && _keybindTree is null; i++) await Task.Delay(50);
-        });
-        yield return ("keybinds-iracing", () =>
-        {
-            var open = new[] { "", "/Driving", "/In-car adjustments", "/Replay and TV cameras" }.Select(g => HotkeyCatalog.IracingGroup + g).ToList();
-            U.KeybindsFolded.AddRange(open);
-            _keybindTree?.Rebuild();
-            U.KeybindsFolded.RemoveAll(open.Contains);
-            _keybindTree?.UpdateLayout();
-            _keybindTree?.ShowGroup(HotkeyCatalog.IracingGroup);
+            _window.GoTo("settings", "settings.plugins", flash: false);
+            _ = ShowTools();
             return Task.CompletedTask;
         });
-        yield return ("keybinds-arrange", () =>
+        yield return ("tools-closed", () =>
         {
-            if (_keybindTree is not null) _keybindTree.Arranging = true;
-            return Task.CompletedTask;
-        });
-        yield return ("keybinds-default-order", () =>
-        {
-            _keybindTree?.ResetOrder();
-            return Task.CompletedTask;
-        });
-        yield return ("keybinds-done", () =>
-        {
-            if (_keybindTree is not null) _keybindTree.Arranging = false;
-            _syncArrange?.Invoke();
-            return Task.CompletedTask;
-        });
-        yield return ("keybinds-search", () =>
-        {
-            _keybindFind?.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
-            if (_keybindSearch is not null) _keybindSearch.Text = "next";
-            return Task.CompletedTask;
-        });
-        yield return ("keybinds-search-closed", () =>
-        {
-            _keybindFind?.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+            _window.CloseModal(false);
             return Task.CompletedTask;
         });
         yield return ("data-section", () =>
         {
             ShowSection("data");
-            if (_sections.Visibility != Visibility.Visible) throw new InvalidOperationException("Picking a settings card in the sidebar didn't leave Keybinds.");
             return Task.CompletedTask;
         });
         yield return ("sidebar-all-open", () =>
@@ -1245,6 +1012,12 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
         yield return ("confirm-delete", () =>
         {
             _ = _window.Confirm("Delete saved colors?", "“Dusk” is removed from My colors. The colors in use now don't change.", "Delete", danger: true);
+            return Task.CompletedTask;
+        });
+        yield return ("quit-with-fans", () =>
+        {
+            _window.CloseModal(false);
+            _ = _window.ShowModal(_window.FanQuitCard(_ => { }, out _));
             return Task.CompletedTask;
         });
         yield return ("confirm-delete-closed", () =>
@@ -1332,14 +1105,14 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
 
     private static Grid Notice(string soft, string deep, string icon, string text)
     {
-        var grid = new Grid { Margin = new Thickness(0, 4, 0, 8) };
+        var grid = new Grid { Margin = new Thickness(0, 3, 0, 6) };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var badge = Ui.Badge(icon, soft, deep, 28, 8, 15);
+        var badge = Ui.Badge(icon, soft, deep, 22.5, 6.5, 12);
         badge.VerticalAlignment = VerticalAlignment.Top;
         grid.Children.Add(badge);
-        var t = new TextBlock { Text = text, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(10, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
+        var t = new TextBlock { Text = text, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(8, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
         Grid.SetColumn(t, 1);
         grid.Children.Add(t);
         return grid;
@@ -1348,10 +1121,10 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
     private StackPanel Section(string title, string icon, string? anchor = null)
     {
         var stack = new StackPanel();
-        var head = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
-        head.Children.Add(new Tile { Style = Ui.Res<Style>("IconBadge"), Width = 30, Height = 30, CornerRadius = ThemeManager.Round(9),
-            Child = new Icon { Data = Ui.Res<Geometry>(icon), Width = 16, Height = 16 } });
-        head.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("H2"), Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
+        var head = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 5) };
+        head.Children.Add(new Tile { Style = Ui.Res<Style>("IconBadge"), Width = 24, Height = 24, CornerRadius = ThemeManager.Round(9),
+            Child = new Icon { Data = Ui.Res<Geometry>(icon), Width = 13, Height = 13 } });
+        head.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("H2"), Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
         stack.Children.Add(head);
         var card = new Tile { Style = Ui.Res<Style>("Card"), Child = stack };
         if (anchor is not null)
@@ -1362,16 +1135,16 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
 
     private static Grid StatusRow(string title, bool ok, string text)
     {
-        var grid = new Grid { Margin = new Thickness(0, 10, 0, 10) };
+        var grid = new Grid { Margin = new Thickness(0, 8, 0, 8) };
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var row = new DockPanel();
-        var dot = new System.Windows.Shapes.Ellipse { Width = 9, Height = 9, Fill = Ui.Res<Brush>(ok ? "Sage" : "Apricot"), Margin = new Thickness(0, 6, 10, 0), VerticalAlignment = VerticalAlignment.Top };
+        var dot = new System.Windows.Shapes.Ellipse { Width = 7, Height = 7, Fill = Ui.Res<Brush>(ok ? "Sage" : "Apricot"), Margin = new Thickness(0, 5, 8, 0), VerticalAlignment = VerticalAlignment.Top };
         DockPanel.SetDock(dot, Dock.Left);
         row.Children.Add(dot);
         var text2 = new StackPanel();
         text2.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold });
-        text2.Children.Add(new TextBlock { Text = text, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 12, 0) });
+        text2.Children.Add(new TextBlock { Text = text, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 10, 0) });
         row.Children.Add(text2);
         grid.Children.Add(row);
         return grid;
@@ -1379,7 +1152,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
 
     private static FrameworkElement Spaced(FrameworkElement e)
     {
-        e.Margin = new Thickness(0, 0, 8, 8);
+        e.Margin = new Thickness(0, 0, 6, 6);
         return e;
     }
 
@@ -1393,15 +1166,15 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ICan
         _pawnIoOpen = true;
         try
         {
-            var stack = new StackPanel { MaxWidth = 460, HorizontalAlignment = HorizontalAlignment.Left };
-            void Para(string text) => stack.Children.Add(new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 0) });
+            var stack = new StackPanel { MaxWidth = 373, HorizontalAlignment = HorizontalAlignment.Left };
+            void Para(string text) => stack.Children.Add(new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0) });
             Para("CPU temperatures and motherboard fans (case, CPU and pump headers) are read and controlled through PawnIO, a small free driver.");
             Para("It replaces WinRing0, the older driver Windows Defender now flags as unsafe, and is installed for the whole PC.");
             Para("Without it everything else still works: GPU temperatures and fans, frame rate, displays, window profiles and the overlays.");
-            var hide = new CheckBox { Content = "Don't show this again", IsChecked = U.HidePawnIoPrompt, Margin = new Thickness(0, 16, 0, 0) };
+            var hide = new CheckBox { Content = "Don't show this again", IsChecked = U.HidePawnIoPrompt, Margin = new Thickness(0, 13, 0, 0) };
             stack.Children.Add(hide);
             var card = Ui.Dialog(_window, "Install the PawnIO driver?", "It isn't installed on this PC.", stack,
-                Ui.DialogButtons(_window, "Install", () => true), null, 540);
+                Ui.DialogButtons(_window, "Install", () => true), null, 437);
             bool install = await _window.ShowModal(card);
             if (hide.IsChecked == true != U.HidePawnIoPrompt)
             {

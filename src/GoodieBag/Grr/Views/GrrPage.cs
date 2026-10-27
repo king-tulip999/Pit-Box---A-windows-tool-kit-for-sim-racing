@@ -1,6 +1,5 @@
 using System.Windows;
 using System.Windows.Controls;
-using GoodieBag.Controls;
 using GoodieBag.Services;
 using GoodieBag.Views;
 
@@ -9,7 +8,7 @@ namespace GoodieBag.Grr.Views;
 internal sealed class GrrPage : UserControl, IPage, IScreenshotStates, ISectionedPage, IPageHistory
 {
     private readonly AppServices _app;
-    private readonly StackPanel _body = new() { Margin = new Thickness(28, 0, 28, 28) };
+    private readonly StackPanel _body = new() { Margin = new Thickness(23, 0, 23, 23) };
     private readonly ScrollViewer _scroll;
     private readonly GrrDashboardSection _dashboard;
     private readonly ContentControl _title = new() { Focusable = false };
@@ -20,7 +19,7 @@ internal sealed class GrrPage : UserControl, IPage, IScreenshotStates, ISectione
 
     private static readonly Dictionary<string, string> Icons = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["cup"] = NavIcon.CarGlyph + "grr-cup", ["gt"] = NavIcon.CarGlyph + "grr-gt", ["indycar"] = NavIcon.CarGlyph + "grr-indycar",
+        ["cup"] = "I.Checkered", ["gt"] = "I.Flag", ["indycar"] = "I.FormulaWheel",
     };
 
     public GrrPage(AppServices app, MainWindow window)
@@ -30,7 +29,7 @@ internal sealed class GrrPage : UserControl, IPage, IScreenshotStates, ISectione
         Content = _scroll;
         _dashboard = new GrrDashboardSection(app, window, leagueTabs: false);
         var header = Ui.SplitRow(_title, _dashboard.Tools!);
-        header.Margin = new Thickness(0, 0, 0, Ui.HeaderGap);
+        header.Margin = Ui.HeaderMargin;
         _body.Children.Add(header);
         Ui.Anchor(_dashboard, GrrParts.Anchor);
         _body.Children.Add(_dashboard);
@@ -42,7 +41,7 @@ internal sealed class GrrPage : UserControl, IPage, IScreenshotStates, ISectione
     {
         var s = app.Config.Grr;
         var sections = s.Leagues.Select(GrrLeagues.Find).OfType<GrrLeague>()
-            .Select(l => new PageSection(l.Id, l.Name, Icons.GetValueOrDefault(l.Id, GrrPlugin.LogoIcon), Hues.Tool(GrrPlugin.PluginId, ("SageSoft", "SageDeep")))).ToList();
+            .Select(l => new PageSection(l.Id, l.Name, Icons.GetValueOrDefault(l.Id, GrrPlugin.LogoIcon))).ToList();
         return new SectionList(sections, s.DashboardLeagueOrNull());
     }
 
@@ -136,7 +135,7 @@ internal sealed class GrrPage : UserControl, IPage, IScreenshotStates, ISectione
             if (CurrentSection != "gt") throw new InvalidOperationException("Picking GT League in the sidebar didn't show it.");
             return Task.CompletedTask;
         });
-        yield return ("grr-narrow", () => { _body.MaxWidth = 760; _body.HorizontalAlignment = HorizontalAlignment.Left; _scroll.ScrollToTop(); return Task.CompletedTask; });
+        yield return ("grr-narrow", () => { _body.MaxWidth = 616; _body.HorizontalAlignment = HorizontalAlignment.Left; _scroll.ScrollToTop(); return Task.CompletedTask; });
         yield return ("grr-wide", () => { _body.ClearValue(MaxWidthProperty); _body.ClearValue(HorizontalAlignmentProperty); return Task.CompletedTask; });
         yield return ("grr-reveal-schedule", () => { Reveal(GrrDashboardSection.Part.Schedule); return Task.CompletedTask; });
     }

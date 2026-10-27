@@ -1,8 +1,8 @@
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Shapes;
-using System.Windows.Threading;
 using GoodieBag.Services;
 using GoodieBag.Theme;
 
@@ -13,15 +13,14 @@ internal sealed class TopographyLayer
     public const string ColorKey = "Slate";
     public const double UnitDips = 312;
     public const double Speed = 0.00004;
-    public const int FramesPerSecond = 30;
+    public const int FramesPerSecond = 15;
 
     private readonly AppServices _app;
     private readonly Window _window;
     private readonly Rectangle _layer;
     private readonly FrameworkElement _track;
-    private readonly DispatcherTimer _timer = new(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(1000.0 / FramesPerSecond) };
     private TopographyEffect? _effect;
-    private DateTime _last;
+    private bool _running;
     private double _z = Random.Shared.NextDouble() * 100;
     private bool _shaderFailed;
 
@@ -31,7 +30,6 @@ internal sealed class TopographyLayer
         _window = window;
         _layer = layer;
         _track = track;
-        _timer.Tick += (_, _) => Step();
         _layer.SizeChanged += (_, _) => Fit();
         _window.DpiChanged += (_, _) => Fit();
         _window.IsVisibleChanged += (_, _) => UpdateRunning();
@@ -65,7 +63,7 @@ internal sealed class TopographyLayer
         }
         else if (!on && _effect is not null)
         {
-            _timer.Stop();
+            Pause();
             _layer.Effect = null;
             _effect = null;
             _layer.Visibility = Visibility.Collapsed;
@@ -89,30 +87,33 @@ internal sealed class TopographyLayer
     {
         if (_effect is null || PresentationSource.FromVisual(_layer)?.CompositionTarget is not { } target) return;
         var toDevice = target.TransformToDevice;
-        double scale = _app.Config.Ui.ScaleFactor;
-        _effect.Size = new Point(Math.Max(1, _layer.ActualWidth * scale * toDevice.M11), Math.Max(1, _layer.ActualHeight * scale * toDevice.M22));
+        _effect.Size = new Point(Math.Max(1, _layer.ActualWidth * toDevice.M11), Math.Max(1, _layer.ActualHeight * toDevice.M22));
         _effect.Unit = UnitDips * toDevice.M11;
     }
 
     private void UpdateRunning()
     {
         bool run = _effect is not null && _window.IsVisible && _window.WindowState != WindowState.Minimized && Motion.Enabled && Motion.WindowActive && !PcClass.Weak;
-        if (run == _timer.IsEnabled) return;
-        if (run)
-        {
-            _last = DateTime.UtcNow;
-            _timer.Start();
-        }
-        else _timer.Stop();
+        if (run == _running) return;
+        if (run) Play();
+        else Pause();
     }
 
-    private void Step()
+    private void Play()
     {
+        _running = true;
+        var drift = new DoubleAnimation(_z, _z + 256, TimeSpan.FromMilliseconds(256 / Speed)) { RepeatBehavior = RepeatBehavior.Forever };
+        Timeline.SetDesiredFrameRate(drift, FramesPerSecond);
+        _effect!.BeginAnimation(TopographyEffect.ZProperty, drift);
+    }
+
+    private void Pause()
+    {
+        if (!_running) return;
+        _running = false;
         if (_effect is null) return;
-        var now = DateTime.UtcNow;
-        double ms = Math.Min((now - _last).TotalMilliseconds, 100);
-        _last = now;
-        _z = (_z + ms * Speed) % 256;
+        _z = _effect.Z % 256;
+        _effect.BeginAnimation(TopographyEffect.ZProperty, null);
         _effect.Z = _z;
     }
 }

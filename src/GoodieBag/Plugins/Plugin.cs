@@ -41,6 +41,8 @@ internal abstract class Plugin
 
     public virtual bool EnabledByDefault => true;
 
+    public virtual string? ParentId => null;
+
     public virtual int Order => 100;
 
     public abstract string Reads { get; }

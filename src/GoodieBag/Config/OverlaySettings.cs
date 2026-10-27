@@ -78,6 +78,7 @@ public sealed class OverlayLayout
 
     public string Name { get; set; } = DefaultName;
 
+    [System.Text.Json.Serialization.JsonIgnore]
     public bool IsDefault => string.Equals(Name, DefaultName, StringComparison.OrdinalIgnoreCase);
 
     public List<OverlayMetricEntry> Metrics { get; set; } = DefaultMetrics();

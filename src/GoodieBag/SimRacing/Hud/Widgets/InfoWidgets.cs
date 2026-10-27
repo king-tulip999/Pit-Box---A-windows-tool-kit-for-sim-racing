@@ -1,5 +1,6 @@
 using System.Drawing;
 using GoodieBag.Config;
+using Units = GoodieBag.Services.CapsUnits;
 using GoodieBag.SimRacing.Race;
 using GoodieBag.SimRacing.Telemetry;
 
@@ -292,17 +293,20 @@ internal sealed class WeatherWidget : HudWidget
         _cells[0] = ("AIR", Temp(f.AirTemp));
         _cells[1] = ("TRACK", Temp(f.TrackTemp));
         _cells[2] = ("HUMIDITY", f.Humidity is { } h ? $"{h * 100:0}%" : RaceFormat.Missing);
-        float cw = area.Width / _cells.Length;
+        float cw = area.Width / _cells.Length, cellPad = 8 * d;
         var font = p.Big;
         foreach (var (_, value) in _cells)
-            if (p.Measure(value, font) > cw - 4) { font = p.Bold; break; }
+            if (p.Measure(value, font) > cw - cellPad * 2) { font = p.Bold; break; }
         float vh = p.LineHeight(font), lh = p.LineHeight(p.Label);
         float top = area.Y + (area.Height - vh - lh) / 2;
         for (int i = 0; i < _cells.Length; i++)
         {
             float x = area.X + cw * i;
-            p.Text(_cells[i].Value, font, p.P.Heading, new RectangleF(x, top, cw, vh), HAlign.Left, VAlign.Center);
-            p.Text(_cells[i].Label, p.Label, p.LabelColor, new RectangleF(x, top + vh, cw, lh), HAlign.Left, VAlign.Top, false);
+            if (i > 0) p.Line(x, top - 2 * d, x, top + lh + vh + 2 * d, HudPalette.Alpha(p.P.Muted, 110), 1);
+            float inset = i > 0 ? cellPad : 0;
+            var cell = new RectangleF(x + inset, top, cw - inset - cellPad / 2, lh + vh);
+            p.Text(_cells[i].Label, p.Label, p.LabelColor, new RectangleF(cell.X, cell.Y, cell.Width, lh), HAlign.Left, VAlign.Top, false);
+            p.Number(_cells[i].Value, font, p.P.Heading, new RectangleF(cell.X, cell.Y + lh, cell.Width, vh), HAlign.Left, VAlign.Center);
         }
     }
 
@@ -406,7 +410,7 @@ internal static class WindArrow
             "kmh" => s * 3.6, "mph" => s * 2.23694, "ms" => s,
             _ => RaceFormat.SpeedValue(s, units),
         };
-        string unit = speedUnit switch { "kmh" => "km/h", "mph" => "mph", "ms" => "m/s", _ => RaceFormat.SpeedUnit(units) };
+        string unit = speedUnit switch { "kmh" => Units.Kmh, "mph" => Units.Mph, "ms" => Units.MetresPerSecond, _ => RaceFormat.SpeedUnit(units) };
         var font = p.Font(MathF.Max(10, Math.Min(box.Width, box.Height) * 0.2f), false);
         string text = shown is { } x ? x.ToString("0", System.Globalization.CultureInfo.InvariantCulture) : RaceFormat.Missing;
         float lh = p.LineHeight(font), uh = showUnit ? p.LineHeight(p.Tiny) : 0;
@@ -446,7 +450,7 @@ internal sealed class WindWidget : HudWidget
     {
         HudOption.Bool("turn", "Turns with the car", true, "On: the pointer shows where the wind blows as you drive (down = a headwind). Off: up = north."),
         HudOption.Choice("colors", "Colors", "headtail", new HudChoice("headtail", "By headwind / crosswind / tailwind", "Red at the nose, amber across, green behind"), new HudChoice("accent", "The accent color")),
-        HudOption.Choice("speedUnit", "Speed in", "units", new HudChoice("units", "Overlay units"), new HudChoice("kmh", "km/h"), new HudChoice("mph", "mph"), new HudChoice("ms", "m/s")),
+        HudOption.Choice("speedUnit", "Speed in", "units", new HudChoice("units", "Overlay units"), new HudChoice("kmh", Units.Kmh), new HudChoice("mph", Units.Mph), new HudChoice("ms", Units.MetresPerSecond)),
         HudOption.Bool("unit", "Unit label", false),
         HudOption.Bool("title", "Title", false, "“Wind” over the dial"),
     };
@@ -485,7 +489,7 @@ internal sealed class LapsWidget : HudWidget
         {
             var foot = new RectangleF(area.X, area.Bottom - p.StripHeight, area.Width, p.StripHeight);
             area = new RectangleF(area.X, area.Y, area.Width, area.Height - foot.Height - 4);
-            p.Strip(foot, new (string, string, Color?)[] { ("AVG", RaceFormat.LapTime(stats.Average), null), ("SPREAD", $"{stats.Spread:0.00} s", null), ("σ", $"{stats.StdDev:0.000}", null) });
+            p.Strip(foot, new (string, string, Color?)[] { ("AVG", RaceFormat.LapTime(stats.Average), null), ("SPREAD", $"{stats.Spread:0.00} {Units.S}", null), ("σ", $"{stats.StdDev:0.000}", null) });
         }
         if (laps.Count == 0) { p.Text("Laps appear here as you complete them", p.Small, p.P.Faint, area, HAlign.Center, VAlign.Center); return; }
         double? best = laps.Where(l => l.Clean).Select(l => (double?)l.Time).Min();

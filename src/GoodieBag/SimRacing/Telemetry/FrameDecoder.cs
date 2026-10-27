@@ -10,7 +10,7 @@ internal sealed class FrameDecoder
     private IrsdkVar? _dBest, _dBestOk, _dSession, _dSessionOk, _dOptimal, _dOptimalOk;
     private IrsdkVar? _inc, _teamInc, _drvInc, _warnings, _oilTemp, _oilPress, _waterTemp, _fuelPress, _voltage;
     private IrsdkVar? _bias, _tc, _abs, _map, _lat, _long, _yawRate, _yaw, _yawNorth, _absActive, _velX, _velY, _leftRight;
-    private IrsdkVar? _pitFlags, _pitFuel, _repair, _optRepair, _pitStatus, _pitActive, _inStall, _fastRepair, _compound;
+    private IrsdkVar? _pitFlags, _pitFuel, _repair, _optRepair, _pitStatus, _pitActive, _inStall, _fastRepair, _compound, _tow;
     private IrsdkVar? _air, _track, _wind, _windDir, _humidity, _fog, _precip, _wetness, _declaredWet;
     private IrsdkVar? _battery, _mguK, _deploy, _p2pCount, _p2pOn, _drs;
     private IrsdkVar? _cPct, _cLap, _cLapDone, _cPos, _cClassPos, _cPit, _cSurface, _cEst, _cF2, _cLast, _cBest, _cCompound, _cFlags;
@@ -46,7 +46,7 @@ internal sealed class FrameDecoder
         _absActive = V("BrakeABSactive");
         _leftRight = V("CarLeftRight");
         _pitFlags = V("PitSvFlags"); _pitFuel = V("PitSvFuel"); _repair = V("PitRepairLeft"); _optRepair = V("PitOptRepairLeft");
-        _pitStatus = V("PlayerCarPitSvStatus"); _pitActive = V("PitstopActive"); _inStall = V("PlayerCarInPitStall");
+        _pitStatus = V("PlayerCarPitSvStatus"); _pitActive = V("PitstopActive"); _inStall = V("PlayerCarInPitStall"); _tow = V("PlayerCarTowTime");
         _fastRepair = V("FastRepairAvailable"); _compound = V("PlayerTireCompound") ?? V("PitSvTireCompound");
         _air = V("AirTemp"); _track = V("TrackTempCrew") ?? V("TrackTemp"); _wind = V("WindVel"); _windDir = V("WindDir");
         _humidity = V("RelativeHumidity"); _fog = V("FogLevel"); _precip = V("Precipitation"); _wetness = V("TrackWetness"); _declaredWet = V("WeatherDeclaredWet");
@@ -125,6 +125,7 @@ internal sealed class FrameDecoder
         f.PitStatus = I(_pitStatus);
         f.PitstopActive = B(_pitActive); f.InPitStall = B(_inStall);
         f.FastRepairsAvailable = I(_fastRepair);
+        f.TowTime = D(_tow) is > 0 and var tow ? tow : null;
         f.TyreCompound = I(_compound);
         for (int i = 0; i < 4; i++)
         {

@@ -11,7 +11,7 @@ internal sealed class SessionStatsPlugin : Plugin
 
     public override string Id => PluginIds.SessionStats;
     public override string Name => "Session Stats";
-    public override string Description => "Your iRacing history in numbers: time, cars and tracks, pace and personal bests, races, incidents and driving style, from every session you drive and your old telemetry files.";
+    public override string Description => "Your iRacing history: personal bests, races, incidents and lap analysis.";
     public override string Icon => "I.Candles";
     public override (string Soft, string Deep) Colors => ("Tool7Soft", "Tool7Deep");
     public override int Order => 60;

@@ -6,7 +6,7 @@ I got sick of switching monitors, audio, fan curves and overlays by hand every t
 
 ## What's in it
 
-Every feature is a plugin you can switch off, and when one's off it runs nothing in the background. Every tool sits in a sidebar (drag to reorder, left or right side), with its sections listed under it. There are themes (Light, Dark, or your own colors, with presets to start from), and `Ctrl+F` searches every setting and keybind in the app.
+Every tool can be switched off, and when one's off it runs nothing in the background. Every tool sits in a sidebar (drag to reorder), with its sections listed under it. There are themes (Light, Dark, or your own colors, with presets to start from), and `Ctrl+F` searches every setting in the app. Keybinds can be keyboard shortcuts or a button on your wheel or button box.
 
 ### Window Profiles
 
@@ -19,7 +19,7 @@ Pick a program and give its window an exact size and spot: a game stretched acro
 
 ### Displays
 
-Turn monitors on and off, arrange them, duplicate one onto another, give them your own names, and set resolution, refresh rate, HDR, taskbar, wallpapers and audio. Save it all as profiles (mine are *Desk* and *Sim rig*) and switch between them with a hotkey.
+Turn monitors on and off, arrange them, duplicate one onto another, give them your own names, and set resolution, refresh rate, HDR, taskbar, wallpapers and audio. Save it all as profiles (mine are *Desk* and *Sim rig*) and switch between them with a keybind. Layout changes ask you to keep them and go back by themselves after 15 seconds if you don't.
 
 <p>
   <img src="screenshots/displays.png" alt="Displays" width="49%">
@@ -28,7 +28,7 @@ Turn monitors on and off, arrange them, duplicate one onto another, give them yo
 
 ### Fan Control
 
-Curves, presets, calibration and an emergency failsafe. When you quit you can keep your curves running in a small background helper (its own tray icon), or hand the fans back to the BIOS / driver.
+Curves, presets, calibration and an emergency failsafe. Each fan has its own limits (minimum, fan stop, how fast it may speed up or slow down), and if the hardware stops answering the fans go back to the BIOS / driver until it's back. When you quit you can keep your curves running in a small background helper (its own tray icon), or hand the fans back to the BIOS / driver.
 
 <p>
   <img src="screenshots/fan-control.png" alt="Fan Control" width="49%">
@@ -48,7 +48,7 @@ A dashboard of CPU, GPU, memory, network, storage, fans and frame rate. The **Pe
 
 #### iRacing Overlay
 
-Relative, Standings, Fuel & strategy, Lap timing & delta, Lap history, Tires, Weather, Wind, Session, Race events, Multiclass traffic, Alerts and a Data block for any single value. Every widget can be set up however you like, with layouts that switch by car / class / track, and an in-game editor (`Ctrl+Alt+E`) so you never have to leave the car.
+Relative, Standings, Fuel and strategy, Lap timing and delta, Lap history, Tires, Weather and track, Wind, Session, Race events, Multiclass traffic, Alerts and a Data block for any single value. Every widget can be set up however you like, with layouts that switch by car / class / track, and an in-game editor (`Ctrl+Alt+E`) so you never have to leave the car.
 
 <p>
   <img src="screenshots/iracing-overlay.png" alt="iRacing Overlay" width="49%">
@@ -59,7 +59,7 @@ Relative, Standings, Fuel & strategy, Lap timing & delta, Lap history, Tires, We
 
 #### iRacing Setup Manager
 
-All your setups sorted by car and class. Rename, move, import share packs and pick up new downloads. A fuel calculator for the selected car tells you how much fuel to start with and how many stops you'll need.
+All your setups sorted by car and class. Rename, move, import share packs and pick up new downloads. Fuel planning lives in the iRacing Overlay's **Fuel** tab.
 
 ![iRacing Setup Manager](screenshots/iracing-setup-manager.png)
 
@@ -75,13 +75,13 @@ Single and triple screens, compare rigs, and write the result straight into iRac
 
 ![FOV Calculator](screenshots/fov-calculator.png)
 
-#### Trading Paints and Garage 61
+#### Companion apps
 
-Launch them with Goodie Bag or when iRacing starts.
+Start Trading Paints and Garage 61 with Goodie Bag or when iRacing starts, and stop them from the same place.
 
 ### Session Stats
 
-Your iRacing history, kept on your PC. Laps, time, results, ratings, incidents and personal bests by week / month / season, with a picture of each car. Open any session for its laps and sectors, then compare laps on telemetry traces or a top-down replay. You can export a lap to share and import other people's. Tire wear is tracked per run from the pit-stall readings. It also reads your old iRacing telemetry files, so your history doesn't start from zero, and can switch on iRacing's telemetry recording and clear out files it has already read.
+Your iRacing history, kept on your PC. Laps, time, results, ratings, incidents and personal bests by week / month / season, with a picture of each car. Panels can be dragged into your own order. Open any session for its laps and sectors, then compare laps on telemetry traces or a top-down replay. You can export a lap to share and import other people's. Tire wear is tracked per run from the pit-stall readings. It also reads your old iRacing telemetry files, so your history doesn't start from zero, and can switch on iRacing's telemetry recording and clear out files it has already read.
 
 ![Session Stats](screenshots/session-stats.png)
 
@@ -118,17 +118,17 @@ Works on Windows 10 and 11 (x64).
 - The sim racing tools only support iRacing.
 - Overlays show over borderless and windowed games, not exclusive fullscreen.
 - If Goodie Bag gets force-killed (Task Manager → End task), fans stay at their last speed until it restarts or the PC reboots.
-- Windows text scaling (100 %, 125 %…) has no supported API, so the Displays page just links to Windows settings for it.
+- Windows text scaling (100%, 125%…) has no supported API, so the Displays page just links to Windows settings for it.
 
 ## Updates and removal
 
-- **Updates:** Settings → About & updates checks on start, daily, weekly or only when you click **Check now**. When there's an update, **Install and restart** downloads it, checks the checksum and swaps the exe. Your settings are kept.
+- **Updates:** Settings → About and updates checks on start, daily, weekly or only when you click **Check now**. When there's an update, **Install and restart** downloads it, checks the checksum and swaps the exe. Your settings are kept.
 - **Reset:** Settings → Data & configuration → **Reset Goodie Bag**. Your old settings are saved as `config.before-reset-<date>.json`, and **Export / Import** lets you back them up or move them to another PC.
-- **Uninstall:** turn off **Start with Windows**, quit from the tray (choose **Stop and quit** if fan control is on), then delete `GoodieBag.exe` and `%APPDATA%\GoodieBag`. If you installed PawnIO, remove it from Windows Settings → Apps.
+- **Uninstall:** turn off **Start with Windows**, quit from the tray (choose **Give fans back and quit** if fan control is on), then delete `GoodieBag.exe` and `%APPDATA%\GoodieBag`. If you installed PawnIO, remove it from Windows Settings → Apps.
 
-## GRR League plugin
+## GRR League
 
-If you race in the GRR league, turn on the GRR League plugin (Settings → Plugins). It shows your next race and the season's schedule, the championship and results for your class, and where you stand, all from the GRR website without leaving the app. It's off by default, so nobody else sees it.
+If you race in the GRR league, turn on the GRR League tool (Settings → Tools → **Choose tools**). It shows your next race and the season's schedule, the championship and results for your class, and where you stand, all from the GRR website without leaving the app. It's off by default, so nobody else sees it.
 
 ![GRR League](screenshots/grr-league.png)
 

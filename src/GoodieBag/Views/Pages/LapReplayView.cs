@@ -5,7 +5,9 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using GoodieBag.Controls;
+using GoodieBag.Services;
 using GoodieBag.SessionStats;
+using GoodieBag.Theme;
 
 namespace GoodieBag.Views.Pages;
 
@@ -27,7 +29,7 @@ internal sealed class ReplayCar
 
 internal sealed class LapReplayView : Grid
 {
-    private const double MinStage = 420, MaxStage = 760;
+    private const double MinStage = 340, MaxStage = 616;
     private const long ReadoutMs = 66;
     private readonly AnalysisState _s;
     private readonly Config.SessionStatsSettings _settings;
@@ -88,7 +90,7 @@ internal sealed class LapReplayView : Grid
             _ = PlaceMapAsync(map, lines);
         }
         _stage.WentFree += () => { _save(); SyncCamera(); };
-        var overlay = new Grid { Margin = new Thickness(14) };
+        var overlay = new Grid { Margin = new Thickness(11) };
 
         var cards = new ReplayCardRow { VerticalAlignment = VerticalAlignment.Top };
         foreach (var car in _cars.OrderBy(c => c.Line.Reference ? 1 : 0))
@@ -98,7 +100,7 @@ internal sealed class LapReplayView : Grid
             cards.Children.Add(card);
         }
         var track = _cars.FirstOrDefault(c => c.Line.Reference) ?? _follow;
-        _mini = new ReplayMiniMap((track.X, track.Y), track.Trace.StepM, _sectorStarts) { Width = 230, Height = 150 };
+        _mini = new ReplayMiniMap((track.X, track.Y), track.Trace.StepM, _sectorStarts) { Width = 186, Height = 122 };
         _sectorName.Style = Ui.Res<Style>("Body");
         _sectorName.FontWeight = FontWeights.SemiBold;
         _sectorName.HorizontalAlignment = HorizontalAlignment.Center;
@@ -106,7 +108,7 @@ internal sealed class LapReplayView : Grid
         _sectorGap.FontWeight = FontWeights.SemiBold;
         _sectorGap.HorizontalAlignment = HorizontalAlignment.Center;
         Typography.SetNumeralAlignment(_sectorGap, FontNumeralAlignment.Tabular);
-        var miniFoot = new Grid { Margin = new Thickness(0, 8, 0, 0) };
+        var miniFoot = new Grid { Margin = new Thickness(0, 6, 0, 0) };
         miniFoot.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         miniFoot.ColumnDefinitions.Add(new ColumnDefinition());
         miniFoot.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -124,12 +126,12 @@ internal sealed class LapReplayView : Grid
         }
         var miniCard = new Tile
         {
-            Style = Ui.Res<Style>("Card"), Padding = new Thickness(12, 10, 12, 10), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom,
+            Style = Ui.Res<Style>("Card"), Padding = new Thickness(10, 8, 10, 8), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom,
             Child = new StackPanel { Children = { _mini, miniFoot } },
         };
         overlay.Children.Add(miniCard);
 
-        var topLeft = new StackPanel { HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 0, 12, 0) };
+        var topLeft = new StackPanel { HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 0, 10, 0) };
         var top = new Grid { VerticalAlignment = VerticalAlignment.Top };
         top.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         top.ColumnDefinitions.Add(new ColumnDefinition());
@@ -139,7 +141,7 @@ internal sealed class LapReplayView : Grid
         overlay.Children.Add(top);
         if (_cars.Any(c => c.Line.Wind is not null))
         {
-            _wind = new ReplayWind(_cars, settings.Imperial) { HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 10) };
+            _wind = new ReplayWind(_cars, settings.Imperial) { HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 8) };
             _wind.Visibility = settings.AnalysisWind ? Visibility.Visible : Visibility.Collapsed;
             topLeft.Children.Add(_wind);
         }
@@ -149,25 +151,25 @@ internal sealed class LapReplayView : Grid
             _table = new SectorTable(_cars, data.SectorStarts);
             overlay.Children.Add(new Tile
             {
-                Style = Ui.Res<Style>("Card"), Padding = new Thickness(14, 10, 14, 10), Child = _table,
+                Style = Ui.Res<Style>("Card"), Padding = new Thickness(11, 8, 11, 8), Child = _table,
                 HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom,
             });
         }
 
-        _zoom = new Slider { Minimum = 0, Maximum = 1, Value = settings.ReplayZoom, Width = 120, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 6, 0) };
+        _zoom = new Slider { Minimum = 0, Maximum = 1, Value = settings.ReplayZoom, Width = 97, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 0, 5, 0) };
         _zoom.ValueChanged += (_, e) => SetZoom(e.NewValue);
         _zoom.ToolTip = "Zoom; all the way out = the whole lap";
         var turn = Ui.LabeledButton("I.Rotate", "Turn with car", () => { });
         Ui.SetToggled(turn, settings.ReplayTurn);
         turn.Click += (_, _) => { settings.ReplayTurn = !settings.ReplayTurn; Ui.SetToggled(turn, settings.ReplayTurn); _stage.Update(); _wind?.Turn(_stage.Rotation); _save(); };
         turn.ToolTip = "Keep the followed car pointing up (off = north up)";
-        turn.Margin = new Thickness(10, 0, 0, 0);
+        turn.Margin = new Thickness(8, 0, 0, 0);
         var zoomRow = new StackPanel { Orientation = Orientation.Horizontal };
         var showRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         _camera = Ui.Segmented(new[] { "Follow car", "Free" }, settings.ReplayFree ? 1 : 0, i => SetFree(i == 1), "replayCamera",
             new[] { "The camera stays on the followed car (click a card to pick it)", "Drag to move around the track" });
         _camera.VerticalAlignment = VerticalAlignment.Center;
-        _camera.Margin = new Thickness(0, 0, 10, 0);
+        _camera.Margin = new Thickness(0, 0, 8, 0);
         zoomRow.Children.Add(_camera);
         zoomRow.Children.Add(Ui.IconButton("I.Minus", "Zoom out", () => ZoomBy(-0.1), "QuietIconButton"));
         zoomRow.Children.Add(_zoom);
@@ -186,7 +188,7 @@ internal sealed class LapReplayView : Grid
             var windButton = Ui.LabeledButton("I.Wind", "Wind", () => { });
             Ui.SetToggled(windButton, settings.AnalysisWind);
             windButton.ToolTip = "Wind speed and direction on each lap";
-            windButton.Margin = new Thickness(6, 0, 0, 0);
+            windButton.Margin = new Thickness(5, 0, 0, 0);
             windButton.Click += (_, _) =>
             {
                 settings.AnalysisWind = !settings.AnalysisWind;
@@ -199,17 +201,17 @@ internal sealed class LapReplayView : Grid
         zoomRow.VerticalAlignment = VerticalAlignment.Center;
 
         var legend = new StackPanel { HorizontalAlignment = HorizontalAlignment.Left };
-        var colors = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(-12, 0, 0, 0) };
+        var colors = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(-10, 0, 0, 0) };
         foreach (var (label, key) in new[] { ("Throttle", StatsUi.Hue("Sage").Deep), ("Coasting", "Heading"), ("Brake", "Danger") })
         {
-            var sw = new Border { Width = 14, Height = 3, Margin = new Thickness(12, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center };
+            var sw = new Border { Width = 11, Height = 2, Margin = new Thickness(10, 0, 5, 0), VerticalAlignment = VerticalAlignment.Center };
             sw.SetResourceReference(Border.BackgroundProperty, key);
             colors.Children.Add(sw);
             colors.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center });
         }
         colors.ToolTip = "The followed lap's line; the other laps are dotted in their colors";
         legend.Children.Add(colors);
-        topLeft.Children.Add(new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(12, 8, 12, 8), HorizontalAlignment = HorizontalAlignment.Left, Child = legend });
+        topLeft.Children.Add(new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(10, 6, 10, 6), HorizontalAlignment = HorizontalAlignment.Left, Child = legend });
 
         var stageHost = new Grid { ClipToBounds = true, Children = { _stage, overlay } };
         IEnumerable<FrameworkElement> Parts() => overlay.Children.OfType<FrameworkElement>().Where(p => p != top)
@@ -236,30 +238,31 @@ internal sealed class LapReplayView : Grid
         }
         foreach (var part in Parts().Append(top)) part.SizeChanged += (_, _) => QueueAvoid();
         stageHost.SizeChanged += (_, _) => QueueAvoid();
-        _stageTile = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Height = 560, Child = stageHost };
+        _stageTile = Hairline.Frame(new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Height = 454, Child = stageHost });
+        _stageTile.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
 
-        _stageTile.Margin = new Thickness(0, 0, 0, 12);
+        _stageTile.Margin = new Thickness(0, 0, 0, 10);
         Children.Add(_stageTile);
 
         _scrubber = new ReplayScrubber(_follow.Trace.LapTime > 0 ? _sectorStarts.Skip(1).Select(d => _follow.Trace.TimeAt(d) / _follow.Trace.LapTime).ToArray() : Array.Empty<double>())
         {
-            Height = 26, Margin = new Thickness(0, 0, 0, 10),
+            Height = 21, Margin = new Thickness(0, 0, 0, 8),
         };
         _scrubber.Seeking += share => { Pause(); Seek(share * _follow.Trace.LapTime); };
 
         _play = Ui.IconButton("I.Play", "Play / pause (Space)", Toggle, "PrimaryButton");
         _clock.Style = Ui.Res<Style>("H3");
         _clock.VerticalAlignment = VerticalAlignment.Center;
-        _clock.Margin = new Thickness(14, 0, 0, 0);
-        _clock.MinWidth = 128;
+        _clock.Margin = new Thickness(11, 0, 0, 0);
+        _clock.MinWidth = 104;
         Typography.SetNumeralAlignment(_clock, FontNumeralAlignment.Tabular);
         var speeds = LapReplay.Speeds.Select(v => new Choice(v.ToString(CultureInfo.InvariantCulture), v.ToString("0.##", CultureInfo.CurrentCulture) + "×")).ToList();
         var speed = Ui.Combo(speeds, settings.ReplaySpeed.ToString(CultureInfo.InvariantCulture), c =>
         {
             if (double.TryParse(c.Id, NumberStyles.Float, CultureInfo.InvariantCulture, out double v)) { _settings.ReplaySpeed = v; _save(); }
-        }, 78);
+        }, 63);
         speed.ToolTip = "Playback speed";
-        speed.Margin = new Thickness(10, 0, 0, 0);
+        speed.Margin = new Thickness(8, 0, 0, 0);
         speed.VerticalAlignment = VerticalAlignment.Center;
         var playRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { _play, _clock, speed } };
         bool compared = _cars.Any(c => !c.Line.Reference) && _cars.Any(c => c.Line.Reference);
@@ -271,16 +274,16 @@ internal sealed class LapReplayView : Grid
             t.VerticalAlignment = VerticalAlignment.Center;
             Typography.SetNumeralAlignment(t, FontNumeralAlignment.Tabular);
         }
-        _gapSeconds.MinWidth = 58;
-        _gapMetres.MinWidth = 50;
-        _gapMetres.Margin = new Thickness(10, 0, 0, 0);
-        var gapLabel = new TextBlock { Text = "Delta", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+        _gapSeconds.MinWidth = 47;
+        _gapMetres.MinWidth = 40;
+        _gapMetres.Margin = new Thickness(8, 0, 0, 0);
+        var gapLabel = new TextBlock { Text = "Delta", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
         var gap = new StackPanel { Orientation = Orientation.Horizontal, Children = { gapLabel, _gapSeconds, _gapMetres } };
         gap.ToolTip = "Behind (+) or ahead (−) of the reference: in time at this spot, and in distance after the same time";
         _refSwitch = Ui.Switch(settings.ReplayShowReference, ShowReference);
         var refSwitch = _refSwitch;
-        var refRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-        refRow.Children.Add(new TextBlock { Text = "Reference", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) });
+        var refRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        refRow.Children.Add(new TextBlock { Text = "Reference", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) });
         refRow.Children.Add(refSwitch);
         refRow.ToolTip = "Show the reference lap's line and car";
         var sync = Ui.Segmented(new[] { "Distance", "Time" }, settings.ReplaySync == "time" ? 1 : 0, i =>
@@ -291,7 +294,7 @@ internal sealed class LapReplayView : Grid
         }, "replaySync", new[] { "Every car at the same spot: the gap shows in time", "Every car after the same time since the line: they race, the gap shows on track" });
         sync.VerticalAlignment = VerticalAlignment.Center;
         var syncRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        syncRow.Children.Add(new TextBlock { Text = "Sync", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) });
+        syncRow.Children.Add(new TextBlock { Text = "Sync", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) });
         syncRow.Children.Add(sync);
         if (compared) showRow.Children.Add(refRow);
         gap.VerticalAlignment = VerticalAlignment.Center;
@@ -301,11 +304,11 @@ internal sealed class LapReplayView : Grid
         {
             if (groups.Children.Count > 0)
             {
-                var rule = new Border { Width = 1, Height = 26, Margin = new Thickness(10, 4, 10, 4), VerticalAlignment = VerticalAlignment.Center };
+                var rule = Hairline.Rule(new Border { Height = 21, Margin = new Thickness(8, 3, 8, 3), VerticalAlignment = VerticalAlignment.Center }, Orientation.Vertical);
                 rule.SetResourceReference(Border.BackgroundProperty, "Line");
                 groups.Children.Add(rule);
             }
-            part.Margin = new Thickness(0, 4, 0, 4);
+            part.Margin = new Thickness(0, 3, 0, 3);
             groups.Children.Add(part);
         }
         Group(playRow);
@@ -316,7 +319,7 @@ internal sealed class LapReplayView : Grid
         var bar = new StackPanel();
         bar.Children.Add(_scrubber);
         bar.Children.Add(groups);
-        _barTile = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(20, 14, 20, 14), Child = bar };
+        _barTile = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(16, 11, 16, 11), Child = bar };
         SetRow(_barTile, 1);
         Children.Add(_barTile);
 
@@ -543,8 +546,8 @@ internal sealed class LapReplayView : Grid
         }
         var reference = _s.Reference.Trace;
         var (seconds, metres) = LapReplay.Gap(compared.Trace, reference, compared.Distance);
-        _gapSeconds.Text = Signed(seconds, "0.000") + " s";
-        _gapMetres.Text = _settings.Imperial ? Signed(metres * 3.28084, "0") + " ft" : Signed(metres, "0") + " m";
+        _gapSeconds.Text = Signed(seconds, "0.000") + " " + Units.S;
+        _gapMetres.Text = _settings.Imperial ? Signed(metres * 3.28084, "0") + " " + Units.Ft : Signed(metres, "0") + " " + Units.M;
         Tone(_gapSeconds, seconds, ref _gapSign);
         _gapMetres.Foreground = _gapSeconds.Foreground;
         double sectorGap = LapReplay.SectorGap(compared.Trace, reference, _sectorStarts, compared.Distance);
@@ -575,18 +578,18 @@ internal sealed class ReplayWind : Tile
     public ReplayWind(List<ReplayCar> cars, bool imperial)
     {
         Style = Ui.Res<Style>("Card");
-        Padding = new Thickness(12, 8, 12, 8);
+        Padding = new Thickness(10, 6, 10, 6);
         IsHitTestVisible = false;
         var rows = new Grid();
         foreach (var width in new[] { GridLength.Auto, GridLength.Auto, new GridLength(1, GridUnitType.Star), GridLength.Auto })
             rows.ColumnDefinitions.Add(new ColumnDefinition { Width = width });
         rows.RowDefinitions.Add(new RowDefinition());
-        var title = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
+        var title = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 5) };
         title.Children.Add(new TextBlock { Text = "Wind", Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
-        var north = new Grid { Width = 18, Height = 18, Margin = new Thickness(10, 0, 0, 0), RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = _north, ToolTip = "North" };
-        var needle = new Icon { Data = Geometry.Parse("M12 3l4 9h-8z"), Width = 18, Height = 18, StrokeThickness = 1.6 };
+        var north = new Grid { Width = 15, Height = 15, Margin = new Thickness(8, 0, 0, 0), RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = _north, ToolTip = "North" };
+        var needle = new Icon { Data = Geometry.Parse("M12 3l4 9h-8z"), Width = 15, Height = 15, StrokeThickness = 1.3 };
         needle.SetResourceReference(Icon.ForegroundProperty, "TextMuted");
-        var n = new TextBlock { Text = "N", Style = Ui.Res<Style>("Caption"), FontSize = 8.5, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom };
+        var n = new TextBlock { Text = "N", Style = Ui.Res<Style>("Caption"), FontSize = 7, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom };
         north.Children.Add(needle);
         north.Children.Add(n);
         title.Children.Add(north);
@@ -597,7 +600,7 @@ internal sealed class ReplayWind : Tile
             var line = car.Line;
             if (line.Wind is not { } wind) continue;
             rows.RowDefinitions.Add(new RowDefinition());
-            var swatch = new Border { Width = 4, Height = 16, Margin = new Thickness(0, 2, 8, 2), VerticalAlignment = VerticalAlignment.Center };
+            var swatch = new Border { Width = 3, Height = 13, Margin = new Thickness(0, 2, 6, 2), VerticalAlignment = VerticalAlignment.Center };
             swatch.SetResourceReference(Border.BackgroundProperty, line.BrushKey);
             if (line.Reference) swatch.Opacity = 0.6;
             double to = (wind.From + Math.PI) * 180 / Math.PI;
@@ -605,12 +608,12 @@ internal sealed class ReplayWind : Tile
             _arrows.Add((turn, to));
             var arrow = new Icon
             {
-                Data = Geometry.Parse("M12 20V4M6 10l6-6 6 6"), Width = 16, Height = 16, StrokeThickness = 2.2, Margin = new Thickness(0, 0, 10, 0),
+                Data = Geometry.Parse("M12 20V4M6 10l6-6 6 6"), Width = 13, Height = 13, StrokeThickness = 1.78, Margin = new Thickness(0, 0, 8, 0),
                 VerticalAlignment = VerticalAlignment.Center, RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = turn,
             };
             arrow.SetResourceReference(Icon.ForegroundProperty, line.BrushKey);
             double speed = imperial ? wind.Kph / 1.609344 : wind.Kph;
-            var value = new TextBlock { Text = $"{line.Short}  {speed:0} {(imperial ? "mph" : "km/h")}", Style = Ui.Res<Style>("Body"), FontSize = 12.5, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0) };
+            var value = new TextBlock { Text = $"{line.Short}  {speed:0} {(imperial ? Units.Mph : Units.Kmh)}", Style = Ui.Res<Style>("Body"), FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
             var point = new TextBlock { Text = SimRacing.Race.RaceFormat.Compass(wind.From + Math.PI), Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center };
             point.ToolTip = "Where the wind blows to";
             Cell(rows, swatch, row, 0);
@@ -993,9 +996,9 @@ internal sealed class ReplayStage : FrameworkElement
         for (int i = 0; i < _labelVisuals.Length; i++)
         {
             using var dc = _labelVisuals[i].RenderOpen();
-            var text = LapAnalysisView.Text(this, "S" + (i + 2), Ui.Res<Brush>("Heading"), 12, bold: true);
+            var text = LapAnalysisView.Text(this, "S" + (i + 2), Ui.Res<Brush>("Heading"), 9.5, bold: true);
             var box = new Rect(-text.Width / 2 - 5, -text.Height / 2 - 2, text.Width + 10, text.Height + 4);
-            dc.DrawRectangle(Ui.Res<Brush>("Surface"), new Pen(Ui.Res<Brush>("LineStrong"), 1), box);
+            dc.DrawRectangle(Ui.Res<Brush>("Surface"), Hairline.Pen(Ui.Res<Brush>("LineStrong"), this), box);
             dc.DrawText(text, new Point(-text.Width / 2, -text.Height / 2));
         }
         int at = _cars.IndexOf(follow);
@@ -1060,10 +1063,10 @@ internal sealed class ReplayStage : FrameworkElement
             Size box;
             using (var dc = callout.RenderOpen())
             {
-                var title = LapAnalysisView.Text(this, note.Title, brush, 11, bold: true);
-                var body = LapAnalysisView.Text(this, note.Text(_s.Imperial), Ui.Res<Brush>("Heading"), 13);
+                var title = LapAnalysisView.Text(this, note.Title, brush, 9, bold: true);
+                var body = LapAnalysisView.Text(this, note.Text(_s.Imperial), Ui.Res<Brush>("Heading"), 10.5);
                 box = new Size(Math.Ceiling(Math.Max(title.Width, body.Width) + 24), Math.Ceiling(title.Height + body.Height + 18));
-                dc.DrawRectangle(Ui.Res<Brush>("Surface"), new Pen(Ui.Res<Brush>("LineStrong"), 1), new Rect(0.5, 0.5, box.Width - 1, box.Height - 1));
+                dc.DrawRectangle(Ui.Res<Brush>("Surface"), Hairline.Pen(Ui.Res<Brush>("LineStrong"), this), Hairline.SnapBox(new Rect(0, 0, box.Width, box.Height), Hairline.ScaleOf(this)));
                 dc.DrawRectangle(brush, null, new Rect(0, 0, 3, box.Height));
                 dc.DrawText(title, new Point(13, 8));
                 dc.DrawText(body, new Point(13, 8 + title.Height + 2));
@@ -1144,7 +1147,7 @@ internal sealed class ReplayStage : FrameworkElement
 internal static class CarShape
 {
     public const double DefaultLength = 4.619;
-    public const double Enlarge = 2.5, MinPixels = 44;
+    public const double Enlarge = 2.5, MinPixels = 36;
 
     private static readonly (string[] Words, double Length)[] Lengths =
     {
@@ -1197,7 +1200,7 @@ internal static class CarShape
 
 internal sealed class ReplayCardRow : Panel
 {
-    private const double MinCard = 270, MaxCard = 460, Gap = 10;
+    private const double MinCard = 219, MaxCard = 373, Gap = 8;
 
     private (int PerRow, double Width) Fit(double width)
     {
@@ -1239,7 +1242,7 @@ internal sealed class ReplayCardRow : Panel
 
 internal sealed class ReplayCard : Tile
 {
-    private const double ValueSize = 19;
+    private const double ValueSize = 15.5;
     private readonly bool _imperial;
     private readonly ScaleTransform _throttle = new(0, 1), _brake = new(0, 1);
     private readonly RotateTransform _wheel = new();
@@ -1255,21 +1258,21 @@ internal sealed class ReplayCard : Tile
         Car = car;
         _imperial = imperial;
         Style = Ui.Res<Style>("Card");
-        Padding = new Thickness(16, 12, 16, 14);
+        Padding = new Thickness(13, 10, 13, 11);
         Cursor = Cursors.Hand;
         ToolTip = "Follow this car";
         MouseLeftButtonUp += (_, e) => { follow(); e.Handled = true; };
 
-        var swatch = new Border { Width = 4, Margin = new Thickness(0, 0, 10, 0) };
+        var swatch = new Border { Width = 3, Margin = new Thickness(0, 0, 8, 0) };
         swatch.SetResourceReference(Border.BackgroundProperty, car.Line.BrushKey);
-        var name = TextFit.TipWhenTrimmed(new TextBlock { Text = car.Line.Driver.Length > 0 ? car.Line.Driver : car.Line.Short, Style = Ui.Res<Style>("Body"), FontSize = 14.5, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.NoWrap, TextTrimming = TextTrimming.CharacterEllipsis });
-        var sub = TextFit.TipWhenTrimmed(new TextBlock { Text = car.Line.Driver.Length > 0 ? car.Line.Short : "", Style = Ui.Res<Style>("Caption"), FontSize = 12, TextWrapping = TextWrapping.NoWrap, TextTrimming = TextTrimming.CharacterEllipsis });
+        var name = TextFit.TipWhenTrimmed(new TextBlock { Text = car.Line.Driver.Length > 0 ? car.Line.Driver : car.Line.Short, Style = Ui.Res<Style>("Body"), FontSize = 11.5, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.NoWrap, TextTrimming = TextTrimming.CharacterEllipsis });
+        var sub = TextFit.TipWhenTrimmed(new TextBlock { Text = car.Line.Driver.Length > 0 ? car.Line.Short : "", Style = Ui.Res<Style>("Caption"), FontSize = 9.5, TextWrapping = TextWrapping.NoWrap, TextTrimming = TextTrimming.CharacterEllipsis });
         if (car.Line.Reference && !onlyOne) sub.Text = sub.Text.Length > 0 ? sub.Text + " · reference" : "Reference";
         sub.ToolTip = sub.Text;
-        var time = new TextBlock { Text = StatFormat.LapTime(car.Trace.LapTime), Style = Ui.Res<Style>("Body"), FontSize = 14.5, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Top };
+        var time = new TextBlock { Text = StatFormat.LapTime(car.Trace.LapTime), Style = Ui.Res<Style>("Body"), FontSize = 11.5, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Top };
         Typography.SetNumeralAlignment(time, FontNumeralAlignment.Tabular);
         var boost = Ui.Chip("P2P", StatsUi.Hue("Coral").Soft, StatsUi.Hue("Coral").Deep);
-        boost.Margin = new Thickness(0, 0, 8, 0);
+        boost.Margin = new Thickness(0, 0, 6, 0);
         boost.VerticalAlignment = VerticalAlignment.Top;
         boost.Visibility = Visibility.Collapsed;
         boost.ToolTip = "Push-to-pass in use";
@@ -1282,27 +1285,27 @@ internal sealed class ReplayCard : Tile
         head.Children.Add(right);
         head.Children.Add(new StackPanel { Children = { name, sub } });
 
-        var pedals = new Grid { Margin = new Thickness(0, 10, 0, 0) };
+        var pedals = new Grid { Margin = new Thickness(0, 8, 0, 0) };
         pedals.ColumnDefinitions.Add(new ColumnDefinition());
-        pedals.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
+        pedals.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });
         pedals.ColumnDefinitions.Add(new ColumnDefinition());
         pedals.Children.Add(Bar("Throttle", StatsUi.Hue("Sage").Deep, _throttle, _throttleText));
         var brakeBar = Bar("Brake", "Danger", _brake, _brakeText);
         Grid.SetColumn(brakeBar, 2);
         pedals.Children.Add(brakeBar);
 
-        var values = new Grid { Margin = new Thickness(0, 10, 0, 0) };
+        var values = new Grid { Margin = new Thickness(0, 8, 0, 0) };
         for (int c = 0; c < 3; c++) values.ColumnDefinitions.Add(new ColumnDefinition());
         values.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        values.Children.Add(Value(_speed, imperial ? "mph" : "km/h", "speed"));
+        values.Children.Add(Value(_speed, imperial ? Units.Mph : Units.Kmh, "speed"));
         values.Children.Add(Value(_gear, "Gear", "gear"));
-        values.Children.Add(Value(_rpm, "RPM", "rpm"));
+        values.Children.Add(Value(_rpm, Units.Rpm, "rpm"));
         var steer = Value(_steer, "Steer", "steering");
-        _steer.MinWidth = 44;
+        _steer.MinWidth = 36;
         steer.ToolTip = "Steering wheel angle in degrees; the wheel shows which way";
         if (car.Trace[TraceChannel.Steering] is not null)
         {
-            var wheel = new Icon { Data = Ui.Res<Geometry>("I.Wheel"), Width = 32, Height = 32, StrokeThickness = 2.4, Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center, RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = _wheel };
+            var wheel = new Icon { Data = Ui.Res<Geometry>("I.Wheel"), Width = 26, Height = 26, StrokeThickness = 1.94, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center, RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = _wheel };
             wheel.SetResourceReference(Icon.ForegroundProperty, LapAnalysisView.LaneHue("steering"));
             steer = new DockPanel { Children = { wheel, steer }, ToolTip = steer.ToolTip };
             DockPanel.SetDock(wheel, Dock.Left);
@@ -1314,22 +1317,22 @@ internal sealed class ReplayCard : Tile
 
     private static FrameworkElement Bar(string label, string brush, ScaleTransform scale, TextBlock percent)
     {
-        var fill = new Border { Height = 6, RenderTransform = scale, HorizontalAlignment = HorizontalAlignment.Stretch };
+        var fill = new Border { Height = 5, RenderTransform = scale, HorizontalAlignment = HorizontalAlignment.Stretch };
         fill.SetResourceReference(Border.BackgroundProperty, brush);
-        var track = new Border { Height = 6, Child = fill, Margin = new Thickness(0, 5, 0, 0) };
+        var track = new Border { Height = 5, Child = fill, Margin = new Thickness(0, 4, 0, 0) };
         track.SetResourceReference(Border.BackgroundProperty, "SurfaceAlt");
         percent.Style = Ui.Res<Style>("Body");
-        percent.FontSize = 13;
+        percent.FontSize = 10.5;
         percent.FontWeight = FontWeights.SemiBold;
         percent.Text = "–";
-        percent.MinWidth = 40;
+        percent.MinWidth = 32;
         percent.TextAlignment = TextAlignment.Right;
         percent.SetResourceReference(TextBlock.ForegroundProperty, brush);
         Typography.SetNumeralAlignment(percent, FontNumeralAlignment.Tabular);
         var top = new DockPanel();
         DockPanel.SetDock(percent, Dock.Right);
         top.Children.Add(percent);
-        top.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), FontSize = 12, VerticalAlignment = VerticalAlignment.Center });
+        top.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), FontSize = 9.5, VerticalAlignment = VerticalAlignment.Center });
         return new StackPanel { Children = { top, track } };
     }
 
@@ -1341,7 +1344,7 @@ internal sealed class ReplayCard : Tile
         value.FontWeight = FontWeights.SemiBold;
         value.Text = "–";
         Typography.SetNumeralAlignment(value, FontNumeralAlignment.Tabular);
-        return new StackPanel { Children = { value, new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), FontSize = 12 } } };
+        return new StackPanel { Children = { value, new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), FontSize = 9.5 } } };
     }
 
     private static void Set(TextBlock text, ref int last, int value, Func<int, string> format)
@@ -1381,7 +1384,7 @@ internal sealed class ReplayCard : Tile
 
 internal sealed class ReplayMiniMap : FrameworkElement
 {
-    private const double Pad = 12;
+    private const double Pad = 10;
     private readonly double[] _x, _y, _starts;
     private readonly double _step, _minX, _maxY, _spanX, _spanY;
     private readonly VisualCollection _visuals;
@@ -1462,7 +1465,7 @@ internal sealed class ReplayMiniMap : FrameworkElement
                 var p = At(_x[i], _y[i]);
                 bool on = k == _sector;
                 dc.DrawEllipse(Ui.Res<Brush>(on ? "AccentText" : "Surface"), edge, p, 8, 8);
-                var n = LapAnalysisView.Text(this, (k + 1).ToString(CultureInfo.CurrentCulture), Ui.Res<Brush>(on ? "OnAccent" : "Heading"), 10, bold: true);
+                var n = LapAnalysisView.Text(this, (k + 1).ToString(CultureInfo.CurrentCulture), Ui.Res<Brush>(on ? "OnAccent" : "Heading"), 8, bold: true);
                 dc.DrawText(n, new Point(p.X - n.Width / 2, p.Y - n.Height / 2));
             }
         }
@@ -1483,7 +1486,7 @@ internal sealed class ReplayMiniMap : FrameworkElement
 
 internal sealed class ReplayScrubber : FrameworkElement
 {
-    private const double Thumb = 7;
+    private const double Thumb = 6;
     private readonly VisualCollection _visuals;
     private readonly DrawingVisual _fill = new(), _thumb = new();
     private readonly ScaleTransform _fillScale = new(0, 1);
@@ -1553,7 +1556,7 @@ internal sealed class ReplayScrubber : FrameworkElement
         tick.Freeze();
         foreach (double m in _marks)
         {
-            double x = Math.Round(Left + m * Width0) + 0.5;
+            double x = Hairline.Snap(Left + m * Width0, Hairline.ScaleOf(this), 1.5);
             dc.DrawLine(tick, new Point(x, mid - 7), new Point(x, mid + 7));
         }
     }
@@ -1594,10 +1597,10 @@ internal sealed class SectorTable : Grid
         foreach (var _ in cars) ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         for (int r = 0; r <= sectors + 1; r++) RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        Add(new TextBlock { Text = "Sectors", Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 14, 6) }, 0, 0);
+        Add(new TextBlock { Text = "Sectors", Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 11, 5) }, 0, 0);
         for (int c = 0; c < cars.Count; c++)
         {
-            var swatch = new Border { Height = 3, Width = 34, Margin = new Thickness(12, 0, 0, 6), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+            var swatch = new Border { Height = 2, Width = 28, Margin = new Thickness(10, 0, 0, 5), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
             swatch.SetResourceReference(Border.BackgroundProperty, cars[c].Line.BrushKey);
             swatch.ToolTip = cars[c].Line.Label;
             Add(swatch, 0, c + 1);
@@ -1606,12 +1609,12 @@ internal sealed class SectorTable : Grid
         {
             int row = k + 1;
             bool total = k == sectors;
-            var band = new Border { Margin = new Thickness(-6, 0, -6, 0) };
+            var band = new Border { Margin = new Thickness(-5, 0, -5, 0) };
             SetRow(band, row);
             SetColumnSpan(band, cars.Count + 1);
             Children.Add(band);
             if (!total) _rows.Add(band);
-            Add(new TextBlock { Text = total ? "Lap" : $"S{k + 1}", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 3, 14, 3) }, row, 0);
+            Add(new TextBlock { Text = total ? "Lap" : $"S{k + 1}", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 2, 11, 2) }, row, 0);
             double best = total ? cars.Min(c => c.Trace.LapTime) : times.Min(t => t[k]);
             for (int c = 0; c < cars.Count; c++)
             {
@@ -1619,7 +1622,7 @@ internal sealed class SectorTable : Grid
                 var text = new TextBlock
                 {
                     Text = total ? StatFormat.LapTime(v) : v.ToString("0.000", CultureInfo.CurrentCulture), Style = Ui.Res<Style>("Caption"),
-                    HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(12, 3, 0, 3),
+                    HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(8, 2, 2, 2), TextWrapping = TextWrapping.NoWrap,
                 };
                 Typography.SetNumeralAlignment(text, FontNumeralAlignment.Tabular);
                 if (cars.Count > 1 && Math.Abs(v - best) < 0.0005)
@@ -1634,6 +1637,7 @@ internal sealed class SectorTable : Grid
 
     private void Add(UIElement e, int row, int col)
     {
+        if (e is TextBlock tb) tb.MinWidth = Math.Ceiling(TextFit.Width(tb, tb.Text));
         SetRow(e, row);
         SetColumn(e, col);
         Children.Add(e);

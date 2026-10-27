@@ -4,22 +4,24 @@ using System.Windows.Input;
 using System.Windows.Media;
 using GoodieBag.Config;
 using GoodieBag.Services;
-using GoodieBag.Plugins;
 
 namespace GoodieBag.Views.Pages;
 
 internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICancelEdit, IRevealAnchor, ISectionedPage, IPageHistory
 {
-    internal static readonly string[] DefaultPanelOrder = { "setups", "hud", "fov", "iracing", "tradingpaints", "garage61" };
+    internal static readonly string[] DefaultPanelOrder = { "setups", "hud", "fov", "iracing", "companions" };
+
+    private static readonly string[] CompanionIds = { "tradingpaints", "garage61" };
 
     private const string PageKey = "simracing";
 
     private readonly AppServices _app;
     private readonly MainWindow _window;
-    private readonly StackPanel _body = new() { Margin = new Thickness(28, 0, 28, 28) };
+    private readonly StackPanel _body = new() { Margin = new Thickness(23, 0, 23, 23) };
     private readonly FovSection _fov;
     private IracingControllerSection? _controller;
     private CompanionAppSection? _tradingPaints, _garage61;
+    private readonly StackPanel _companions = new();
     private SetupManagerSection? _setups;
     private RaceHudSection? _hud;
     private readonly ScrollViewer _scroll;
@@ -38,51 +40,87 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
         _view = new SectionView(() => _scroll);
 
         var heading = _view.Heading;
-        heading.Margin = new Thickness(0, 0, 0, Ui.HeaderGap);
-        _view.Empty = new SectionDef("", "Sim Racing Tools", "Every tool is turned off. Switch the ones you want on in Settings → Plugins.", "I.FormulaWheel",
-            Hues.Tool(PluginIds.SimRacing, Hues.Accent), () => new Border());
+        heading.Margin = Ui.HeaderMargin;
+        _view.Empty = new SectionDef("", "Sim Racing Tools", "Every tool is turned off. Switch the ones you want on in Settings → Tools.", "I.FormulaWheel", () => new Border());
         _body.Children.Add(heading);
         _body.Children.Add(_view.Content);
 
         _fov = new FovSection(app, window);
         _view.Add(Def("fov", "The correct field of view for your seat and screens, so speed, distance and apexes look real.",
-            () => _fov, "simracing.fov"));
+            () => _fov, "simracing.fov", () => _fov.OnShown()));
         _view.Add(Def("iracing", "Every iRacing setting with a plain-language description, a health check and backups.",
-            () => _controller = new IracingControllerSection(_app, _window), "simracing.iracing"));
+            () => _controller = new IracingControllerSection(_app, _window), "simracing.iracing",
+            () => _controller?.OnShown()));
         _view.Add(Def("setups", "Your car setups by car: find, rename, move, import and share them with league mates without File Explorer.",
             () => _setups = new SetupManagerSection(_app, _window), "simracing.setups",
             () => _setups?.OnShown(), () => _setups?.OnHidden()));
         _view.Add(Def("hud", "",
             () => _hud = new RaceHudSection(_app, _window), "simracing.hud.panel",
             () => _hud?.OnShown(), () => _hud?.OnHidden()));
-        _view.Add(Def("tradingpaints", "Start the official Trading Paints Downloader, by hand or automatically with Goodie Bag or iRacing.",
-            () => _tradingPaints = new CompanionAppSection(_app, p => p.TradingPaints,
-                "It downloads the custom paints of the cars around you so you see them in iRacing; it's free."), "simracing.tradingpaints",
-            () => _tradingPaints?.OnShown(), () => _tradingPaints?.OnHidden()));
-        _view.Add(Def("garage61", "Start the Garage 61 Telemetry Agent, which records your iRacing laps for garage61.net, by hand or automatically.",
-            () => _garage61 = new CompanionAppSection(_app, p => p.Garage61,
-                "It records your iRacing laps and telemetry and uploads them to garage61.net, to compare with your team and other drivers."), "simracing.garage61",
-            () => _garage61?.OnShown(), () => _garage61?.OnHidden()));
+        _view.Add(Def("companions", "",
+            BuildCompanions, "simracing.companions",
+            ShowCompanions, HideCompanions));
 
         Layout(animate: false);
+    }
+
+    private UIElement BuildCompanions()
+    {
+        _tradingPaints = new CompanionAppSection(_app, p => p.TradingPaints,
+            "It downloads the custom paints of the cars around you so you see them in iRacing; it's free.");
+        Ui.Anchor(_tradingPaints, "simracing.tradingpaints");
+        _garage61 = new CompanionAppSection(_app, p => p.Garage61,
+            "It records your iRacing laps and telemetry and uploads them to garage61.net, to compare with your team and other drivers.");
+        _garage61.Margin = new Thickness(0, Ui.PanelSpacing, 0, 0);
+        Ui.Anchor(_garage61, "simracing.garage61");
+        FillCompanions();
+        return _companions;
+    }
+
+    private void FillCompanions()
+    {
+        _companions.Children.Clear();
+        if (_tradingPaints is null || _garage61 is null) return;
+        bool paints = !S.IsPanelHidden("tradingpaints"), laps = !S.IsPanelHidden("garage61");
+        if (paints) _companions.Children.Add(_tradingPaints);
+        if (laps) _companions.Children.Add(_garage61);
+        _garage61.Margin = new Thickness(0, paints ? Ui.PanelSpacing : 0, 0, 0);
+    }
+
+    private void ShowCompanions()
+    {
+        FillCompanions();
+        if (!S.IsPanelHidden("tradingpaints")) _tradingPaints?.OnShown(); else _tradingPaints?.OnHidden();
+        if (!S.IsPanelHidden("garage61")) _garage61?.OnShown(); else _garage61?.OnHidden();
+    }
+
+    private void HideCompanions()
+    {
+        _tradingPaints?.OnHidden();
+        _garage61?.OnHidden();
     }
 
     private static SectionDef Def(string id, string subtitle, Func<UIElement> build, string anchor, Action? shown = null, Action? hidden = null)
     {
         var t = Tool(id);
-        return new SectionDef(id, t.Title, subtitle, t.Icon, t.Colors, build, anchor, shown, hidden);
+        return new SectionDef(id, t.Title, subtitle, t.Icon, build, anchor, shown, hidden);
     }
 
     private SimRacingSettings S => _app.Config.SimRacing;
 
     private static readonly PageSection[] Tools =
     {
-        new("setups", "iRacing Setup Manager", "I.Folder", ("GoldSoft", "GoldDeep")),
-        new("hud", "iRacing Overlay", "I.RaceOverlay", ("ApricotSoft", "ApricotDeep")),
-        new("fov", "FOV calculator", "I.Compass", ("CoralSoft", "CoralDeep")),
-        new("iracing", "iRacing Controller", "I.Keyboard", ("SlateSoft", "SlateDeep")),
-        new("tradingpaints", "Trading Paints", "I.Palette", ("PlumSoft", "PlumDeep")),
-        new("garage61", "Garage 61", "I.Activity", ("SageSoft", "SageDeep")),
+        new("setups", "iRacing Setup Manager", "I.Folder"),
+        new("hud", "iRacing Overlay", "I.RaceOverlay"),
+        new("fov", "FOV calculator", "I.Compass"),
+        new("iracing", "iRacing Controller", "I.Keyboard"),
+        new("companions", "Companion apps", "I.Rocket"),
+    };
+
+    private static readonly PageSection[] Companions =
+    {
+        new("tradingpaints", "Trading Paints", "F.TradingPaints"),
+        new("garage61", "Garage 61", "F.Garage61"),
     };
 
     private static List<string> OrderedFor(SimRacingSettings s)
@@ -91,7 +129,10 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
         return DefaultPanelOrder.OrderBy(Slot).ThenBy(id => Array.IndexOf(DefaultPanelOrder, id)).ToList();
     }
 
-    private static List<string> VisibleFor(SimRacingSettings s) => OrderedFor(s).Where(id => !s.IsPanelHidden(id)).ToList();
+    private static bool Shown(SimRacingSettings s, string id) =>
+        id == "companions" ? CompanionIds.Any(c => !s.IsPanelHidden(c)) : !s.IsPanelHidden(id);
+
+    private static List<string> VisibleFor(SimRacingSettings s) => OrderedFor(s).Where(id => Shown(s, id)).ToList();
 
     private static List<PageSection> SectionsOf(SimRacingSettings s) => VisibleFor(s).Select(id => Tools.First(t => t.Id == id)).ToList();
 
@@ -104,9 +145,19 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
 
     private static PageSection Tool(string id) => Tools.First(t => t.Id == id);
 
-    internal static IReadOnlyList<PageSection> ToolsInOrder(AppServices app) => OrderedFor(app.Config.SimRacing).Select(Tool).ToList();
+    internal static IReadOnlyList<PageSection> ToolsInOrder(AppServices app) =>
+        OrderedFor(app.Config.SimRacing).SelectMany(id => id == "companions" ? Companions : new[] { Tool(id) }).ToList();
 
-    internal static bool IsToolOn(AppServices app, string id) => !app.Config.SimRacing.IsPanelHidden(id);
+    internal static bool IsToolOn(AppServices app, string id) => Shown(app.Config.SimRacing, id);
+
+    internal static string? ToolOfAnchor(string? anchor)
+    {
+        const string Prefix = PageKey + ".";
+        if (anchor is null || !anchor.StartsWith(Prefix, StringComparison.Ordinal)) return null;
+        string first = anchor[Prefix.Length..].Split('.')[0];
+        if (first == "compare") return "fov";
+        return Tools.Concat(Companions).Any(t => t.Id == first) ? first : null;
+    }
 
     internal static void SetToolOn(AppServices app, string id, bool on)
     {
@@ -191,7 +242,7 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
             _view.Build(id);
             built = true;
         }
-        return built;
+        return built || _hud?.ShowTabFor(anchor) == true;
     }
 
     public void OnShown()
@@ -214,6 +265,7 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
         if (S.IsPanelHidden(id) == hidden) return;
         S.SetPanelHidden(id, hidden);
         _app.Save();
+        if (CompanionIds.Contains(id) && _view.Built("companions")) ShowCompanions();
         Layout(animate: true);
         GoodieBag.Plugins.BuiltIn.SimRacingPlugin.PanelsChanged(_app);
     }
@@ -228,7 +280,8 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
 
     private void Only(string id)
     {
-        if (S.IsPanelHidden(id)) SetHidden(id, false);
+        if (id == "companions") foreach (var c in CompanionIds) SetHidden(c, false);
+        else if (S.IsPanelHidden(id)) SetHidden(id, false);
         ShowSection(id);
         _body.UpdateLayout();
         _scroll.ScrollToTop();
@@ -274,7 +327,7 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
         Only("iracing");
         foreach (var (name, enter) in _controller?.ScreenshotStates() ?? Enumerable.Empty<(string, Func<Task>)>())
             yield return ("controller-" + name, async () => { await enter(); _scroll.ScrollToTop(); });
-        yield return ("controller-narrow", () => { _body.MaxWidth = 760; _body.HorizontalAlignment = HorizontalAlignment.Left; _scroll.ScrollToTop(); return Task.CompletedTask; });
+        yield return ("controller-narrow", () => { _body.MaxWidth = 616; _body.HorizontalAlignment = HorizontalAlignment.Left; _scroll.ScrollToTop(); return Task.CompletedTask; });
         yield return ("controller-wide", () => { _body.ClearValue(MaxWidthProperty); _body.ClearValue(HorizontalAlignmentProperty); return Task.CompletedTask; });
         ComboBox? dropdown = null;
         yield return ("dropdown-open", async () =>
@@ -290,27 +343,33 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
         Only("setups");
         foreach (var state in _setups?.ScreenshotStates() ?? Enumerable.Empty<(string, Func<Task>)>())
             yield return state;
-        yield return ("setups-narrow", () => { _body.MaxWidth = 760; _body.HorizontalAlignment = HorizontalAlignment.Left; _scroll.ScrollToTop(); return Task.CompletedTask; });
+        yield return ("setups-narrow", () => { _body.MaxWidth = 616; _body.HorizontalAlignment = HorizontalAlignment.Left; _scroll.ScrollToTop(); return Task.CompletedTask; });
         yield return ("setups-wide", () => { _body.ClearValue(MaxWidthProperty); _body.ClearValue(HorizontalAlignmentProperty); return Task.CompletedTask; });
         yield return ("hud", () => { Only("hud"); return Task.CompletedTask; });
         foreach (var state in _hud?.ScreenshotStates() ?? Enumerable.Empty<(string, Func<Task>)>())
             yield return state;
         yield return ("hud-narrow", async () =>
         {
-            _body.MaxWidth = 760;
+            _body.MaxWidth = 616;
             _body.HorizontalAlignment = HorizontalAlignment.Left;
             if (_hud?.ScreenshotStates().FirstOrDefault(s => s.Name == "hud-standings") is { Enter: { } open }) await open();
         });
         yield return ("hud-wide", () => { _body.ClearValue(MaxWidthProperty); _body.ClearValue(HorizontalAlignmentProperty); return Task.CompletedTask; });
-        yield return ("tradingpaints", () => { Only("tradingpaints"); return Task.CompletedTask; });
-        yield return ("garage61", () => { Only("garage61"); return Task.CompletedTask; });
+        yield return ("companions", () => { Only("companions"); return Task.CompletedTask; });
+        yield return ("companions-one-off", () =>
+        {
+            SetHidden("garage61", true);
+            if (!Sections.Any(s => s.Id == "companions") || _companions.Children.Count != 1)
+                throw new InvalidOperationException("Companion apps should show only the app that's still on.");
+            return Task.CompletedTask;
+        });
         yield return ("companions-turned-off", () =>
         {
             SetHidden("tradingpaints", true);
             SetHidden("garage61", true);
             if (GoodieBag.Plugins.BuiltIn.SimRacingPlugin.FeatureOn(_app, "tradingpaints") || GoodieBag.Plugins.BuiltIn.SimRacingPlugin.FeatureOn(_app, "garage61"))
                 throw new InvalidOperationException("A companion app stayed on with its panel hidden.");
-            if (Sections.Any(s => s.Id is "tradingpaints" or "garage61") || _view.Current is "tradingpaints" or "garage61")
+            if (Sections.Any(s => s.Id == "companions") || _view.Current is "companions")
                 throw new InvalidOperationException("A tool that was turned off is still in the sidebar.");
             return Task.CompletedTask;
         });
@@ -325,7 +384,7 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
         yield return ("reordered", () =>
         {
             MoveSections(Visible().AsEnumerable().Reverse().ToList());
-            if (Sections[0].Id != "garage61") throw new InvalidOperationException("Moving the tools didn't change their order.");
+            if (Sections[0].Id != "companions") throw new InvalidOperationException("Moving the tools didn't change their order.");
             return Task.CompletedTask;
         });
         yield return ("default-order", () =>

@@ -16,7 +16,28 @@ internal static class ScreenshotRunner
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern bool IsWindowVisible(IntPtr hWnd);
 
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool PrintWindow(IntPtr hWnd, IntPtr hdc, uint flags);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hWnd, out ScreenRect rect);
+
+    [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
+    private static extern int DwmGetWindowAttribute(IntPtr hWnd, int attribute, out ScreenRect value, int size);
+
+    private struct ScreenRect
+    {
+        public int Left, Top, Right, Bottom;
+        public readonly int Width => Right - Left;
+        public readonly int Height => Bottom - Top;
+    }
+
+    private const uint RenderFullContent = 2;
+    private const int ExtendedFrameBounds = 9;
+
     private static readonly List<string> Errors = new();
+
+    private static readonly List<string> PixelFindings = new();
 
     public static bool Active { get; private set; }
 
@@ -78,6 +99,10 @@ internal static class ScreenshotRunner
         }
     }
 
+    public static bool RealDpi => Environment.GetCommandLineArgs().Contains("--real-dpi", StringComparer.OrdinalIgnoreCase);
+
+    public static bool DrawsAt96 => Active && !RealDpi;
+
     public static bool Quick => Environment.GetCommandLineArgs().Contains("--quick", StringComparer.OrdinalIgnoreCase);
 
     private static int Wait(int ms) => Quick ? Math.Max(250, ms / 4) : ms;
@@ -97,6 +122,8 @@ internal static class ScreenshotRunner
             (window.Width, window.Height) = BaseSize;
             window.Show();
             await Task.Delay(Quick ? 1200 : 2500);
+            if (RealDpi)
+                File.WriteAllText(Path.Combine(folder, "dpi.txt"), VisualTreeHelper.GetDpi(window).PixelsPerInchX.ToString(System.Globalization.CultureInfo.InvariantCulture));
             if (window.SetupOpen && Environment.GetCommandLineArgs().Contains("--setup-themes", StringComparer.OrdinalIgnoreCase))
             {
                 await CaptureSetupThemesAsync(window, folder);
@@ -162,6 +189,7 @@ internal static class ScreenshotRunner
                 await CaptureSizesAsync(window, folder);
             if (only is null) await CheckSearchAsync(window, folder, n);
             if (only is null) SaveTrayIcons(folder);
+            if (only is null) SaveTrayMenu(window, folder);
             if (!Quick)
             {
                 await CaptureUpdateButtonAsync(window, folder);
@@ -176,6 +204,8 @@ internal static class ScreenshotRunner
         }
         finally
         {
+            if (RealDpi)
+                File.WriteAllLines(Path.Combine(folder, "pixels.txt"), PixelFindings.Count == 0 ? new[] { "none" } : PixelFindings);
             lock (Errors)
                 File.WriteAllText(Path.Combine(folder, "errors.txt"), Errors.Count == 0 ? "none\n" : string.Join("\n\n", Errors));
             App.Quit();
@@ -286,6 +316,18 @@ internal static class ScreenshotRunner
                 using var bitmap = icon.ToBitmap();
                 bitmap.Save(Path.Combine(dir, $"{theme.Id}-{name}.png"), System.Drawing.Imaging.ImageFormat.Png);
             }
+    }
+
+    private static void SaveTrayMenu(MainWindow window, string folder)
+    {
+        string dir = Path.Combine(folder, "tray-menu");
+        Directory.CreateDirectory(dir);
+        try
+        {
+            using var tray = new TrayService(window.Services, showIcon: false);
+            tray.SaveMenuPictures(dir);
+        }
+        catch (Exception ex) { RecordError(ex); }
     }
 
     private static async Task CaptureNavIconThemesAsync(MainWindow window, string folder)
@@ -508,9 +550,13 @@ internal static class ScreenshotRunner
     {
         if (window.Content is not Visual root) return;
         var found = LayoutLint.Inspect(root, where);
+        if (RealDpi) PixelFindings.AddRange(PixelLint.Inspect(root, where).Select(f => f.ToString()));
         foreach (PresentationSource source in PresentationSource.CurrentSources)
             if (source.RootVisual is FrameworkElement { IsVisible: true } popup && popup.GetType().Name == "PopupRoot")
+            {
                 found.AddRange(LayoutLint.Inspect(popup, where + " popup"));
+                if (RealDpi) PixelFindings.AddRange(PixelLint.Inspect(popup, where + " popup").Select(f => f.ToString()));
+            }
         lock (Errors)
             Errors.AddRange(found.Select(f => f.ToString()));
     }
@@ -542,7 +588,7 @@ internal static class ScreenshotRunner
     }
 
     private static (double W, double H) BaseSize =>
-        Arg("--window")?.Split('x') is [var w, var h] && double.TryParse(w, out double width) && double.TryParse(h, out double height) ? (width, height) : (1280 + MainWindow.SidebarDips(AppServices.Current?.Config.Ui.ScaleFactor ?? Config.UiSettings.BaseScale), 820);
+        Arg("--window")?.Split('x') is [var w, var h] && double.TryParse(w, out double width) && double.TryParse(h, out double height) ? (width, height) : (1280 + MainWindow.SidebarDips, 820);
 
     private static string? Arg(string name)
     {
@@ -554,26 +600,20 @@ internal static class ScreenshotRunner
     private static async Task CaptureSizesAsync(MainWindow window, string folder)
     {
         window.Navigate(window.FirstPage);
-        var ui = AppServices.Current!.Config.Ui;
-        int scale = ui.InterfaceScale;
-        foreach (var (w, h, size) in new[] { (1600, 1040, 100), (1500, 820, 100), (1400, 760, 100), (1280, 720, 100), (1280, 720, 90), (1280, 720, 110) })
+        foreach (var (w, h) in new[] { (1600, 1040), (1500, 820), (1400, 760), (1280, 720) })
         {
             try
             {
-                ui.InterfaceScale = size;
-                window.ApplyInterfaceScale();
                 window.Width = w;
                 window.Height = h;
                 await Task.Delay(Wait(1200));
-                Capture(window, Path.Combine(folder, $"size-{w}x{h}-{size}.png"));
+                Capture(window, Path.Combine(folder, $"size-{w}x{h}.png"));
             }
             catch (Exception ex)
             {
                 RecordError(ex);
             }
         }
-        ui.InterfaceScale = scale;
-        window.ApplyInterfaceScale();
         (window.Width, window.Height) = BaseSize;
     }
 
@@ -605,6 +645,11 @@ internal static class ScreenshotRunner
 
     private static void Capture(Window window, string path)
     {
+        if (RealDpi)
+        {
+            CaptureScreen(window, path);
+            return;
+        }
         if (window.Content is not FrameworkElement root)
             return;
         int width = (int)Math.Ceiling(root.ActualWidth), height = (int)Math.Ceiling(root.ActualHeight);
@@ -638,6 +683,52 @@ internal static class ScreenshotRunner
         encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using var file = File.Create(path);
         encoder.Save(file);
+    }
+
+    private static void CaptureScreen(Window window, string path)
+    {
+        var hwnd = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+        if (hwnd == IntPtr.Zero || !GetWindowRect(hwnd, out var whole) || whole.Width <= 0 || whole.Height <= 0)
+            return;
+        if (DwmGetWindowAttribute(hwnd, ExtendedFrameBounds, out var frame, System.Runtime.InteropServices.Marshal.SizeOf<ScreenRect>()) != 0 || frame.Width <= 0)
+            frame = whole;
+        using var shot = PrintToBitmap(hwnd, whole);
+        using (var g = System.Drawing.Graphics.FromImage(shot))
+            foreach (PresentationSource source in PresentationSource.CurrentSources)
+            {
+                if (source is not System.Windows.Interop.HwndSource popup || popup.RootVisual is not FrameworkElement { IsVisible: true } root || root.GetType().Name != "PopupRoot")
+                    continue;
+                if (!IsWindowVisible(popup.Handle) || !GetWindowRect(popup.Handle, out var at) || at.Width <= 0 || at.Height <= 0)
+                    continue;
+                using var part = PrintToBitmap(popup.Handle, at);
+                g.DrawImageUnscaled(part, at.Left - whole.Left, at.Top - whole.Top);
+            }
+        var crop = new System.Drawing.Rectangle(frame.Left - whole.Left, frame.Top - whole.Top, frame.Width, frame.Height);
+        crop.Intersect(new System.Drawing.Rectangle(0, 0, shot.Width, shot.Height));
+        using var cut = shot.Clone(crop, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+        cut.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+        if (IsBlank(cut))
+            RecordError(new InvalidOperationException($"{Path.GetFileName(path)}: the screen capture came back blank (display off, asleep or locked?)"));
+    }
+
+    private static bool IsBlank(System.Drawing.Bitmap bitmap)
+    {
+        var first = bitmap.GetPixel(0, 0);
+        for (int y = 0; y < 8; y++)
+            for (int x = 0; x < 8; x++)
+                if (bitmap.GetPixel(bitmap.Width * (2 * x + 1) / 16, bitmap.Height * (2 * y + 1) / 16) != first)
+                    return false;
+        return true;
+    }
+
+    private static System.Drawing.Bitmap PrintToBitmap(IntPtr hwnd, ScreenRect rect)
+    {
+        var bitmap = new System.Drawing.Bitmap(rect.Width, rect.Height, System.Drawing.Imaging.PixelFormat.Format32bppRgb);
+        using var g = System.Drawing.Graphics.FromImage(bitmap);
+        var dc = g.GetHdc();
+        try { PrintWindow(hwnd, dc, RenderFullContent); }
+        finally { g.ReleaseHdc(dc); }
+        return bitmap;
     }
 
     internal static string StateTag(int i) => i < 24 ? ((char)('a' + i)).ToString() : "y" + (char)('a' + Math.Min(25, i - 24));

@@ -161,7 +161,8 @@ internal sealed class GrrService
                 {
                     var text = await Http.GetStringAsync(league.Feed);
                     var data = await Task.Run(() => GrrFeed.Parse(text, league.Id));
-                    return (league, data, text, problem: data.Schedule is null && data.Standings is null ? "the feed had no schedule or standings" : null);
+                    return (league, data, text, problem: data.Schedule is null && data.Standings is null ? "the feed had no schedule or standings"
+                        : GrrFeed.LostWhatItHad(_data.GetValueOrDefault(league.Id), data) ? "the feed came back incomplete" : null);
                 }
                 catch (Exception ex)
                 {
@@ -201,7 +202,9 @@ internal sealed class GrrService
         try
         {
             Directory.CreateDirectory(CacheFolder);
-            File.WriteAllText(Path.Combine(CacheFolder, league + ".json"), text);
+            string file = Path.Combine(CacheFolder, league + ".json");
+            File.WriteAllText(file + ".tmp", text);
+            File.Move(file + ".tmp", file, overwrite: true);
             if (File.Exists(OldCacheFile)) File.Delete(OldCacheFile);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }

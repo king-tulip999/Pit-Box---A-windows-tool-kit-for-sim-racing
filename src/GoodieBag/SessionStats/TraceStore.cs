@@ -35,7 +35,13 @@ internal sealed class TraceStore : IDisposable
     public static TraceStore Open(string path)
     {
         if (path != ":memory:") Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        return new TraceStore(SqliteDb.Open(path), path);
+        var db = SqliteDb.Open(path);
+        try { return new TraceStore(db, path); }
+        catch
+        {
+            db.Dispose();
+            throw;
+        }
     }
 
     public string? Meta(string key) => _db.Scalar("SELECT value FROM meta WHERE key = ?1", key) as string;
@@ -62,22 +68,27 @@ internal sealed class TraceStore : IDisposable
     {
         var result = new List<((int, double, bool), LapTrace)>();
         var taken = new HashSet<int>();
-        foreach (var (number, trace) in traces.OrderBy(t => t.Key))
+        var placed = new HashSet<int>();
+        var close = traces.SelectMany(t => stored.Select((s, i) => (Number: t.Key, Trace: t.Value, At: i, Off: Math.Abs(s.Time - t.Value.LapTime))))
+            .Where(c => c.Off <= 0.05)
+            .OrderBy(c => c.Off)
+            .ThenBy(c => offset is { } o && stored[c.At].Lap == c.Number + o ? 0 : 1)
+            .ThenBy(c => Math.Abs(stored[c.At].Lap - c.Number));
+        foreach (var c in close)
         {
-            int at = -1;
-            double nearest = 0.05;
-            for (int i = 0; i < stored.Count; i++)
-            {
-                double off = Math.Abs(stored[i].Time - trace.LapTime);
-                if (off <= nearest && !taken.Contains(i)) { nearest = off; at = i; }
-            }
-            if (at < 0 && offset is { } o)
-                for (int i = 0; i < stored.Count; i++)
-                    if (stored[i].Lap == number + o && !taken.Contains(i) && Math.Abs(stored[i].Time - trace.LapTime) < 1) { at = i; break; }
-            if (at < 0) continue;
-            taken.Add(at);
-            result.Add((stored[at], trace));
+            if (placed.Contains(c.Number) || !taken.Add(c.At)) continue;
+            placed.Add(c.Number);
+            result.Add((stored[c.At], c.Trace));
         }
+        if (offset is { } shift)
+            foreach (var (number, trace) in traces.Where(t => !placed.Contains(t.Key)).OrderBy(t => t.Key))
+                for (int i = 0; i < stored.Count; i++)
+                    if (stored[i].Lap == number + shift && !taken.Contains(i) && Math.Abs(stored[i].Time - trace.LapTime) < 1)
+                    {
+                        taken.Add(i);
+                        result.Add((stored[i], trace));
+                        break;
+                    }
         return result;
     }
 

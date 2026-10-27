@@ -106,6 +106,7 @@ internal static class FanService
 
         new Thread(() => { stop.WaitOne(); app.Dispatcher.BeginInvoke(new Action(() => Leave(app))); }) { IsBackground = true, Name = "Fan service stop" }.Start();
         ShowTray(app, config.Fans.ActivePreset ?? "your fan preset", config.Ui.Theme);
+        _hardware.Problem += (title, message) => _tray?.ShowBalloonTip(10_000, title, message, WinForms.ToolTipIcon.Warning);
     }
 
     private static bool AppRunning()

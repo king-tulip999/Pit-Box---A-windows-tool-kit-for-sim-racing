@@ -35,6 +35,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap };
     private Border _statusChip = new();
+    private (string, string, string) _statusShown;
     private Border _segments = new();
     private int _tab;
     private bool _shown;
@@ -50,27 +51,28 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         Preview = new PreviewSource(() => S);
         _timer.Tick += (_, _) => { Preview.Advance(Host); RefreshStatus(); _tick?.Invoke(); };
 
-        var top = new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, 12) };
+        var top = new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, 10) };
         var topStack = new StackPanel();
         var onOff = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         onOff.Children.Add(_statusChip);
+        onOff.Children.Add(new TextBlock { Text = "Show the overlay", FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(13, 0, 0, 0) });
         var power = Ui.Switch(S.Enabled, on => Host?.SetEnabled(on));
-        power.Margin = new Thickness(12, 0, 0, 0);
+        power.Margin = new Thickness(10, 0, 0, 0);
         power.VerticalAlignment = VerticalAlignment.Center;
         onOff.Children.Add(power);
         _status.Style = Ui.Res<Style>("Body");
         _status.VerticalAlignment = VerticalAlignment.Center;
         _status.TextWrapping = TextWrapping.Wrap;
         System.Windows.Automation.AutomationProperties.SetName(power, "iRacing Overlay");
-        topStack.Children.Add(Ui.SplitRow(_status, onOff, 16, stackLeft: true));
+        topStack.Children.Add(Ui.SplitRow(_status, onOff, 13, stackLeft: true));
         top.Child = topStack;
         Children.Add(top);
 
-        _segments = Ui.Segmented(Tabs, 0, i => { _tab = i; Build(); }, "hudtabs");
+        _segments = Ui.PageTabs(Tabs, 0, i => { _tab = i; Build(); }, "hudtabs");
         _segments.HorizontalAlignment = HorizontalAlignment.Left;
         _segments.VerticalAlignment = VerticalAlignment.Center;
         var tabRow = Ui.SplitRow(_segments, _arrange);
-        tabRow.Margin = new Thickness(0, 0, 0, 12);
+        tabRow.Margin = new Thickness(0, 0, 0, 10);
         Children.Add(tabRow);
         Children.Add(_body);
         Ui.Anchor(this, "simracing.hud");
@@ -92,7 +94,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         {
             var cancel = Ui.LabeledButton("I.Undo", "Cancel", () => { Host?.EndEdit(keep: false); RefreshArrange(); });
             cancel.ToolTip = "Put every widget back where it was";
-            cancel.Margin = new Thickness(0, 0, 8, 0);
+            cancel.Margin = new Thickness(0, 0, 6, 0);
             _arrange.Children.Add(cancel);
             _arrange.Children.Add(Ui.LabeledButton("I.Check", "Done arranging", () => { Host?.EndEdit(keep: true); RefreshArrange(); }, "PrimaryButton"));
             return;
@@ -104,10 +106,10 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         simulate.ToolTip = _app.Demo ? "Not with demo data (no widgets are put on screen)"
             : "Puts the widgets on screen with a made-up race (marked SIMULATED), to try layouts without iRacing (not while a session runs). Not saved.";
         ToolTipService.SetShowOnDisabled(simulate, true);
-        simulate.Margin = new Thickness(0, 0, 8, 0);
+        simulate.Margin = new Thickness(0, 0, 6, 0);
         _arrange.Children.Add(simulate);
         _editLayout = Ui.LabeledButton("I.Pencil", "Edit layout", () => { if (Host is { } hud) HudQuickEditor.Toggle(_app, hud); });
-        _editLayout.Margin = new Thickness(0, 0, 8, 0);
+        _editLayout.Margin = new Thickness(0, 0, 6, 0);
         ToolTipService.SetShowOnDisabled(_editLayout, true);
         SyncEditLayout();
         _arrange.Children.Add(_editLayout);
@@ -212,20 +214,20 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
                 SimStatus.Waiting => ("iRacing loading", "WarnSoft", "WarnDeep"),
                 _ => ("Waiting for iRacing", "SlateSoft", "SlateDeep"),
             };
-        var chip = Ui.Chip(text, soft, deep);
-        chip.Margin = new Thickness(0);
-        chip.VerticalAlignment = VerticalAlignment.Center;
-        if (_statusChip.Parent is Panel parent)
+        if (_statusChip.Parent is Panel parent && (text, soft, deep) != _statusShown)
         {
+            var chip = Ui.Chip(text, soft, deep);
+            chip.Margin = new Thickness(0);
+            chip.VerticalAlignment = VerticalAlignment.Center;
             int i = parent.Children.IndexOf(_statusChip);
             parent.Children.RemoveAt(i);
             parent.Children.Insert(i, chip);
+            _statusChip = chip;
+            _statusShown = (text, soft, deep);
         }
-        _statusChip = chip;
         string layout = ShownLayout;
         string why = h?.MatchedRule is { } rule ? $" (rule: {rule.Describe()})" : "";
-        _status.Text = _app.Demo ? $"Layout: {layout} · demo data: previews only"
-            : !S.Enabled ? $"Layout: {layout}"
+        _status.Text = _app.Demo || !S.Enabled ? $"Layout: {layout}"
             : $"Layout: {layout}{why} · {(h?.OnScreen == true ? "on screen" : ShowWhenText())}" + (h?.Editing == true ? " · arranging" : "");
         _status.Visibility = _status.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -252,6 +254,8 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             SettingsTab => HudSettingsTab(),
             _ => WidgetsTabView(),
         };
+        if (_tab == AlertsTabIndex) Ui.Anchor((FrameworkElement)_body.Child, AlertsAnchor);
+        else if (_tab == SettingsTab) Ui.Anchor((FrameworkElement)_body.Child, SettingsAnchor);
         if (_widgets is not null) _tick = _widgets.Tick;
         Motion.Stagger(_body.Child as Panel ?? new StackPanel());
     }
@@ -261,10 +265,10 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         var stack = new StackPanel();
         stack.Children.Add(Ui.Text(title, "H3"));
         if (caption is not null) stack.Children.Add(Caption(caption, 2));
-        var body = new SettingsFlow { Margin = new Thickness(0, 8, 0, 0) };
+        var body = new SettingsFlow { Margin = new Thickness(0, 6, 0, 0) };
         foreach (var r in rows) body.Children.Add(r);
         stack.Children.Add(body);
-        return new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, 12), Child = stack };
+        return new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, 10), Child = stack };
     }
 
     private static TextBlock Caption(string text, double top = 6) => new()
@@ -284,7 +288,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             if (Host is null) { S.ActiveLayout = c.Id!; _app.Save(); }
             RefreshStatus();
             _widgets?.FollowLayout();
-        }, 260);
+        }, 211);
         _builtLayouts = LayoutsSignature();
         var add = Ui.LabeledButton("I.Plus", "New layout", () => { }, "PrimaryButton");
         add.Click += (_, _) => NewLayoutBox(add, S, S.Layout(ShownLayout), AddLayout);
@@ -325,14 +329,17 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             ToolTipService.SetShowOnDisabled(rename, true);
             ToolTipService.SetShowOnDisabled(delete, true);
         }
-        var row = new WrapPanel();
+        var row = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
+        var layoutLabel = Ui.Text("Layout", "H3");
+        layoutLabel.VerticalAlignment = VerticalAlignment.Center;
+        layoutLabel.Margin = new Thickness(0, 0, 13, 0);
+        row.Children.Add(layoutLabel);
         row.Children.Add(pick);
-        foreach (var b in new[] { dup, rename, delete }) { b.Margin = new Thickness(6, 0, 0, 0); row.Children.Add(b); }
-        add.Margin = new Thickness(6, 0, 0, 0);
+        foreach (var b in new[] { dup, rename, delete }) { b.Margin = new Thickness(5, 0, 0, 0); row.Children.Add(b); }
+        add.Margin = new Thickness(5, 0, 0, 0);
         row.Children.Add(add);
-        reset.Margin = new Thickness(6, 0, 0, 0);
+        reset.Margin = new Thickness(5, 0, 0, 0);
         row.Children.Add(reset);
-        layouts.Children.Add(row);
 
         var rules = new StackPanel();
         var addRule = Ui.LabeledButton("I.Plus", "Add rule", () =>
@@ -354,10 +361,10 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             },
             "Arrange", "Drag the rules into order: when two fit a session equally, the higher one wins");
         var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        _rules.Button.Margin = new Thickness(0, 0, 8, 0);
+        _rules.Button.Margin = new Thickness(0, 0, 6, 0);
         actions.Children.Add(_rules.Button);
         actions.Children.Add(addRule);
-        _ruleCount = new TextBlock { Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0) };
+        _ruleCount = new TextBlock { Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
         var useRules = Ui.Switch(S.AutoSwitch, on =>
         {
             S.AutoSwitch = on;
@@ -366,7 +373,10 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             rules.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
             RefreshRuleCount();
         });
-        var switchRow = new StackPanel { Orientation = Orientation.Horizontal, Children = { _ruleCount, useRules } };
+        var switchLabel = new TextBlock { Text = "Switch layouts automatically", FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+        Ui.AddInfo(switchLabel, "Rules pick a layout by session, class, car and track. The most specific matching rule wins, then the higher one; with none, the layout picked on the left shows.");
+        useRules.VerticalAlignment = VerticalAlignment.Center;
+        var switchRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { switchLabel, _ruleCount, useRules } };
         _rules.Fill();
         _rulesEmpty = Caption("No rules yet: the layout picked above always shows.", 0);
         _rulesEmpty.VerticalAlignment = VerticalAlignment.Center;
@@ -376,18 +386,16 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         ruleBar.Children.Add(actions);
         ruleBar.Children.Add(_rulesEmpty);
         rules.Children.Add(ruleBar);
-        _rules.View.Margin = new Thickness(0, 8, 0, 0);
+        _rules.View.Margin = new Thickness(0, 6, 0, 0);
         rules.Children.Add(_rules.View);
         rules.Visibility = S.AutoSwitch ? Visibility.Visible : Visibility.Collapsed;
-        rules.Margin = new Thickness(0, 4, 0, 0);
+        rules.Margin = new Thickness(0, 3, 0, 0);
         RefreshRuleCount();
-        var divider = new Border { Height = 1, Margin = new Thickness(0, 14, 0, 6) };
-        divider.SetResourceReference(Border.BackgroundProperty, "Line");
-        layouts.Children.Add(divider);
-        layouts.Children.Add(Ui.SettingRow("Switch layouts automatically", null, switchRow, null,
-            "Rules pick a layout by session, class, car and track. The most specific matching rule wins, then the higher one; with none, the layout picked above shows."));
+        layouts.Children.Add(Ui.SplitRow(row, switchRow, 13));
+        rules.Margin = new Thickness(0, 10, 0, 0);
         layouts.Children.Add(rules);
-        root.Children.Add(_rulesCard = Foldable("layout", "Layout", null, null, layouts, foldable: false));
+        root.Children.Add(_rulesCard = new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, 10), Padding = new Thickness(13, 10, 13, 10), Child = layouts });
+        Ui.Anchor(_rulesCard, LayoutsAnchor);
 
         _widgets = new RaceHudWidgets(_app, this, inPage: true);
         root.Children.Add(_widgets.Root);
@@ -397,17 +405,17 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     private Tile Foldable(string id, string title, string? caption, FrameworkElement? actions, FrameworkElement body, bool foldable = true)
     {
         bool folded = foldable && S.FoldedPanels.Contains(id, StringComparer.OrdinalIgnoreCase);
-        var chevron = new Icon { Data = Ui.Res<Geometry>(folded ? "I.ChevronRight" : "I.ChevronDown"), Width = 15, Height = 15, Foreground = Ui.Res<Brush>("TextMuted"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+        var chevron = new Icon { Data = Ui.Res<Geometry>(folded ? "I.ChevronRight" : "I.ChevronDown"), Width = 12, Height = 12, Foreground = Ui.Res<Brush>("TextMuted"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
         var titles = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         titles.Children.Add(Ui.Text(title, "H3"));
         if (caption is not null) titles.Children.Add(Caption(caption, 2));
         var header = new DockPanel { LastChildFill = true };
         header.Children.Add(chevron);
         header.Children.Add(titles);
-        var bar = new Button { Style = Ui.Res<Style>("QuietButton"), Content = header, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(16, 14, 12, 14) };
+        var bar = new Button { Style = Ui.Res<Style>("QuietButton"), Content = header, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(13, 11, 10, 11) };
         Controls.ClickGuard.SetAllowRepeat(bar, true);
         System.Windows.Automation.AutomationProperties.SetName(bar, title);
-        body.Margin = new Thickness(12, 0, 16, 14);
+        body.Margin = new Thickness(10, 0, 13, 11);
         void Show(bool open)
         {
             body.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
@@ -431,13 +439,13 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         {
             header.Children.Remove(chevron);
             bar.Content = null;
-            header.Margin = new Thickness(16, 14, 12, 14);
+            header.Margin = new Thickness(13, 11, 10, 11);
             head.Children.Add(header);
         }
         if (actions is not null)
         {
             actions.VerticalAlignment = VerticalAlignment.Center;
-            actions.Margin = new Thickness(12, 0, 16, 0);
+            actions.Margin = new Thickness(10, 0, 13, 0);
             Grid.SetColumn(actions, 1);
             head.Children.Add(actions);
         }
@@ -458,7 +466,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         var stack = new StackPanel();
         stack.Children.Add(head);
         stack.Children.Add(body);
-        return new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, 12), Padding = new Thickness(0), Child = stack };
+        return new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, 10), Padding = new Thickness(0), Child = stack };
     }
 
     private ArrangeList? _rules;
@@ -479,8 +487,8 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         var parts = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
         FrameworkElement Part(string label, ComboBox combo)
         {
-            var stack = new StackPanel { Margin = new Thickness(0, 0, 12, 6) };
-            stack.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(2, 0, 0, 3) });
+            var stack = new StackPanel { Margin = new Thickness(0, 0, 10, 5) };
+            stack.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(2, 0, 0, 2) });
             stack.Children.Add(combo);
             return stack;
         }
@@ -494,12 +502,12 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             combo.SelectionChanged += (_, _) => { if (combo.SelectedItem is Choice c) { set(c.Id is { Length: > 0 } s ? s : null); Changed(); RefreshStatus(); } };
             return combo;
         }
-        parts.Children.Add(Part("Show layout", Ui.Combo(S.Layouts.Select(l => new Choice(l.Name, l.Name)), rule.Layout, c => { rule.Layout = c.Id!; Changed(); RefreshStatus(); }, 150)));
+        parts.Children.Add(Part("Show layout", Ui.Combo(S.Layouts.Select(l => new Choice(l.Name, l.Name)), rule.Layout, c => { rule.Layout = c.Id!; Changed(); RefreshStatus(); }, 122)));
         parts.Children.Add(Part("In", Ui.Combo(new[]
         {
             new Choice("", "Every session"), new Choice("Practice", "Practice"), new Choice("Qualify", "Qualifying"), new Choice("Race", "Race"),
             new Choice("TimeTrial", "Time trials"),
-        }, rule.Session ?? "", c => { rule.Session = c.Id is { Length: > 0 } s ? s : null; Changed(); RefreshStatus(); }, 140)));
+        }, rule.Session ?? "", c => { rule.Session = c.Id is { Length: > 0 } s ? s : null; Changed(); RefreshStatus(); }, 113)));
         parts.Children.Add(Part("Class", Pick(SessionNames.Merge(rule.Class, S.KnownClasses.Append(me?.ClassName), SessionNames.Classes), rule.Class, "Any class", v => rule.Class = v, 150)));
         parts.Children.Add(Part("Car", Pick(SessionNames.Merge(rule.Car, S.KnownCars.Append(me?.CarName), GoodieBag.SimRacing.Setups.SetupCars.BuiltInNames), rule.Car, "Any car", v => rule.Car = v, 230)));
         parts.Children.Add(Part("Track", Pick(SessionNames.Merge(rule.Track, S.KnownTracks.Append(f.Session.TrackDisplayName), SessionNames.Tracks), rule.Track, "Any track", v => rule.Track = v, 250)));
@@ -519,16 +527,16 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         remove.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(remove, 1);
         grid.Children.Add(remove);
-        var tile = new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(12, 8, 8, 4), BorderThickness = new Thickness(1), Child = grid };
+        var tile = Hairline.Frame(new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(10, 6, 6, 3), Child = grid });
         tile.SetResourceReference(Border.BorderBrushProperty, "Line");
         return tile;
     }
 
     internal static void NewLayoutBox(Button anchor, RaceHudSettings settings, HudLayout? current, Action<HudLayout> add)
     {
-        var name = new TextBox { Text = settings.UniqueName(current is null ? "Layout" : current.Name + " copy"), Width = 260, MaxLength = Ui.NameLength };
-        var clean = new CheckBox { Content = "Clean screen", IsChecked = current is null, IsEnabled = current is not null, Margin = new Thickness(0, 12, 0, 0) };
-        var cleanNote = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(26, 2, 0, 0), MaxWidth = 300 };
+        var name = new TextBox { Text = settings.UniqueName(current is null ? "Layout" : current.Name + " copy"), Width = 211, MaxLength = Ui.NameLength };
+        var clean = new CheckBox { Content = "Clean screen", IsChecked = current is null, IsEnabled = current is not null, Margin = new Thickness(0, 10, 0, 0) };
+        var cleanNote = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(21, 2, 0, 0), MaxWidth = 243 };
         void Note()
         {
             cleanNote.Text = clean.IsChecked == true ? "Starts empty: add the widgets you want." : $"Starts as a copy of “{current?.Name}”.";
@@ -537,19 +545,19 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         }
         Note();
         clean.Click += (_, _) => Note();
-        var error = new TextBlock { Foreground = Ui.Res<Brush>("DangerDeep"), TextWrapping = TextWrapping.Wrap, MaxWidth = 300, Margin = new Thickness(0, 6, 0, 0), Visibility = Visibility.Collapsed };
+        var error = new TextBlock { Foreground = Ui.Res<Brush>("DangerDeep"), TextWrapping = TextWrapping.Wrap, MaxWidth = 243, Margin = new Thickness(0, 5, 0, 0), Visibility = Visibility.Collapsed };
 
         var stack = new StackPanel();
-        stack.Children.Add(new TextBlock { Text = "New layout", Style = Ui.Res<Style>("H3"), Margin = new Thickness(0, 0, 0, 10) });
-        stack.Children.Add(new TextBlock { Text = "Name", Style = Ui.Res<Style>("Muted"), Margin = new Thickness(0, 0, 0, 4) });
+        stack.Children.Add(new TextBlock { Text = "New layout", Style = Ui.Res<Style>("H3"), Margin = new Thickness(0, 0, 0, 8) });
+        stack.Children.Add(new TextBlock { Text = "Name", Style = Ui.Res<Style>("Muted"), Margin = new Thickness(0, 0, 0, 3) });
         stack.Children.Add(name);
         stack.Children.Add(error);
         stack.Children.Add(clean);
         stack.Children.Add(cleanNote);
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 16, 0, 0) };
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 13, 0, 0) };
         var cancel = Ui.LabeledButton("I.X", "Cancel", () => { }, "GhostButton");
         var save = Ui.LabeledButton("I.Check", "Save", () => { }, "PrimaryButton");
-        save.Margin = new Thickness(8, 0, 0, 0);
+        save.Margin = new Thickness(6, 0, 0, 0);
         save.IsDefault = true;
         buttons.Children.Add(cancel);
         buttons.Children.Add(save);
@@ -558,9 +566,10 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         var box = new Popup
         {
             PlacementTarget = anchor, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true,
-            Child = new Tile { Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(18, 14, 18, 16), Margin = new Thickness(0, 6, 0, 0), Child = stack },
+            Child = new Tile { Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(15, 11, 15, 13), Margin = new Thickness(0, 5, 0, 0), Child = stack },
         };
         RenderOptions.SetClearTypeHint(box.Child, ClearTypeHint.Enabled);
+        Ui.DropBelow(box);
         Ui.FollowTarget(box);
         void Save()
         {
@@ -607,7 +616,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     private void RenameLayout()
     {
         string old = ShownLayout;
-        var box = new TextBox { Text = old, Width = 320, MaxLength = Ui.NameLength };
+        var box = new TextBox { Text = old, Width = 259, MaxLength = Ui.NameLength };
         var error = new TextBlock();
         var buttons = Ui.DialogButtons(_window, "Save", () =>
         {
@@ -616,7 +625,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             Build();
             return true;
         });
-        _ = _window.ShowModal(Ui.Dialog(_window, "Rename layout", "Rules that pick it follow the new name.", Ui.FieldRow("Name", box), buttons, error, 480));
+        _ = _window.ShowModal(Ui.Dialog(_window, "Rename layout", "Rules that pick it follow the new name.", Ui.FieldRow("Name", box), buttons, error, 389));
         box.Focus();
         box.SelectAll();
     }
@@ -629,20 +638,20 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         HudHost? Host() => app.Plugins.Find(PluginIds.SimRacing) is SimRacingPlugin { Hud: { } hud } ? hud : null;
         var a = S.Appearance;
         var root = new StackPanel();
-        var custom = new StackPanel { Visibility = a.Colors == HudColors.Custom ? Visibility.Visible : Visibility.Collapsed, Margin = new Thickness(0, 4, 0, 0) };
+        var custom = new StackPanel { Visibility = a.Colors == HudColors.Custom ? Visibility.Visible : Visibility.Collapsed, Margin = new Thickness(0, 3, 0, 0) };
         var colors = Ui.Segmented(new[] { "Default", "Custom" }, (int)a.Colors, i =>
         {
             a.Colors = (HudColors)i;
             custom.Visibility = a.Colors == HudColors.Custom ? Visibility.Visible : Visibility.Collapsed;
             changed();
         }, "hudcolors");
-        FillCustomColours(custom, S, changed, rebuild);
+        FillCustomColours(app, custom, S, changed, rebuild);
         var when = Ui.Combo(new[]
         {
             new Choice(nameof(HudShowWhen.Driving), "In the car"),
             new Choice(nameof(HudShowWhen.Connected), "Whenever a session is loaded"),
             new Choice(nameof(HudShowWhen.Always), "Always"),
-        }, S.ShowWhen.ToString(), c => { S.ShowWhen = Enum.Parse<HudShowWhen>(c.Id!); changed(); statusChanged?.Invoke(); }, 240);
+        }, S.ShowWhen.ToString(), c => { S.ShowWhen = Enum.Parse<HudShowWhen>(c.Id!); changed(); statusChanged?.Invoke(); }, 194);
         var stdLook = new HudAppearance();
         Ui.SettingDefault D(Func<bool> same, Action reset, string shown) => new(same, () => { reset(); changed(); rebuild(); }, shown);
         root.Children.Add(Group("Overlay", null,
@@ -651,10 +660,10 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
                 Ui.Switch(!S.Interactive, on => { S.Interactive = !on; changed(); })),
             Ui.SettingRow("Units", null, Ui.Segmented(new[] { "Metric", "Imperial" }, (int)S.Units, i => { S.Units = (HudUnits)i; changed(); }, "hudunits"),
                 D(() => S.Units == HudUnits.Metric, () => S.Units = HudUnits.Metric, "Metric"))));
-        var keys = new KeybindTree(app, e => e.Id.StartsWith("hud.", StringComparison.Ordinal), skip: 2, label: ShortKeybindLabel, flat: true) { Style = null, Padding = new Thickness(0), Margin = new Thickness(-6, 6, 0, 0) };
+        var keys = new KeybindTree(app, e => e.Id.StartsWith("hud.", StringComparison.Ordinal), skip: 2, label: ShortKeybindLabel, flat: true) { Style = null, Padding = new Thickness(0), Margin = new Thickness(-5, 5, 0, 0) };
         root.Children.Add(new Tile
         {
-            Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, 12),
+            Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, 10),
             Child = new StackPanel { Children = { Ui.Text("Keybinds", "H3"), keys } },
         });
         root.Children.Add(Group("Look", "The overlay keeps its own colors whatever the app's theme; flags keep their real colors.",
@@ -686,7 +695,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         return text.Length == 0 ? label : char.ToUpperInvariant(text[0]) + text[1..];
     }
 
-    private static void FillCustomColours(StackPanel into, RaceHudSettings S, Action changed, Action rebuild)
+    private static void FillCustomColours(AppServices app, StackPanel into, RaceHudSettings S, Action changed, Action rebuild)
     {
         var c = S.Appearance.Custom;
         var groups = new (string Title, (string Label, string Help, string Id)[] Rows)[]
@@ -717,17 +726,17 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             }),
         };
         var entries = c.All().ToDictionary(e => e.Id, e => e);
-        var grid = new StackPanel { Margin = new Thickness(0, 2, 0, 8) };
+        var grid = new StackPanel { Margin = new Thickness(0, 2, 0, 6) };
         foreach (var (title, rows) in groups)
         {
-            grid.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 6, 0, 6) });
+            grid.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 5, 0, 5) });
             var wrap = new WrapPanel();
             foreach (var (label, help, id) in rows)
             {
                 var (_, get, set) = entries[id];
-                var cell = new StackPanel { Width = 200, Margin = new Thickness(0, 0, 14, 8) };
-                cell.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 0, 0, 3), ToolTip = help });
-                cell.Children.Add(ColorField.Build(get, hex => { set(hex); changed(); return true; }, help, 92));
+                var cell = new StackPanel { Width = 162, Margin = new Thickness(0, 0, 11, 6) };
+                cell.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 0, 0, 2), ToolTip = help });
+                cell.Children.Add(ColorField.Build(get, hex => { set(hex); changed(); return true; }, help, 75));
                 wrap.Children.Add(cell);
             }
             grid.Children.Add(wrap);
@@ -735,12 +744,19 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         into.Children.Add(grid);
         var reset = Ui.LabeledButton("I.Undo", "Start from Default", () =>
         {
+            var before = S.Appearance.Custom;
             S.Appearance.Custom = new HudCustomColors();
             changed();
             rebuild();
+            app.Notify("Colors reset", "The custom palette starts from Default again.", NoticeKind.Success, action: new NoticeAction("Undo", () =>
+            {
+                S.Appearance.Custom = before;
+                changed();
+                rebuild();
+            }));
         }, "GhostButton");
         reset.HorizontalAlignment = HorizontalAlignment.Left;
-        reset.Margin = new Thickness(0, 0, 0, 8);
+        reset.Margin = new Thickness(0, 0, 0, 6);
         into.Children.Add(reset);
     }
 
@@ -755,7 +771,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             () => S.AlertGroupOrder,
             order => { S.AlertGroupOrder = order; Changed(); },
             "Arrange", "Drag the groups into the order you want them here");
-        var foldAll = new CollapseAllButton { Margin = new Thickness(0, 0, 8, 0) };
+        var foldAll = new CollapseAllButton { Margin = new Thickness(0, 0, 6, 0) };
         void CountOpen() => foldAll.SetOpen(AlertCatalog.Groups.Count(g => !S.AlertGroupsFolded.Contains(g.Id, StringComparer.OrdinalIgnoreCase)), AlertCatalog.Groups.Count());
         foldAll.Requested += fold =>
         {
@@ -766,10 +782,10 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         };
         _alertFoldChanged = CountOpen;
         CountOpen();
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 0, 10) };
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 0, 8) };
         var about = GoodieBag.Views.HudSettings.HelpTip.For("Alerts show in the Alerts widget. One isn't raised again within its cooldown; sticky ones stay until the condition clears.", "Alerts");
         about.VerticalAlignment = VerticalAlignment.Center;
-        about.Margin = new Thickness(0, 0, 12, 0);
+        about.Margin = new Thickness(0, 0, 10, 0);
         buttons.Children.Add(about);
         buttons.Children.Add(foldAll);
         buttons.Children.Add(_alertGroups.Button);
@@ -783,10 +799,10 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     {
         var defs = group.Alerts.Select(AlertCatalog.Find).OfType<AlertDef>().ToList();
         bool folded = S.AlertGroupsFolded.Contains(group.Id, StringComparer.OrdinalIgnoreCase);
-        var count = new TextBlock { Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
+        var count = new TextBlock { Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
         void Count() => count.Text = $"{defs.Count(d => RaceState.ChoiceFor(S, d).Enabled)} of {defs.Count} on";
         Count();
-        var rows = new UniformGrid { Columns = 1, Margin = new Thickness(10, 0, 14, 10), Visibility = folded ? Visibility.Collapsed : Visibility.Visible };
+        var rows = new UniformGrid { Columns = 1, Margin = new Thickness(8, 0, 11, 8), Visibility = folded ? Visibility.Collapsed : Visibility.Visible };
         var cells = defs.Select(d => new Border { Child = AlertRow(d, Count), Padding = new Thickness(0, 2, 0, 2) }).ToList();
         foreach (var cell in cells)
         {
@@ -799,7 +815,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             for (int i = 0; i < cells.Count; i++)
             {
                 cells[i].BorderThickness = new Thickness(0, i >= columns ? 1 : 0, 0, 0);
-                cells[i].Margin = columns == 1 ? new Thickness(0) : i % 2 == 0 ? new Thickness(0, 0, 12, 0) : new Thickness(12, 0, 0, 0);
+                cells[i].Margin = columns == 1 ? new Thickness(0) : i % 2 == 0 ? new Thickness(0, 0, 10, 0) : new Thickness(10, 0, 0, 0);
             }
         }
         Lay(1);
@@ -808,16 +824,16 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             int columns = e.NewSize.Width >= AlertTwoColumnsFrom ? 2 : 1;
             if (columns != rows.Columns) Lay(columns);
         };
-        var chevron = new Icon { Data = Ui.Res<Geometry>(folded ? "I.ChevronRight" : "I.ChevronDown"), Width = 15, Height = 15, Foreground = Ui.Res<Brush>("TextMuted"), VerticalAlignment = VerticalAlignment.Center };
+        var chevron = new Icon { Data = Ui.Res<Geometry>(folded ? "I.ChevronRight" : "I.ChevronDown"), Width = 12, Height = 12, Foreground = Ui.Res<Brush>("TextMuted"), VerticalAlignment = VerticalAlignment.Center };
         var header = new DockPanel { LastChildFill = true };
         header.Children.Add(chevron);
-        var badge = Ui.Badge(group.Icon, "AccentSoft", "AccentText", 28, 8, 15);
-        badge.Margin = new Thickness(8, 0, 10, 0);
+        var badge = Ui.Badge(group.Icon, "AccentSoft", "AccentText", 22.5, 6.5, 12);
+        badge.Margin = new Thickness(6, 0, 8, 0);
         header.Children.Add(badge);
         DockPanel.SetDock(count, Dock.Right);
         header.Children.Add(count);
         header.Children.Add(new TextBlock { Text = ThemeManager.Case(group.Title), Style = Ui.Res<Style>("H3"), VerticalAlignment = VerticalAlignment.Center });
-        var bar = new Button { Style = Ui.Res<Style>("QuietButton"), Content = header, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(16, 14, 22, 14) };
+        var bar = new Button { Style = Ui.Res<Style>("QuietButton"), Content = header, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(13, 11, 18, 11) };
         Controls.ClickGuard.SetAllowRepeat(bar, true);
         System.Windows.Automation.AutomationProperties.SetName(bar, group.Title);
         bar.Click += (_, _) =>
@@ -836,17 +852,17 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Child = stack };
     }
 
-    private const double ThresholdColumn = 210, SwitchColumn = 56, AlertTwoColumnsFrom = 1000;
+    private const double ThresholdColumn = 170, SwitchColumn = 45, AlertTwoColumnsFrom = 810;
 
     private FrameworkElement AlertRow(AlertDef def, Action changed)
     {
         var choice = RaceState.ChoiceFor(S, def);
         HudAlertSetting Mine() => S.Alerts.TryGetValue(def.Id, out var x) ? x : S.Alerts[def.Id] = new HudAlertSetting();
-        var grid = new Grid { Margin = new Thickness(30, 6, 0, 6) };
+        var grid = new Grid { Margin = new Thickness(24, 5, 0, 5) };
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(ThresholdColumn) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(SwitchColumn) });
-        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 16, 0) };
+        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 13, 0) };
         var title = new TextBlock { Text = def.Title, Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
         text.Children.Add(title);
         if (def.Description.Length > 0)
@@ -854,20 +870,20 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         bool waiting = def.Id == "stint.limit" && S.Fuel.MaxStintMinutes <= 0;
         if (waiting)
         {
-            var note = new TextBlock { Text = "Can't go off until Longest stint is set.", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
+            var note = new TextBlock { Text = "Can't go off until Longest stint is set.", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) };
             note.SetResourceReference(TextBlock.ForegroundProperty, "WarnDeep");
-            var go = new Button { Style = Ui.Res<Style>("GhostButton"), Content = "Fuel tab ›", MinHeight = 0, Height = 26, Padding = new Thickness(8, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
-            go.Click += (_, _) => SelectTab(FuelTabIndex);
-            text.Children.Add(new WrapPanel { Margin = new Thickness(0, 4, 0, 0), Children = { note, go } });
+            var go = Ui.LabeledButton("I.ChevronRight", "Fuel tab", () => SelectTab(FuelTabIndex));
+            go.VerticalAlignment = VerticalAlignment.Center;
+            text.Children.Add(new WrapPanel { Margin = new Thickness(0, 3, 0, 0), Children = { note, go } });
         }
         grid.Children.Add(text);
         NumberBox? box = null;
         if (def.Threshold is not null)
         {
-            box = new NumberBox(choice.Threshold ?? def.Threshold.Value, def.ThresholdUnit, 60)
+            box = new NumberBox(choice.Threshold ?? def.Threshold.Value, def.ThresholdUnit, 49)
             {
                 Minimum = 0, Maximum = 1000, Step = def.Threshold.Value < 5 ? 0.5 : 1, Decimals = def.Threshold.Value % 1 == 0 ? 0 : 1,
-                VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 14, 0),
+                VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 11, 0),
                 ToolTip = "When it's raised",
             };
             box.ValueChanged += v => { Mine().Threshold = v; Changed(); };
@@ -903,13 +919,13 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         var fuel = S.Fuel;
         NumberBox Box(double value, string unit, double min, double max, double step, int decimals, Action<double> set)
         {
-            var b = new NumberBox(value, unit, 70) { Minimum = min, Maximum = max, Step = step, Decimals = decimals };
+            var b = new NumberBox(value, unit, 57) { Minimum = min, Maximum = max, Step = step, Decimals = decimals };
             b.ValueChanged += v => { set(v); Changed(); RefreshFormulas(); };
             return b;
         }
         var std = new HudFuelSettings();
         Ui.SettingDefault D(Func<bool> same, Action reset, string shown) => new(same, () => { reset(); Changed(); Build(); }, shown);
-        root.Children.Add(Group("Fuel & strategy", null,
+        root.Children.Add(Group("Fuel and strategy", null,
             Ui.SubHeader("Measuring", first: true),
             Ui.SettingRow("Laps measured", "Recent clean green-flag laps used for fuel per lap.", Box(fuel.Window, "laps", 1, 30, 1, 0, v => fuel.Window = (int)v),
                 D(() => fuel.Window == std.Window, () => fuel.Window = std.Window, RaceFormat.Count(std.Window, "lap")),
@@ -926,25 +942,36 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
                 D(() => fuel.MarginLaps == std.MarginLaps, () => fuel.MarginLaps = std.MarginLaps, $"{std.MarginLaps:0.0} laps")),
             Ui.SettingRow("Fixed reserve", "Kept on top of everything else.", Box(fuel.ReserveLiters, "L", 0, 50, 0.1, 1, v => fuel.ReserveLiters = v),
                 D(() => fuel.ReserveLiters == std.ReserveLiters, () => fuel.ReserveLiters = std.ReserveLiters, "0 L")),
-            Ui.SettingRow("Extra distance", "A long pit lane, the lap after the flag.", Box(fuel.ExtraKm, "km", 0, 50, 0.1, 1, v => fuel.ExtraKm = v),
-                D(() => fuel.ExtraKm == std.ExtraKm, () => fuel.ExtraKm = std.ExtraKm, "0 km"),
+            Ui.SettingRow("Extra distance", "A long pit lane, the lap after the flag.", Box(fuel.ExtraKm, Units.Km, 0, 50, 0.1, 1, v => fuel.ExtraKm = v),
+                D(() => fuel.ExtraKm == std.ExtraKm, () => fuel.ExtraKm = std.ExtraKm, $"0 {Units.Km}"),
                 "Distance on top of the race (a long pit lane, the lap after the flag), turned into laps of this track."),
             Ui.SubHeader("Stops"),
-            Ui.SettingRow("A pit stop costs", "Lane plus standing time.", Box(fuel.PitLaneLossSeconds, "s", 0, 300, 1, 0, v => fuel.PitLaneLossSeconds = v),
-                D(() => fuel.PitLaneLossSeconds == std.PitLaneLossSeconds, () => fuel.PitLaneLossSeconds = std.PitLaneLossSeconds, $"{std.PitLaneLossSeconds:0} s"),
+            Ui.SettingRow("A pit stop costs", "Lane plus standing time.", Box(fuel.PitLaneLossSeconds, Units.S, 0, 300, 1, 0, v => fuel.PitLaneLossSeconds = v),
+                D(() => fuel.PitLaneLossSeconds == std.PitLaneLossSeconds, () => fuel.PitLaneLossSeconds = std.PitLaneLossSeconds, $"{std.PitLaneLossSeconds:0} {Units.S}"),
                 "Lane plus standing time, used for strategy notes."),
             Ui.SettingRow("Longest stint", "0 = no limit.", Box(fuel.MaxStintMinutes, "min", 0, 600, 5, 0, v => fuel.MaxStintMinutes = v),
                 D(() => fuel.MaxStintMinutes == std.MaxStintMinutes, () => fuel.MaxStintMinutes = std.MaxStintMinutes, "no limit"),
                 "The Stint time alert warns before it.")));
 
-        _formulas = new StackPanel { Margin = new Thickness(0, 4, 0, 0) };
+        _formulas = new UniformGrid { Margin = new Thickness(0, 3, 0, 0) };
+        _formulas.SizeChanged += (_, e) => FitFormulaColumns(e.NewSize.Width);
         _formulaNote = Caption("", 0);
         _formulaCaution = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap };
         _formulaCautionLine = Ui.IconText("I.Alert", _formulaCaution, "WarnDeep");
-        _formulaCautionLine.Margin = new Thickness(0, 6, 0, 0);
-        var card = Group("How the numbers are worked out", "The fuel widget's sums, with the numbers from the session running now (or the simulated one). Every figure to the flag is an estimate.",
-            new StackPanel { Children = { _formulaNote, _formulaCautionLine, _formulas } });
-        Ui.Anchor(card, "simracing.hud.fuelformulas");
+        _formulaCautionLine.Margin = new Thickness(0, 5, 0, 0);
+        Button sums = null!;
+        sums = Ui.LabeledButton("I.ChevronDown", _showSums ? "Hide the sums" : "Show the sums", () =>
+        {
+            _showSums = !_showSums;
+            _formulaRows.Clear();
+            RefreshFormulas();
+            sums.Content = Ui.IconLabel(_showSums ? "I.ChevronsUp" : "I.ChevronDown", _showSums ? "Hide the sums" : "Show the sums");
+        }, "GhostButton");
+        sums.HorizontalAlignment = HorizontalAlignment.Left;
+        sums.Margin = new Thickness(0, 8, 0, 0);
+        var card = Group("How the numbers are worked out", "The fuel widget's figures from the session running now (or the simulated one). Every figure to the flag is an estimate.",
+            new StackPanel { Children = { _formulaNote, _formulaCautionLine, _formulas, sums } });
+        Ui.Anchor(card, FuelAnchor);
         root.Children.Add(card);
         _formulaRows.Clear();
         RefreshFormulas();
@@ -952,7 +979,21 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         return root;
     }
 
-    private StackPanel? _formulas;
+    private const double FormulaColumnsFrom = 960;
+
+    private void FitFormulaColumns(double width)
+    {
+        if (_formulas is null) return;
+        bool side = !_showSums && width >= FormulaColumnsFrom;
+        int columns = side ? _formulas.Children.Count : 1;
+        if (_formulas.Columns != columns) _formulas.Columns = columns;
+        for (int i = 0; i < _formulas.Children.Count; i++)
+            if (_formulas.Children[i] is FrameworkElement column)
+                column.Margin = new Thickness(0, 0, side && i < _formulas.Children.Count - 1 ? Ui.PanelSpacing : 0, side ? 0 : 6);
+    }
+
+    private bool _showSums;
+    private UniformGrid? _formulas;
     private TextBlock? _formulaNote, _formulaCaution;
     private FrameworkElement? _formulaCautionLine;
     private readonly List<(TextBlock Now, TextBlock Formula)> _formulaRows = new();
@@ -981,7 +1022,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         {
             ("Measured", new[]
             {
-                ("Fuel per lap", $"From your last {fuel.Window} clean laps under green (no pit road, refuel, full-course caution, formation lap or incident): newer laps count more, and from 5 laps one far from the rest is left out.",
+                ("Fuel per lap", $"From your last {RaceFormat.Count(fuel.Window, "clean lap")} under green (no pit road, refuel, full-course caution, formation lap or incident): newer laps count more, and from 5 laps one far from the rest is left out.",
                     est.HasEstimate ? $"{RaceFormat.Fuel(est.MeanLitersPerLap, u)} · {RaceFormat.Count(est.UsedLapCount, "lap")} · {GoodieBag.SimRacing.Hud.Widgets.FuelWidget.Confidence(est.Reliability)}" : race.FuelData.EnergyUnits ? "kWh car: not supported" : "measuring…"),
                 ("Lap to lap", "How much the clean laps differ (weighted spread); it sets the safety reserve.", est.HasEstimate ? Spread() : "–"),
                 ("Laps of fuel", "Fuel in the tank ÷ fuel per lap.", plan is { } p1 ? $"{F(f.Fuel)} ÷ {F(p1.PerLap)} = {L(p1.LapsOfFuel)}" : "–"),
@@ -997,8 +1038,8 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
                     plan is null ? "–" : plan.StatisticalReserve > 0 ? F(plan.StatisticalReserve) : "none yet (needs 2 clean laps)"),
                 ("Margin at the flag", $"{fuel.MarginLaps:0.#} laps × fuel per lap.", Extra(rate * fuel.MarginLaps)),
                 ("Fixed reserve", "As set above.", Extra(fuel.ReserveLiters)),
-                ("Extra consumption", $"{fuel.ExtraPercent:0.#}% × fuel per lap × laps to go.", Extra(rate * (togo ?? 0) * fuel.ExtraPercent / 100)),
-                ("Extra distance", $"{fuel.ExtraKm:0.#} km ÷ the track's length × fuel per lap.", km is null && fuel.ExtraKm > 0 ? "track length unknown" : Extra(rate * (km is { } length ? fuel.ExtraKm / length : 0))),
+                ("Extra consumption", $"{fuel.ExtraPercent:0.#}% × fuel per lap × laps to go.", Extra(rate * togo * fuel.ExtraPercent / 100)),
+                ("Extra distance", $"{fuel.ExtraKm:0.#} {Units.Km} ÷ the track's length × fuel per lap.", km is null && fuel.ExtraKm > 0 ? "track length unknown" : Extra(rate * (km is { } length ? fuel.ExtraKm / length : 0))),
                 ("Fuel to the flag", "Expected + safety reserve + the four extras above.", F(plan?.ToFinish)),
             }),
             ("Plan", new[]
@@ -1019,19 +1060,22 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         {
             _formulas.Children.Clear();
             _formulaRows.Clear();
-            foreach (var (title, rows) in sections)
+            for (int section = 0; section < sections.Length; section++)
             {
-                _formulas.Children.Add(Ui.SubHeader(title, first: _formulas.Children.Count == 0));
+                var (title, rows) = sections[section];
+                var column = new StackPanel();
+                _formulas.Children.Add(column);
+                column.Children.Add(Ui.SubHeader(title, first: section == 0 || !_showSums));
                 bool result = title == "Plan";
                 for (int i = 0; i < rows.Length; i++)
                 {
-                    if (i > 0) _formulas.Children.Add(new Border { Height = 1, Margin = new Thickness(0, 6, 0, 6), Background = Ui.Res<Brush>("Line") });
+                    if (i > 0) column.Children.Add(Hairline.Rule(new Border { Margin = new Thickness(0, 5, 0, 5), Background = Ui.Res<Brush>("Line") }));
                     var grid = new Grid();
-                    grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
-                    grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(280) });
-                    grid.ColumnDefinitions.Add(new ColumnDefinition());
-                    grid.Children.Add(new TextBlock { Text = rows[i].Name, Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 12, 0) });
-                    var now = new TextBlock { Style = Ui.Res<Style>("Body"), FontFamily = Ui.Res<FontFamily>("MonoFont"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 16, 0) };
+                    grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(_showSums ? 154 : 136) });
+                    grid.ColumnDefinitions.Add(new ColumnDefinition { Width = _showSums ? new GridLength(227) : new GridLength(1, GridUnitType.Star) });
+                    grid.ColumnDefinitions.Add(new ColumnDefinition { Width = _showSums ? new GridLength(1, GridUnitType.Star) : new GridLength(0) });
+                    grid.Children.Add(new TextBlock { Text = rows[i].Name, Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 10, 0) });
+                    var now = new TextBlock { Style = Ui.Res<Style>("Body"), FontFamily = Ui.Res<FontFamily>("MonoFont"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 13, 0) };
                     if (result)
                     {
                         now.FontWeight = FontWeights.SemiBold;
@@ -1039,13 +1083,14 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
                     }
                     Grid.SetColumn(now, 1);
                     grid.Children.Add(now);
-                    var formula = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 1, 0, 0) };
+                    var formula = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 1, 0, 0), Visibility = _showSums ? Visibility.Visible : Visibility.Collapsed };
                     Grid.SetColumn(formula, 2);
                     grid.Children.Add(formula);
-                    _formulas.Children.Add(grid);
+                    column.Children.Add(grid);
                     _formulaRows.Add((now, formula));
                 }
             }
+            FitFormulaColumns(_formulas.ActualWidth);
         }
         int n = 0;
         foreach (var (_, rows) in sections)
@@ -1093,7 +1138,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         yield return ("hud-quick-editor", () =>
         {
             quick = new RaceHudWidgets(_app, this);
-            quickBox = new Border { Width = 1000, Height = 720, BorderThickness = new Thickness(1), Child = quick.Root, Margin = new Thickness(0, 12, 0, 0) };
+            quickBox = Hairline.Frame(new Border { Width = 810, Height = 583, Child = quick.Root, Margin = new Thickness(0, 10, 0, 0) });
             quickBox.SetResourceReference(Border.BackgroundProperty, "Bg");
             quickBox.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
             Children.Add(quickBox);
@@ -1127,6 +1172,23 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         if (_segments.Child is Panel panel && panel.Children[tab] is RadioButton rb) rb.IsChecked = true;
         _tab = tab;
         Build();
+    }
+
+    public const string LayoutsAnchor = "simracing.hud.layouts", AlertsAnchor = "simracing.hud.alerts", FuelAnchor = "simracing.hud.fuelformulas", SettingsAnchor = "simracing.hud.settings";
+
+    public bool ShowTabFor(string anchor)
+    {
+        int tab = anchor switch
+        {
+            LayoutsAnchor => WidgetsTab,
+            AlertsAnchor => AlertsTabIndex,
+            FuelAnchor => FuelTabIndex,
+            SettingsAnchor => SettingsTab,
+            _ => -1,
+        };
+        if (tab < 0 || tab == _tab) return false;
+        SelectTab(tab);
+        return true;
     }
 }
 

@@ -35,6 +35,11 @@ internal static class ThemeManager
 
     private static ResourceDictionary? _applied;
 
+    private static readonly HashSet<string> SeeThroughKeys = new() { "Panel", "Surface", "SurfaceAlt", "SidebarBg" };
+
+    private static Color Faded(Color color, double opacity) =>
+        opacity >= 1 ? color : Color.FromArgb((byte)Math.Round(color.A * opacity), color.R, color.G, color.B);
+
     public static void Apply(AppTheme theme)
     {
         var spec = Themes.For(theme);
@@ -42,7 +47,7 @@ internal static class ThemeManager
         var res = new ResourceDictionary();
         var p = Resolve(spec);
         foreach (var (key, color) in p)
-            res[key] = Freeze(new SolidColorBrush(color));
+            res[key] = Freeze(new SolidColorBrush(SeeThroughKeys.Contains(key) ? Faded(color, spec.PanelOpacity) : color));
 
         res["DisplayFont"] = Family(spec.DisplayFont);
         res["UiFont"] = Family(spec.UiFont);
@@ -55,11 +60,12 @@ internal static class ThemeManager
         _ui = _uiBold = _display = null;
 
         foreach (var (key, r) in new (string, double)[]
-                 { ("R.Card", CardRadius), ("R.Inset", 10), ("R.Popup", 10), ("R.Control", 9), ("R.Input", 8), ("R.Tooltip", 8), ("R.Small", 7), ("R.Tiny", 5) })
+                 { ("R.Card", CardRadius), ("R.Inset", 10), ("R.Popup", 10), ("R.Tooltip", 8), ("R.Small", 7), ("R.Tiny", 5) })
             res[key] = Round(r);
         res["R.Switch"] = new CornerRadius(spec.SwitchRadius);
         res["R.Knob"] = new CornerRadius(spec.KnobRadius);
         res["R.Chip"] = new CornerRadius(spec.ChipRadius);
+        res["R.Control"] = res["R.Input"] = new CornerRadius(spec.ControlRadius);
 
         res["CardEdge"] = res["LineStrong"];
 
@@ -115,6 +121,7 @@ internal static class ThemeManager
         if (at >= 0) merged[at] = res;
         else merged.Add(res);
         _applied = res;
+        Hairline.Install();
         Changed?.Invoke();
     }
 

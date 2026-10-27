@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using GoodieBag.Config;
+using Units = GoodieBag.Services.CapsUnits;
 using GoodieBag.SimRacing.FuelEngine;
 using GoodieBag.SimRacing.Telemetry;
 
@@ -7,7 +8,7 @@ namespace GoodieBag.SimRacing.Race;
 
 internal readonly record struct RaceEvent(double SessionTime, string Text, AlertLevel Level);
 
-internal readonly record struct PitStop(int Lap, double LaneTime, double? StallTime);
+internal readonly record struct PitStop(int Lap, double LaneTime, double? StallTime, double? Span = null);
 
 internal sealed class RaceState
 {
@@ -32,6 +33,7 @@ internal sealed class RaceState
     private RaceFlags _lastFlags;
     private bool _wasOnPitRoad, _wasStall, _wasConnected, _lapsPbKnown;
     private double _pitEnteredAt = -1, _stallAt = -1, _stallTime;
+    private double? _pitEnteredPct;
     private int _lastPosition;
     private double? _bestLap;
     private bool _windowWasOpen;
@@ -51,8 +53,6 @@ internal sealed class RaceState
     public FuelModel FuelData { get; } = new();
     public LapTracker Laps { get; } = new();
     public AlertEngine Alerts { get; }
-
-    public (SpotterCall Call, double At) LastCall { get; private set; }
 
     public int SelectedCar { get; set; } = -1;
 
@@ -77,7 +77,7 @@ internal sealed class RaceState
 
     public double? FuelPerLap { get; private set; }
 
-    public double? Tank => Frame.Session.FuelMaxLiters is { } max ? max * (Frame.Session.MaxFuelPct ?? 1) : null;
+    public double? Tank => CarTanks.Usable(Frame.Session);
 
     public IReadOnlyList<StandingRow> Standings
     {
@@ -141,6 +141,7 @@ internal sealed class RaceState
     private readonly double[,] _carLaps = new double[TelemetryFrame.MaxCars, CarLapHistory];
     private readonly int[] _carLapCount = new int[TelemetryFrame.MaxCars];
     private readonly double[] _carLastSeen = new double[TelemetryFrame.MaxCars];
+    private readonly bool[] _carLapDirty = new bool[TelemetryFrame.MaxCars];
 
     private readonly int[] _carPitExitLap = new int[TelemetryFrame.MaxCars];
     private readonly bool[] _carLeftPits = new bool[TelemetryFrame.MaxCars];
@@ -163,6 +164,18 @@ internal sealed class RaceState
 
     public int StopsOf(int car) => (uint)car < TelemetryFrame.MaxCars ? _carStops[car] : 0;
 
+    private readonly bool[] _carTowing = new bool[TelemetryFrame.MaxCars];
+    private readonly TrackSurface[] _carSurfaceWas = Enumerable.Repeat(TrackSurface.NotInWorld, TelemetryFrame.MaxCars).ToArray();
+
+    public bool Towing(int car) =>
+        (uint)car < TelemetryFrame.MaxCars && (car == Frame.PlayerCarIdx ? Frame.TowTime is not null : _carTowing[car]);
+
+    public double? TowLeft(int car) => car == Frame.PlayerCarIdx ? Frame.TowTime : null;
+
+    internal static bool TowStarts(TrackSurface was, TrackSurface now, bool wasOnPitRoad, SessionPhase phase) =>
+        now == TrackSurface.NotInWorld && was is TrackSurface.OnTrack or TrackSurface.OffTrack or TrackSurface.ApproachingPits
+        && !wasOnPitRoad && phase is not (SessionPhase.Checkered or SessionPhase.CoolDown);
+
     public double? PaceOf(int car, int n = 5)
     {
         if ((uint)car >= TelemetryFrame.MaxCars || _carLapCount[car] == 0) return null;
@@ -174,9 +187,15 @@ internal sealed class RaceState
 
     private void TrackCars(TelemetryFrame f)
     {
+        bool caution = (f.Flags & (RaceFlags.Caution | RaceFlags.CautionWaving)) != 0;
         for (int i = 0; i < TelemetryFrame.MaxCars; i++)
         {
             bool pit = f.CarOnPitRoad[i];
+            var surface = f.CarSurface[i];
+            if (surface != TrackSurface.NotInWorld) _carTowing[i] = false;
+            else if (TowStarts(_carSurfaceWas[i], surface, _carWasPit[i], f.Phase)) _carTowing[i] = true;
+            _carSurfaceWas[i] = surface;
+            if (pit || caution) _carLapDirty[i] = true;
             if (pit && !_carWasPit[i] && f.Phase >= SessionPhase.Racing) _carStops[i]++;
             if (pit && !_carWasPit[i]) { _carPitAt[i] = f.SessionTime ?? 0; _carPitLap[i] = Math.Max(1, f.CarLap[i]); }
             if (!pit && _carWasPit[i])
@@ -189,9 +208,13 @@ internal sealed class RaceState
             double last = f.CarLastLap[i];
             if (last > 0 && Math.Abs(last - _carLastSeen[i]) > 1e-6)
             {
-                _carLaps[i, _carLapCount[i] % CarLapHistory] = last;
-                _carLapCount[i]++;
+                if (!_carLapDirty[i])
+                {
+                    _carLaps[i, _carLapCount[i] % CarLapHistory] = last;
+                    _carLapCount[i]++;
+                }
                 _carLastSeen[i] = last;
+                _carLapDirty[i] = pit || caution;
             }
         }
     }
@@ -273,11 +296,7 @@ internal sealed class RaceState
             TrackPositions(f);
         }
         var call = _spotter.Next(f.Sides);
-        if (call != SpotterCall.None)
-        {
-            LastCall = (call, Now);
-            Alerts.Fire("side.car", Now, Spotter.Text(call));
-        }
+        if (call != SpotterCall.None) Alerts.Fire("side.car", Now, Spotter.Text(call));
         if (Now - _lastChecks >= 0.25)
         {
             _lastChecks = Now;
@@ -302,7 +321,10 @@ internal sealed class RaceState
         Array.Clear(_carLeftPits);
         Array.Clear(_carLapCount);
         Array.Clear(_carLastSeen);
+        Array.Clear(_carLapDirty);
         Array.Copy(f.CarOnPitRoad, _carWasPit, TelemetryFrame.MaxCars);
+        Array.Clear(_carTowing);
+        Array.Copy(f.CarSurface, _carSurfaceWas, TelemetryFrame.MaxCars);
         _standingsSeq = -1;
         _lastIncidents = -1;
         _lastClassPos = 0;
@@ -328,6 +350,7 @@ internal sealed class RaceState
         if (f.OnPitRoad && !_wasOnPitRoad)
         {
             _pitEnteredAt = t;
+            _pitEnteredPct = f.LapDistPct is >= 0 and <= 1 ? f.LapDistPct : null;
             _stallTime = 0;
             AddEvent(f, "Pit entry", AlertLevel.Info);
         }
@@ -337,9 +360,10 @@ internal sealed class RaceState
         {
             if (_pitEnteredAt >= 0 && t > _pitEnteredAt)
             {
-                var stop = new PitStop(f.LapCompleted ?? 0, t - _pitEnteredAt, _stallTime > 0 ? _stallTime : null);
+                double? span = _pitEnteredPct is { } from && f.LapDistPct is >= 0 and <= 1 and var to ? (to - from + 1) % 1 : null;
+                var stop = new PitStop(f.LapCompleted ?? 0, t - _pitEnteredAt, _stallTime > 0 ? _stallTime : null, span);
                 _pitStops.Add(stop);
-                AddEvent(f, $"Pit exit · lane {stop.LaneTime:0.0} s" + (stop.StallTime is { } st ? $", stopped {st:0.0} s" : ""), AlertLevel.Info);
+                AddEvent(f, $"Pit exit · lane {stop.LaneTime:0.0} {Units.S}" + (stop.StallTime is { } st ? $", stopped {st:0.0} {Units.S}" : ""), AlertLevel.Info);
             }
             StintStart = t;
             StintStartLap = f.LapCompleted ?? 0;
@@ -375,7 +399,7 @@ internal sealed class RaceState
         _lastPosition = pos;
         if (cls > 0 && _lastClassPos > 0 && cls != _lastClassPos)
             Alerts.Fire("position.change", Now, cls < _lastClassPos ? $"Up to P{cls}" : $"Down to P{cls}",
-                cls < _lastClassPos ? $"{_lastClassPos - cls} place{(_lastClassPos - cls == 1 ? "" : "s")} gained" : $"{cls - _lastClassPos} place{(cls - _lastClassPos == 1 ? "" : "s")} lost");
+                cls < _lastClassPos ? $"{RaceFormat.Count(_lastClassPos - cls, "place")} gained" : $"{RaceFormat.Count(cls - _lastClassPos, "place")} lost");
         if (cls > 0) _lastClassPos = cls;
     }
 
@@ -475,7 +499,7 @@ internal sealed class RaceState
         Alerts.Set("flag.white", f.Flags.HasFlag(RaceFlags.White) && f.Driving, now);
         if (f.Precipitation is { } rain)
             Alerts.Set("weather.rain", rain * 100 >= Math.Max(0.5, Alerts.Threshold("weather.rain")), now, detail: $"{rain * 100:0}% rain");
-        if (f.TrackWetness is { } wet)
+        if (f.TrackWetness is { } wet and > 0)
         {
             if (_lastWetness >= 0 && wet != _lastWetness)
                 Alerts.Fire("weather.wet", now, wet > _lastWetness ? "Track getting wetter" : "Track drying", "Now " + RaceFormat.Wetness(wet).ToLowerInvariant());
@@ -532,11 +556,11 @@ internal sealed class RaceState
                 bool fasterBehind = isFaster && gap is < 0 and var g1 && -g1 < faster && closing;
                 Alerts.Set("traffic.faster", fasterBehind, now,
                     fasterBehind ? $"Faster car behind · {f.Session.ByCar.GetValueOrDefault(i)?.ClassName}" : null,
-                    fasterBehind ? $"{Name(f, i)} · {-(gap ?? 0):0.0} s" : null, FasterKeys[i]);
+                    fasterBehind ? $"{Name(f, i)} · {-(gap ?? 0):0.0} {Units.S}" : null, FasterKeys[i]);
                 bool slowerAhead = !isFaster && lap is { } l2 && myLap is { } m2 && l2 > m2 * 1.02 && gap is > 0 && gap < slower && closing;
                 Alerts.Set("traffic.slower", slowerAhead, now,
                     slowerAhead ? $"Slower car ahead · {f.Session.ByCar.GetValueOrDefault(i)?.ClassName}" : null,
-                    slowerAhead ? $"{Name(f, i)} · {gap:0.0} s" : null, SlowerKeys[i]);
+                    slowerAhead ? $"{Name(f, i)} · {gap:0.0} {Units.S}" : null, SlowerKeys[i]);
             }
         }
     }

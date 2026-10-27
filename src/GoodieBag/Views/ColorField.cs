@@ -10,12 +10,12 @@ namespace GoodieBag.Views;
 
 internal static class ColorField
 {
-    public static FrameworkElement Build(Func<string> get, Func<string, bool> set, string? help = null, double boxWidth = 96)
+    public static FrameworkElement Build(Func<string> get, Func<string, bool> set, string? help = null, double boxWidth = 78)
     {
-        var chip = new Border { Width = 22, Height = 18, CornerRadius = ThemeManager.Round(3), BorderThickness = new Thickness(1), BorderBrush = Ui.Res<Brush>("LineStrong") };
+        var chip = Hairline.Frame(new Border { Width = 18, Height = 15, CornerRadius = ThemeManager.Round(3), BorderBrush = Ui.Res<Brush>("LineStrong") });
         var swatch = new Button
         {
-            Width = 34, Height = 30, MinHeight = 0, Padding = new Thickness(0), Margin = new Thickness(0, 0, 8, 0), ToolTip = "Pick a color", Style = Ui.Res<Style>("Btn"),
+            Width = 28, Height = 24, MinHeight = 0, Padding = new Thickness(0), Margin = new Thickness(0, 0, 6, 0), ToolTip = "Pick a color", Style = Ui.Res<Style>("Btn"),
             Content = chip,
         };
         var box = new TextBox { Text = get(), Width = boxWidth, MaxLength = 7, FontFamily = Ui.Res<FontFamily>("MonoFont"), VerticalAlignment = VerticalAlignment.Center, ToolTip = help };
