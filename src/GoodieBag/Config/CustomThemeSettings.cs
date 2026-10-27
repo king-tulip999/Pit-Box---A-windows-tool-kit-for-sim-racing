@@ -22,13 +22,13 @@ public sealed class CustomThemeSettings
 public sealed class ThemeColors
 {
     public string Background { get; set; } = "#000000";
-    public string Edges { get; set; } = "#775869";
-    public string Text { get; set; } = "#F5ECEE";
-    public string Accent { get; set; } = "#DB156B";
-    public string Highlight { get; set; } = "#00FFD0";
-    public string Success { get; set; } = "#3DDC84";
-    public string Warning { get; set; } = "#FFB224";
-    public string Error { get; set; } = "#FF4545";
+    public string Edges { get; set; } = "#4A6A78";
+    public string Text { get; set; } = "#E6F6FA";
+    public string Accent { get; set; } = "#00B4D8";
+    public string Highlight { get; set; } = "#90E0EF";
+    public string Success { get; set; } = "#2DD4A0";
+    public string Warning { get; set; } = "#FFC145";
+    public string Error { get; set; } = "#FF5A5F";
 
     public static readonly ThemeColors Default = new();
 

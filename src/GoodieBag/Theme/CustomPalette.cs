@@ -42,9 +42,12 @@ internal static class CustomPalette
 
     private static Color Pick(string hex, string fallback) => Parse(hex) ?? Parse(fallback)!.Value;
 
-    public static IReadOnlyDictionary<string, Color> Build(ThemeColors seeds)
+    public static readonly IReadOnlyDictionary<string, Color> Default = Derive(ThemeColors.Default);
+
+    public static IReadOnlyDictionary<string, Color> Build(ThemeColors seeds) => seeds.IsDefault ? Default : Derive(seeds);
+
+    private static IReadOnlyDictionary<string, Color> Derive(ThemeColors seeds)
     {
-        if (seeds.IsDefault) return Palettes.Custom;
         var d = ThemeColors.Default;
         Color bg = Pick(seeds.Background, d.Background), edge = Pick(seeds.Edges, d.Edges), text = Pick(seeds.Text, d.Text),
             accent = Pick(seeds.Accent, d.Accent), hi = Pick(seeds.Highlight, d.Highlight), ok = Pick(seeds.Success, d.Success),
@@ -84,6 +87,7 @@ internal static class CustomPalette
         var onAccent = ThemeManager.Contrast(Colors.White, accent) >= 3 ? Light(accent, 0.96) : Dark(accent, 0.85);
         var accentText = ReadableOn(accent, bg);
         var pressed = Dark(accent, 0.23);
+        if (ThemeManager.Contrast(onAccent, pressed) < 4.5) pressed = Dark(accent, 0.12);
         p["Accent"] = p["AccentEdge"] = p["PrimaryEdge"] = p["PrimaryHover"] = p["SwitchOnBorder"] = p["SwitchOnKnob"] = p["LogoFg"] = p["LogoEdge"] = accent;
         p["Meter1"] = p["Meter2"] = p["Meter3"] = accent;
         p["AccentHover"] = Light(accent, 0.18);
