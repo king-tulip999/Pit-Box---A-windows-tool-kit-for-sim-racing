@@ -327,7 +327,7 @@ internal sealed class SessionStatsService : IDisposable
         }
     }
 
-    private const string RereadKey = "recorder_reread", RereadVersion = "line-dip-pit-exit-early-laps";
+    private const string RereadKey = "recorder_reread", RereadVersion = "official-lap-times-differs-grid-class-finish";
 
     private void Reread(StatsStore store, string folder, bool traces, TraceRetention retention, CancellationToken cancel)
     {

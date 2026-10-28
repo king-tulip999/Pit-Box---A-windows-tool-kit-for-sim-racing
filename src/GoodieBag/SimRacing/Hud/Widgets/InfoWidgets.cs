@@ -297,17 +297,29 @@ internal sealed class WeatherWidget : HudWidget
         }
         p.Panel(body);
         var area = body.Inflated(-10 * d, -6 * d);
-        if (v.Options.Bool("wind") && area.Width >= 230 * d) Wind(p, v, area.Right(Math.Min(area.Width * 0.47f, area.Height + 96 * d), out area));
         _cells[0] = ("AIR", Temp(f.AirTemp));
         _cells[1] = ("TRACK", Temp(f.TrackTemp));
         _cells[2] = ("HUMIDITY", f.Humidity is { } h ? $"{h * 100:0}%" : RaceFormat.Missing);
-        float cw = area.Width / _cells.Length, cellPad = 8 * d;
         var font = p.Big;
-        foreach (var (_, value) in _cells)
-            if (p.Measure(value, font) > cw - cellPad * 2) { font = p.Bold; break; }
+        float cellPad = 8 * d;
+        float need = 0;
+        int shown = 0;
+        for (int i = 0; i < _cells.Length; i++)
+        {
+            float cell = Math.Max(p.Measure(_cells[i].Value, font), p.Measure(_cells[i].Label, p.Label)) + cellPad * 2;
+            float wider = Math.Max(need, cell);
+            if (wider * (i + 1) > area.Width) break;
+            need = wider;
+            shown = i + 1;
+        }
+        if (shown == 0) return;
+        float valuesW = need * shown;
+        if (v.Options.Bool("wind") && WindWidth(p, v, area.Height) is var windW && area.Width - valuesW >= windW)
+            Wind(p, v, area.Right(Math.Max(windW, Math.Min(area.Width * 0.47f, area.Width - valuesW)), out area));
+        float cw = area.Width / shown;
         float vh = p.LineHeight(font), lh = p.LineHeight(p.Label);
         float top = area.Y + (area.Height - vh - lh) / 2;
-        for (int i = 0; i < _cells.Length; i++)
+        for (int i = 0; i < shown; i++)
         {
             float x = area.X + cw * i;
             if (i > 0) p.Line(x, top - 2 * d, x, top + lh + vh + 2 * d, HudPalette.Alpha(p.P.Muted, 110), 1);
@@ -316,6 +328,18 @@ internal sealed class WeatherWidget : HudWidget
             p.Text(_cells[i].Label, p.Label, p.LabelColor, new RectangleF(cell.X, cell.Y, cell.Width, lh), HAlign.Left, VAlign.Top, false);
             p.Number(_cells[i].Value, font, p.P.Heading, new RectangleF(cell.X, cell.Y + lh, cell.Width, vh), HAlign.Left, VAlign.Center);
         }
+    }
+
+    private static readonly string[] WindWords = { "HEADWIND", "CROSSWIND", "TAILWIND", "CALM" };
+
+    private static float DialSize(HudPainter p, float height) => Math.Min(height + 6 * p.Density, 74 * p.Density);
+
+    private static float WindWidth(HudPainter p, HudView v, float height)
+    {
+        float d = p.Density;
+        string line = RaceFormat.SpeedUnit(v.Units).ToUpperInvariant() + " · WNW";
+        float text = Math.Max(p.Widest(WindWords, p.SmallBold), p.Measure(line, p.Label)) + 4;
+        return 8 * d + DialSize(p, height) + 8 * d + text;
     }
 
     private static void Sky(HudPainter p, HudView v, RectangleF r)
@@ -364,7 +388,7 @@ internal sealed class WeatherWidget : HudWidget
         var f = v.Frame;
         float d = p.Density;
         p.Divider(r.X, r.Y + 4 * d, r.Bottom - 4 * d);
-        float size = Math.Min(r.Height + 6 * d, 74 * d);
+        float size = DialSize(p, r.Height);
         var ring = new RectangleF(r.X + 8 * d, r.Y + (r.Height - size) / 2, size, size);
         double? toward = f.WindDir is { } from ? from + Math.PI : null;
         double heading = v.Options.Bool("turn") && f.YawNorth is { } yaw ? yaw : 0;

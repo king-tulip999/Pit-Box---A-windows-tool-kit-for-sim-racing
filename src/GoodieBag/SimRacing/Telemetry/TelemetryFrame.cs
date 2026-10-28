@@ -109,7 +109,7 @@ internal sealed class TelemetryFrame
     public readonly double[] CarLastLap = new double[MaxCars], CarBestLap = new double[MaxCars];
     public readonly int[] CarTyreCompound = new int[MaxCars];
     public readonly RaceFlags[] CarFlags = new RaceFlags[MaxCars];
-    public bool HasCarPositions, HasCarEstTime, HasCarLapTimes, HasCarF2Time;
+    public bool HasCarPositions, HasCarEstTime, HasCarLapTimes, HasCarF2Time, HasLapLast;
 
     public double? RawValue(string name, int index = 0) =>
         Vars.TryGetValue(name, out var v) ? IrsdkMemory.Read(Raw.AsSpan(0, Math.Min(RawLength, Raw.Length)), v, index) : null;
@@ -175,6 +175,6 @@ internal sealed class TelemetryFrame
         Array.Fill(CarBestLap, -1);
         Array.Fill(CarTyreCompound, -1);
         Array.Clear(CarFlags);
-        HasCarPositions = HasCarEstTime = HasCarLapTimes = HasCarF2Time = false;
+        HasCarPositions = HasCarEstTime = HasCarLapTimes = HasCarF2Time = HasLapLast = false;
     }
 }

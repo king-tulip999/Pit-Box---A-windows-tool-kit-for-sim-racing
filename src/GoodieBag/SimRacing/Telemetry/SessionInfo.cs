@@ -34,6 +34,8 @@ internal sealed record SessionEntry(int Number, SessionKind Kind, string Type, s
 
 internal sealed record SectorEntry(int Number, double StartPct);
 
+internal sealed record ResultEntry(int CarIdx, int Position, int ClassPosition, int LapsComplete, int LapsLed, int? FastestLap, double? FastestTime, double? LastTime, int? Incidents, int ReasonOutId, string ReasonOut);
+
 internal sealed class SessionInfo
 {
     public static readonly SessionInfo Empty = new();
@@ -66,6 +68,18 @@ internal sealed class SessionInfo
     public IReadOnlyDictionary<int, DriverEntry> ByCar { get; init; } = new Dictionary<int, DriverEntry>();
 
     public IReadOnlyDictionary<int, int> GridPositions { get; init; } = new Dictionary<int, int>();
+
+    public IReadOnlyDictionary<int, int> GridClassPositions { get; init; } = new Dictionary<int, int>();
+
+    public IReadOnlyDictionary<int, IReadOnlyList<ResultEntry>> Results { get; init; } = new Dictionary<int, IReadOnlyList<ResultEntry>>();
+
+    public ResultEntry? ResultOf(int session, int car)
+    {
+        if (!Results.TryGetValue(session, out var list)) return null;
+        for (int i = 0; i < list.Count; i++)
+            if (list[i].CarIdx == car) return list[i];
+        return null;
+    }
 
     public int PlayerCarIdx { get; init; } = -1;
     public double? FuelMaxLiters { get; init; }
@@ -150,9 +164,28 @@ internal sealed class SessionInfo
             .OrderBy(s => s.StartPct).ToList();
 
         var grid = new Dictionary<int, int>();
+        var gridClass = new Dictionary<int, int>();
         foreach (var r in SessionYaml.Items(root, "QualifyResultsInfo", "Results"))
-            if (SessionYaml.Int(r, "CarIdx") is { } car && SessionYaml.Int(r, "Position") is { } pos)
-                grid[car] = pos + 1;
+        {
+            if (SessionYaml.Int(r, "CarIdx") is not { } car) continue;
+            if (SessionYaml.Int(r, "Position") is { } pos) grid[car] = pos + 1;
+            if (SessionYaml.Int(r, "ClassPosition") is { } classPos) gridClass[car] = classPos + 1;
+        }
+
+        var results = new Dictionary<int, IReadOnlyList<ResultEntry>>();
+        foreach (var s in SessionYaml.Items(root, "SessionInfo", "Sessions"))
+        {
+            var list = SessionYaml.Items(s, "ResultsPositions")
+                .Where(r => SessionYaml.Int(r, "CarIdx") is >= 0 and < 255 && SessionYaml.Int(r, "Position") is > 0)
+                .Select(r => new ResultEntry(
+                    SessionYaml.Int(r, "CarIdx")!.Value, SessionYaml.Int(r, "Position")!.Value, (SessionYaml.Int(r, "ClassPosition") ?? -1) + 1,
+                    SessionYaml.Int(r, "LapsComplete") ?? 0, SessionYaml.Int(r, "LapsLed") ?? 0,
+                    SessionYaml.Int(r, "FastestLap") is > 0 and var fl ? fl : null, SessionYaml.Num(r, "FastestTime") is > 0 and var ft ? ft : null,
+                    SessionYaml.Num(r, "LastTime") is > 0 and var lt ? lt : null, SessionYaml.Int(r, "Incidents"),
+                    SessionYaml.Int(r, "ReasonOutId") ?? 0, SessionYaml.Str(r, "ReasonOutStr") ?? ""))
+                .ToList();
+            if (list.Count > 0) results[SessionYaml.Int(s, "SessionNum") ?? 0] = list;
+        }
 
         return new SessionInfo
         {
@@ -182,6 +215,8 @@ internal sealed class SessionInfo
             ByCar = byCar,
             Sectors = sectors,
             GridPositions = grid,
+            GridClassPositions = gridClass,
+            Results = results,
             PlayerCarIdx = SessionYaml.Int(driverInfo, "DriverCarIdx") ?? -1,
             FuelMaxLiters = SessionYaml.Num(driverInfo, "DriverCarFuelMaxLtr") is > 0 and var fuel ? fuel : null,
             MaxFuelPct = SessionYaml.Num(driverInfo, "DriverCarMaxFuelPct") is > 0 and var maxPct ? maxPct : null,

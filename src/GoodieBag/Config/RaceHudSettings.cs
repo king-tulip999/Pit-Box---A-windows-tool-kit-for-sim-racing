@@ -45,8 +45,6 @@ public sealed class RaceHudSettings
 
     public HudFuelSettings Fuel { get; set; } = new();
 
-    public RaceWindowSettings Window { get; set; } = new();
-
     public Dictionary<string, HudAlertSetting> Alerts { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     public List<string> AlertGroupOrder { get; set; } = new();

@@ -42,11 +42,12 @@ internal sealed record LapRow(int Lap, double Time, bool Clean, double? TopSpeed
     IReadOnlyList<double>? Sectors = null, LapFlags Flags = LapFlags.None, int? Incidents = null, int? Run = null, string? Setup = null);
 
 [Flags]
-internal enum LapFlags { None = 0, PitLane = 1, OffTrack = 2, Incident = 4, Refuel = 8 }
+internal enum LapFlags { None = 0, PitLane = 1, OffTrack = 2, Incident = 4, Refuel = 8, Untimed = 16, TimeDiffers = 32 }
 
 internal sealed class SessionRecorder
 {
     private const double Gravity = 9.80665, FullThrottle = 0.98, Braking = 0.05, GlitchG = 6;
+    internal const double OfficialWait = 3, OfficialAgrees = 1;
     private readonly string _source;
     private readonly TraceBuilder? _trace;
     private IReadOnlyList<double> _sectorStarts = Array.Empty<double>();
@@ -70,6 +71,8 @@ internal sealed class SessionRecorder
     private bool _onPitRoad, _sawStall, _wasDriving, _leftPits;
     private int _run, _lapRun;
     private int? _lapsAtCheckered;
+    private (LapRow Lap, double Cross, double? Before, LapTrace? Trace)? _pending;
+    private bool _officialTimes;
     private readonly TyreWearTracker _tyres = new();
     private readonly double[] _wear = new double[TyreReading.Values];
 
@@ -145,12 +148,14 @@ internal sealed class SessionRecorder
         Wear(f, row);
         if (f.Incidents is { } inc) row.Incidents = inc;
         if (row.SessionType == nameof(SessionKind.Race)) RacePositions(f, row);
+        Official(f, row);
         Lap(f, row, driving, dt);
         return ended;
     }
 
     public (SessionRow Row, List<LapRow> Laps)? Finish()
     {
+        if (_row is { } open) Settle(open, null);
         var row = _row;
         _row = null;
         _identity = "";
@@ -162,6 +167,7 @@ internal sealed class SessionRecorder
         _onPitRoad = _wasDriving = _leftPits = false;
         _run = 0;
         _lapsAtCheckered = null;
+        _officialTimes = false;
         _tyres.Reset();
         if (row is null) return null;
         var laps = _laps.ToList();
@@ -253,11 +259,14 @@ internal sealed class SessionRecorder
     {
         int me = f.PlayerCarIdx;
         if ((uint)me >= TelemetryFrame.MaxCars) return;
-        int pos = f.CarClassPosition[me] > 0 ? f.CarClassPosition[me] : f.CarPosition[me] > 0 ? f.CarPosition[me]
-            : f.PlayerClassPosition is > 0 and var classPos ? classPos : f.PlayerPosition ?? 0;
+        if (f.Session.GridClassPositions.TryGetValue(me, out var grid) && grid > 0) row.StartPos = grid;
+        bool over = f.Phase is SessionPhase.Checkered or SessionPhase.CoolDown;
+        var result = over && f.LapCompleted is { } done && f.Session.ResultOf(f.SessionNum, me) is { ClassPosition: > 0 } r && r.LapsComplete >= done ? r : null;
+        if (result is not null) row.FinishPos = result.ClassPosition;
+        int pos = f.CarClassPosition[me] > 0 ? f.CarClassPosition[me] : f.PlayerClassPosition is > 0 and var classPos ? classPos : 0;
         if (pos <= 0) return;
         if (row.StartPos is null && f.Phase == SessionPhase.Racing) row.StartPos = pos;
-        if (f.Phase is SessionPhase.Racing or SessionPhase.Checkered or SessionPhase.CoolDown) row.FinishPos = pos;
+        if (f.Phase == SessionPhase.Racing || over && result is null) row.FinishPos = pos;
         if (f.Phase == SessionPhase.Checkered) _lapsAtCheckered ??= f.LapCompleted;
         var surface = f.CarSurface[me] != TrackSurface.NotInWorld ? f.CarSurface[me] : f.PlayerSurface ?? TrackSurface.NotInWorld;
         if (!row.Finished && surface != TrackSurface.NotInWorld
@@ -305,14 +314,12 @@ internal sealed class SessionRecorder
                 var flags = (_pitThisLap ? LapFlags.PitLane : 0) | (_offThisLap ? LapFlags.OffTrack : 0) | (lapIncidents > 0 ? LapFlags.Incident : 0) | (_refuelled ? LapFlags.Refuel : 0);
                 string setup = f.Session.PlayerSetupName;
                 double? fuelUsed = !_refuelled && _fuelStart is { } fs && f.Fuel is { } fe && fs - fe >= 0 ? fs - fe : null;
+                if (_pending is not null) Settle(row, null);
                 int number = _laps.Count + 1;
-                _laps.Add(new LapRow(number, time, clean, _top > 0 ? _top * 3.6 : null, fuelUsed,
+                var lap = new LapRow(number, time, clean, _top > 0 ? _top * 3.6 : null, fuelUsed,
                     _lapDt > 0 ? 100 * _throttleDt / _lapDt : null, _lapDt > 0 ? 100 * _brakeDt / _lapDt : null, _shifts, _peakG > 0 ? _peakG : null,
-                    SectorTimes(start, cross), flags, lapIncidents, _lapRun > 0 ? _lapRun : null, setup.Length > 0 ? setup : null));
-                if (_trace?.Finish(start, time) is { } trace) (row.Traces ??= new())[number] = trace;
-                row.Laps = _laps.Count;
-                LapDone?.Invoke(row, _laps.Skip(_savedLaps).ToList());
-                _savedLaps = _laps.Count;
+                    SectorTimes(start, cross), flags, lapIncidents, _lapRun > 0 ? _lapRun : null, setup.Length > 0 ? setup : null);
+                _pending = (lap, cross, f.LapLast, _trace?.Finish(start, time));
             }
             ResetLap();
             _lapStart = cross;
@@ -336,6 +343,29 @@ internal sealed class SessionRecorder
         }
         _prevPct = pct;
         _prevTime = t;
+    }
+
+    private void Official(TelemetryFrame f, SessionRow row)
+    {
+        if (f.HasLapLast) _officialTimes = true;
+        if (_pending is not { } p) return;
+        if (f.LapLast != p.Before) Settle(row, f.LapLast);
+        else if (f.SessionTime is not { } t || t - p.Cross >= OfficialWait || t < p.Cross) Settle(row, null);
+    }
+
+    private void Settle(SessionRow row, double? official)
+    {
+        if (_pending is not { } p) return;
+        _pending = null;
+        var lap = official is { } o and > 0
+            ? Math.Abs(o - p.Lap.Time) > OfficialAgrees ? p.Lap with { Time = o, Clean = false, Flags = p.Lap.Flags | LapFlags.TimeDiffers } : p.Lap with { Time = o }
+            : !_officialTimes ? p.Lap
+            : p.Lap with { Clean = false, Flags = p.Lap.Flags | LapFlags.Untimed };
+        _laps.Add(lap);
+        if (p.Trace is { } trace) (row.Traces ??= new())[lap.Lap] = trace;
+        row.Laps = _laps.Count;
+        LapDone?.Invoke(row, _laps.Skip(_savedLaps).ToList());
+        _savedLaps = _laps.Count;
     }
 
     private List<double>? SectorTimes(double start, double end)

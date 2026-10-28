@@ -4,7 +4,7 @@ using GoodieBag.SimRacing.TrackMaps;
 namespace GoodieBag.SessionStats;
 
 internal sealed record TrackOutline(List<(double[] X, double[] Y)> Surface, List<(double[] X, double[] Y, bool Filled)> Pit, double PitWidth,
-    (double X1, double Y1, double X2, double Y2)? StartLine, double Width, double Rms, double MapLength = 0);
+    (double X1, double Y1, double X2, double Y2)? StartLine, double Width, double Rms, double MapLength = 0, List<(string Text, double X, double Y)>? Turns = null);
 
 internal static class TrackFit
 {
@@ -159,7 +159,8 @@ internal static class TrackFit
             var (x2, y2) = sim.Apply(line.B.X, line.B.Y);
             start = (x1, y1, x2, y2);
         }
-        return new TrackOutline(surface, pit, pitWidth, start, width, rms, mapLength);
+        var turns = map.Turns.Select(t => { var (tx, ty) = sim.Apply(t.At.X, t.At.Y); return (t.Text, tx, ty); }).ToList();
+        return new TrackOutline(surface, pit, pitWidth, start, width, rms, mapLength, turns);
     }
 
     private static double[]? SolveLinear(double[,] m)

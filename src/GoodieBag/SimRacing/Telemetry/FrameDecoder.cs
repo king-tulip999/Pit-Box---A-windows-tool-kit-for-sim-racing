@@ -144,6 +144,7 @@ internal sealed class FrameDecoder
         f.HasCarPositions = _cPos is not null;
         f.HasCarEstTime = _cEst is not null;
         f.HasCarLapTimes = _cLast is not null;
+        f.HasLapLast = _lapLast is not null;
         f.HasCarF2Time = _cF2 is not null;
         for (int i = 0; i < n; i++)
         {

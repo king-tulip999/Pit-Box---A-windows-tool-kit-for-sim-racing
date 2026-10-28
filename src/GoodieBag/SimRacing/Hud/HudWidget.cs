@@ -53,6 +53,8 @@ internal sealed record HudWidgetDef(string Kind, string Name, string Description
     public double MinW { get; init; } = 80;
     public double MinH { get; init; } = 40;
     public int DefaultHz { get; init; } = 10;
+    public int MovingHz { get; init; }
+    public Func<HudOptions, bool>? Moves { get; init; }
     public IReadOnlyList<HudOption> Options { get; init; } = Array.Empty<HudOption>();
     public string? Limits { get; init; }
     public bool Clickable { get; init; }
@@ -63,6 +65,8 @@ internal sealed record HudWidgetDef(string Kind, string Name, string Description
     public Editors.HudEditorDef EditorDef => Editor ?? (_plain ??= Editors.HudEditorDef.Plain(this));
 
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<IReadOnlyList<HudOption>, Dictionary<string, HudOption>> ByKey = new();
+
+    public int Hz(HudOptions options) => MovingHz > 0 && Moves?.Invoke(options) == true ? MovingHz : DefaultHz;
 
     public HudOption? Option(string key) =>
         ByKey.GetValue(Options, list =>
