@@ -1,0 +1,119 @@
+using System.Globalization;
+using System.Windows;
+using System.Windows.Media;
+
+using PitBox.Theme;
+
+namespace PitBox.Controls;
+
+public sealed record LayoutTile(double X, double Y, double Width, double Height, string Label, string Detail, bool Primary);
+
+public sealed class MonitorLayoutView : FrameworkElement
+{
+    private IReadOnlyList<LayoutTile> _tiles = Array.Empty<LayoutTile>();
+    private static Typeface LabelFace => ThemeManager.DisplayFace;
+    private static Typeface DetailFace => ThemeManager.UiFace();
+
+    private static Brush TileFill => ThemeManager.Brush("TileRaised", Brushes.WhiteSmoke);
+    private static Brush TileStroke => ThemeManager.Brush("TileEdge", Brushes.LightGray);
+    private static Brush PrimaryFill => ThemeManager.Brush("AccentSoft", Brushes.Plum);
+    private static Brush PrimaryStroke => ThemeManager.Brush("Accent", Brushes.SlateBlue);
+    private static Brush TextBrush => ThemeManager.Brush("Text", Brushes.Black);
+    private static Brush DetailBrush => ThemeManager.Brush("TextMuted", Brushes.Gray);
+    private const double MinLabelHeight = 22;
+    private Pen? _tilePen, _primaryPen, _targetPen;
+    private Rect? _target;
+
+    public void SetTiles(IReadOnlyList<LayoutTile> tiles)
+    {
+        _tiles = tiles;
+        InvalidateVisual();
+    }
+
+    public void SetTarget(Rect? target)
+    {
+        _target = target;
+        InvalidateVisual();
+    }
+
+    protected override void OnRender(DrawingContext dc)
+    {
+        double w = ActualWidth, h = ActualHeight;
+        dc.DrawRectangle(Brushes.Transparent, null, new Rect(0, 0, w, h));
+        if (_tiles.Count == 0 || w <= 0 || h <= 0)
+            return;
+
+        double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
+        foreach (var t in _tiles)
+        {
+            minX = Math.Min(minX, t.X);
+            minY = Math.Min(minY, t.Y);
+            maxX = Math.Max(maxX, t.X + t.Width);
+            maxY = Math.Max(maxY, t.Y + t.Height);
+        }
+        if (_target is { } box)
+        {
+            minX = Math.Min(minX, box.X);
+            minY = Math.Min(minY, box.Y);
+            maxX = Math.Max(maxX, box.Right);
+            maxY = Math.Max(maxY, box.Bottom);
+        }
+        if (maxX - minX <= 0 || maxY - minY <= 0 || w <= 8 || h <= 8)
+            return;
+        double scale = Math.Min((w - 8) / (maxX - minX), (h - 8) / (maxY - minY));
+        double ox = (w - (maxX - minX) * scale) / 2, oy = (h - (maxY - minY) * scale) / 2;
+        double dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        _tilePen = Frozen(_tilePen, TileStroke, 1);
+        _primaryPen = Frozen(_primaryPen, PrimaryStroke, 1.6);
+
+        foreach (var t in _tiles)
+        {
+            var r = new Rect(ox + (t.X - minX) * scale + 2, oy + (t.Y - minY) * scale + 2, Math.Max(0, t.Width * scale - 4), Math.Max(0, t.Height * scale - 4));
+            if (r.Width <= 2 || r.Height <= 2)
+                continue;
+            dc.DrawGeometry(t.Primary ? PrimaryFill : TileFill, t.Primary ? _primaryPen : _tilePen, Tile.Shape(r, ThemeManager.Round(6)));
+            if (r.Height < MinLabelHeight || string.IsNullOrEmpty(t.Label))
+                continue;
+
+            double size = Math.Clamp(r.Height * 0.4, 8, 30);
+            var label = new FormattedText(ThemeManager.Case(t.Label), CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, ThemeManager.RaceFace, size, TextBrush, dpi);
+            double total = label.Height;
+            FormattedText? detail = null;
+            if (!string.IsNullOrEmpty(t.Detail) && r.Height > 44)
+            {
+                detail = new FormattedText(ThemeManager.Case(t.Detail), CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, DetailFace, Math.Clamp(size * 0.55, 7, 10), DetailBrush, dpi);
+                if (detail.Width > r.Width - 6)
+                    detail = null;
+                else
+                    total += detail.Height + 1;
+            }
+            double ty = r.Y + (r.Height - total) / 2;
+            dc.DrawText(label, new Point(r.X + (r.Width - label.Width) / 2, ty));
+            if (detail is not null)
+                dc.DrawText(detail, new Point(r.X + (r.Width - detail.Width) / 2, ty + label.Height + 1));
+        }
+        if (_target is { } target)
+        {
+            var edge = ThemeManager.Brush("AccentText", Brushes.SlateBlue);
+            if (_targetPen?.Brush != edge)
+            {
+                _targetPen = new Pen(edge, 2) { DashStyle = new DashStyle(new double[] { 3, 2 }, 0) };
+                _targetPen.Freeze();
+            }
+            var fill = edge.Clone();
+            fill.Opacity = 0.22;
+            fill.Freeze();
+            var r = new Rect(ox + (target.X - minX) * scale + 1, oy + (target.Y - minY) * scale + 1, Math.Max(2, target.Width * scale - 2), Math.Max(2, target.Height * scale - 2));
+            dc.DrawRectangle(fill, _targetPen, r);
+        }
+    }
+
+    private static Pen Frozen(Pen? cached, Brush brush, double thickness)
+    {
+        if (cached is not null && cached.Brush == brush)
+            return cached;
+        var pen = new Pen(brush, thickness);
+        pen.Freeze();
+        return pen;
+    }
+}

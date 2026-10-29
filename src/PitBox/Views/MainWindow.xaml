@@ -1,0 +1,113 @@
+<Window x:Class="PitBox.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="clr-namespace:PitBox.Controls"
+        xmlns:v="clr-namespace:PitBox.Views"
+        Title="Pit-Box" Width="1472" Height="820" MinWidth="1280" MinHeight="720"
+        WindowStartupLocation="CenterScreen" Icon="/Assets/PitBox.ico"
+        Background="{DynamicResource Bg}" Foreground="{DynamicResource Text}"
+        FontFamily="{DynamicResource UiFont}" FontSize="12"
+        UseLayoutRounding="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="44" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
+
+    <Grid x:Name="Root">
+        <!-- ================================================= content -->
+        <Grid x:Name="ContentArea" Background="{DynamicResource WindowBg}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="42" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- title bar (draggable; buttons opt out of the caption area) -->
+            <DockPanel x:Name="TitleBar" Grid.Row="0" LastChildFill="False">
+                <!-- left: the brand (just the mark, not a button) and, while a newer version is available, the update badge.
+                     Lined up with the pages' content (28 px). -->
+                <StackPanel x:Name="TitleLeft" DockPanel.Dock="Left" Orientation="Horizontal" Margin="23,6,0,0" VerticalAlignment="Top">
+                    <StackPanel x:Name="Brand" Orientation="Horizontal" VerticalAlignment="Center">
+                        <c:Tile x:Name="LogoTile" Background="{DynamicResource LogoBg}"
+                                BorderBrush="{DynamicResource LogoEdge}" BorderThickness="{DynamicResource LogoEdgeThickness}">
+                            <c:BrandMark Foreground="{DynamicResource LogoFg}" />
+                        </c:Tile>
+                        <TextBlock x:Name="Wordmark" Foreground="{DynamicResource Heading}" />
+                    </StackPanel>
+                    <!-- only while a newer version is available (collapsed = no space); same install as Settings → Updates -->
+                    <Button x:Name="UpdateBadge" Style="{StaticResource PrimaryButton}" Visibility="Collapsed" Margin="13,0,0,0" Padding="8,5"
+                            VerticalAlignment="Center" FontSize="9.5" WindowChrome.IsHitTestVisibleInChrome="True" />
+                </StackPanel>
+                <StackPanel x:Name="CaptionButtons" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                    <Button x:Name="MinButton" Style="{StaticResource CaptionButton}" WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Minimize">
+                        <c:CaptionGlyph Kind="Minimize" />
+                    </Button>
+                    <Button x:Name="MaxButton" Style="{StaticResource CaptionButton}" WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Maximize">
+                        <c:CaptionGlyph x:Name="MaxIcon" Kind="Maximize" />
+                    </Button>
+                    <Button x:Name="CloseButton" Style="{StaticResource CloseCaptionButton}" WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Close">
+                        <c:CaptionGlyph Kind="Close" />
+                    </Button>
+                </StackPanel>
+                <!-- Only for a theme with a link (ThemeSpec.Link, set up by FitBrand): its logo in the title bar beside the window
+                     buttons, on every page, as a button (ThemeLogoButton: quiet box, hover = accent glow + "Take me there") that
+                     opens the theme's site. Fades out when the bar gets too narrow for it (FitThemeLogo); the rest of the bar
+                     stays draggable. -->
+                <Button x:Name="ThemeLogo" DockPanel.Dock="Right" Style="{StaticResource ThemeLogoButton}" Click="OnThemeLogoClick"
+                        Height="28" Margin="0,2,11,0" VerticalAlignment="Top" Visibility="Collapsed"
+                        WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Button.ToolTip>
+                        <StackPanel>
+                            <TextBlock x:Name="ThemeLogoTitle" FontWeight="SemiBold" />
+                            <TextBlock x:Name="ThemeLogoTip" Opacity="0.8" />
+                        </StackPanel>
+                    </Button.ToolTip>
+                    <Image x:Name="ThemeLogoImage" Stretch="Uniform" Height="23" RenderOptions.BitmapScalingMode="HighQuality" />
+                </Button>
+            </DockPanel>
+
+            <!-- the accent line between the title bar and the page, as between a page's panels; spans the window -->
+            <v:DividerLine x:Name="TitleRule" Grid.Row="0" VerticalAlignment="Bottom" Margin="23,0,23,0" />
+
+            <!-- the sidebar (Views/Sidebar.cs: every tool, the open tool's sections, Settings) beside the page, left or right
+                 (UiSettings.SidebarRight) -->
+            <Grid x:Name="Body" Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ContentControl x:Name="SidebarHost" Grid.Column="0" Focusable="False" Margin="13,11,0,13" />
+                <Grid x:Name="PageArea" Grid.Column="1" ClipToBounds="True">
+                    <!-- every theme: a plan drawing of a circuit section (Theme/CircuitPlan.cs, Theme/CircuitArt.cs) behind the page,
+                         filling the page area from the bottom-right and fading towards the top-left; cards are opaque, so it shows in
+                         the gaps. The drawing is cached as a bitmap; the cars lapping it (UiSettings.TrackCars) are separate small visuals. -->
+                    <v:CircuitBackdrop x:Name="Circuit" Margin="0,0,12,6" />
+                    <ContentControl x:Name="PageContent" Focusable="False">
+                        <ContentControl.RenderTransform>
+                            <TranslateTransform x:Name="PageMove" />
+                        </ContentControl.RenderTransform>
+                    </ContentControl>
+                </Grid>
+            </Grid>
+
+            <StackPanel x:Name="Toasts" Grid.RowSpan="2" VerticalAlignment="Bottom" HorizontalAlignment="Right" Margin="0,0,23,19" Width="292" />
+
+            <!-- modal layer for confirmations / prompts -->
+            <Grid x:Name="ModalLayer" Grid.RowSpan="2" Visibility="Collapsed" KeyboardNavigation.TabNavigation="Cycle" Background="{DynamicResource Dim}">
+                <ContentControl x:Name="ModalContent" HorizontalAlignment="Center" VerticalAlignment="Center" Focusable="False" />
+            </Grid>
+        </Grid>
+
+        <!-- first-launch / revisited setup over the whole window (Views/SetupScreen.cs), with its own caption buttons -->
+        <Grid x:Name="SetupLayer" Panel.ZIndex="2" Visibility="Collapsed" KeyboardNavigation.TabNavigation="Cycle">
+            <ContentControl x:Name="SetupContent" Focusable="False" />
+            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" Orientation="Horizontal">
+                <Button x:Name="SetupMinButton" Style="{StaticResource CaptionButton}" WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Minimize">
+                    <c:CaptionGlyph Kind="Minimize" />
+                </Button>
+                <Button x:Name="SetupCloseButton" Style="{StaticResource CloseCaptionButton}" WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Close">
+                    <c:CaptionGlyph Kind="Close" />
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

@@ -1,0 +1,87 @@
+using System.Windows;
+using PitBox.Services;
+using PitBox.Views;
+using WinForms = System.Windows.Forms;
+
+namespace PitBox.Plugins;
+
+internal static class PluginIds
+{
+    public const string Overlay = "overlay";
+    public const string OverlayPage = "overlay";
+    public const string FanControl = "fan-control";
+    public const string SimRacing = "sim-racing";
+    public const string WindowProfiles = "window-profiles";
+    public const string WindowProfilesPage = "windows";
+    public const string Displays = "displays";
+    public const string SessionStats = "session-stats";
+}
+
+internal enum PageSensors
+{
+    None,
+    Basic,
+    Full,
+}
+
+internal sealed record PluginPage(string Key, string Title, string Icon, Func<AppServices, MainWindow, FrameworkElement> Create,
+    PageSensors Sensors = PageSensors.None, Func<AppServices, SectionList>? Sections = null);
+
+internal sealed record PluginHotkey(string Id, string Label, Func<string?> Get, Action<string?> Set, Action Invoke, string? Group = null, string? Default = null);
+
+internal abstract class Plugin
+{
+    public abstract string Id { get; }
+    public abstract string Name { get; }
+    public abstract string Description { get; }
+
+    public abstract string Icon { get; }
+
+    public virtual (string Soft, string Deep) Colors => ("AccentSoft", "AccentText");
+
+    public virtual bool EnabledByDefault => true;
+
+    public virtual string? ParentId => null;
+
+    public virtual int Order => 100;
+
+    public abstract string Reads { get; }
+
+    public abstract string BackgroundWork { get; }
+
+    public abstract string Changes { get; }
+
+    public virtual IReadOnlyList<PluginPage> Pages => Array.Empty<PluginPage>();
+
+    public virtual IEnumerable<SearchEntry> SearchEntries => Array.Empty<SearchEntry>();
+
+    public virtual IEnumerable<PluginHotkey> Hotkeys(AppServices app) => Array.Empty<PluginHotkey>();
+
+    public virtual void AddTrayItems(WinForms.ToolStripItemCollection items, AppServices app) { }
+
+    public virtual string? Status(AppServices app) => null;
+
+    public virtual IReadOnlyCollection<int>? IracingLeagueIds(AppServices app) => null;
+
+    public bool IsActive { get; private set; }
+
+    internal void Start(AppServices app)
+    {
+        if (IsActive)
+            return;
+        IsActive = true;
+        OnStart(app);
+    }
+
+    internal void Stop(AppServices app)
+    {
+        if (!IsActive)
+            return;
+        IsActive = false;
+        OnStop(app);
+    }
+
+    protected abstract void OnStart(AppServices app);
+
+    protected abstract void OnStop(AppServices app);
+}
