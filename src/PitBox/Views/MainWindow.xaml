@@ -75,12 +75,13 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
+                <!-- every theme: a plan drawing of a circuit section (Theme/CircuitPlan.cs, Theme/CircuitArt.cs) behind the page and
+                     the see-through sidebar, filling the body from the bottom-right and fading towards the top-left; cards are opaque,
+                     so it shows in the gaps. The drawing is cached as a bitmap; the cars lapping it (UiSettings.TrackCars) are separate
+                     small visuals. -->
+                <v:CircuitBackdrop x:Name="Circuit" Grid.ColumnSpan="3" Margin="0,0,12,6" />
                 <ContentControl x:Name="SidebarHost" Grid.Column="0" Focusable="False" Margin="13,11,0,13" />
                 <Grid x:Name="PageArea" Grid.Column="1" ClipToBounds="True">
-                    <!-- every theme: a plan drawing of a circuit section (Theme/CircuitPlan.cs, Theme/CircuitArt.cs) behind the page,
-                         filling the page area from the bottom-right and fading towards the top-left; cards are opaque, so it shows in
-                         the gaps. The drawing is cached as a bitmap; the cars lapping it (UiSettings.TrackCars) are separate small visuals. -->
-                    <v:CircuitBackdrop x:Name="Circuit" Margin="0,0,12,6" />
                     <ContentControl x:Name="PageContent" Focusable="False">
                         <ContentControl.RenderTransform>
                             <TranslateTransform x:Name="PageMove" />

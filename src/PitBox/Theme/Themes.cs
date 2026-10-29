@@ -24,6 +24,7 @@ internal sealed record ThemeSpec
 
     public double Radius { get; init; }
     public double PanelOpacity { get; init; } = 0.85;
+    public double SidebarOpacity { get; init; } = 0.6;
     public double SwitchRadius { get; init; } = 11;
     public double KnobRadius { get; init; } = 8;
     public double ChipRadius { get; init; }

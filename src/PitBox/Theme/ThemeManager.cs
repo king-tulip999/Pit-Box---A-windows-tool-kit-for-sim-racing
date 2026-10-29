@@ -36,7 +36,7 @@ internal static class ThemeManager
 
     private static ResourceDictionary? _applied;
 
-    private static readonly HashSet<string> SeeThroughKeys = new() { "Panel", "Surface", "SurfaceAlt", "SidebarBg" };
+    private static readonly HashSet<string> SeeThroughKeys = new() { "Panel", "Surface", "SurfaceAlt" };
 
     private static Color Faded(Color color, double opacity) =>
         opacity >= 1 ? color : Color.FromArgb((byte)Math.Round(color.A * opacity), color.R, color.G, color.B);
@@ -63,7 +63,8 @@ internal static class ThemeManager
         var res = new ResourceDictionary();
         var p = Resolve(spec);
         foreach (var (key, color) in p)
-            res[key] = Freeze(new SolidColorBrush(SeeThroughKeys.Contains(key) ? Faded(color, spec.PanelOpacity) : color));
+            res[key] = Freeze(new SolidColorBrush(key == "SidebarBg" ? Faded(color, spec.SidebarOpacity)
+                : SeeThroughKeys.Contains(key) ? Faded(color, spec.PanelOpacity) : color));
 
         res["DisplayFont"] = Family(spec.DisplayFont);
         res["UiFont"] = Family(spec.UiFont);
