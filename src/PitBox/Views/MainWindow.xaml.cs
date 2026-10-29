@@ -466,7 +466,7 @@ public partial class MainWindow : Window
         try
         {
             var spec = ThemeManager.Current;
-            Icon = System.Windows.Media.Imaging.BitmapFrame.Create(spec.WindowIcon
+            Icon =System.Windows.Media.Imaging.BitmapFrame.Create(spec.WindowIcon
                 ?? new Uri(Themes.BuiltIn.Contains(spec) ? $"pack://application:,,,/Assets/Themes/PitBox-{spec.Id}.ico" : "pack://application:,,,/Assets/PitBox.ico"));
         }
         catch (Exception ex)

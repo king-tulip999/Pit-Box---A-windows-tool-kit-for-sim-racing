@@ -70,6 +70,80 @@ public static class TextCase
 
     public static string UpperForGdi(string text) => Spaced(Capitals(text), joined: false);
 
+    public const char Joiner = '⁠';
+
+    public static string KeepNameWhole(string text)
+    {
+        int at = text.IndexOf('-');
+        if (at < 0) return text;
+        System.Text.StringBuilder? sb = null;
+        int copied = 0;
+        for (; at >= 0; at = text.IndexOf('-', at + 1))
+        {
+            if (at + 1 < text.Length && text[at + 1] == Joiner) continue;
+            if (!Spells(text, at, -1, Brand.WordmarkStart) || !Spells(text, at, 1, Brand.WordmarkEnd)) continue;
+            sb ??= new System.Text.StringBuilder(text.Length + 2);
+            sb.Append(text, copied, at + 1 - copied).Append(Joiner);
+            copied = at + 1;
+        }
+        return sb is null ? text : sb.Append(text, copied, text.Length - copied).ToString();
+    }
+
+    private static bool Spells(string text, int from, int step, string word)
+    {
+        int i = from;
+        for (int k = 0; k < word.Length; k++)
+        {
+            do i += step; while (i >= 0 && i < text.Length && text[i] is Hair or Narrow);
+            char want = word[step < 0 ? word.Length - 1 - k : k];
+            if (i < 0 || i >= text.Length || char.ToUpperInvariant(text[i]) != want) return false;
+        }
+        return true;
+    }
+
+    public static readonly DependencyProperty KeepNameProperty = DependencyProperty.RegisterAttached(
+        "KeepName", typeof(bool), typeof(TextCase), new PropertyMetadata(false, OnKeepNameChanged));
+
+    public static bool GetKeepName(DependencyObject d) => (bool)d.GetValue(KeepNameProperty);
+
+    public static void SetKeepName(DependencyObject d, bool value) => d.SetValue(KeepNameProperty, value);
+
+    private static void OnKeepNameChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not TextBlock tb) return;
+        tb.Loaded -= OnNameLoaded;
+        if (e.NewValue is not true) return;
+        tb.Loaded += OnNameLoaded;
+        if (tb.IsLoaded) OnNameLoaded(tb, null);
+    }
+
+    private static void OnNameLoaded(object sender, RoutedEventArgs? e)
+    {
+        var tb = (TextBlock)sender;
+        if (GetUpper(tb) && !GetVerbatim(tb) || BindingOperations.IsDataBound(tb, TextBlock.TextProperty)) return;
+        if (HasInlines(tb))
+        {
+            JoinRuns(tb.Inlines);
+            return;
+        }
+        string text = tb.Text;
+        string whole = KeepNameWhole(text);
+        if (whole != text) tb.SetCurrentValue(TextBlock.TextProperty, whole);
+    }
+
+    private static void JoinRuns(InlineCollection inlines)
+    {
+        foreach (var inline in inlines)
+        {
+            if (inline is Run run && !BindingOperations.IsDataBound(run, Run.TextProperty))
+            {
+                string whole = KeepNameWhole(run.Text);
+                if (whole != run.Text) run.Text = whole;
+            }
+            else if (inline is Span span) JoinRuns(span.Inlines);
+        }
+    }
+
     public static readonly DependencyProperty UpperProperty = DependencyProperty.RegisterAttached(
         "Upper", typeof(bool), typeof(TextCase), new PropertyMetadata(false, OnUpperChanged));
 
@@ -114,7 +188,7 @@ public static class TextCase
         if (!HasInlines(tb) || tb.Inlines.Count <= 1)
         {
             string text = tb.Text;
-            string upper = IsMono(tb.FontFamily) ? Capitals(Plain(text)) : Upper(text);
+            string upper = KeepNameWhole(IsMono(tb.FontFamily) ? Capitals(Plain(text)) : Upper(text));
             if (upper != text) tb.SetCurrentValue(TextBlock.TextProperty, upper);
             return;
         }
@@ -128,7 +202,7 @@ public static class TextCase
         if ((string?)tb.GetValue(RawProperty) == text) return;
         tb.SetValue(RawProperty, text);
         bool cased = GetUpper(tb) && !GetVerbatim(tb) && tb.IsLoaded && !BindingOperations.IsDataBound(tb, TextBlock.TextProperty);
-        tb.Text = cased ? IsMono(tb.FontFamily) ? Capitals(Plain(text)) : Upper(text) : text;
+        tb.Text = KeepNameWhole(cased ? IsMono(tb.FontFamily) ? Capitals(Plain(text)) : Upper(text) : text);
     }
 
     private static readonly Dictionary<FontFamily, bool> Mono = new();
@@ -153,7 +227,7 @@ public static class TextCase
         {
             if (inline is Run run && !BindingOperations.IsDataBound(run, Run.TextProperty) && !GetVerbatim(run))
             {
-                string upper = mono ? Capitals(Plain(run.Text)) : Upper(run.Text);
+                string upper = KeepNameWhole(mono ? Capitals(Plain(run.Text)) : Upper(run.Text));
                 if (upper != run.Text) run.Text = upper;
             }
             else if (inline is Span span) UpperRuns(span.Inlines, mono);
@@ -167,8 +241,8 @@ public sealed class CaseConverter : IValueConverter
 
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value switch
     {
-        string s => Verbatim ? s : ThemeManager.Case(s),
-        Choice c => Verbatim ? c.Text : ThemeManager.Case(c.Text),
+        string s => TextCase.KeepNameWhole(Verbatim ? s : ThemeManager.Case(s)),
+        Choice c => TextCase.KeepNameWhole(Verbatim ? c.Text : ThemeManager.Case(c.Text)),
         _ => value,
     };
 

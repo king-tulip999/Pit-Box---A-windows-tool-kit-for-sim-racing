@@ -32,7 +32,7 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
     {
         _app = app;
         _window = window;
-        Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = Ui.PageFrame(_body), Focusable = false };
+        Content = new ScrollViewer { Style = Ui.Res<Style>("PageScroll"), Content = Ui.PageFrame(_body), Focusable = false };
 
         _canvas.Selected += key => { _selected = key; BuildDetails(); };
         _canvas.Moved += key =>

@@ -60,9 +60,11 @@
          in each keyed style (a keyed style replaces the implicit one; a new TextBlock style needs it too). -->
     <Style TargetType="TextBlock">
         <Setter Property="th:TextCase.Upper" Value="{DynamicResource Caps}" />
+        <Setter Property="th:TextCase.KeepName" Value="True" />
     </Style>
     <Style x:Key="H1" TargetType="TextBlock">
         <Setter Property="th:TextCase.Upper" Value="{DynamicResource Caps}" />
+        <Setter Property="th:TextCase.KeepName" Value="True" />
         <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
         <Setter Property="FontSize" Value="24.5" />
         <Setter Property="FontWeight" Value="{DynamicResource HeadingWeight}" />
@@ -71,6 +73,7 @@
     </Style>
     <Style x:Key="H2" TargetType="TextBlock">
         <Setter Property="th:TextCase.Upper" Value="{DynamicResource Caps}" />
+        <Setter Property="th:TextCase.KeepName" Value="True" />
         <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
         <Setter Property="FontSize" Value="14.5" />
         <Setter Property="FontWeight" Value="{DynamicResource HeadingWeight}" />
@@ -79,6 +82,7 @@
     </Style>
     <Style x:Key="H3" TargetType="TextBlock">
         <Setter Property="th:TextCase.Upper" Value="{DynamicResource Caps}" />
+        <Setter Property="th:TextCase.KeepName" Value="True" />
         <Setter Property="FontSize" Value="12.5" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="FontStyle" Value="{DynamicResource HeadingStyle}" />
@@ -86,6 +90,7 @@
     </Style>
     <Style x:Key="Body" TargetType="TextBlock">
         <Setter Property="th:TextCase.Upper" Value="{DynamicResource Caps}" />
+        <Setter Property="th:TextCase.KeepName" Value="True" />
         <Setter Property="FontSize" Value="12" />
         <Setter Property="Foreground" Value="{DynamicResource Text}" />
         <Setter Property="TextWrapping" Value="Wrap" />
@@ -95,6 +100,7 @@
     </Style>
     <Style x:Key="Caption" TargetType="TextBlock">
         <Setter Property="th:TextCase.Upper" Value="{DynamicResource Caps}" />
+        <Setter Property="th:TextCase.KeepName" Value="True" />
         <Setter Property="FontSize" Value="11.5" />
         <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
         <Setter Property="TextWrapping" Value="Wrap" />
@@ -102,12 +108,14 @@
     <!-- metadata labels (CPU, SWITCH MODE…): small, semibold, faint -->
     <Style x:Key="Eyebrow" TargetType="TextBlock">
         <Setter Property="th:TextCase.Upper" Value="{DynamicResource Caps}" />
+        <Setter Property="th:TextCase.KeepName" Value="True" />
         <Setter Property="FontSize" Value="11.5" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="Foreground" Value="{DynamicResource EyebrowText}" />
     </Style>
     <Style x:Key="BigValue" TargetType="TextBlock">
         <Setter Property="th:TextCase.Upper" Value="{DynamicResource Caps}" />
+        <Setter Property="th:TextCase.KeepName" Value="True" />
         <Setter Property="FontFamily" Value="{DynamicResource MetricFont}" />
         <Setter Property="FontSize" Value="26" />
         <Setter Property="FontWeight" Value="Bold" />
@@ -1186,6 +1194,7 @@
                             <ContentPresenter.Resources>
                                 <Style TargetType="TextBlock">
                                     <Setter Property="th:TextCase.Upper" Value="{DynamicResource Caps}" />
+                                    <Setter Property="th:TextCase.KeepName" Value="True" />
                                     <Setter Property="TextWrapping" Value="Wrap" />
                                 </Style>
                             </ContentPresenter.Resources>

@@ -46,7 +46,7 @@ internal static class StatsSessions
                 table.ColumnDefinitions.Add(c == 2 ? new ColumnDefinition { Width = new GridLength(1000, GridUnitType.Star), MinWidth = 97, MaxWidth = CarTrackMax } : new ColumnDefinition { Width = GridLength.Auto });
             table.ColumnDefinitions.Add(new ColumnDefinition());
             table.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            string[] heads = { "Time", "Session", "Car and track", "Laps", "Best lap", "Incidents", "Result", "" };
+            string[] heads = { "Time", "Session", "Car and track", "Laps", "Best lap", "Incidents", "Awards", "" };
             int span = table.ColumnDefinitions.Count;
             for (int c = 0; c < heads.Length; c++)
                 Cell(table, 0, c, new TextBlock { Text = heads[c], Style = Ui.Res<Style>("Eyebrow") }, c is >= 3 and <= 6);
@@ -114,7 +114,7 @@ internal static class StatsSessions
                 else Cell(table, row, 3, Caption(s.Laps.ToString(CultureInfo.CurrentCulture)), true);
                 Cell(table, row, 4, Time(s.Best), true);
                 Cell(table, row, 5, Caption(s.Incidents is { } inc ? inc + "x" : "–"), true);
-                Cell(table, row, 6, Result(s, races.AwardsOf(s.Id), place), true);
+                Cell(table, row, 6, Awards(races.AwardsOf(s.Id), place), true);
                 bool hasTrace = traced.Contains(s.Id);
                 var mark = new Icon
                 {
@@ -185,16 +185,12 @@ internal static class StatsSessions
         return row;
     }
 
-    private static FrameworkElement Result(SessionSummary s, IReadOnlyList<Award> awards, string place)
+    private static FrameworkElement Awards(IReadOnlyList<Award> awards, string place)
     {
-        if (awards.Count > 0)
-        {
-            var row = new StackPanel { Orientation = Orientation.Horizontal };
-            foreach (var award in awards) row.Children.Add(RaceParts.AwardSquare(award, place));
-            return row;
-        }
-        if (s.Type != "Race" || s.FinishPos is not { } finish) return Caption(SimRacing.Race.RaceFormat.Missing);
-        return Caption(s.StartPos is { } start ? $"P{start} → P{finish}" : "P" + finish);
+        if (awards.Count == 0) return Caption(SimRacing.Race.RaceFormat.Missing);
+        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        foreach (var award in awards) row.Children.Add(RaceParts.AwardSquare(award, place));
+        return row;
     }
 
     private static ComboBox Pick(string all, IEnumerable<string> values, string? selected, Action<string?> changed)

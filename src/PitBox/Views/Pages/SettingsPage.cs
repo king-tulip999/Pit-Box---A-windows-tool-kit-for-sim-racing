@@ -96,7 +96,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         _app = app;
         _window = window;
         _body = new PanelStack { Margin = new Thickness(23, 0, 23, 23), IsPanel = child => child == _sections };
-        _scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = Ui.PageFrame(_body), Focusable = false };
+        _scroll = new ScrollViewer { Style = Ui.Res<Style>("PageScroll"), Content = Ui.PageFrame(_body), Focusable = false };
         Content = _scroll;
     }
 
@@ -479,7 +479,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         _rateNote = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) };
         FillRateNote();
         var rateRow = RowWithNote("Sensor update rate", _rateNote, rate,
-            $"How often temperatures, loads, clocks and fan speeds are read for every page (the Sensor update rate at the top of the Dashboard is this same setting). Fan control still checks its curves and the failsafe at least every {PerformanceSettings.FanLoopMs / 1000} {Units.S}, and the overlay uses its own rate while it's showing. Applies at once.");
+            $"How often temperatures, loads, clocks and fan speeds are read for every page. Fan control still checks its curves and the failsafe at least every {PerformanceSettings.FanLoopMs / 1000} {Units.S}, and the overlay uses its own rate while it's showing. Applies at once.");
         Ui.Anchor(rateRow, "settings.sensorrate");
         section.Children.Add(rateRow);
 
