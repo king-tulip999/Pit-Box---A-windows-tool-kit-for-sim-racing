@@ -675,12 +675,12 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
                 D(() => a.Corner == stdLook.Corner, () => a.Corner = stdLook.Corner, stdLook.Corner + " px")),
             Ui.SettingRow("Outline", null, Ui.Switch(a.Outline, on => { a.Outline = on; changed(); }),
                 D(() => a.Outline == stdLook.Outline, () => a.Outline = stdLook.Outline, stdLook.Outline ? "On" : "Off"))));
-        var grid = Ui.SliderWithValue(2, 64, S.GridSize, "{0:0} px", v =>
+        var grid = Ui.SliderWithValue(RaceHudSettings.MinGrid, RaceHudSettings.MaxGrid, S.GridSize, "{0:0} px", v =>
         {
             S.GridSize = (int)v;
             changed();
             Host()?.ShowGrid();
-        }, step: 2);
+        }, step: RaceHudSettings.GridStep);
         root.Children.Add(Group("Arranging on screen", null,
             Ui.SettingRow("Snap while arranging", "Edges line up with other widgets and the screen, else a grid. Hold Alt to place freely.", Ui.Switch(S.Snap, on => { if (Host() is { } host) host.SetSnap(on); else S.Snap = on; changed(); })),
             Ui.SettingRow("Grid", app.Demo ? "The grid is shown over your screens while you adjust it (not with demo data)." : "Shown over your screens while you adjust it.", grid)));

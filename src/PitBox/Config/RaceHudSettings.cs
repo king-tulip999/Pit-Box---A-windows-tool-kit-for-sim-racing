@@ -39,6 +39,8 @@ public sealed class RaceHudSettings
 
     public HudUnits Units { get; set; } = HudUnits.Metric;
 
+    public const int MinGrid = 2, MaxGrid = 64, GridStep = 2;
+
     public int GridSize { get; set; } = 12;
 
     public bool Snap { get; set; } = true;
@@ -207,7 +209,7 @@ public sealed class RaceHudSettings
         Appearance.Clamp();
         Fuel ??= new();
         Fuel.Clamp();
-        GridSize = Math.Clamp(GridSize, 2, 64);
+        GridSize = Math.Clamp(GridSize, MinGrid, MaxGrid);
         var alerts = new Dictionary<string, HudAlertSetting>(StringComparer.OrdinalIgnoreCase);
         foreach (var (id, a) in Alerts ?? new()) if (id is not null && a is not null) alerts[id] = a;
         Alerts = alerts;

@@ -568,6 +568,16 @@ internal sealed class HudHost : IDisposable
 
     public void ToggleSnap() => SetSnap(!Settings.Snap);
 
+    private void StepGrid(int delta)
+    {
+        int size = Math.Clamp(Settings.GridSize + delta, RaceHudSettings.MinGrid, RaceHudSettings.MaxGrid);
+        if (size == Settings.GridSize) return;
+        Settings.GridSize = size;
+        Save();
+        ShowGrid();
+        Changed?.Invoke();
+    }
+
     public void SetSnap(bool on)
     {
         if (Settings.Snap == on) return;
@@ -716,6 +726,8 @@ internal sealed class HudHost : IDisposable
             case "undo": Undo(); break;
             case "redo": Redo(); break;
             case "snap": ToggleSnap(); break;
+            case "gridDown": StepGrid(-RaceHudSettings.GridStep); break;
+            case "gridUp": StepGrid(RaceHudSettings.GridStep); break;
             case "cancel": EndEdit(keep: false); break;
             case "done": EndEdit(keep: true); break;
         }
