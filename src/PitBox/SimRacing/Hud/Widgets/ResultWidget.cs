@@ -45,7 +45,7 @@ internal sealed class ResultWidget : HudWidget
     public override bool HasContent(HudView v)
     {
         Track(v);
-        return Showing(v);
+        return v.Frame.Simulated || Showing(v);
     }
 
     private static Color Tier(HudPalette p, int finish, bool byFinish) => !byFinish ? p.Accent : finish switch { 1 => p.Gold, 2 => p.Silver, 3 => p.Bronze, _ => p.Accent };
