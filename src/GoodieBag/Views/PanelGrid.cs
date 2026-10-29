@@ -65,6 +65,8 @@ internal sealed class PanelGrid : Panel
 
     public double PanelSpacing { get; init; }
 
+    public bool InRows { get; init; }
+
     public bool Dividers { get; init; }
 
     public bool LiveEdit { get; init; }
@@ -561,7 +563,7 @@ internal sealed class PanelGrid : Panel
         if ((col, row) != _dragCell && _dragOthers is { } others)
         {
             _dragCell = (col, row);
-            _dragIndex = GridLayout.DropIndex(others.Select(i => i.Box).ToList(), item.Box, _columns, col, row, _dragIndex, ColStep / RowStep);
+            _dragIndex = GridLayout.DropIndex(others.Select(i => i.Box).ToList(), item.Box, _columns, col, row, _dragIndex, ColStep / RowStep, InRows);
             InvalidateMeasure();
         }
         AutoScroll(pointer);
@@ -657,7 +659,7 @@ internal sealed class PanelGrid : Panel
             item.Box.Cols = cols;
             item.Box.Rows = Math.Max(1, (int)Math.Ceiling(((height ?? item.Host.DesiredSize.Height) + Gap) / RowStep - 0.001));
         }
-        GridLayout.Pack((DragOrder() ?? Ordered()).Select(i => i.Box).ToList(), _columns);
+        GridLayout.Pack((DragOrder() ?? Ordered()).Select(i => i.Box).ToList(), _columns, InRows);
         _usedRows = GridLayout.Bottom(_items.Select(i => i.Box));
         _ghost.Measure(new Size(width, double.PositiveInfinity));
 

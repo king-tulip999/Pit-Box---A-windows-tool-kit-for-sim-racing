@@ -259,6 +259,8 @@ internal static class StatsSessionView
                 if (lap.Flags.HasFlag(LapFlags.Incident)) Tag(lap.Incidents is > 0 and var n ? $"Incident {n}x" : "Incident", coralSoft, coralDeep);
                 if (lap.Flags.HasFlag(LapFlags.OffTrack)) Tag("Off track", coralSoft, coralDeep);
                 if (lap.Flags.HasFlag(LapFlags.PitLane)) Tag(lap.Flags.HasFlag(LapFlags.Refuel) ? "Pit stop" : "Pit lane", "SurfaceAlt", "TextMuted", "Out lap, in lap or a stop: never a clean lap");
+                if (lap.Flags.HasFlag(LapFlags.Untimed)) Tag("Not timed", "SurfaceAlt", "TextMuted", "iRacing gave this lap no time: the time shown is measured line to line, and it's never a clean lap");
+                if (lap.Flags.HasFlag(LapFlags.TimeDiffers)) Tag("Timed from the pits", "SurfaceAlt", "TextMuted", "iRacing's time for this lap started before you crossed the line, so it's never a clean lap");
                 if (!lap.Clean && lap.Flags == LapFlags.None) Tag("Not clean", coralSoft, coralDeep, "An incident, the pit lane or off track on this lap");
                 Cell(table, row, c, flag);
             }

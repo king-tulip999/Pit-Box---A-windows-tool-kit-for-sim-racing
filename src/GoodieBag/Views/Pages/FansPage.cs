@@ -69,7 +69,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
     {
         _app = app;
         _window = window;
-        _fanGrid = new PanelGrid(_app.Config.Fans.Layout, _app.Save) { Margin = new Thickness(0, 0, 0, 3), RowHeight = 1, Gap = 0, PanelSpacing = Ui.PanelSpacing, TwoColumnsFrom = Ui.TwoCardsFrom, ColumnGap = Ui.PanelSpacing };
+        _fanGrid = new PanelGrid(_app.Config.Fans.Layout, _app.Save) { Margin = new Thickness(0, 0, 0, 3), RowHeight = 1, Gap = 0, PanelSpacing = Ui.PanelSpacing, TwoColumnsFrom = Ui.TwoCardsFrom, ColumnGap = Ui.PanelSpacing, InRows = true };
         Grid.SetIsSharedSizeScope(_fanGrid, true);
         _master = Ui.Switch(_app.Config.Fans.Enabled, on => _app.SetFanControlEnabled(on));
         Content = new ScrollViewer { Style = Ui.Res<Style>("PageScroll"), Content = Ui.PageFrame(_body) };
@@ -434,7 +434,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         for (int i = 0; i < visible.Count; i++)
         {
             var f = visible[i];
-            _fanGrid.Add(new PanelDef(f.ControlId, _app.FanName(f), _ => FanCard(f)) { FullWidthWhen = () => _expanded.Contains(f.ControlId), Order = order[i] });
+            _fanGrid.Add(new PanelDef(f.ControlId, _app.FanName(f), _ => FanCard(f)) { Order = order[i] });
         }
     }
 
@@ -537,11 +537,8 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
                 var line = Hairline.Rule(new Border { Margin = new Thickness(0, 11, 0, 11) });
                 line.SetResourceReference(Border.BackgroundProperty, "Line");
                 var limits = Limits(fan, hw);
-                var grid = new Grid();
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MaxWidth = 616 });
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(29) });
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                grid.ColumnDefinitions.Add(new ColumnDefinition());
+                limits.HorizontalAlignment = HorizontalAlignment.Left;
+                var body = new StackPanel();
                 if (entry.Mode == FanMode.Curve && entry.CurveName is { } name && Fans.Curves.FirstOrDefault(c => c.Name == name) is not null)
                 {
                     var preview = new CurvePreview
@@ -557,13 +554,12 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
                     preview.Status.Margin = new Thickness(0);
                     preview.Status.MaxWidth = 454;
                     var statusRow = new WrapPanel { Margin = new Thickness(0, 6, 0, 0), Children = { preview.Status, edit } };
-                    grid.Children.Add(new StackPanel { Children = { preview.Graph, statusRow } });
-                    Grid.SetColumn(limits, 2);
+                    body.Children.Add(new StackPanel { Margin = new Thickness(0, 0, 0, 16), Children = { preview.Graph, statusRow } });
                     if (parts is not null) parts.Curve = preview;
                     UpdateCurvePreview(fan.ControlId, preview, _app.Hardware.Catalog);
                 }
-                grid.Children.Add(limits);
-                expandHost.Content = new StackPanel { Margin = new Thickness(57, 0, 0, 3), Children = { line, grid } };
+                body.Children.Add(limits);
+                expandHost.Content = new StackPanel { Margin = new Thickness(57, 0, 0, 3), Children = { line, body } };
             }
             var seg = Ui.Segmented(new[] { "Auto", "Curve", "Fixed" }, (int)entry.Mode, i =>
             {

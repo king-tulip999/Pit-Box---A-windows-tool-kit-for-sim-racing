@@ -298,7 +298,7 @@ internal sealed class HudHost : IDisposable
                 if (s.Window?.Visible == true) { s.Window.Hide(); s.Window.ReleaseSurface(); }
                 continue;
             }
-            int hz = s.Config.UpdateHz > 0 ? s.Config.UpdateHz : s.Def.DefaultHz;
+            int hz = s.Config.UpdateHz > 0 ? s.Config.UpdateHz : s.Def.Hz(s.Options);
             fastest = Math.Max(fastest, hz);
             bool due = Stopwatch.GetElapsedTime(s.LastDraw, now).TotalMilliseconds >= 1000.0 / hz - 4;
             if (!_editing && frame.Status == SimStatus.Connected && (s.Config.OnlyWhenNeeded ?? s.Def.HideWhenEmpty) == true)

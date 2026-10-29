@@ -671,6 +671,8 @@ internal sealed class ReplayStage : FrameworkElement
     private bool _builtRef;
     private readonly List<NoteMark> _notes = new();
     private readonly List<Rect> _taken = new();
+    private readonly List<TurnMark> _turns = new();
+    private readonly List<Rect> _turnsShown = new();
 
     public List<Rect> Avoid { get; } = new();
     private ReplayCar? _notesFor;
@@ -684,6 +686,15 @@ internal sealed class ReplayStage : FrameworkElement
         public required Size Box;
     }
 
+
+    private sealed class TurnMark
+    {
+        public required DrawingVisual Visual;
+        public required MatrixTransform At;
+        public required Point World;
+        public required string Text;
+        public Size Box;
+    }
 
     public event Action? WentFree;
 
@@ -782,6 +793,7 @@ internal sealed class ReplayStage : FrameworkElement
         _ticks = Ticks(Track, _s.Reference.Trace.StepM, outline.Width);
         _checker = Checker(Track, _s.Reference.Trace.StepM, outline.Width);
         for (int i = 0; i < _labelAt.Length; i++) _labelAt[i] = LabelPoint(Track, _s.Reference.Trace.StepM, _s.SectorDistances[i], outline.Width);
+        MakeTurns(outline);
         _builtScale = -1;
         Update();
     }
@@ -910,6 +922,38 @@ internal sealed class ReplayStage : FrameworkElement
             _labelMatrix[i].Matrix = new Matrix(1, 0, 0, 1, p.X, p.Y);
         }
         PlaceNotes(m, follow);
+        PlaceTurns(m);
+    }
+
+    private void MakeTurns(TrackOutline outline)
+    {
+        foreach (var old in _turns) _visuals.Remove(old.Visual);
+        _turns.Clear();
+        foreach (var (text, x, y) in outline.Turns ?? new())
+        {
+            var at = new MatrixTransform();
+            var mark = new TurnMark { Visual = new DrawingVisual { Transform = at }, At = at, World = new Point(x, y), Text = text };
+            _turns.Add(mark);
+            _visuals.Insert(1, mark.Visual);
+        }
+    }
+
+    private void PlaceTurns(Matrix m)
+    {
+        _turnsShown.Clear();
+        var view = new Rect(4, 4, ActualWidth - 8, ActualHeight - 8);
+        foreach (var turn in _turns)
+        {
+            var p = m.Transform(turn.World);
+            double x = Math.Round(p.X), y = Math.Round(p.Y);
+            var box = new Rect(x - turn.Box.Width / 2, y - turn.Box.Height / 2, turn.Box.Width, turn.Box.Height);
+            bool show = view.Contains(box);
+            foreach (var r in _turnsShown) if (show && r.IntersectsWith(box)) show = false;
+            foreach (var r in _taken) if (show && r.IntersectsWith(box)) show = false;
+            if (show) _turnsShown.Add(box);
+            turn.Visual.Opacity = show ? 1 : 0;
+            turn.At.Matrix = new Matrix(1, 0, 0, 1, x, y);
+        }
     }
 
     private void PlaceNotes(Matrix m, ReplayCar follow)
@@ -999,6 +1043,13 @@ internal sealed class ReplayStage : FrameworkElement
             var text = LapAnalysisView.Text(this, "S" + (i + 2), Ui.Res<Brush>("Heading"), 9.5, bold: true);
             var box = new Rect(-text.Width / 2 - 5, -text.Height / 2 - 2, text.Width + 10, text.Height + 4);
             dc.DrawRectangle(Ui.Res<Brush>("Surface"), Hairline.Pen(Ui.Res<Brush>("LineStrong"), this), box);
+            dc.DrawText(text, new Point(-text.Width / 2, -text.Height / 2));
+        }
+        foreach (var turn in _turns)
+        {
+            using var dc = turn.Visual.RenderOpen();
+            var text = LapAnalysisView.Text(this, turn.Text, Ui.Res<Brush>("TextMuted"), 10);
+            turn.Box = new Size(text.Width + 4, text.Height);
             dc.DrawText(text, new Point(-text.Width / 2, -text.Height / 2));
         }
         int at = _cars.IndexOf(follow);

@@ -208,7 +208,7 @@ internal sealed class RaceHudWidgets
     {
         _heartbeat = Environment.TickCount64;
         if (_preview is null || Selected() is not { } w) return;
-        int hz = Math.Clamp(w.UpdateHz > 0 ? w.UpdateHz : HudCatalog.Find(w.Kind)?.DefaultHz ?? 10, 1, 60);
+        int hz = Math.Clamp(w.UpdateHz > 0 ? w.UpdateHz : HudCatalog.Find(w.Kind) is { } def ? def.Hz(new HudOptions(def, w)) : 10, 1, 60);
         var interval = TimeSpan.FromMilliseconds(1000.0 / hz);
         if (_previewTimer is null)
         {
@@ -437,7 +437,7 @@ internal sealed class RaceHudWidgets
         bgRow.Children.Add(own);
         bgRow.Children.Add(background);
         rows.Add(SettingRows.Row("Own background", "The panel behind the text only; switched off it follows the overlay's Background.", false, bgRow));
-        var rates = new[] { 0, 1, 2, 5, 10, 15, 20, 30, 60 }.Select(r => new Choice(r.ToString(), r == 0 ? $"Default ({def.DefaultHz} per second)" : $"{r} per second"));
+        var rates = new[] { 0, 1, 2, 5, 10, 15, 20, 30, 60 }.Select(r => new Choice(r.ToString(), r == 0 ? def.MovingHz > 0 ? $"Default ({def.DefaultHz} per second, {def.MovingHz} while it moves)" : $"Default ({def.DefaultHz} per second)" : $"{r} per second"));
         rows.Add(SettingRows.Row("Redraw", null, false, Ui.Combo(rates, w.UpdateHz.ToString(), c => { w.UpdateHz = int.Parse(c.Id!); Changed(); }, ComboWidth)));
         var sessions = SettingRows.Toggles(SessionKinds.Select(k => (k, SessionLabel(k), (string?)null)).ToList(),
             kind => w.Sessions.Contains(kind, StringComparer.OrdinalIgnoreCase),
