@@ -236,9 +236,6 @@ public sealed class CompanionAppSettings
 {
     public bool LaunchWithPitBox { get; set; }
 
-    [System.Text.Json.Serialization.JsonPropertyName(LegacyName.LaunchSetting)]
-    public bool? LaunchWithOldName { get => null; set { if (value == true) LaunchWithPitBox = true; } }
-
     public bool LaunchWithIracing { get; set; }
 
     public string? CustomPath { get; set; }

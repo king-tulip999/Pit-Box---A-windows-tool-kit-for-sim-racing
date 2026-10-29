@@ -90,13 +90,7 @@ public partial class App : Application
             Shutdown();
             return;
         }
-        if (!demo && LegacyExe.RenameAndRestart(e.Args))
-        {
-            Shutdown();
-            return;
-        }
         bool tookOverFans = !demo && FanService.StopRunning(TimeSpan.FromSeconds(12));
-        if (!demo && ConfigStore.MoveOldFolder()) StartupManager.MoveOldTask();
 
         DispatcherUnhandledException += OnUiException;
         Dispatcher.BeginInvoke(new Action(() => _starting = false));

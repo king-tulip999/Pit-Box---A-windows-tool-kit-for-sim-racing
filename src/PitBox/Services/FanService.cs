@@ -43,23 +43,7 @@ internal static class FanService
         }
     }
 
-    public static bool StopRunning(TimeSpan wait) => StopOldName(wait) | StopCurrent(wait);
-
-    private static bool StopOldName(TimeSpan wait)
-    {
-        if (!Held(LegacyName.FanMutex)) return false;
-        try
-        {
-            using var stop = EventWaitHandle.OpenExisting(LegacyName.FanStopEvent);
-            stop.Set();
-        }
-        catch { }
-        var until = DateTime.UtcNow + wait;
-        while (Held(LegacyName.FanMutex) && DateTime.UtcNow < until) Thread.Sleep(100);
-        return true;
-    }
-
-    private static bool StopCurrent(TimeSpan wait)
+    public static bool StopRunning(TimeSpan wait)
     {
         if (!IsRunning) return false;
         try

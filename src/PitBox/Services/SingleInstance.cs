@@ -10,11 +10,6 @@ internal static class SingleInstance
 
     public static bool TryAcquire()
     {
-        if (Mutex.TryOpenExisting(Config.LegacyName.AppMutex, out var old))
-        {
-            old.Dispose();
-            return false;
-        }
         _mutex = new Mutex(true, MutexName, out bool created);
         if (!created)
         {
@@ -28,16 +23,13 @@ internal static class SingleInstance
 
     public static void SignalExisting()
     {
-        foreach (var name in new[] { ShowEventName, Config.LegacyName.ShowEvent })
+        try
         {
-            try
-            {
-                using var ev = EventWaitHandle.OpenExisting(name);
-                ev.Set();
-            }
-            catch
-            {
-            }
+            using var ev = EventWaitHandle.OpenExisting(ShowEventName);
+            ev.Set();
+        }
+        catch
+        {
         }
     }
 

@@ -82,20 +82,6 @@ internal static class StartupManager
             """;
     }
 
-    public static void MoveOldTask()
-    {
-        try
-        {
-            if (Schtasks($"/Query /TN \"{Config.LegacyName.Task}\"", out _) != 0) return;
-            Schtasks($"/Delete /TN \"{Config.LegacyName.Task}\" /F", out _);
-            SetEnabled(true);
-        }
-        catch (Exception ex)
-        {
-            App.LogError(ex);
-        }
-    }
-
     private static void RemoveLegacyRunEntry()
     {
         if (_legacyRemoved)

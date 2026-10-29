@@ -22,7 +22,7 @@ internal static class LapFile
     private sealed class Header
     {
         [JsonPropertyName("pitBoxLap")] public int Format { get; set; }
-        [JsonPropertyName(PitBox.Config.LegacyName.LapHeader), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int OldFormat { get; set; }
+        [JsonPropertyName("goodieBagLap"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int OldFormat { get; set; }
         [JsonPropertyName("driver")] public string? Driver { get; set; }
         [JsonPropertyName("car")] public string? Car { get; set; }
         [JsonPropertyName("track")] public string? Track { get; set; }

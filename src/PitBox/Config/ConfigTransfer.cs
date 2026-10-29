@@ -8,7 +8,7 @@ internal sealed record ImportPreview(AppConfig? Config, string? Error, IReadOnly
 internal static class ConfigTransfer
 {
     public const string Header = "pitBoxExport";
-    private const string OldHeader = LegacyName.ExportHeader;
+    private const string OldHeader = "goodieBagExport";
 
     public static string Export(AppConfig config, string appVersion, DateTime now)
     {

@@ -9,39 +9,10 @@ namespace PitBox.Config;
 public static class ConfigStore
 {
     private static readonly string AppData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-    private static readonly string NewFolder = Path.Combine(AppData, "Pit-Box");
-    private static readonly string OldFolder = Path.Combine(AppData, LegacyName.Code);
 
-    public static string Folder { get; private set; } = Directory.Exists(NewFolder) || !Directory.Exists(OldFolder) ? NewFolder : OldFolder;
+    public static string Folder { get; } = Path.Combine(AppData, "Pit-Box");
 
     public static string FilePath => Path.Combine(Folder, "config.json");
-
-    public static bool MoveOldFolder()
-    {
-        if (Folder == NewFolder) return false;
-        try
-        {
-            Directory.Move(OldFolder, NewFolder);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            return false;
-        }
-        Folder = NewFolder;
-        try
-        {
-            if (File.Exists(FilePath))
-            {
-                string json = File.ReadAllText(FilePath);
-                string fixedJson = json.Replace(JsonPath(OldFolder), JsonPath(NewFolder), StringComparison.OrdinalIgnoreCase);
-                if (fixedJson != json) File.WriteAllText(FilePath, fixedJson);
-            }
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
-        return true;
-    }
-
-    private static string JsonPath(string path) => path.Replace("\\", "\\\\");
 
     private static readonly NullabilityInfoContext Nullability = new();
 
