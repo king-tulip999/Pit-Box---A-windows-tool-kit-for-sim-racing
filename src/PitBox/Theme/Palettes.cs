@@ -18,8 +18,8 @@ internal static class Palettes
         ["OnAccent"] = Hex("#FFFFFF"), ["AccentSoft"] = Hex("#EBCDDA"), ["AccentSoftHover"] = Hex("#E4C0D0"), ["AccentText"] = Hex("#8A2250"),
         ["ButtonEdge"] = Hex("#9A876E"),
         ["Sage"] = Hex("#5A8538"), ["SageSoft"] = Hex("#D0E0BD"), ["SageDeep"] = Hex("#2F4D17"),
-        ["Warn"] = Hex("#A66F10"), ["WarnSoft"] = Hex("#EBCB8F"), ["WarnDeep"] = Hex("#5E3E05"),
-        ["Danger"] = Hex("#D92B1F"), ["DangerSoft"] = Hex("#F2B0A6"), ["DangerDeep"] = Hex("#7A0F07"),
+        ["Warn"] = Hex("#A66F10"), ["WarnSoft"] = Hex("#F0D9AA"), ["WarnDeep"] = Hex("#5E3E05"),
+        ["Danger"] = Hex("#D92B1F"), ["DangerSoft"] = Hex("#F7CCC5"), ["DangerDeep"] = Hex("#7A0F07"),
         ["Gold"] = Hex("#DDBE52"), ["GoldSoft"] = Hex("#EAE0C2"), ["GoldDeep"] = Hex("#775B0D"), ["GoldEdge"] = Hex("#BB9B34"), ["OnGold"] = Hex("#2A1F0E"),
         ["Apricot"] = Hex("#E5A870"), ["ApricotSoft"] = Hex("#EBD9C7"), ["ApricotDeep"] = Hex("#8E4F1F"),
         ["Coral"] = Hex("#CC6845"), ["CoralSoft"] = Hex("#EAD3C9"), ["CoralDeep"] = Hex("#99452A"),
@@ -48,7 +48,7 @@ internal static class Palettes
         ["ButtonEdge"] = Hex("#3A3A3A"),
         ["Sage"] = Hex("#5A8538"), ["SageSoft"] = Hex("#1F3314"), ["SageDeep"] = Hex("#BFE09A"),
         ["Warn"] = Hex("#A66F10"), ["WarnSoft"] = Hex("#3A2A0C"), ["WarnDeep"] = Hex("#F2CC80"),
-        ["Danger"] = Hex("#D92B1F"), ["DangerSoft"] = Hex("#5A1512"), ["DangerDeep"] = Hex("#FFC9C2"),
+        ["Danger"] = Hex("#D92B1F"), ["DangerSoft"] = Hex("#451210"), ["DangerDeep"] = Hex("#FFC9C2"),
         ["Gold"] = Hex("#FFC08A"), ["GoldSoft"] = Hex("#2B241F"), ["GoldDeep"] = Hex("#FFD2AD"), ["GoldEdge"] = Hex("#D99A63"), ["OnGold"] = Hex("#1A120A"),
         ["Apricot"] = Hex("#FFC08A"), ["ApricotSoft"] = Hex("#2B241F"), ["ApricotDeep"] = Hex("#FFD2AD"),
         ["Coral"] = Hex("#F07A35"), ["CoralSoft"] = Hex("#2D1D19"), ["CoralDeep"] = Hex("#FF9A5C"),
@@ -179,5 +179,5 @@ internal static class OverlayPresets
     };
 
     public static IReadOnlyList<(Config.OverlayColorPreset Preset, string Label)> All =>
-        Themes.All.Select(t => (Config.OverlayLayout.For(t.Id), t.Name)).Append((Config.OverlayColorPreset.Custom, "Custom")).ToList();
+        Themes.All.Select(t => (Config.OverlayLayout.For(t.Id), t.Name)).ToList();
 }

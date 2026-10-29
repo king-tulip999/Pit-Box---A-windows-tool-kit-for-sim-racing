@@ -8,7 +8,6 @@ internal sealed record ImportPreview(AppConfig? Config, string? Error, IReadOnly
 internal static class ConfigTransfer
 {
     public const string Header = "pitBoxExport";
-    private const string OldHeader = "goodieBagExport";
 
     public static string Export(AppConfig config, string appVersion, DateTime now)
     {
@@ -35,7 +34,7 @@ internal static class ConfigTransfer
 
     private static HashSet<string> BuildKnownSections()
     {
-        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { Header, OldHeader, "windowsmith" };
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { Header, "windowsmith" };
         foreach (var property in JsonSerializer.SerializeToElement(new AppConfig(), ConfigStore.JsonOptions).EnumerateObject())
             names.Add(property.Name);
         return names;
@@ -57,7 +56,7 @@ internal static class ConfigTransfer
                 if (KnownSections.Contains(property.Name)) known++;
             if (known == 0)
                 return Fail(NotSettings);
-            if ((root.TryGetProperty(Header, out var header) || root.TryGetProperty(OldHeader, out header)) && header.ValueKind == JsonValueKind.Object
+            if (root.TryGetProperty(Header, out var header) && header.ValueKind == JsonValueKind.Object
                 && header.TryGetProperty("version", out var version) && version.ValueKind == JsonValueKind.String)
                 savedBy = version.GetString();
         }

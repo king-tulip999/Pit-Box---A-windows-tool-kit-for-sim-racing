@@ -429,7 +429,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         look.Children.Add(new Border { Height = 8 });
         look.Children.Add(new ThemePicker(U.Theme, _app.SetTheme, columns: 2, height: 52, oled: _app.UseOledColors) { Margin = new Thickness(0, 0, -8, 3) });
         look.Children.Add(Ui.Divider());
-        var custom = new CustomThemeSection(_app, _window);
+        var custom = new CustomThemeSection(_app);
         Ui.Anchor(custom, "settings.customcolors");
         look.Children.Add(custom);
         look.Children.Add(Ui.Divider());
@@ -958,8 +958,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         });
         yield return ("custom-colors-on", () =>
         {
-            U.OledCustom.Enabled = true;
-            U.OledCustom.Colors = CustomPalette.Presets[0].Colors.Copy();
+            U.OledCustom.Use(CustomPalette.Presets[0].Name);
             Themes.SetOledCustom(U.OledCustom);
             _app.SetTheme(AppTheme.Custom);
             _window.GoTo("settings", "settings.customcolors", flash: false);
@@ -972,8 +971,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         });
         yield return ("custom-colors-back", () =>
         {
-            U.OledCustom.Enabled = false;
-            U.OledCustom.Colors = new ThemeColors();
+            U.OledCustom.Use(null);
             Themes.SetOledCustom(U.OledCustom);
             _app.SetTheme(theme);
             _window.Navigate("settings");

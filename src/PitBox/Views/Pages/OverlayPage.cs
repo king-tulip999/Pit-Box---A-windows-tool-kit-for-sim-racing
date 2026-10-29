@@ -10,7 +10,6 @@ using PitBox.Controls;
 using PitBox.Overlay;
 using PitBox.Services;
 using PitBox.Theme;
-using WinForms = System.Windows.Forms;
 
 namespace PitBox.Views.Pages;
 
@@ -609,92 +608,22 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
 
     private void BuildColors(StackPanel colors)
     {
-        var custom = new WrapPanel { ItemWidth = 118, Visibility = L.Colors == OverlayColorPreset.Custom ? Visibility.Visible : Visibility.Collapsed, Margin = new Thickness(0, 5, 0, 0) };
         colors.Children.Add(Anchored(Ui.SettingRow("Colors", null,
             ThemeMenu.OverlayButton(
-                () => new ThemeMenu.Pick(L.Colors.IsApp, L.Colors == OverlayColorPreset.Custom, L.Colors.Theme ?? ThemeManager.Current.Id, L.ColorSet),
+                () => new ThemeMenu.Pick(L.Colors.IsApp, false, L.Colors.Theme ?? ThemeManager.Current.Id, L.ColorSet),
                 pick =>
                 {
-                    if (pick.Custom)
-                    {
-                        if (L.Colors != OverlayColorPreset.Custom)
-                        {
-                            var layout = L;
-                            var before = L.Custom;
-                            L.Custom = OverlayPresets.For(L.Colors, L.Custom, L.ColorSet);
-                            if (!SameColors(before, L.Custom))
-                                _app.Notify("Custom colors start from this look", "Your earlier custom colors were replaced.", NoticeKind.Info, action: new NoticeAction("Undo", () =>
-                                {
-                                    layout.Custom = before;
-                                    Changed();
-                                    if (ReferenceEquals(layout, L)) BuildSettings();
-                                }));
-                        }
-                        L.Colors = OverlayColorPreset.Custom;
-                    }
-                    else if (pick.FollowApp) { L.Colors = OverlayColorPreset.App; L.ColorSet = null; }
+                    if (pick.FollowApp) { L.Colors = OverlayColorPreset.App; L.ColorSet = null; }
                     else { L.Colors = OverlayLayout.For(pick.Theme); L.ColorSet = pick.Set; }
                     Wiping(Changed);
                     BuildSettings();
-                }, followApp: true, customLabel: "Custom", minWidth: 162)), "overlay.colors"));
+                }, followApp: true, customLabel: null, minWidth: 162)), "overlay.colors"));
 
-        var c = L.Custom;
-        custom.Children.Add(ColorRow("Main text", () => c.Text, v => c.Text = v));
-        custom.Children.Add(ColorRow("Secondary text", () => c.Secondary, v => c.Secondary = v));
-        custom.Children.Add(ColorRow("Accent (labels)", () => c.Accent, v => c.Accent = v));
-        custom.Children.Add(ColorRow("Background", () => c.Background, v => c.Background = v));
-        custom.Children.Add(ColorRow("Graph", () => c.Graph, v => c.Graph = v));
-        custom.Children.Add(ColorRow("FPS", () => c.Fps, v => c.Fps = v));
-        custom.Children.Add(ColorRow("Warning", () => c.Warning, v => c.Warning = v));
-        custom.Children.Add(ColorRow("Critical", () => c.Critical, v => c.Critical = v));
-        colors.Children.Add(custom);
         _contrast.Style = Ui.Res<Style>("Caption");
         _contrast.Foreground = Ui.Res<Brush>("WarnDeep");
         _contrast.Margin = new Thickness(0, 6, 0, 0);
         colors.Children.Add(Detached(_contrast));
     }
-
-    private StackPanel ColorRow(string label, Func<string> get, Action<string> set)
-    {
-        var swatch = new Button { Width = 24, Height = 21, MinHeight = 0, Padding = new Thickness(0), ToolTip = "Pick a color", Margin = new Thickness(0, 0, 5, 0) };
-        var hex = new TextBox { Width = 78, Text = get() };
-        void Paint()
-        {
-            var color = OverlayRenderer.Parse(get(), System.Drawing.Color.Gray);
-            swatch.Background = new SolidColorBrush(Color.FromRgb(color.R, color.G, color.B));
-        }
-        hex.TextChanged += (_, _) =>
-        {
-            string text = hex.Text.Trim();
-            if (!text.StartsWith('#')) text = "#" + text;
-            if (System.Text.RegularExpressions.Regex.IsMatch(text, "^#[0-9A-Fa-f]{6}$"))
-            {
-                set(text.ToUpperInvariant());
-                Paint();
-                Changed();
-            }
-        };
-        swatch.Click += (_, _) =>
-        {
-            if (!PitBox.Services.External.Allowed("color dialog")) return;
-            var current = OverlayRenderer.Parse(get(), System.Drawing.Color.Gray);
-            using var dialog = new WinForms.ColorDialog { Color = current, FullOpen = true, AnyColor = true };
-            if (dialog.ShowDialog() == WinForms.DialogResult.OK)
-                hex.Text = $"#{dialog.Color.R:X2}{dialog.Color.G:X2}{dialog.Color.B:X2}";
-        };
-        Paint();
-        var controls = new StackPanel { Orientation = Orientation.Horizontal };
-        controls.Children.Add(swatch);
-        controls.Children.Add(hex);
-        var cell = new StackPanel { Margin = new Thickness(0, 3, 6, 5) };
-        cell.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = label, Style = Ui.Res<Style>("Muted"), Margin = new Thickness(0, 0, 0, 3), TextTrimming = TextTrimming.CharacterEllipsis }));
-        cell.Children.Add(controls);
-        return cell;
-    }
-
-    internal static bool SameColors(OverlayColors a, OverlayColors b) =>
-        new[] { (a.Text, b.Text), (a.Secondary, b.Secondary), (a.Accent, b.Accent), (a.Background, b.Background), (a.Graph, b.Graph), (a.Fps, b.Fps), (a.Warning, b.Warning), (a.Critical, b.Critical) }
-            .All(p => string.Equals(p.Item1?.Trim(), p.Item2?.Trim(), StringComparison.OrdinalIgnoreCase));
 
     private void UpdateContrast()
     {
@@ -1058,12 +987,12 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
 
     public IEnumerable<(string Name, Func<Task> Enter)> ScreenshotStates()
     {
-        yield return ("compact-custom", () =>
+        yield return ("compact-color-set", () =>
         {
             L.Style = OverlayStyle.Compact;
             L.ShowGraph = true;
-            L.Colors = OverlayColorPreset.Custom;
-            L.Custom = new OverlayColors { Text = "#EEEEEE", Background = "#D8D8D8" };
+            L.Colors = OverlayLayout.For(AppTheme.Custom);
+            L.ColorSet = "Synthwave";
             Changed();
             BuildSettings();
             return Task.CompletedTask;

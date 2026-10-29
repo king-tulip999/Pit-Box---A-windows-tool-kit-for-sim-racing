@@ -162,14 +162,19 @@ internal sealed class TrayService : IDisposable
             var oled = _app.Config.Ui.OledCustom;
             bool on = ThemeManager.Current.Id == id;
             var item = new ToolStripMenuItem(Themes.For(Config.AppTheme.Custom).Name) { Checked = on };
-            item.DropDownItems.Add(new ToolStripMenuItem("Default", null, (_, _) => _app.UseOledColors(null)) { Checked = on && !oled.InUse });
-            if (!oled.Colors.IsDefault)
-                item.DropDownItems.Add(new ToolStripMenuItem(string.IsNullOrWhiteSpace(oled.Name) ? "Your custom colors" : $"Your custom colors ({oled.Name})", null, (_, _) => _app.UseOledColors("")) { Checked = on && oled.InUse });
-            if (oled.Profiles.Count > 0) item.DropDownItems.Add(new ToolStripSeparator());
-            foreach (var profile in oled.Profiles.ToList())
+            item.DropDownItems.Add(new ToolStripMenuItem("Default", null, (_, _) => _app.UseOledColors(null)) { Checked = on && !oled.Enabled });
+            item.DropDownItems.Add(new ToolStripSeparator());
+            foreach (var family in CustomPalette.Families)
             {
-                string name = profile.Name;
-                item.DropDownItems.Add(new ToolStripMenuItem(name, null, (_, _) => _app.UseOledColors(name)));
+                var group = new ToolStripMenuItem(family);
+                foreach (var preset in CustomPalette.Presets.Where(p => p.Family == family))
+                {
+                    string name = preset.Name;
+                    bool picked = on && oled.Enabled && string.Equals(oled.Name, name, StringComparison.OrdinalIgnoreCase);
+                    group.Checked |= picked;
+                    group.DropDownItems.Add(new ToolStripMenuItem(name, null, (_, _) => _app.UseOledColors(name)) { Checked = picked });
+                }
+                item.DropDownItems.Add(group);
             }
             themes.DropDownItems.Add(item);
         }

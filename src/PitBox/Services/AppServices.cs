@@ -218,44 +218,13 @@ internal sealed class AppServices : IDisposable
 
     internal void SwitchThemeUnsaved(AppTheme theme) => Theme.ThemeManager.Apply(theme);
 
-    public void UseOledColors(string? set)
+    public void UseOledColors(string? preset)
     {
         var c = Config.Ui.OledCustom;
-        if (set is null) c.Enabled = false;
-        else
-        {
-            if (set.Length > 0 && c.Profile(set) is { } profile) ReplaceOledColors(() => { c.Colors = profile.Colors.Copy(); c.Name = profile.Name; });
-            c.Enabled = true;
-        }
-        c.EditingProfile = null;
+        c.Use(preset);
         Theme.Themes.SetOledCustom(c);
         if (Config.Ui.Theme != AppTheme.Custom) { SetTheme(AppTheme.Custom); return; }
         Save();
-        Theme.ThemeManager.Apply(Config.Ui.Theme);
-        Overlay.InvalidateColors();
-    }
-
-    public void ReplaceOledColors(Action replace)
-    {
-        var c = Config.Ui.OledCustom;
-        bool unsaved = c.EditingProfile is null && !c.Colors.IsDefault && !c.Profiles.Any(p => p.Colors.SameAs(c.Colors));
-        var (colors, name) = (c.Colors.Copy(), c.Name);
-        replace();
-        if (!unsaved || c.Colors.SameAs(colors)) return;
-        Notify("Your custom colors were replaced", "They weren't saved as a set.", NoticeKind.Info, action: new NoticeAction("Undo", () =>
-        {
-            c.Colors = colors;
-            c.Name = name;
-            c.EditingProfile = null;
-            OledCustomChanged();
-        }));
-    }
-
-    public void OledCustomChanged()
-    {
-        Theme.Themes.SetOledCustom(Config.Ui.OledCustom);
-        Save();
-        if (Config.Ui.Theme != AppTheme.Custom) return;
         Theme.ThemeManager.Apply(Config.Ui.Theme);
         Overlay.InvalidateColors();
     }

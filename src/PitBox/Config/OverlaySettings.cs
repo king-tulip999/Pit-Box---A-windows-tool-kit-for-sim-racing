@@ -174,6 +174,12 @@ public sealed class OverlayLayout
             .ToDictionary(p => p.Key, p => p.Value.Trim().Length > 24 ? p.Value.Trim()[..24] : p.Value.Trim()), StringComparer.OrdinalIgnoreCase);
         MetricTags = (MetricTags ?? new()).Where(p => Enum.IsDefined(p.Key)).ToDictionary(p => p.Key, p => (p.Value ?? "").Trim().Length > 16 ? p.Value!.Trim()[..16] : (p.Value ?? "").Trim());
         Colors = OverlayColorPreset.Named(Colors.Id);
+        if (Colors == OverlayColorPreset.Custom)
+        {
+            Colors = OverlayColorPreset.App;
+            ColorSet = null;
+            Custom = new();
+        }
     }
 
     public static OverlayColorPreset For(AppTheme theme) => OverlayColorPreset.For(theme);

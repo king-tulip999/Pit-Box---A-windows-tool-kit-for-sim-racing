@@ -219,12 +219,8 @@ public sealed class UiSettings
     {
         bool onPastel = ui.Theme == OldPastelTheme;
         if (onPastel) ui.Theme = AppTheme.Custom;
-        if (onPastel && !ui.OledCustom.InUse && PitBox.Theme.CustomPalette.Preset(ui.PastelPreset ?? "Pastel") is { } colors)
-        {
-            ui.OledCustom.Colors = colors.Copy();
-            ui.OledCustom.Name = PitBox.Theme.CustomPalette.Presets.First(p => p.Colors == colors).Name;
-            ui.OledCustom.Enabled = true;
-        }
+        if (onPastel && !ui.OledCustom.InUse && PitBox.Theme.CustomPalette.Preset(ui.PastelPreset ?? "Pastel") is not null)
+            ui.OledCustom.Use(ui.PastelPreset ?? "Pastel");
         ui.PastelPreset = null;
     }
 

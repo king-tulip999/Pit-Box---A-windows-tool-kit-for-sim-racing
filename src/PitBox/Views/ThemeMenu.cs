@@ -86,26 +86,16 @@ internal static class ThemeMenu
         var c = Oled;
         var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom, MinWidth = Math.Max(220, anchor.ActualWidth) };
         Ui.DropBelow(menu);
-        bool usingCustom = c?.InUse == true;
-        var own = new MenuItem { Header = Header("Default", Themes.Custom), IsChecked = ThemeManager.Current.Id == AppTheme.Custom && !usingCustom };
+        bool on = ThemeManager.Current.Id == AppTheme.Custom;
+        var own = new MenuItem { Header = Header("Default", Themes.Custom), IsChecked = on && c?.Enabled != true };
         own.Click += (_, _) => use(null);
         menu.Items.Add(own);
-        if (c is not null && !c.Colors.IsDefault)
+        var item = new MenuItem();
+        AddSets(item, name => on && c?.Enabled == true && string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase), name => use(name));
+        foreach (var family in item.Items.Cast<object>().ToList())
         {
-            var mine = new MenuItem
-            {
-                Header = Header(string.IsNullOrWhiteSpace(c.Name) ? "Your custom colors" : $"Your custom colors ({c.Name})", Themes.Custom with { Colors = CustomPalette.Build(c.Colors) }),
-                IsChecked = ThemeManager.Current.Id == AppTheme.Custom && usingCustom,
-            };
-            mine.Click += (_, _) => use("");
-            menu.Items.Add(mine);
-        }
-        foreach (var profile in (c?.Profiles ?? new List<ThemeColorProfile>()).ToList())
-        {
-            var p = profile;
-            var item = new MenuItem { Header = Header(p.Name, Themes.Custom with { Colors = CustomPalette.Build(p.Colors) }) };
-            item.Click += (_, _) => use(p.Name);
-            menu.Items.Add(item);
+            item.Items.Remove(family);
+            menu.Items.Add(family);
         }
         menu.IsOpen = true;
     }
@@ -113,15 +103,17 @@ internal static class ThemeMenu
     private static void AddSets(MenuItem into, Func<string, bool> isChecked, Action<string> pick)
     {
         into.Items.Add(new Separator());
-        var profiles = Oled?.Profiles ?? new List<ThemeColorProfile>();
-        if (profiles.Count == 0)
-            into.Items.Add(new MenuItem { Header = "No saved colors yet (Settings → Appearance → Custom colors)", IsEnabled = false });
-        foreach (var profile in profiles.ToList())
+        foreach (var family in CustomPalette.Families)
         {
-            var p = profile;
-            var item = new MenuItem { Header = Header(p.Name, Themes.Custom with { Colors = CustomPalette.Build(p.Colors) }), IsChecked = isChecked(p.Name) };
-            item.Click += (_, _) => pick(p.Name);
-            into.Items.Add(item);
+            var group = new MenuItem { Header = family };
+            foreach (var (name, _, _) in CustomPalette.Presets.Where(p => p.Family == family))
+            {
+                var item = new MenuItem { Header = Header(name, Themes.ForSet(AppTheme.Custom, name)), IsChecked = isChecked(name) };
+                item.Click += (_, _) => pick(name);
+                group.IsChecked |= item.IsChecked;
+                group.Items.Add(item);
+            }
+            into.Items.Add(group);
         }
     }
 

@@ -2,11 +2,6 @@ namespace PitBox.Config;
 
 internal static class ConfigReferences
 {
-    public static void ColorSet(AppConfig config, string oldName, string? newName)
-    {
-        foreach (var l in config.Overlay.Layouts) l.ColorSet = Follow(l.ColorSet, oldName, newName);
-    }
-
     public static void FanCurve(AppConfig config, string oldName, string? newName)
     {
         foreach (var e in config.Fans.Presets.SelectMany(p => p.Fans).Where(e => Same(e.CurveName, oldName)))
@@ -35,7 +30,7 @@ internal static class ConfigReferences
         var presets = config.Fans.Presets.Select(p => p.Name).ToList();
         var curves = config.Fans.Curves.Select(c => c.Name).ToList();
         var layouts = config.Overlay.Layouts.Select(l => l.Name).ToList();
-        var colorSets = config.Ui.OledCustom.Profiles.Select(p => p.Name).Append(Theme.Themes.OledDefaultSet).ToList();
+        var colorSets = Theme.CustomPalette.Presets.Select(p => p.Name).Append(Theme.Themes.OledDefaultSet).ToList();
         if (presets.Count > 0) Check("active fan preset", config.Fans.ActivePreset, presets);
         var groups = config.WindowProfiles.Groups.Select(g => g.Id).ToList();
         foreach (var w in config.WindowProfiles.Profiles)
@@ -49,7 +44,6 @@ internal static class ConfigReferences
         if (layouts.Count > 0) Check("active overlay layout", config.Overlay.ActiveLayout, layouts);
         foreach (var l in config.Overlay.Layouts)
             Check($"overlay layout “{l.Name}” color set", l.ColorSet, colorSets);
-        Check("color set being edited", config.Ui.OledCustom.EditingProfile, colorSets);
         if (config.SimRacing.Hud is { } hud)
         {
             var hudLayouts = hud.Layouts.Select(l => l.Name).ToList();
@@ -60,6 +54,4 @@ internal static class ConfigReferences
     }
 
     private static bool Same(string? a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
-
-    private static string? Follow(string? value, string oldName, string? newName) => Same(value, oldName) ? newName : value;
 }

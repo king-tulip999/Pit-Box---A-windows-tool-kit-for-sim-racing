@@ -8,15 +8,30 @@ public sealed class CustomThemeSettings
 
     public ThemeColors Colors { get; set; } = new();
 
-    public List<ThemeColorProfile> Profiles { get; set; } = new();
-
-    public string? EditingProfile { get; set; }
-
     [System.Text.Json.Serialization.JsonIgnore]
     public bool InUse => Enabled && !Colors.IsDefault;
 
-    public ThemeColorProfile? Profile(string? name) =>
-        name is null ? null : Profiles.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+    public void Use(string? preset)
+    {
+        if (PitBox.Theme.CustomPalette.Preset(preset) is { } colors)
+        {
+            Colors = colors.Copy();
+            Name = PitBox.Theme.CustomPalette.NameOf(colors);
+            Enabled = true;
+        }
+        else
+        {
+            Colors = new();
+            Name = null;
+            Enabled = false;
+        }
+    }
+
+    public void Normalize()
+    {
+        string? preset = PitBox.Theme.CustomPalette.NameOf(Colors);
+        Use(Enabled ? preset : null);
+    }
 }
 
 public sealed class ThemeColors
@@ -40,10 +55,4 @@ public sealed class ThemeColors
 
     [System.Text.Json.Serialization.JsonIgnore]
     public bool IsDefault => SameAs(Default);
-}
-
-public sealed class ThemeColorProfile
-{
-    public string Name { get; set; } = "";
-    public ThemeColors Colors { get; set; } = new();
 }

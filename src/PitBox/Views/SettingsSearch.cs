@@ -82,7 +82,7 @@ internal static class SettingsIndex
         new("Open on", "The page Pit-Box opens on when it starts.", "Settings", "settings", "settings.startpage", "start page startup page default page home first page open last page used"),
         new("Keep on top", "Keep the window above other windows.", "Settings", "settings", "settings.ontop", "always on top pin topmost float"),
         new("Theme", "Light, Dark, Custom (your own colors and name, or a preset such as Pastel), and GRR (with the GRR League plugin on); animations.", "Settings", "settings", "settings.look", "soft 2048 vanilla custom oled pastel dark mode light black color color animation appearance grr"),
-        new("Custom colors", "Your own colors for the Custom theme: presets, saved sets, the theme's name.", "Settings", "settings", "settings.customcolors", "custom color color oled theme preset palette accent background name profile"),
+        new("Custom colors", "Color sets for the Custom theme: pastel, neon, glow, night, nature, warm, racing, mono.", "Settings", "settings", "settings.customcolors", "custom color color oled theme preset palette accent background pastel neon cyberpunk glow"),
         new("Hardware access", "Admin rights and sensor driver status.", "Settings", "settings", "settings.access", "admin driver"),
         new("Tools", "Turn optional tools on or off.", "Settings", "settings", "settings.plugins", "module feature enable plugin plugins tools on off"),
     };

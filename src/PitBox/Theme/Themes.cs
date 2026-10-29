@@ -122,8 +122,8 @@ internal static class Themes
     {
         if (id != AppTheme.Custom || string.IsNullOrEmpty(set)) return For(id);
         if (set == OledDefaultSet) return Custom;
-        if (Services.AppServices.Current?.Config.Ui.OledCustom.Profile(set) is not { } profile) return For(id);
-        return Custom with { Name = profile.Name, Colors = CustomPalette.Build(profile.Colors), Dark = CustomPalette.IsDark(profile.Colors) };
+        if (CustomPalette.Preset(set) is not { } colors) return For(id);
+        return Custom with { Name = CustomPalette.NameOf(colors)!, Colors = CustomPalette.Build(colors), Dark = CustomPalette.IsDark(colors) };
     }
 
     public const string DefaultCustomName = "Custom";

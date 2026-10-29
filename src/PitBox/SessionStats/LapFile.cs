@@ -14,15 +14,14 @@ internal sealed record SharedLapInfo(long Id, string Driver, string Car, string 
 
 internal static class LapFile
 {
-    public const string Extension = ".gblap";
-    public const string Filter = "Pit-Box lap (*.gblap)|*.gblap";
+    public const string Extension = ".pblap";
+    public const string Filter = "Pit-Box lap (*.pblap)|*.pblap";
     private const int Format = 1;
     private const long MaxBytes = 32 << 20;
 
     private sealed class Header
     {
         [JsonPropertyName("pitBoxLap")] public int Format { get; set; }
-        [JsonPropertyName("goodieBagLap"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int OldFormat { get; set; }
         [JsonPropertyName("driver")] public string? Driver { get; set; }
         [JsonPropertyName("car")] public string? Car { get; set; }
         [JsonPropertyName("track")] public string? Track { get; set; }
@@ -63,7 +62,6 @@ internal static class LapFile
                 header = JsonSerializer.Deserialize<Header>(s);
             }
             catch (JsonException) { throw new InvalidDataException("This isn't a Pit-Box lap file."); }
-            if (header is not null && header.Format <= 0) header.Format = header.OldFormat;
             if (header is null || header.Format <= 0) throw new InvalidDataException("This isn't a Pit-Box lap file.");
             if (header.Format > Format) throw new InvalidDataException("This lap was saved by a newer Pit-Box. Update to open it.");
             if (string.IsNullOrWhiteSpace(header.Track) || string.IsNullOrWhiteSpace(header.Car)) throw new InvalidDataException("The file doesn't say which car and track the lap is from.");
