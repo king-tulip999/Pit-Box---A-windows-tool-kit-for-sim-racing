@@ -833,10 +833,16 @@ internal static class Ui
     public static Border Chip(string text, string? soft = null, string? deep = null)
     {
         var chip = new Tile { Style = Res<Style>("Chip"), Child = TextFit.TipWhenTrimmed(new TextBlock { Text = ThemeManager.Case(text), TextTrimming = TextTrimming.CharacterEllipsis }) };
-        if (soft is not null) { chip.Background = Res<Brush>(soft); chip.BorderBrush = Res<Brush>(ThemeManager.Current.Glow && deep is not null ? deep : soft); }
+        if (soft is not null) { chip.Background = Res<Brush>(soft); chip.BorderBrush = Res<Brush>(ChipEdge(soft)); }
         if (deep is not null) ((TextBlock)chip.Child).Foreground = Res<Brush>(deep);
         if (soft == "DangerSoft") Danger(chip, (TextBlock)chip.Child, 9);
         return chip;
+    }
+
+    private static string ChipEdge(string soft)
+    {
+        string family = soft.EndsWith("Soft", StringComparison.Ordinal) ? soft[..^4] : soft;
+        return Application.Current.TryFindResource(family) is Brush ? family : soft;
     }
 
     public static void Danger(Border tile, TextBlock text, double iconSize = 11)

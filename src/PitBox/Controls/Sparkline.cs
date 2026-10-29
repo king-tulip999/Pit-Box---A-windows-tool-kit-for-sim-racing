@@ -12,7 +12,7 @@ public sealed class Sparkline : FrameworkElement
     private Brush? _fill;
 
     public int Capacity { get; set; } = 60;
-    public Brush Stroke { get; set; } = ThemeManager.Brush("Accent", Brushes.SteelBlue);
+    public Brush Stroke { get; set; } = ThemeManager.Brush("Graph", Brushes.SteelBlue);
 
     public double? Min { get; set; }
     public double? Max { get; set; }
@@ -145,7 +145,7 @@ public sealed class Meter : FrameworkElement
         set => SetValue(ValueProperty, value);
     }
 
-    public Brush Fill { get; set; } = ThemeManager.Brush("Accent", Brushes.SteelBlue);
+    public Brush Fill { get; set; } = ThemeManager.Brush("Mono", Brushes.SteelBlue);
 
     public bool Tiered { get; set; }
 
@@ -164,12 +164,6 @@ public sealed class Meter : FrameworkElement
     private Geometry? _fill;
     private Brush? _penBrush;
     private Pen? _pen;
-
-    private static Brush FillFor(Brush edge)
-    {
-        var fill = ThemeManager.Brush("MeterFill", Brushes.SteelBlue);
-        return fill is SolidColorBrush f && edge is SolidColorBrush e && f.Color == e.Color ? ThemeManager.Brush("Accent", Brushes.SteelBlue) : fill;
-    }
 
     protected override void OnRender(DrawingContext dc)
     {
@@ -229,7 +223,7 @@ public sealed class Meter : FrameworkElement
         double fw = value * inner.Width;
         if (fw <= 0.5) return;
         double end = Math.Max(inner.Height, fw);
-        var fill = FillFor(edge);
+        var fill = ThemeManager.Brush("MeterFill", Brushes.SteelBlue);
         if (cut > 0)
         {
             double icut = Math.Max(0, cut - Pad * (2 - Math.Sqrt(2)));

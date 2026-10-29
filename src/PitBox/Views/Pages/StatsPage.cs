@@ -1734,7 +1734,7 @@ internal static class StatsCharts
                 dc.DrawText(label, new Point(Math.Clamp(x - label.Width / 2, Left - 20, w - label.Width), h - Bottom + 6));
             }
 
-            var accent = Ui.Res<Brush>("Accent");
+            var accent = Ui.Res<Brush>("Graph");
             var steps = new StreamGeometry();
             using (var g = steps.Open())
             {
@@ -1792,8 +1792,8 @@ internal static class StatsCharts
             var (lo, hi, step) = LapScale(_sessions.Min(s => s.Best), _sessions.Max(s => s.P90));
             var y = LapAxis(dc, lo, hi, step);
             double slot = Slot, box = Math.Clamp(slot * 0.5, 4, 22);
-            var accent = Ui.Res<Brush>("Accent");
-            var soft = Ui.Res<Brush>("AccentSoft");
+            var accent = Ui.Res<Brush>("Graph");
+            var soft = Ui.Res<Brush>("GraphSoft");
             var whisker = new Pen(Ui.Res<Brush>("TextMuted"), 1.5);
             var edge = new Pen(accent, 1.5);
             var median = new Pen(Ui.Res<Brush>("Heading"), 2);
@@ -1874,8 +1874,8 @@ internal static class StatsCharts
                 dc.DrawText(label, new Point(Left - 8 - label.Width, yy - label.Height / 2));
             }
             double slot = Slot, bar = Math.Max(2, slot * 0.66);
-            var accent = Ui.Res<Brush>("Accent");
-            var hover = Ui.Res<Brush>("AccentText");
+            var accent = Ui.Res<Brush>("Graph");
+            var hover = Ui.Res<Brush>("GraphText");
             for (int i = 0; i < _bins.Count; i++)
             {
                 if (_bins[i].Seconds <= 0) continue;

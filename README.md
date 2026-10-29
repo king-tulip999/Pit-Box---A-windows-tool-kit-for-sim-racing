@@ -12,7 +12,7 @@ Every tool can be switched off, and when one's off it runs nothing in the backgr
 
 #### iRacing Overlay
 
-[![Watch the iRacing Overlay showcase](screenshots/hud-showcase.jpg)](screenshots/hud-showcase.mp4)
+[![Watch the iRacing Overlay showcase](screenshots/hud-showcase.jpg)](https://www.youtube.com/watch?v=PLWhXW9Hh0A)
 
 Relative, Standings, Fuel and strategy, Lap timing and delta, Lap history, Tires, Weather and track, Wind, Session, Race events, Multiclass traffic, Alerts, Track map, a Result card after the race and a Data block for any single value. Every widget can be set up however you like, with layouts that switch by car / class / track, and an in-game editor (`Ctrl+Alt+E`) so you never have to leave the car.
 

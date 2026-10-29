@@ -199,8 +199,6 @@ public sealed class UiSettings
 
     public bool Animations { get; set; } = true;
 
-    public bool TrackCars { get; set; } = true;
-
     public bool TrayTipShown { get; set; }
 
     public bool HidePawnIoPrompt { get; set; }

@@ -25,6 +25,8 @@ internal sealed record ThemeSpec
     public double Radius { get; init; }
     public double PanelOpacity { get; init; } = 0.85;
     public double SidebarOpacity { get; init; } = 0.6;
+    public System.Windows.Media.Color? BackdropBg { get; init; }
+    public System.Windows.Media.Color? BackdropLine { get; init; }
     public double SwitchRadius { get; init; } = 11;
     public double KnobRadius { get; init; } = 8;
     public double ChipRadius { get; init; }
@@ -38,13 +40,6 @@ internal sealed record ThemeSpec
     public Thickness LogoEdge { get; init; }
     public double CardChamfer { get; init; }
     public double ControlChamfer { get; init; }
-
-    public string CircuitInk { get; init; } = "Slate";
-    public string CircuitLine { get; init; } = "Accent";
-    public string CircuitApex { get; init; } = "AccentText";
-    public string CircuitGold { get; init; } = "Gold";
-    public double CircuitBoost { get; init; } = 1;
-    public double CircuitGlow { get; init; }
 
     public bool RacingDecor { get; init; }
     public double FocusOffset { get; init; } = 1;
@@ -69,7 +64,6 @@ internal static class Themes
     {
         Id = AppTheme.Light, Name = "Light", Dark = false, Colors = Palettes.Light, Partner = AppTheme.Dark,
         Outline = "ButtonEdge",
-        CircuitInk = "SlateDeep", CircuitGold = "GoldDeep", CircuitBoost = 1.35,
     };
 
     private static readonly Thickness Hairline = new(1);
@@ -79,6 +73,7 @@ internal static class Themes
         Id = AppTheme.Dark, Name = "Dark", Dark = true, Colors = Palettes.Dark, Partner = AppTheme.Light,
         CardEdge = Hairline, LogoEdge = new(0),
         StepsClimb = false, Outline = "ScrollThumbBrushDrag",
+        BackdropBg = Palettes.Hex("#0A0D16"), BackdropLine = Palettes.Hex("#171925"),
     };
 
     public static readonly ThemeSpec Custom = new()
@@ -86,7 +81,6 @@ internal static class Themes
         Id = AppTheme.Custom, Name = DefaultCustomName, Dark = true, Colors = CustomPalette.Default, Partner = AppTheme.Light,
         CardEdge = Hairline, LogoEdge = new(1.5),
         Glow = true, GlowStrength = 0.45, StepsClimb = false,
-        CircuitInk = "AccentText", CircuitLine = "Slate", CircuitApex = "SlateDeep", CircuitBoost = 1.1, CircuitGlow = 5,
     };
 
     public static readonly ThemeSpec[] BuiltIn = { Light, Dark, Custom };

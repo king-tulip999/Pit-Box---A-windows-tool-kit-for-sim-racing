@@ -20,6 +20,10 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
+            <!-- every theme: contour lines (Assets/BackdropLines.png, a mask recoloured per theme) with short accent streaks running
+                 along them (Assets/BackdropPaths.bin), behind the whole window; the sidebar shows a blurred copy (GlassPane) -->
+            <v:TopographyBackdrop x:Name="Backdrop" Grid.RowSpan="2" />
+
             <!-- title bar (draggable; buttons opt out of the caption area) -->
             <DockPanel x:Name="TitleBar" Grid.Row="0" LastChildFill="False">
                 <!-- left: the brand (just the mark, not a button) and, while a newer version is available, the update badge.
@@ -75,11 +79,6 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <!-- every theme: a plan drawing of a circuit section (Theme/CircuitPlan.cs, Theme/CircuitArt.cs) behind the page and
-                     the see-through sidebar, filling the body from the bottom-right and fading towards the top-left; cards are opaque,
-                     so it shows in the gaps. The drawing is cached as a bitmap; the cars lapping it (UiSettings.TrackCars) are separate
-                     small visuals. -->
-                <v:CircuitBackdrop x:Name="Circuit" Grid.ColumnSpan="3" Margin="0,0,12,6" />
                 <ContentControl x:Name="SidebarHost" Grid.Column="0" Focusable="False" Margin="13,11,0,13" />
                 <Grid x:Name="PageArea" Grid.Column="1" ClipToBounds="True">
                     <ContentControl x:Name="PageContent" Focusable="False">

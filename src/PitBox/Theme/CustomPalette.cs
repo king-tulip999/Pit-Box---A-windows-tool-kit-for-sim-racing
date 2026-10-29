@@ -89,7 +89,10 @@ internal static class CustomPalette
         var pressed = Dark(accent, 0.23);
         if (ThemeManager.Contrast(onAccent, pressed) < 4.5) pressed = Dark(accent, 0.12);
         p["Accent"] = p["AccentEdge"] = p["PrimaryEdge"] = p["PrimaryHover"] = p["SwitchOnBorder"] = p["SwitchOnKnob"] = p["LogoFg"] = p["LogoEdge"] = accent;
-        p["Meter1"] = p["Meter2"] = p["Meter3"] = accent;
+        p["Mono"] = p["Meter1"] = p["Meter2"] = p["Meter3"] = M(bg, text, 0.8);
+        p["Graph"] = hi;
+        p["GraphSoft"] = M(bg, hi, 0.2);
+        p["GraphText"] = darkBg ? Light(hi, 0.55) : Dark(hi, 0.5);
         p["AccentHover"] = Light(accent, 0.18);
         p["AccentPressed"] = p["PrimaryPressed"] = p["ScrollThumbBrushDrag"] = pressed;
         p["OnAccent"] = p["PrimaryHoverFg"] = onAccent;
@@ -108,23 +111,26 @@ internal static class CustomPalette
         p["SlateDeep"] = darkBg ? Light(hi, 0.35) : Dark(hi, 0.45);
         p["EyebrowText"] = M(bg, hi, 0.78);
 
-        p["Sage"] = p["SageDeep"] = ok;
-        p["SageSoft"] = M(bg, ok, 0.1);
-        p["Warn"] = p["WarnDeep"] = p["Gold"] = p["Apricot"] = p["Meter4"] = warn;
-        p["WarnSoft"] = p["GoldSoft"] = p["ApricotSoft"] = M(bg, warn, 0.14);
+        p["Sage"] = ok;
+        p["SageSoft"] = M(bg, ok, 0.2);
+        p["SageDeep"] = darkBg ? Light(ok, 0.45) : Dark(ok, 0.45);
+        p["Warn"] = p["Gold"] = p["Apricot"] = p["Meter4"] = warn;
+        p["WarnSoft"] = M(bg, warn, 0.2);
+        p["WarnDeep"] = darkBg ? Light(warn, 0.45) : Dark(warn, 0.5);
+        p["GoldSoft"] = p["ApricotSoft"] = M(bg, warn, 0.14);
         p["GoldDeep"] = p["ApricotDeep"] = Light(warn, 0.2);
         p["GoldEdge"] = Dark(warn, 0.2);
         p["OnGold"] = M(Colors.Black, warn, 0.1);
         p["Danger"] = p["Meter5"] = bad;
-        p["DangerSoft"] = M(bg, bad, 0.16);
-        p["DangerDeep"] = Light(bad, 0.3);
+        p["DangerSoft"] = M(bg, bad, 0.24);
+        p["DangerDeep"] = Light(bad, 0.55);
         p["CloseHover"] = Dark(bad, 0.12);
         p["OnDanger"] = M(Colors.Black, bad, 0.1);
 
         if (!darkBg)
         {
             p["AccentText"] = p["PrimaryFg"] = p["MetricText"] = ReadableOn(accent, bg);
-            p["DangerDeep"] = Dark(bad, 0.3);
+            p["DangerDeep"] = Dark(bad, 0.5);
             p["GoldDeep"] = p["ApricotDeep"] = Dark(warn, 0.35);
             p["Dim"] = Color.FromArgb(0x80, 0, 0, 0);
         }

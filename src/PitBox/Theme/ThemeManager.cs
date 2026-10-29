@@ -91,7 +91,7 @@ internal static class ThemeManager
             res[$"Tool{i + 1}Soft"] = Freeze(new SolidColorBrush(tints[i].Soft));
             res[$"Tool{i + 1}Deep"] = Freeze(new SolidColorBrush(tints[i].Deep));
         }
-        res["MeterFill"] = Freeze(new SolidColorBrush(MeterFillColor));
+        res["MeterFill"] = res["Mono"];
         res["TimingBest"] = Freeze(new SolidColorBrush(spec.Dark ? TimingBestDark : TimingBestLight));
         RaceLook.Install(spec, p, res);
         res["Changed"] = res["Accent"];
@@ -117,9 +117,6 @@ internal static class ThemeManager
         res["FocusRingGapMargin"] = new Thickness(-gap);
         res["FocusRingOutset"] = gap + 2;
         res["FocusRingMargin"] = new Thickness(-(gap + 2));
-
-        res["CircuitDrawing"] = CircuitArt.Drawing(spec, p);
-        res["CircuitCars"] = CircuitArt.Cars(spec, p);
 
         res["RacingVisibility"] = spec.RacingDecor ? Visibility.Visible : Visibility.Collapsed;
         res["RacingFade"] = Fade;
@@ -154,8 +151,6 @@ internal static class ThemeManager
         Color.FromRgb(0xE5, 0x48, 0x4D), Color.FromRgb(0x30, 0xA4, 0x6C), Color.FromRgb(0xF0, 0x74, 0x3A),
         Color.FromRgb(0x14, 0xB8, 0xC9),
     };
-
-    internal static readonly Color MeterFillColor = Color.FromRgb(0x6F, 0xD9, 0xA3);
 
     internal static readonly Color TimingBestDark = Color.FromRgb(0xB9, 0x7C, 0xFF), TimingBestLight = Color.FromRgb(0x7E, 0x3F, 0xD0);
 
@@ -212,7 +207,7 @@ internal static class ThemeManager
 
     private static readonly string[] MeterKeys = { "Meter1", "Meter2", "Meter3", "Meter4", "Meter5" };
 
-    public static Brush StepBrush(double position) => Current.StepsClimb ? RampBrush(position) : Brush("Accent", Brushes.Orange);
+    public static Brush StepBrush(double position) => Current.StepsClimb ? RampBrush(position) : Brush("Mono", Brushes.Orange);
 
     private static Typeface? _ui, _uiBold, _display;
 

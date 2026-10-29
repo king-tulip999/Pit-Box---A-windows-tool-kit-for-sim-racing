@@ -37,7 +37,7 @@ public partial class MainWindow : Window
     {
         _app = app;
         InitializeComponent();
-        SidebarHost.Content = _sidebar;
+        SidebarHost.Content = new Grid { Children = { new GlassPane(Backdrop), _sidebar } };
         _sidebar.PageClicked += Navigate;
         _sidebar.SectionClicked += OpenSection;
         _sidebar.PagesMoved += keys => SetNavOrder(keys);

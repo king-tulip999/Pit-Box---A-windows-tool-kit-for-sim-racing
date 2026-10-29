@@ -537,8 +537,8 @@ internal static class StatsSessionView
                 }
                 runStart = i;
             }
-            var accent = Ui.Res<Brush>("AccentText");
-            var line = new Pen(Ui.Res<Brush>("Accent"), 1.5) { LineJoin = PenLineJoin.Round };
+            var accent = Ui.Res<Brush>("GraphText");
+            var line = new Pen(Ui.Res<Brush>("Graph"), 1.5) { LineJoin = PenLineJoin.Round };
             var hollow = new Pen(Ui.Res<Brush>("TextMuted"), 1.5);
             Point P(int i) => new(X(i), Math.Max(Top, y(Math.Min(_hi, _laps[i].Time))));
             var geo = new StreamGeometry();

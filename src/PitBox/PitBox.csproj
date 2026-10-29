@@ -55,6 +55,8 @@
     <Resource Include="Assets\PitBox.ico" />
     <Resource Include="Assets\Themes\*.ico" />
     <Resource Include="Assets\OverlayPreview.jpg" />
+    <Resource Include="Assets\BackdropLines.png" />
+    <Resource Include="Assets\BackdropPaths.bin" />
     <!-- the GRR theme: Barlow (SIL Open Font License, the licence text beside the fonts) and the GRR logo -->
     <Resource Include="Assets\Fonts\**" />
     <Resource Include="Assets\GrrLogo.png" />

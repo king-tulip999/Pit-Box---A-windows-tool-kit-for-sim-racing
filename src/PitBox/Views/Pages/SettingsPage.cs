@@ -437,25 +437,10 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         string animationNote = SystemParameters.ClientAreaAnimation
             ? "Page transitions, card entrances, spinning fan icons. Nothing animates while Pit-Box is in the tray." + (PcClass.Weak ? " This PC gets a lighter version: 30 frames a second, no blur." : "")
             : "Windows' “Animation effects” setting is off, so animations stay off.";
-        var anim = Ui.Switch(U.Animations, v => { U.Animations = v; _app.Save(); NavIcon.RefreshAll(); CircuitBackdrop.RefreshCars(); });
+        var anim = Ui.Switch(U.Animations, v => { U.Animations = v; _app.Save(); NavIcon.RefreshAll(); Motion.Refresh(); });
         anim.IsEnabled = SystemParameters.ClientAreaAnimation;
         look.Children.Add(Ui.SettingRow("Animations", animationNote, anim,
-            SystemParameters.ClientAreaAnimation ? new Ui.SettingDefault(() => U.Animations, () => { U.Animations = true; _app.Save(); NavIcon.RefreshAll(); CircuitBackdrop.RefreshCars(); Build(); }, "On") : null));
-        look.Children.Add(Ui.Divider());
-        void SetCars(bool on)
-        {
-            U.TrackCars = on;
-            _app.Save();
-            CircuitBackdrop.RefreshCars();
-        }
-        var cars = Ui.Switch(U.TrackCars, SetCars);
-        cars.IsEnabled = U.Animations && SystemParameters.ClientAreaAnimation;
-        var carsRow = Ui.SettingRow("Moving cars", U.Animations && SystemParameters.ClientAreaAnimation
-                ? "Cars lap the track drawn behind the pages. They pause while another window is active."
-                : "Off while animations are off.", cars,
-            new Ui.SettingDefault(() => U.TrackCars, () => { SetCars(true); Build(); }, "On"));
-        Ui.Anchor(carsRow, "settings.cars");
-        look.Children.Add(carsRow);
+            SystemParameters.ClientAreaAnimation ? new Ui.SettingDefault(() => U.Animations, () => { U.Animations = true; _app.Save(); NavIcon.RefreshAll(); Motion.Refresh(); Build(); }, "On") : null));
     }
 
     private TextBlock? _rateNote;
