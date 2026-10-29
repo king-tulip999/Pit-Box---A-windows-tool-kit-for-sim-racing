@@ -255,7 +255,7 @@ internal sealed partial class RaceHudWidgets
             var row = new DockPanel { LastChildFill = true };
             if (widget is { } w)
             {
-                var shown = Ui.Switch(w.Enabled, v => { w.Enabled = v; _toggled = (w.Id, v); Changed(); Fill(); });
+                var shown = Ui.Switch(w.Enabled, v => { w.Enabled = v; Changed(); Fill(); });
                 shown.ToolTip = w.Enabled ? "Shown: switch off to hide this widget" : "Hidden: switch on to show this widget";
                 shown.Margin = new Thickness(8, 0, 0, 0);
                 shown.VerticalAlignment = VerticalAlignment.Center;
@@ -311,7 +311,7 @@ internal sealed partial class RaceHudWidgets
         if (_preview is not null && Selected() is { } shown2)
         {
             DrawPreview(shown2);
-            FoldPreview(shown2);
+            ShowPreviewHidden(shown2);
         }
         if (_reveal is { } reveal)
         {

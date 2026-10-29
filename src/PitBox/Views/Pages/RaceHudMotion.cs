@@ -7,7 +7,7 @@ namespace PitBox.Views.Pages;
 
 internal sealed partial class RaceHudWidgets
 {
-    private const double RiseStepMs = 60, RiseDistance = 8, RiseMs = 260, FoldMs = 320, CrossFadeMs = 300, BlinkMs = 260;
+    private const double RiseStepMs = 60, RiseDistance = 8, RiseMs = 260, CrossFadeMs = 300;
 
     private readonly Canvas _navLayer = new() { IsHitTestVisible = false };
     private RadioButton? _navChecked;
@@ -18,7 +18,6 @@ internal sealed partial class RaceHudWidgets
     private bool _navQuiet;
     private bool _filledOnce;
     private string? _enteredFor;
-    private (string Id, bool On)? _toggled;
 
     private FrameworkElement NavWithLayer(FrameworkElement nav) => new Grid { Children = { _navLayer, nav } };
 
@@ -66,29 +65,9 @@ internal sealed partial class RaceHudWidgets
         _enteredFor = shownFor;
     }
 
-    private void FoldPreview(HudWidgetConfig w)
+    private void ShowPreviewHidden(HudWidgetConfig w)
     {
-        if (_preview?.Parent is not FrameworkElement host) return;
         if (_previewHidden is { } hidden) hidden.Visibility = w.Enabled ? Visibility.Collapsed : Visibility.Visible;
-        if (_toggled is not { } toggled || toggled.Id != w.Id) return;
-        _toggled = null;
-        if (!Motion.Flourish) return;
-        var scale = new ScaleTransform();
-        host.RenderTransformOrigin = new Point(0.5, 0.5);
-        host.RenderTransform = scale;
-        double line = 0.015;
-        if (!toggled.On)
-        {
-            double shut = BlinkMs * 0.45;
-            scale.BeginAnimation(ScaleTransform.ScaleYProperty, Views.Reveal.Keys(BlinkMs, Motion.Ease, (0, 1), (shut, line), (BlinkMs, 1)));
-            _previewHidden?.BeginAnimation(UIElement.OpacityProperty, Views.Reveal.Keys(BlinkMs + 160, Motion.Ease, (0, 0), (shut, 0), (BlinkMs + 160, 1)));
-        }
-        else
-        {
-            double open = FoldMs * 0.45;
-            scale.BeginAnimation(ScaleTransform.ScaleXProperty, Views.Reveal.Keys(FoldMs, Motion.Ease, (0, 0), (open, 1)));
-            scale.BeginAnimation(ScaleTransform.ScaleYProperty, Views.Reveal.Keys(FoldMs, Motion.Ease, (0, line), (open, line), (FoldMs, 1)));
-        }
     }
 
     private (ImageSource Source, double Width, double Height)? Snapshot()
