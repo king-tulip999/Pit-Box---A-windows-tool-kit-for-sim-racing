@@ -146,6 +146,17 @@ internal sealed class Sidebar : Border, IFrameStep
 
     private string? _settingsKey;
 
+    private static readonly string[] AccentKeys = ["Accent", "AccentSoft"];
+
+    public void UseAccent(ResourceDictionary? theme)
+    {
+        foreach (var key in AccentKeys)
+        {
+            if (theme?[key] is { } value) Resources[key] = value;
+            else Resources.Remove(key);
+        }
+    }
+
     public void Select(string? key, Func<string, SectionList?> sectionsOf, bool allOpen, bool animate = true)
     {
         var leaving = Filled();

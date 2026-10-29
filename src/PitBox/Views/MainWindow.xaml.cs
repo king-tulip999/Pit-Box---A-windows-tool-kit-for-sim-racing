@@ -171,6 +171,8 @@ public partial class MainWindow : Window
 
     internal FrameworkElement SidebarView => _sidebar;
 
+    internal void SetSidebarAccent(ResourceDictionary? theme) => _sidebar.UseAccent(theme);
+
     private ISectionedPage? _watched;
     private (string? Page, string? Section) _lastSection;
 

@@ -8,6 +8,7 @@ namespace PitBox.Grr.Views;
 internal sealed class GrrPage : UserControl, IPage, IScreenshotStates, ISectionedPage, IPageHistory
 {
     private readonly AppServices _app;
+    private readonly MainWindow _window;
     private readonly StackPanel _body = new() { Margin = new Thickness(23, 0, 23, 23) };
     private readonly ScrollViewer _scroll;
     private readonly GrrDashboardSection _dashboard;
@@ -25,6 +26,7 @@ internal sealed class GrrPage : UserControl, IPage, IScreenshotStates, ISectione
     public GrrPage(AppServices app, MainWindow window)
     {
         _app = app;
+        _window = window;
         _scroll = new ScrollViewer { Style = Ui.Res<Style>("PageScroll"), Content = Ui.PageFrame(_body), Focusable = false };
         Content = _scroll;
         _dashboard = new GrrDashboardSection(app, window, leagueTabs: false) { ThemeToggled = ToggleTheme };
@@ -60,6 +62,7 @@ internal sealed class GrrPage : UserControl, IPage, IScreenshotStates, ISectione
         _theme = _app.Config.Grr.PageTheme && _app.Config.Ui.Theme != GrrTheme.Id ? Theme.ThemeManager.Build(GrrTheme.Spec) : null;
         if (_theme is not null) Resources.MergedDictionaries.Add(_theme);
         _dashboard.PageTheme = _theme;
+        if (_shown) _window.SetSidebarAccent(_theme);
     }
 
     private void ToggleTheme()
@@ -115,6 +118,7 @@ internal sealed class GrrPage : UserControl, IPage, IScreenshotStates, ISectione
     public void OnShown()
     {
         _shown = true;
+        _window.SetSidebarAccent(_theme);
         _app.Grr.Changed -= OnGrrChanged;
         _app.Grr.Changed += OnGrrChanged;
         if (Signature() != _signature) Changed();
@@ -124,6 +128,7 @@ internal sealed class GrrPage : UserControl, IPage, IScreenshotStates, ISectione
     public void OnHidden()
     {
         _shown = false;
+        _window.SetSidebarAccent(null);
         _app.Grr.Changed -= OnGrrChanged;
         _dashboard.OnHidden();
     }
