@@ -53,6 +53,20 @@
         </Setter>
     </Style>
 
+    <Style x:Key="SwitchFocusRing">
+        <Setter Property="Control.Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Border Margin="{DynamicResource SwitchRingMargin}" Width="{DynamicResource SwitchRingWidth}" Height="{DynamicResource SwitchRingHeight}"
+                            HorizontalAlignment="Left" VerticalAlignment="Center" BorderBrush="{DynamicResource FocusEdge}" BorderThickness="2"
+                            CornerRadius="{DynamicResource R.SwitchRing}" SnapsToDevicePixels="True">
+                        <Border BorderBrush="{DynamicResource FocusGap}" BorderThickness="{DynamicResource FocusRingGapThickness}" CornerRadius="{DynamicResource R.SwitchRingGap}" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- ============================================================ text
          Warm hierarchy: Heading (titles) > Text (body) > TextMuted (secondary) > TextFaint (metadata).
          Values are big and bold (about 3× their label); labels small and quiet.
@@ -559,7 +573,7 @@
         <Setter Property="ContentTemplateSelector" Value="{StaticResource CasedContent}" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Foreground" Value="{DynamicResource Text}" />
-        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource SwitchFocusRing}" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="Template">
             <Setter.Value>

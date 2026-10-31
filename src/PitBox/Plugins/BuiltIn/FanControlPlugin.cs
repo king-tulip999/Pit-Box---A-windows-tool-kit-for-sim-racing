@@ -11,7 +11,7 @@ internal sealed class FanControlPlugin : Plugin
     public override string Description => "Fan curves and presets for case, CPU and GPU fans. Motherboard fans need a small driver, asked for when needed.";
     public override string Icon => "I.Fan";
     public override (string Soft, string Deep) Colors => ("SageSoft", "SageDeep");
-    public override int Order => 30;
+    public override int Order => 50;
     public override string Reads => "CPU, GPU and motherboard temperatures and fan speeds, once a second while fan control is switched on.";
     public override string BackgroundWork =>
         "While fan control is switched on: reads temperatures once a second and drives your fans. Switched off: never.";

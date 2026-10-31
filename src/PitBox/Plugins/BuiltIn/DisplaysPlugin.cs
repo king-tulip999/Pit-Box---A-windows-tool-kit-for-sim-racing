@@ -10,7 +10,7 @@ internal sealed class DisplaysPlugin : Plugin
     public override string Description => "Switch monitors, arrangement, HDR, wallpapers and audio in one click.";
     public override string Icon => "I.Monitor";
     public override (string Soft, string Deep) Colors => ("SlateSoft", "SlateDeep");
-    public override int Order => 40;
+    public override int Order => 20;
     public override string Reads =>
         "Your monitors (arrangement, resolution, refresh rate, HDR), taskbar, wallpapers and audio devices, only while its page is open or a profile is applied.";
     public override string BackgroundWork => "Never. Only its profile keybinds are registered.";

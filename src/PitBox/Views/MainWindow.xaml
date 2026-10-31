@@ -26,19 +26,12 @@
 
             <!-- title bar (draggable; buttons opt out of the caption area) -->
             <DockPanel x:Name="TitleBar" Grid.Row="0" LastChildFill="False">
-                <!-- left: the brand (just the mark, not a button) and, while a newer version is available, the update badge.
+                <!-- left: the brand wordmark (not a button); the update badge lives in the sidebar footer above Settings.
                      Lined up with the pages' content (28 px). -->
                 <StackPanel x:Name="TitleLeft" DockPanel.Dock="Left" Orientation="Horizontal" Margin="23,6,0,0" VerticalAlignment="Top">
                     <StackPanel x:Name="Brand" Orientation="Horizontal" VerticalAlignment="Center">
-                        <c:Tile x:Name="LogoTile" Background="{DynamicResource LogoBg}"
-                                BorderBrush="{DynamicResource LogoEdge}" BorderThickness="{DynamicResource LogoEdgeThickness}">
-                            <c:BrandMark Foreground="{DynamicResource LogoFg}" />
-                        </c:Tile>
                         <TextBlock x:Name="Wordmark" Foreground="{DynamicResource Heading}" />
                     </StackPanel>
-                    <!-- only while a newer version is available (collapsed = no space); same install as Settings → Updates -->
-                    <Button x:Name="UpdateBadge" Style="{StaticResource PrimaryButton}" Visibility="Collapsed" Margin="13,0,0,0" Padding="8,5"
-                            VerticalAlignment="Center" FontSize="11" WindowChrome.IsHitTestVisibleInChrome="True" />
                 </StackPanel>
                 <StackPanel x:Name="CaptionButtons" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
                     <Button x:Name="MinButton" Style="{StaticResource CaptionButton}" WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Minimize">

@@ -108,7 +108,7 @@ internal sealed class TelemetryFrame
     public readonly TrackSurface[] CarSurface = new TrackSurface[MaxCars];
     public readonly double[] CarEstTime = new double[MaxCars], CarF2Time = new double[MaxCars];
     public readonly double[] CarLastLap = new double[MaxCars], CarBestLap = new double[MaxCars];
-    public readonly int[] CarTyreCompound = new int[MaxCars];
+    public readonly int[] CarTyreCompound = new int[MaxCars], CarFastRepairsUsed = new int[MaxCars];
     public readonly RaceFlags[] CarFlags = new RaceFlags[MaxCars];
     public bool HasCarPositions, HasCarEstTime, HasCarLapTimes, HasCarF2Time, HasLapLast;
 
@@ -176,6 +176,7 @@ internal sealed class TelemetryFrame
         Array.Fill(CarLastLap, -1);
         Array.Fill(CarBestLap, -1);
         Array.Fill(CarTyreCompound, -1);
+        Array.Fill(CarFastRepairsUsed, -1);
         Array.Clear(CarFlags);
         HasCarPositions = HasCarEstTime = HasCarLapTimes = HasCarF2Time = HasLapLast = false;
     }

@@ -1,3 +1,4 @@
+using System.Numerics;
 using PitBox.SimRacing.Telemetry;
 
 namespace PitBox.SimRacing.Race;
@@ -38,7 +39,7 @@ internal sealed class PitExitFeed
             predictor.SetContext(track, player.CarId);
             _nextAt = double.NegativeInfinity;
         }
-        if (now < _nextAt && now > _nextAt - Interval * 25) return;
+        if (!f.OnPitRoad && now < _nextAt && now > _nextAt - Interval * 25) return;
         _nextAt = now + Interval;
         Fill(f, plan, tank, player);
         Latest = predictor.Update(_frame);
@@ -58,18 +59,30 @@ internal sealed class PitExitFeed
             x.OnPitRoad[i] = f.CarOnPitRoad[i];
             x.TrackSurface[i] = racing ? (int)f.CarSurface[i] : -1;
             x.ClassId[i] = racing ? d!.ClassId : -1;
+            x.FastRepairsUsed[i] = f.CarFastRepairsUsed[i];
+            x.Penalty[i] = (f.CarFlags[i] & RaceFlags.Black) != 0;
+            x.Meatball[i] = (f.CarFlags[i] & RaceFlags.Repair) != 0;
         }
         x.ClassLapTime = player.ClassEstLapTime ?? f.Session.PlayerEstLapTime ?? 0;
-        x.FuelToAdd = FuelToAdd(plan, f.Fuel, tank);
-        x.TiresPlanned = (f.PitFlags & Tyres) != 0;
-        x.RepairTime = f.PitRepairLeft is > 0 and var repair ? repair : 0;
+        x.FuelRequest = FuelRequest(f.PitFlags, f.PitFuel, plan);
+        x.Tank = tank ?? 0;
+        x.FuelPerLap = plan?.PerLap ?? 0;
+        x.TireCount = BitOperations.PopCount((uint)(f.PitFlags & Tyres));
+        x.RepairTime = RepairTime(f.PitRepairLeft, f.PitFlags, f.FastRepairsAvailable);
+        x.ServiceActive = f.PitstopActive;
         x.FuelLevel = (float)(f.Fuel ?? 0);
         x.Caution = (f.Flags & (RaceFlags.Caution | RaceFlags.CautionWaving)) != 0;
     }
 
-    internal static double FuelToAdd(FuelPlan? plan, double? level, double? tank)
+    internal static double FuelRequest(PitServices flags, double? menu, FuelPlan? plan)
     {
-        if (plan is not { Stops: > 0, AddAtNextStop: { } add } || add <= 0) return 0;
-        return tank is { } t && level is { } l ? Math.Clamp(add, 0, Math.Max(0, t - l)) : add;
+        if (menu is { } amount) return (flags & PitServices.Fuel) != 0 ? Math.Max(0, amount) : 0;
+        return plan is { Stops: > 0, AddAtNextStop: { } add } && add > 0 ? add : 0;
+    }
+
+    internal static double RepairTime(double? required, PitServices flags, int? fastRepairs)
+    {
+        if (required is not > 0) return 0;
+        return (flags & PitServices.FastRepair) != 0 && fastRepairs is > 0 ? 0 : required.Value;
     }
 }

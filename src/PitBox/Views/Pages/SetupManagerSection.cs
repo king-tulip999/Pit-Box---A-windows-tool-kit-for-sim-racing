@@ -44,7 +44,7 @@ internal sealed class SetupManagerSection : StackPanel
         _app = app;
         _window = window;
         _classFilter = new HashSet<string>(S.ClassFilter, StringComparer.OrdinalIgnoreCase);
-        _store = new SetupStore(S, app.Demo && Environment.GetEnvironmentVariable("PB_REAL_SETUPS") is null);
+        _store = new SetupStore(S, app.Demo);
         _store.Changed += () => { Prune(); RenderAll(); };
 
         Children.Add(_intro);
@@ -1370,7 +1370,7 @@ internal sealed class SetupManagerSection : StackPanel
     {
         if (_store.Demo) { _app.Notify("File Explorer", "Opens File Explorer there (not available with demo data).", NoticeKind.Info); return; }
         if (!PitBox.Services.External.Allowed("open File Explorer")) return;
-        try { Process.Start(new ProcessStartInfo("explorer.exe", arguments) { UseShellExecute = true })?.Dispose(); }
+        try { Process.Start(new ProcessStartInfo(App.Explorer, arguments) { UseShellExecute = true })?.Dispose(); }
         catch { _app.Notify("File Explorer", "Windows couldn't open File Explorer.", NoticeKind.Warning); }
     }
 

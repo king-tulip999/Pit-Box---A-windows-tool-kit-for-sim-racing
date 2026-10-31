@@ -65,17 +65,14 @@ public class Tile : Border
 
     protected override Size ArrangeOverride(Size finalSize)
     {
-        var arranged = base.ArrangeOverride(finalSize);
-        if (Child is { } child && LayoutPadding() is { } whole)
-        {
-            var dpi = VisualTreeHelper.GetDpi(this);
-            var edge = Hairline.WholePixels(BorderThickness, dpi.DpiScaleX, dpi.DpiScaleY);
-            double left = edge.Left + whole.Left, top = edge.Top + whole.Top;
-            child.Arrange(new Rect(left, top,
-                Math.Max(0, finalSize.Width - left - edge.Right - whole.Right),
-                Math.Max(0, finalSize.Height - top - edge.Bottom - whole.Bottom)));
-        }
-        return arranged;
+        if (Child is not { } child || LayoutPadding() is not { } whole) return base.ArrangeOverride(finalSize);
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var edge = Hairline.WholePixels(BorderThickness, dpi.DpiScaleX, dpi.DpiScaleY);
+        double left = edge.Left + whole.Left, top = edge.Top + whole.Top;
+        child.Arrange(new Rect(left, top,
+            Math.Max(0, finalSize.Width - left - edge.Right - whole.Right),
+            Math.Max(0, finalSize.Height - top - edge.Bottom - whole.Bottom)));
+        return finalSize;
     }
 
     private Thickness? LayoutPadding()

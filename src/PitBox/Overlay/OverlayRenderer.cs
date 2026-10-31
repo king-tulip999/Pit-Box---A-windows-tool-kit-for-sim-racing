@@ -98,7 +98,7 @@ internal sealed class OverlayRenderer : IDisposable
         Hits?.Clear();
         const float across = Spacing, down = Spacing;
 
-        float pad = 10 * scale, rowGap = 3 * scale * down, cellGap = 12 * scale * across, labelGap = 8 * scale, groupGap = 16 * scale * across;
+        float pad = 10 * scale, side = 16 * scale, rowGap = 3 * scale * down, cellGap = 12 * scale * across, labelGap = 8 * scale, groupGap = 16 * scale * across;
         float rowHeight = _valueFont!.GetHeight(_measure);
 
         var rows = layout.Style == OverlayStyle.Compact && groups.Count > 0 ? new List<List<Group>> { groups } : groups.Select(g => new List<Group> { g }).ToList();
@@ -112,7 +112,7 @@ internal sealed class OverlayRenderer : IDisposable
         bool graph = layout.ShowGraph && data.FrameTimes.Length > 1;
         float graphHeight = graph ? 34 * scale : 0;
         float contentWidth = Math.Max(rows.Count == 0 ? 0 : rows.Max(RowWidth), graph ? 160 * scale : 0);
-        int width = Math.Max(20, (int)Math.Ceiling(contentWidth + pad * 2));
+        int width = Math.Max(20, (int)Math.Ceiling(contentWidth + side * 2));
         float textHeight = rows.Count * rowHeight + Math.Max(0, rows.Count - 1) * rowGap;
         int height = Math.Max(20, (int)Math.Ceiling(pad * 2 + textHeight + (graph ? graphHeight + (rows.Count > 0 ? 6 * scale : 0) : 0)));
 
@@ -139,7 +139,7 @@ internal sealed class OverlayRenderer : IDisposable
         float y = pad;
         foreach (var row in rows)
         {
-            float x = pad;
+            float x = side;
             foreach (var group in row)
             {
                 bool inline = layout.Style == OverlayStyle.Compact;
@@ -175,7 +175,7 @@ internal sealed class OverlayRenderer : IDisposable
         if (graph)
         {
             float top = height - pad - graphHeight;
-            DrawGraph(g, new RectangleF(pad, top, width - pad * 2, graphHeight), data.FrameTimes, colors, scale);
+            DrawGraph(g, new RectangleF(side, top, width - side * 2, graphHeight), data.FrameTimes, colors, scale);
         }
         return new Size(width, height);
     }

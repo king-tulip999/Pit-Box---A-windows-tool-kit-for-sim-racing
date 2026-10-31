@@ -82,7 +82,6 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
     {
         _shownAt = Environment.TickCount64;
         _master.IsChecked = _app.Config.Fans.Enabled;
-        _fanSignature = "";
         BuildBanners();
         BuildPresetBar();
         BuildCurves();
@@ -379,7 +378,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         if (_curvesBeforeCatalog) BuildCurveEditor();
 
         var visible = catalog.Fans.Where(f => !Fans.HardwareFor(f.ControlId).Hidden).ToList();
-        string signature = string.Join("|", visible.Select(f => f.ControlId)) + "#" + Fans.ActivePreset + "#" + string.Join(",", Fans.Curves.Select(c => c.Name))
+        string signature = string.Join("|", visible.Select(f => f.ControlId + "=" + _app.FanName(f))) + "#" + Fans.ActivePreset + "#" + string.Join(",", Fans.Curves.Select(c => c.Name))
                            + "#" + string.Join("|", catalog.Fans.Where(f => Fans.HardwareFor(f.ControlId).Hidden).Select(f => f.ControlId));
         if (signature != _fanSignature)
         {
@@ -391,19 +390,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         }
 
         foreach (var fan in visible)
-        {
-            if (!_cards.TryGetValue(fan.ControlId, out var parts)) continue;
-            TextCase.Set(parts.Rpm, (fan.Rpm is { } r ? $"{r:N0} RPM" : "– RPM") + (fan.Percent is not null && !fan.Controlled ? " · auto" : ""));
-            parts.Output.Set(fan.Percent is { } p ? $"{p:0}" : "–");
-            var cal = Fans.HardwareFor(fan.ControlId).Calibration;
-            parts.Spinner.SetSpeed(fan.Percent, fan.Rpm, cal?.MaxRpm ?? 0, Motion.Enabled && !parts.Fresh);
-            double level = fan.Percent is { } pp ? pp / 100 : cal?.MaxRpm > 0 && fan.Rpm is { } rr ? rr / cal.MaxRpm : 0;
-            if (double.IsNaN(level)) level = 0;
-            if (parts.Fresh && Motion.Flourish) parts.Bar.Value = 0;
-            if (parts.Fresh && !Motion.Flourish) parts.Bar.Value = level;
-            else Motion.To(parts.Bar, SegmentMeter.ValueProperty, level, parts.Fresh ? 760 : 450, Motion.BarStep);
-            parts.Fresh = false;
-        }
+            if (_cards.TryGetValue(fan.ControlId, out var parts)) ShowLive(fan, parts);
 
         foreach (var (id, parts) in _cards)
             if (parts.Curve is { } preview) UpdateCurvePreview(id, preview, catalog);
@@ -429,6 +416,19 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
             _lastEmergency = catalog.Emergency;
             BuildBanners();
         }
+    }
+
+    private void ShowLive(FanInfo fan, FanCardParts parts)
+    {
+        TextCase.Set(parts.Rpm, (fan.Rpm is { } r ? $"{r:N0} RPM" : "– RPM") + (fan.Percent is not null && !fan.Controlled ? " · auto" : ""));
+        parts.Output.Set(fan.Percent is { } p ? $"{p:0}" : "–");
+        var cal = Fans.HardwareFor(fan.ControlId).Calibration;
+        parts.Spinner.SetSpeed(fan.Percent, fan.Rpm, cal?.MaxRpm ?? 0, Motion.Enabled && !parts.Fresh);
+        double level = fan.Percent is { } pp ? pp / 100 : cal?.MaxRpm > 0 && fan.Rpm is { } rr ? rr / cal.MaxRpm : 0;
+        if (double.IsNaN(level)) level = 0;
+        if (parts.Fresh) parts.Bar.Value = level;
+        else Motion.To(parts.Bar, SegmentMeter.ValueProperty, level, 450, Motion.BarStep);
+        parts.Fresh = false;
     }
 
     private void BuildFanCards(List<FanInfo> visible)
@@ -503,11 +503,12 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         rpm.HorizontalAlignment = HorizontalAlignment.Left;
         rpm.Margin = new Thickness(0, -3, 4, 0);
         System.Windows.Documents.Typography.SetNumeralAlignment(rpm, FontNumeralAlignment.Tabular);
-        var side = new StackPanel { Margin = new Thickness(7, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Children = { percent, rpm } };
+        var side = new StackPanel { Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Children = { percent, rpm } };
         var readout = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Children = { output, side } };
         Grid.SetColumn(readout, 2);
         left.Children.Add(readout);
-        _cards[fan.ControlId] = new FanCardParts { Spinner = spinner, Rpm = rpm, Output = output, Bar = bar };
+        var parts = _cards[fan.ControlId] = new FanCardParts { Spinner = spinner, Rpm = rpm, Output = output, Bar = bar };
+        ShowLive(_app.Hardware.Catalog?.Fans.FirstOrDefault(f => f.ControlId == fan.ControlId) ?? fan, parts);
 
         var right = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         var expandHost = new ContentControl { Focusable = false };

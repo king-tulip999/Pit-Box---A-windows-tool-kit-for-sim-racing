@@ -36,7 +36,7 @@ internal static class ProcessLauncher
                 }
                 if (!hasArguments)
                 {
-                    Process.Start(new ProcessStartInfo("explorer.exe", $"\"{target}\"") { UseShellExecute = false })?.Dispose();
+                    Process.Start(new ProcessStartInfo(App.Explorer, $"\"{target}\"") { UseShellExecute = false })?.Dispose();
                     return null;
                 }
                 if (error is not (NoShellToken or ErrorElevationRequired))

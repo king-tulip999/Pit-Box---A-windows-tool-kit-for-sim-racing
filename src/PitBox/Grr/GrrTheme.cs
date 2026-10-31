@@ -87,7 +87,7 @@ internal static class GrrTheme
         ["SwitchOnKnob"] = Hex("#071000"), ["ChipBorder"] = Hex("#00000000"),
         ["InputEdge"] = Hex("#5C6E60"), ["InputEdgeHover"] = Hex("#7D8F80"), ["SwitchBorder"] = Hex("#5C6E60"),
         ["FocusEdge"] = Hex("#8CFF33"), ["FocusGap"] = Hex("#0B100C"),
-        ["LogoBg"] = Hex("#75FF00"), ["LogoFg"] = Hex("#071000"), ["LogoEdge"] = Hex("#75FF00"),
+        ["LogoBg"] = Hex("#0B100C"), ["LogoFg"] = Hex("#F4F6F4"), ["LogoAccent"] = Hex("#75FF00"), ["LogoEdge"] = Hex("#0B100C"),
         ["SidebarEdge"] = Hex("#1B241D"),
         ["BgGlow"] = Hex("#101C0B"),
         ["OnDanger"] = Hex("#1A0606"),

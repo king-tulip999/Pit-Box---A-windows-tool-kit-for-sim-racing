@@ -169,8 +169,12 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         if (Host is { } h)
         {
             h.Changed += OnHostChanged;
-            h.Watch(true);
-            _watched = h;
+            Dispatcher.BeginInvoke(() =>
+            {
+                if (!_shown || _watched is not null) return;
+                h.Watch(true);
+                _watched = h;
+            }, DispatcherPriority.Background);
         }
         _timer.Start();
         RefreshStatus();

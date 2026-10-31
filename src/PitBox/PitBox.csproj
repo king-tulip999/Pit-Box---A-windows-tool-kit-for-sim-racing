@@ -19,7 +19,7 @@
     <ApplicationIcon>Assets\PitBox.ico</ApplicationIcon>
     <AssemblyName>PitBox</AssemblyName>
     <RootNamespace>PitBox</RootNamespace>
-    <Version>2.5.0</Version>
+    <Version>2.6.0</Version>
     <Title>Pit-Box</Title>
     <AssemblyTitle>Pit-Box</AssemblyTitle>
     <Product>Pit-Box</Product>
@@ -57,7 +57,7 @@
     <Resource Include="Assets\Themes\*.ico" />
     <Resource Include="Assets\OverlayPreview.jpg" />
     <Resource Include="Assets\BackdropLines.png" />
-    <!-- Saira (the app font) and Barlow Condensed (logo, in-game overlay), SIL Open Font License, licence texts beside the fonts; the GRR logo -->
+    <!-- Saira (the app font, wordmark and in-game overlay), SIL Open Font License, licence texts beside the fonts; the GRR logo -->
     <Resource Include="Assets\Fonts\**" />
     <Resource Include="Assets\GrrLogo.png" />
     <Resource Include="Assets\CarTop*.png" />

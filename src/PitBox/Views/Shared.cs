@@ -111,13 +111,13 @@ internal static class IdentifyDisplays
 
 internal static class BitmapConvert
 {
-    public static BitmapSource ToSource(System.Drawing.Bitmap bitmap)
+    public static BitmapSource ToSource(System.Drawing.Bitmap bitmap, double scale = 1)
     {
         var rect = new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height);
         var data = bitmap.LockBits(rect, System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
         try
         {
-            var source = BitmapSource.Create(bitmap.Width, bitmap.Height, 96, 96, PixelFormats.Bgra32, null,
+            var source = BitmapSource.Create(bitmap.Width, bitmap.Height, 96 * scale, 96 * scale, PixelFormats.Bgra32, null,
                 data.Scan0, data.Stride * bitmap.Height, data.Stride);
             source.Freeze();
             return source;
@@ -619,24 +619,46 @@ internal static class Ui
 
     public const int NameLength = 48;
 
-    public static void FitLockup(Border tile, TextBlock text, double maxHeight, double width, double gap)
+    public static void FitLockup(Border tile, TextBlock text, double maxHeight, double width, double gap, double? exactHeight = null)
     {
         var probe = new FormattedText(Brand.Wordmark, System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
             Brand.WordmarkFace, 100, Brushes.Black, 1.0);
-        double h = Math.Max(16, Math.Floor(Math.Min(maxHeight, (width - gap) / (1 + probe.Width / probe.Extent))));
+        double h = exactHeight ?? Math.Max(16, Math.Floor(Math.Min(maxHeight, (width - gap) / (1 + probe.Width / probe.Extent))));
         tile.Width = tile.Height = h;
         tile.VerticalAlignment = VerticalAlignment.Top;
         tile.CornerRadius = ThemeManager.Round(Math.Round(h * 0.3));
+        FitWordmark(text, h, gap);
+    }
 
-        double size = 100 * h / probe.Extent, k = size / 100;
+    private static Border WordmarkGap(double size)
+    {
+        var gap = new FormattedText(Brand.WordmarkGap, System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+            Brand.WordmarkFace, size, Brushes.Black, 1.0);
+        var ink = gap.BuildGeometry(new Point()).Bounds;
+        double air = Math.Round(size * 0.06);
+        var bar = new Border
+        {
+            Width = ink.Width,
+            Height = ink.Height,
+            Margin = new Thickness(ink.Left + air, 0, gap.WidthIncludingTrailingWhitespace - ink.Right + air, 0),
+        };
+        bar.SetResourceReference(Border.BackgroundProperty, "Heading");
+        return bar;
+    }
+
+    public static void FitWordmark(TextBlock text, double height, double gap = 0)
+    {
+        var probe = new FormattedText(Brand.Wordmark, System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+            Brand.WordmarkFace, 100, Brushes.Black, 1.0);
+        double size = 100 * height / probe.Extent, k = size / 100;
         double inkTop = (probe.Height + probe.OverhangAfter - probe.Extent) * k;
-        var head = Res<Brush>("Heading") is SolidColorBrush headBrush ? headBrush.Color : Colors.White;
-        var accent = Res<Brush>("AccentText") is SolidColorBrush accentBrush ? accentBrush.Color : head;
+        var start = new Run(Brand.WordmarkStart);
+        start.SetResourceReference(TextElement.ForegroundProperty, "AccentText");
         var end = new Run(Brand.WordmarkEnd);
-        end.SetResourceReference(TextElement.ForegroundProperty, "AccentText");
+        end.SetResourceReference(TextElement.ForegroundProperty, "Heading");
         text.Inlines.Clear();
-        text.Inlines.Add(new Run(Brand.WordmarkStart));
-        text.Inlines.Add(new Run(Brand.WordmarkJoin) { Foreground = Brand.JoinBrush(head, accent) });
+        text.Inlines.Add(start);
+        text.Inlines.Add(new InlineUIContainer(WordmarkGap(size)) { BaselineAlignment = BaselineAlignment.Baseline });
         text.Inlines.Add(end);
         text.FontFamily = Brand.WordmarkFace.FontFamily;
         text.FontStyle = Brand.WordmarkFace.Style;

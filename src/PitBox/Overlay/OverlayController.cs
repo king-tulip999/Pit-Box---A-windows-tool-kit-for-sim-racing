@@ -165,12 +165,12 @@ internal sealed class OverlayController : IDisposable
 
     public IReadOnlyList<OverlayHit> PreviewHits => _previewRenderer.Hits!;
 
-    public Bitmap RenderPreview(OverlayLayout layout, FrameStats? frames, double[] frameTimes)
+    public Bitmap RenderPreview(OverlayLayout layout, FrameStats? frames, double[] frameTimes, float scale = 1f)
     {
         string? fpsNote = _frames.Error is not null && frames is null ? "needs admin" : null;
         var hw = _hardware.Latest;
         if (!_running) SampleTemps(hw);
-        return _previewRenderer.Render(layout, new OverlayData(hw, frames, fpsNote, _fans(), _network.Latest, frameTimes, _gpuTemp.Value, _cpuTemp.Value), 1f);
+        return _previewRenderer.Render(layout, new OverlayData(hw, frames, fpsNote, _fans(), _network.Latest, frameTimes, _gpuTemp.Value, _cpuTemp.Value), scale);
     }
 
     public void ResetAverages()

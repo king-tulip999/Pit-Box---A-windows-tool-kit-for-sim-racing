@@ -67,7 +67,7 @@ internal static class Themes
     public static readonly ThemeSpec Custom = new()
     {
         Id = AppTheme.Custom, Name = DefaultCustomName, Dark = true, Colors = CustomPalette.Default,
-        CardEdge = Hairline, LogoEdge = new(1.5),
+        CardEdge = Hairline, LogoEdge = new(0),
         Glow = true, GlowStrength = 0.45, StepsClimb = false,
     };
 

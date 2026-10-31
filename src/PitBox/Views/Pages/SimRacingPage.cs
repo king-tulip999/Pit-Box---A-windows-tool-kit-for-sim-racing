@@ -9,7 +9,7 @@ namespace PitBox.Views.Pages;
 
 internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICancelEdit, IRevealAnchor, ISectionedPage, IPageHistory
 {
-    internal static readonly string[] DefaultPanelOrder = { "setups", "hud", "fov", "iracing", "companions" };
+    internal static readonly string[] DefaultPanelOrder = { "setups", "hud", "iracing", "fov", "companions" };
 
     private static readonly string[] CompanionIds = { "tradingpaints", "garage61" };
 

@@ -155,7 +155,7 @@ internal sealed class Sidebar : Border, IFrameStep
         return group;
     }
 
-    public void Build(IReadOnlyList<SidebarPage> pages, SidebarPage settings, FrameworkElement searchButton, FrameworkElement searchHost, FrameworkElement? themeButton)
+    public void Build(IReadOnlyList<SidebarPage> pages, SidebarPage settings, FrameworkElement searchButton, FrameworkElement searchHost, FrameworkElement? themeButton, FrameworkElement? updateButton = null)
     {
         _settingsKey = settings.Key;
         string signature = ThemeManager.Current.Id + "|" + string.Join("|", pages.Select(p => $"{p.Key}:{p.Title}"));
@@ -179,6 +179,12 @@ internal sealed class Sidebar : Border, IFrameStep
         if (searchButton.Parent is Panel oldButton) oldButton.Children.Remove(searchButton);
         searchHost.Margin = new Thickness(0, 2, 0, 5);
         _footer.Children.Add(searchHost);
+        if (updateButton is not null)
+        {
+            if (updateButton.Parent is Panel oldUpdate) oldUpdate.Children.Remove(updateButton);
+            updateButton.Margin = new Thickness(0, 4, 0, 6);
+            _footer.Children.Add(updateButton);
+        }
         var line = new DockPanel { LastChildFill = true };
         if (themeButton is not null)
         {

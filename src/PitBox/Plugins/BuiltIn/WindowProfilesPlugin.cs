@@ -16,7 +16,7 @@ internal sealed class WindowProfilesPlugin : Plugin
     public override string Description => "Give a program's window an exact size and spot, e.g. a game stretched across triples.";
     public override string Icon => PageIcon;
     public override (string Soft, string Deep) Colors => ("AccentSoft", "AccentText");
-    public override int Order => 20;
+    public override int Order => 30;
     public override string Reads => "Which programs start and close (only the ones with an automatic profile), and the size and spot of their windows.";
     public override string BackgroundWork => "Only with automatic profiles: Windows' program start events for those programs, and for about 35 s after a profile is applied a check once a second that the game didn't move its window back. Nothing set up: never.";
     public override string Changes => "The size, position and borders of the windows your profiles name. Nothing else.";

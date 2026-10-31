@@ -4,7 +4,6 @@ using System.Windows.Input;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using PitBox.Config;
 using PitBox.Controls;
 using PitBox.Overlay;
@@ -28,9 +27,6 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
     private bool _reordered;
     private Vector _grab;
     private Size _heldSize;
-    private readonly Border _ghost = new() { IsHitTestVisible = false, Visibility = Visibility.Collapsed, BorderThickness = new Thickness(1.5), Opacity = 0.92 };
-    private readonly Border _slot = new() { IsHitTestVisible = false, Visibility = Visibility.Collapsed, BorderThickness = new Thickness(1.5) };
-    private readonly Canvas _targets = new() { IsHitTestVisible = false };
     private readonly CheckBox _visible;
     private readonly TextBlock _previewNote = new();
     private readonly System.Windows.Shapes.Ellipse _liveDot = new() { Width = 6, Height = 6, Opacity = 0.3, Margin = new Thickness(0, 0, 7, 0), VerticalAlignment = VerticalAlignment.Center };
@@ -39,9 +35,8 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
     private readonly OverlayPreviewMotion _motion;
     private readonly Dictionary<OverlayMetric, (DockPanel Row, TextBlock Label)> _metricRows = new();
     private (DockPanel Row, TextBlock Label)? _litRow;
-    private bool _wasVisible, _glideNext, _growNext;
+    private bool _glideNext, _growNext;
     private readonly TextBlock _contrast = new() { TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed };
-    private readonly Border _offBadge = new();
 
     private OverlaySettings O => _app.Config.Overlay;
     private OverlayLayout L => O.Current;
@@ -58,9 +53,6 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         Ui.Anchor(_visible, "overlay.visible");
         Content = embedded ? _body : new ScrollViewer { Style = Ui.Res<Style>("PageScroll"), Content = Ui.PageFrame(_body) };
         _scene.Children.Add(_preview);
-        _scene.Children.Add(_targets);
-        _scene.Children.Add(_slot);
-        _scene.Children.Add(_ghost);
         _motion = new OverlayPreviewMotion(_scene, _preview, () => _app.Overlay.PreviewHits);
         HookPreviewDrag();
         _liveDot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "AccentText");
@@ -78,13 +70,6 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         RefreshStatus();
         if (!ReferenceEquals(_built, L) || MonitorSignature() != _builtMonitors) BuildSettings();
         RenderPreview();
-        _wasVisible = O.Visible;
-        ShowOffBadge();
-        if (O.Visible && Motion.Flourish)
-        {
-            _motion.Hide();
-            Motion.AfterPageSettles(Dispatcher, () => { if (IsVisible) _motion.Boot(); else _motion.Stop(); });
-        }
         _refresh.Interval = TimeSpan.FromMilliseconds(RefreshMs);
         _refresh.Start();
         _app.OverlayChanged += OnOverlayChanged;
@@ -109,10 +94,6 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         RefreshStatus();
         if (!ReferenceEquals(_built, L)) QueueBuild();
         RenderPreview();
-        if (O.Visible == _wasVisible) return;
-        _wasVisible = O.Visible;
-        ShowOffBadge();
-        if (O.Visible) _motion.Boot();
     }
 
     private int RefreshMs => Math.Clamp(O.UpdateIntervalMs, 250, 1000);
@@ -127,7 +108,7 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
     {
         var before = _motion.Capture();
         change();
-        if (before is { } frame) _motion.Morph(frame, ms);
+        if (before is { } frame) _motion.Fade(frame, ms);
     }
 
     private void Wiping(Action change, bool glow = false)
@@ -253,7 +234,6 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         });
         RenderOptions.SetBitmapScalingMode(scene.Children[0], BitmapScalingMode.HighQuality);
         scene.Children.Add(Detached(_scene));
-        scene.Children.Add(Detached(BuildOffBadge()));
         var stack = new StackPanel();
         var head = new Grid();
         head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -273,34 +253,6 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         _left.Children.Add(Card(stack));
     }
 
-    private Border BuildOffBadge()
-    {
-        var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var text = Ui.Text("Overlay is off · preview only");
-        text.FontWeight = FontWeights.SemiBold;
-        text.VerticalAlignment = VerticalAlignment.Center;
-        text.Margin = new Thickness(0, 0, 12, 0);
-        grid.Children.Add(text);
-        var show = new Button { Style = Ui.Res<Style>("GhostButton"), Content = "Show overlay" };
-        show.Click += (_, _) => _app.SetOverlayVisible(true);
-        Grid.SetColumn(show, 1);
-        grid.Children.Add(show);
-        _offBadge.Child = grid;
-        _offBadge.Padding = new Thickness(14, 8, 8, 8);
-        Hairline.Frame(_offBadge);
-        _offBadge.HorizontalAlignment = HorizontalAlignment.Center;
-        _offBadge.VerticalAlignment = VerticalAlignment.Bottom;
-        _offBadge.Margin = new Thickness(0, 0, 0, 16);
-        _offBadge.SetResourceReference(Border.BackgroundProperty, "Surface");
-        _offBadge.SetResourceReference(Border.BorderBrushProperty, "Accent");
-        ShowOffBadge();
-        return _offBadge;
-    }
-
-    private void ShowOffBadge() => _offBadge.Visibility = O.Visible ? Visibility.Collapsed : Visibility.Visible;
-
     private void HookPreviewDrag()
     {
         _preview.SizeChanged += (_, _) => PlacePreview();
@@ -308,24 +260,20 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         {
             var at = InFrame(e);
             if (HitAt(at) is not { } hit || HeldRect((hit.Group, hit.Metric)) is not { } box) return;
-            Light(null, null);
             _drag = (hit.Group, hit.Metric);
             _grab = at - box.TopLeft;
             _heldSize = box.Size;
-            PickUp(box);
+            _motion.Holding = true;
+            Light(hit.Group, hit.Metric);
+            _motion.Spotlight(hit.Group, hit.Metric);
             _preview.CaptureMouse();
-            MoveGhost(at);
             e.Handled = true;
         };
         _preview.MouseMove += (_, e) =>
         {
             var at = InFrame(e);
             if (_drag is { } held && _preview.IsMouseCaptured)
-            {
-                MoveGhost(at);
                 DragTo(held, at - _grab + new Vector(_heldSize.Width / 2, _heldSize.Height / 2));
-                ShowSlot();
-            }
             else if (HitAt(at) is { } hover) Light(hover.Group, hover.Metric);
             else Light(null, null);
         };
@@ -337,9 +285,8 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         _preview.LostMouseCapture += (_, _) =>
         {
             _drag = null;
-            _ghost.Visibility = _slot.Visibility = Visibility.Collapsed;
-            _ghost.Child = null;
-            _targets.Children.Clear();
+            _motion.Holding = false;
+            if (_lit.Group is not null) _motion.Spotlight(_lit.Group, _lit.Metric);
             if (!_reordered) return;
             _reordered = false;
             Dispatcher.InvokeAsync(BuildSettings);
@@ -349,7 +296,7 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
     private Point InFrame(MouseEventArgs e)
     {
         var p = e.GetPosition(_preview);
-        double k = _preview.ActualWidth > 0 ? _overlaySize.W / _preview.ActualWidth : 1;
+        double k = _preview.ActualWidth > 0 && _preview.Source is System.Windows.Media.Imaging.BitmapSource source ? source.PixelWidth / _preview.ActualWidth : 1;
         return new Point(p.X * k, p.Y * k);
     }
 
@@ -363,79 +310,6 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
             box = box is { } b ? Rect.Union(b, r) : r;
         }
         return box;
-    }
-
-    private void PickUp(Rect box)
-    {
-        if (_preview.Source is not BitmapSource source || OverlayPreviewMotion.Crop(source, box) is not { } copy) return;
-        _ghost.Child = new Image { Source = copy, Stretch = Stretch.Fill };
-        var lift = new ScaleTransform(1.05, 1.05);
-        _ghost.RenderTransformOrigin = new Point(0.5, 0.5);
-        _ghost.RenderTransform = lift;
-        if (Motion.Flourish)
-        {
-            var up = new System.Windows.Media.Animation.DoubleAnimation(1, 1.05, TimeSpan.FromMilliseconds(140)) { EasingFunction = Motion.Ease, FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop };
-            lift.BeginAnimation(ScaleTransform.ScaleXProperty, up);
-            lift.BeginAnimation(ScaleTransform.ScaleYProperty, up);
-        }
-        _ghost.Background = Ui.Res<Brush>("Surface");
-        _ghost.BorderBrush = Ui.Res<Brush>("AccentText");
-        _slot.BorderBrush = Ui.Res<Brush>("AccentText");
-        _slot.Background = Ui.Res<Brush>("AccentSoft").CloneCurrentValue();
-        _slot.Background.Opacity = 0.35;
-        _ghost.Visibility = Visibility.Visible;
-        ShowSlot();
-    }
-
-    private double PreviewScale => _overlaySize.W > 0 && _preview.ActualWidth > 0 ? _preview.ActualWidth / _overlaySize.W : 1;
-
-    private void MoveGhost(Point at)
-    {
-        double k = PreviewScale;
-        var topLeft = at - _grab;
-        _ghost.Width = _heldSize.Width * k + 3;
-        _ghost.Height = _heldSize.Height * k + 3;
-        Canvas.SetLeft(_ghost, Canvas.GetLeft(_preview) + topLeft.X * k - 1.5 + 3);
-        Canvas.SetTop(_ghost, Canvas.GetTop(_preview) + topLeft.Y * k - 1.5 - 3);
-    }
-
-    private void ShowSlot()
-    {
-        if (_drag is not { } held || HeldRect(held) is not { } box) return;
-        double k = PreviewScale;
-        _slot.Width = box.Width * k + 3;
-        _slot.Height = box.Height * k + 3;
-        Canvas.SetLeft(_slot, Canvas.GetLeft(_preview) + box.X * k - 1.5);
-        Canvas.SetTop(_slot, Canvas.GetTop(_preview) + box.Y * k - 1.5);
-        _slot.Visibility = Visibility.Visible;
-        ShowTargets(held, k);
-    }
-
-    private void ShowTargets((string Group, OverlayMetric? Metric) held, double k)
-    {
-        var boxes = _app.Overlay.PreviewHits
-            .Where(h => held.Metric is null ? h.Group != held.Group : h.Group == held.Group && h.Metric is not null && h.Metric != held.Metric)
-            .GroupBy(h => held.Metric is null ? (object)h.Group : h.Metric!.Value)
-            .Select(g => g.Select(h => h.Rect).Aggregate(System.Drawing.RectangleF.Union))
-            .ToList();
-        var shown = _targets.Children;
-        while (shown.Count > boxes.Count) shown.RemoveAt(shown.Count - 1);
-        while (shown.Count < boxes.Count)
-        {
-            var outline = Hairline.Frame(new Border { SnapsToDevicePixels = true, Opacity = 0.6 });
-            outline.SetResourceReference(Border.BorderBrushProperty, "AccentText");
-            shown.Add(outline);
-        }
-        double left = Canvas.GetLeft(_preview), top = Canvas.GetTop(_preview);
-        for (int i = 0; i < boxes.Count; i++)
-        {
-            var box = boxes[i];
-            var outline = (Border)shown[i];
-            outline.Width = box.Width * k + 3;
-            outline.Height = box.Height * k + 3;
-            Canvas.SetLeft(outline, left + box.X * k - 1.5);
-            Canvas.SetTop(outline, top + box.Y * k - 1.5);
-        }
     }
 
     private OverlayHit? HitAt(Point p)
@@ -471,9 +345,7 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
             L.MoveGroup(held.Group, L.GroupOrder().IndexOf(groups[to].Group));
         }
         _reordered = true;
-        var before = _motion.Capture();
         Changed();
-        if (before is { } frame) _motion.Morph(frame, 160);
     }
 
     private (double X, double Y) Room() =>
@@ -979,12 +851,13 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
             : "Live temperatures and load. FPS and the frame-time graph show sample values until a game is running.";
         try
         {
-            using var bitmap = _app.Overlay.RenderPreview(L, stats, times);
-            _preview.Source = BitmapConvert.ToSource(bitmap);
+            double dpi = VisualTreeHelper.GetDpi(_preview).DpiScaleX;
+            using var bitmap = _app.Overlay.RenderPreview(L, stats, times, (float)dpi);
+            _preview.Source = BitmapConvert.ToSource(bitmap, dpi);
             double wasWidth = _overlaySize.W;
-            _overlaySize = (bitmap.Width, bitmap.Height);
+            _overlaySize = (bitmap.Width / dpi, bitmap.Height / dpi);
             if (_growNext && wasWidth > 0)
-                _motion.Grow(wasWidth / bitmap.Width, L.Corner is OverlayCorner.TopRight or OverlayCorner.BottomRight, L.Corner is OverlayCorner.BottomLeft or OverlayCorner.BottomRight);
+                _motion.Grow(wasWidth / _overlaySize.W, L.Corner is OverlayCorner.TopRight or OverlayCorner.BottomRight, L.Corner is OverlayCorner.BottomLeft or OverlayCorner.BottomRight);
             _growNext = false;
         }
         catch

@@ -7,7 +7,6 @@ namespace PitBox.Views;
 
 internal sealed class Odometer : StackPanel, IFrameStep
 {
-    private const double Overhang = 6;
     private const string Strip = "0\n1\n2\n3\n4\n5\n6\n7\n8\n9";
     private static readonly string[] Digits = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9" };
 
@@ -22,6 +21,7 @@ internal sealed class Odometer : StackPanel, IFrameStep
     }
 
     private readonly List<Slot> _slots = new();
+    private double _overhang = 6;
     private string _text = "";
     private string _shape = "";
     private double _start, _stagger;
@@ -45,6 +45,7 @@ internal sealed class Odometer : StackPanel, IFrameStep
     {
         TextElement.SetFontSize(this, size);
         TextElement.SetFontStyle(this, italic ? FontStyles.Italic : FontStyles.Normal);
+        _overhang = Math.Max(6, Math.Ceiling(size * (italic ? 0.3 : 0.12)));
         TextElement.SetFontWeight(this, heavy ? FontWeights.ExtraBold : FontWeights.Bold);
         SetResourceReference(TextElement.FontFamilyProperty, "RaceFont");
         SetResourceReference(TextElement.ForegroundProperty, brush);
@@ -124,7 +125,7 @@ internal sealed class Odometer : StackPanel, IFrameStep
             cell.Children.Add(canvas);
             var slot = new Slot { Sizer = sizer, Move = move, Strip = canvas, Shown = start, From = start, To = start };
             sizer.SizeChanged += (_, e) => move.Y = -slot.Shown * e.NewSize.Height;
-            var clip = new Border { ClipToBounds = true, Child = cell, Padding = new Thickness(Overhang, 0, Overhang, 0), Margin = new Thickness(-Overhang, 0, -Overhang, 0) };
+            var clip = new Border { ClipToBounds = true, Child = cell, Padding = new Thickness(_overhang, 0, _overhang, 0), Margin = new Thickness(-_overhang, 0, -_overhang, 0) };
             Children.Add(clip);
             _slots.Add(slot);
         }

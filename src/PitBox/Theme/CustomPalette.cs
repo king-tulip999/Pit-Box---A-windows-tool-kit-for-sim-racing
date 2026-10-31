@@ -113,7 +113,7 @@ internal static class CustomPalette
         var p = new Dictionary<string, Color>(Palettes.Custom);
 
         var tint = M(edge, accent, 0.5);
-        p["Bg"] = p["Panel"] = p["LogoBg"] = bg;
+        p["Bg"] = p["Panel"] = p["LogoBg"] = p["LogoEdge"] = bg;
         p["Surface"] = M(bg, edge, 0.06);
         p["SurfaceAlt"] = p["SegmentBg"] = M(bg, edge, 0.12);
         p["TileRaised"] = M(bg, edge, 0.17);
@@ -131,7 +131,7 @@ internal static class CustomPalette
         p["SegmentEdge"] = M(bg, edge, 0.5);
         p["QuietEdge"] = M(bg, edge, 0.65);
 
-        p["Heading"] = p["BtnHoverFg"] = text;
+        p["Heading"] = p["BtnHoverFg"] = p["LogoFg"] = text;
         p["Text"] = p["TooltipText"] = p["BtnFg"] = M(bg, text, 0.93);
         p["TextMuted"] = M(bg, text, 0.66);
         p["TextFaint"] = M(bg, text, 0.56);
@@ -140,7 +140,7 @@ internal static class CustomPalette
         var accentText = ReadableOn(accent, bg);
         var pressed = Dark(accent, 0.23);
         if (ThemeManager.Contrast(onAccent, pressed) < 4.5) pressed = Dark(accent, 0.12);
-        p["Accent"] = p["AccentEdge"] = p["PrimaryEdge"] = p["PrimaryHover"] = p["SwitchOnBorder"] = p["SwitchOnKnob"] = p["LogoFg"] = p["LogoEdge"] = accent;
+        p["Accent"] = p["AccentEdge"] = p["PrimaryEdge"] = p["PrimaryHover"] = p["SwitchOnBorder"] = p["SwitchOnKnob"] = p["LogoAccent"] = accent;
         p["Mono"] = p["Meter1"] = p["Meter2"] = p["Meter3"] = M(bg, text, 0.8);
         p["Graph"] = hi;
         p["GraphSoft"] = M(bg, hi, 0.2);

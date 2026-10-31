@@ -119,6 +119,11 @@ internal static class ThemeManager
         res["FocusRingGapMargin"] = new Thickness(-gap);
         res["FocusRingOutset"] = gap + 2;
         res["FocusRingMargin"] = new Thickness(-(gap + 2));
+        res["SwitchRingMargin"] = new Thickness(-(gap + 2), 0, 0, 0);
+        res["SwitchRingWidth"] = 32 + 2 * (gap + 2);
+        res["SwitchRingHeight"] = 18 + 2 * (gap + 2);
+        res["R.SwitchRing"] = new CornerRadius(spec.SwitchRadius + gap + 2);
+        res["R.SwitchRingGap"] = new CornerRadius(spec.SwitchRadius + gap);
 
         res["RacingVisibility"] = spec.RacingDecor ? Visibility.Visible : Visibility.Collapsed;
         res["RacingFade"] = Fade;

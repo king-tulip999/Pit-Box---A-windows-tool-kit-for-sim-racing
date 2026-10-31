@@ -16,6 +16,7 @@ internal sealed class RigDiagram : FrameworkElement, IFrameStep
     private double _morphStart, _morph = 1, _introStart, _intro = 1;
     private bool _introQueued;
     private FovResult? _ideal, _idealFrom;
+    private (double Scale, double Cx, double Top)? _fit, _fitFrom;
 
     public RigDiagram()
     {
@@ -45,6 +46,7 @@ internal sealed class RigDiagram : FrameworkElement, IFrameStep
         if (shown is not null && Motion.Flourish && IsLoaded && Morphable(shown, result))
         {
             _from = shown;
+            _fitFrom = _fit;
             _morphStart = FrameDriver.Now;
             _morph = 0;
             FrameDriver.Run(this);
@@ -52,6 +54,7 @@ internal sealed class RigDiagram : FrameworkElement, IFrameStep
         else
         {
             _from = null;
+            _fitFrom = null;
             _morph = 1;
             _idealFrom = null;
             if (_intro >= 1) FrameDriver.Stop(this);
@@ -73,6 +76,7 @@ internal sealed class RigDiagram : FrameworkElement, IFrameStep
             else
             {
                 _from = null;
+                _fitFrom = null;
                 _idealFrom = null;
             }
         }
@@ -193,6 +197,14 @@ internal sealed class RigDiagram : FrameworkElement, IFrameStep
         double worldW = halfWidth * 2 + 30, worldH = far - near + 28;
         double scale = Math.Min((w - LabelRoom * 2) / worldW, h / worldH);
         double cx = w / 2, top = (h - (far - near) * scale) / 2 + 6;
+        if (_fitFrom is { } from && _morph < 1)
+        {
+            double glide = FrameDriver.EaseOut(_morph);
+            scale = from.Scale + (scale - from.Scale) * glide;
+            cx = from.Cx + (cx - from.Cx) * glide;
+            top = from.Top + (top - from.Top) * glide;
+        }
+        _fit = (scale, cx, top);
         Point P(V2 v) => new(cx + v.X * scale, top + (far - v.Y) * scale);
 
         var eye = P(new V2(0, 0));

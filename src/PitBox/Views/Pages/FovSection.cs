@@ -49,6 +49,9 @@ internal sealed class FovSection : StackPanel
     private int _mode = 2;
     private readonly FrameworkElement _compareCard, _measureCard;
     private bool _bottomWide = true;
+    private readonly List<UIElement> _tripleRows = new();
+    private TextBlock? _screenHeading;
+    private bool? _shownTriple;
 
     private static readonly (string Label, Func<FovSetup> Make)[] Presets =
     {
@@ -255,11 +258,12 @@ internal sealed class FovSection : StackPanel
     private void BuildInputs()
     {
         _inputs.Children.Clear();
-        _inputs.Children.Add(Row("Screens", Ui.Segmented(new[] { "Single", "Triple" }, C.Triple ? 1 : 0, i => Change(() => C.Triple = i == 1, rebuild: true), "Layout",
+        _inputs.Children.Add(Row("Screens", Ui.Segmented(new[] { "Single", "Triple" }, C.Triple ? 1 : 0, i => { Change(() => C.Triple = i == 1); ShowTriple(animate: true); }, "Layout",
             new[] { "One screen in front of you", "A center screen plus two side screens angled in" }),
             "Triple: a center screen straight ahead and two side screens angled in towards you."));
 
-        _inputs.Children.Add(Section(C.Triple ? "Center screen" : "Screen"));
+        _screenHeading = Section("");
+        _inputs.Children.Add(_screenHeading);
         ScreenEditor(C.Centre);
 
         int tripleFrom = _inputs.Children.Count;
@@ -270,7 +274,8 @@ internal sealed class FovSection : StackPanel
             if (C.MixedSides)
                 ScreenEditor(C.Side);
         }
-        var tripleRows = Enumerable.Range(tripleFrom, _inputs.Children.Count - tripleFrom).Select(i => _inputs.Children[i]).ToList();
+        _tripleRows.Clear();
+        _tripleRows.AddRange(Enumerable.Range(tripleFrom, _inputs.Children.Count - tripleFrom).Select(i => _inputs.Children[i]));
 
         _inputs.Children.Add(Section("Position"));
         var distance = new NumberBox(ToLen(C.DistanceCm), LenUnit, 64) { Minimum = ToLen(10), Maximum = ToLen(400), Step = Imperial ? 0.5 : 1, Decimals = Imperial ? 1 : 0 };
@@ -295,18 +300,29 @@ internal sealed class FovSection : StackPanel
                 _inputs.Children.Add(Row("Your angle", degrees, "How far your side screens are turned in from flat (0° = in line with the center)."));
             }
         }
-        tripleRows.AddRange(Enumerable.Range(tripleFrom, _inputs.Children.Count - tripleFrom).Select(i => _inputs.Children[i]));
-        if (!C.Triple)
-            foreach (var row in tripleRows)
+        _tripleRows.AddRange(Enumerable.Range(tripleFrom, _inputs.Children.Count - tripleFrom).Select(i => _inputs.Children[i]));
+        ShowTriple(animate: false);
+    }
+
+    private void ShowTriple(bool animate)
+    {
+        if (_screenHeading is not null) _screenHeading.Text = C.Triple ? "Center screen" : "Screen";
+        foreach (var row in _tripleRows)
+        {
+            row.IsEnabled = C.Triple;
+            double opacity = C.Triple ? 1 : 0.45;
+            if (animate) Motion.FadeTo(row, opacity, 180);
+            else
             {
-                row.IsEnabled = false;
-                row.Opacity = 0.45;
-                if (row is FrameworkElement fe)
-                {
-                    fe.ToolTip = "For triple screens: pick Triple above to use it.";
-                    ToolTipService.SetShowOnDisabled(fe, true);
-                }
+                row.BeginAnimation(OpacityProperty, null);
+                row.Opacity = opacity;
             }
+            if (row is FrameworkElement fe)
+            {
+                fe.ToolTip = C.Triple ? null : "For triple screens: pick Triple above to use it.";
+                ToolTipService.SetShowOnDisabled(fe, true);
+            }
+        }
     }
 
     private void ScreenEditor(FovScreen screen)
@@ -389,10 +405,16 @@ internal sealed class FovSection : StackPanel
         _inputs.Children.Add(Row("Resolution", resRow, "Native resolution: sets the aspect ratio (when “From resolution”) and pixels per degree."));
 
         var curve = new StackPanel { Orientation = Orientation.Horizontal };
-        var curved = Ui.Switch(screen.Curved, v => Change(() => screen.Curved = v, rebuild: true));
+        var radiusPart = new StackPanel { Orientation = Orientation.Horizontal, Visibility = screen.Curved ? Visibility.Visible : Visibility.Collapsed };
+        var curved = Ui.Switch(screen.Curved, v =>
+        {
+            Change(() => screen.Curved = v);
+            radiusPart.Visibility = v ? Visibility.Visible : Visibility.Collapsed;
+            if (v) Motion.FadeIn(radiusPart, 180);
+        });
         System.Windows.Automation.AutomationProperties.SetName(curved, "Curved");
         curve.Children.Add(curved);
-        if (screen.Curved)
+        curve.Children.Add(radiusPart);
         {
             var radius = new ComboBox { Width = 78, Margin = new Thickness(8, 0, 0, 0) };
             foreach (var r in Radii) radius.Items.Add($"{r}R");
@@ -411,8 +433,8 @@ internal sealed class FovSection : StackPanel
                 }
                 else custom.Visibility = Visibility.Visible;
             };
-            curve.Children.Add(radius);
-            curve.Children.Add(custom);
+            radiusPart.Children.Add(radius);
+            radiusPart.Children.Add(custom);
         }
         _inputs.Children.Add(Row("Curved", curve, "The “R” rating on the box: 1500R means the curve is part of a circle with a 1.5 m radius. Smaller = more curved. You sit inside the curve."));
     }
@@ -429,10 +451,13 @@ internal sealed class FovSection : StackPanel
         numbers.Children.Add(Number("Horizontal FOV", $"{r.HorizontalFovTotal:0.0}°", r.Triple ? $"All three screens · center {r.HorizontalFovCentre:0.0}°" : "For horizontal-FOV games", "I.Eye", "SageSoft", "SageDeep", HorizontalGames));
         numbers.Children.Add(Number("Vertical FOV", $"{r.VerticalFov:0.0}°", r.Triple && C.MixedSides ? $"Center · sides {r.VerticalFovSide:0.0}°" : "For vertical-FOV games", "I.Sliders", "SlateSoft", "SlateDeep", VerticalGames));
         bool offIdeal = r.Triple && !C.AutoAngle && Math.Abs(r.SideAngle - r.OptimalSideAngle) >= 3;
-        numbers.Children.Add(r.Triple
+        var third = r.Triple
             ? Number("Side angle", $"{r.SideAngle:0.0}°", C.AutoAngle ? $"Turned in from flat · {180 - r.SideAngle:0.0}° between screens" : $"Your angle · ideal is {r.OptimalSideAngle:0.0}°", "I.Rotate", "ApricotSoft", "ApricotDeep",
                 offIdeal ? $"{Math.Abs(r.SideAngle - r.OptimalSideAngle):0.0}° {(r.SideAngle > r.OptimalSideAngle ? "more" : "less")} than the angle that faces you square-on. Side angle → Ideal uses it." : null, warn: offIdeal)
-            : Number("Detail", $"{r.PixelsPerDegree:0.0}", "Pixels per degree (horizontal)", "I.Rotate", "ApricotSoft", "ApricotDeep"));
+            : Number("Detail", $"{r.PixelsPerDegree:0.0}", "Pixels per degree (horizontal)", "I.Rotate", "ApricotSoft", "ApricotDeep");
+        numbers.Children.Add(third);
+        if (_shownTriple is { } before && before != r.Triple) Motion.FadeIn(third, 200);
+        _shownTriple = r.Triple;
         if (numbers != _numbers) _numbers.Children.Add(numbers);
         _measureCard.Margin = _mode == 2 ? new Thickness(5, 0, 5, 10) : new Thickness(0);
         _numbers.Children.Add(_measureCard);
@@ -738,7 +763,7 @@ internal sealed class FovSection : StackPanel
     private void FillMeasure(FovResult r)
     {
         _measure.Children.Clear();
-        var grid = new UniformGrid { Columns = _mode == 2 ? 1 : 3, Margin = new Thickness(-6, 0, -6, 0) };
+        Panel grid = _mode == 2 ? new StackPanel { Margin = new Thickness(-6, 0, -6, 0) } : new UniformGrid { Columns = 3, Margin = new Thickness(-6, 0, -6, 0) };
         void M(string label, string value, string? help)
         {
             var cell = new StackPanel { Margin = new Thickness(6, 3, 6, 3), ToolTip = help };

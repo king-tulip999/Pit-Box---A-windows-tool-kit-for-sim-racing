@@ -940,10 +940,22 @@ internal sealed partial class IracingControllerSection : StackPanel
                     next++;
                 }
             }
+            void Resume(object sender, DependencyPropertyChangedEventArgs e)
+            {
+                if (!body.IsVisible) return;
+                body.IsVisibleChanged -= Resume;
+                Dispatcher.BeginInvoke(More, System.Windows.Threading.DispatcherPriority.Background);
+            }
             void More()
             {
                 if (_body.Child != body) return;
-                Add(RowsPerBatch);
+                if (!body.IsVisible)
+                {
+                    body.IsVisibleChanged -= Resume;
+                    body.IsVisibleChanged += Resume;
+                    return;
+                }
+                Add(RowsPerLaterBatch);
                 if (next < groups.Count) Dispatcher.BeginInvoke(More, System.Windows.Threading.DispatcherPriority.Background);
             }
             Add(RowsPerBatch);
@@ -951,7 +963,7 @@ internal sealed partial class IracingControllerSection : StackPanel
             return body;
         }
 
-        private const int RowsPerBatch = 24;
+        private const int RowsPerBatch = 24, RowsPerLaterBatch = 8;
 
         private static List<Setting> Ordered(List<Setting> settings)
         {

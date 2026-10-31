@@ -74,6 +74,7 @@ internal sealed class Stage : IDisposable
         tile.SetResourceReference(Border.BackgroundProperty, "LogoBg");
         var glyph = new BrandMark();
         glyph.SetResourceReference(BrandMark.ForegroundProperty, "LogoFg");
+        glyph.SetResourceReference(BrandMark.AccentProperty, "LogoAccent");
         tile.Child = glyph;
         var word = new TextBlock();
         word.SetResourceReference(TextBlock.ForegroundProperty, "Heading");

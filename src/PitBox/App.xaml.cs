@@ -228,12 +228,12 @@ public partial class App : Application
             _services.Notify("Fan control is back in Pit-Box", "The background fan control you left running has stopped; Pit-Box drives the fans again.", NoticeKind.Info);
     }
 
-    internal static void RelaunchAfterExit(string args, IEnumerable<string>? steps = null, string? exe = null)
+    internal static void RelaunchAfterExit(string args, IEnumerable<string>? steps = null, string? exe = null, string? scratch = null)
     {
         if (!PitBox.Services.External.Allowed("restart")) return;
         exe ??= Environment.ProcessPath!;
         int pid = Environment.ProcessId;
-        var script = Path.Combine(ScratchFolder(exe), $"PitBox-relaunch-{pid}.cmd");
+        var script = Path.Combine(scratch ??= Scratch(exe), $"PitBox-relaunch-{pid}.cmd");
         var lines = new List<string>
         {
             "@echo off",
@@ -243,9 +243,9 @@ public partial class App : Application
         };
         if (steps is not null) lines.AddRange(steps);
         lines.Add($"start \"\" {BatchPath(exe)} {args}");
-        lines.Add("del \"%~f0\"");
+        lines.Add(IsProtectedScratch(scratch) ? $"cd /d \"%SystemRoot%\" & rd /s /q {BatchPath(scratch)}" : "del \"%~f0\"");
         WriteScript(script, lines);
-        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe", $"/c \".\\{Path.GetFileName(script)}\"")
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(SystemExe("cmd"), $"/c \".\\{Path.GetFileName(script)}\"")
         {
             WorkingDirectory = Path.GetDirectoryName(script)!,
             CreateNoWindow = true, UseShellExecute = false, WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
@@ -274,9 +274,44 @@ public partial class App : Application
         return Path.GetTempPath();
     }
 
+    private const string ProtectedPrefix = "PitBox-scratch-";
+
+    private static string ProtectedRoot => Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+
+    internal static string Scratch(string exe) => Environment.IsPrivilegedProcess ? ProtectedScratch() : ScratchFolder(exe);
+
+    internal static string ProtectedScratch()
+    {
+        var security = new System.Security.AccessControl.DirectorySecurity();
+        security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+        security.SetOwner(new System.Security.Principal.SecurityIdentifier(System.Security.Principal.WellKnownSidType.BuiltinAdministratorsSid, null));
+        foreach (var sid in new[] { System.Security.Principal.WellKnownSidType.LocalSystemSid, System.Security.Principal.WellKnownSidType.BuiltinAdministratorsSid })
+            security.AddAccessRule(new System.Security.AccessControl.FileSystemAccessRule(new System.Security.Principal.SecurityIdentifier(sid, null),
+                System.Security.AccessControl.FileSystemRights.FullControl,
+                System.Security.AccessControl.InheritanceFlags.ContainerInherit | System.Security.AccessControl.InheritanceFlags.ObjectInherit,
+                System.Security.AccessControl.PropagationFlags.None, System.Security.AccessControl.AccessControlType.Allow));
+        var folder = new DirectoryInfo(Path.Combine(ProtectedRoot, ProtectedPrefix + Guid.NewGuid().ToString("N")));
+        FileSystemAclExtensions.Create(folder, security);
+        return folder.FullName;
+    }
+
+    internal static bool IsProtectedScratch(string folder) =>
+        string.Equals(Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(folder)), ProtectedRoot, StringComparison.OrdinalIgnoreCase)
+        && Path.GetFileName(Path.TrimEndingDirectorySeparator(folder)).StartsWith(ProtectedPrefix, StringComparison.Ordinal);
+
+    internal static void RemoveScratch(string folder)
+    {
+        if (!IsProtectedScratch(folder)) return;
+        try { Directory.Delete(folder, recursive: true); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+    }
+
     internal static string BatchPath(string path) => "\"" + path.Replace("%", "%%") + "\"";
 
     private static string SystemTool(string name) => $"\"%SystemRoot%\\System32\\{name}.exe\"";
+
+    internal static string SystemExe(string name) => Path.Combine(Environment.SystemDirectory, name + ".exe");
+
+    internal static string Explorer => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
     internal static readonly string WaitASecond = SystemTool("ping") + " -n 2 127.0.0.1 >nul";
 
     public static void Quit()

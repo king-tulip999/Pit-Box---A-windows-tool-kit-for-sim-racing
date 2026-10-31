@@ -91,7 +91,8 @@ public partial class MainWindow : Window
         _app.IsWindowVisible = () => IsVisible && WindowState != WindowState.Minimized;
         _app.Notice += (title, message, kind, action) => ShowToast(title, message, kind, action);
         _app.Updates.Changed += UpdateBadgeState;
-        UpdateBadge.Click += (_, _) => _ = _app.Updates.InstallAsync();
+        _updateBadge.Style = Ui.Res<Style>("PrimaryButton");
+        _updateBadge.Click += (_, _) => _ = _app.Updates.InstallAsync();
 
         ContentRendered += (_, _) =>
         {
@@ -409,7 +410,7 @@ public partial class MainWindow : Window
             foreach (var page in plugin.Pages.Where(p => _nav.ContainsKey(p.Key)))
                 pages.Add(new SidebarPage(page.Key, page.Title));
         pages = pages.OrderBy(p => keys.IndexOf(p.Key)).ToList();
-        _sidebar.Build(pages, new SidebarPage("settings", "Settings"), _searchButton, _searchHost, null);
+        _sidebar.Build(pages, new SidebarPage("settings", "Settings"), _searchButton, _searchHost, null, _updateBadge);
         SyncSidebar(animate: false);
     }
 
@@ -593,6 +594,7 @@ public partial class MainWindow : Window
     private const double TitleButtonHeight = 28;
 
     private readonly Button _searchButton;
+    private readonly Button _updateBadge = new() { Visibility = Visibility.Collapsed, HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly Border _searchHost = new() { Visibility = Visibility.Collapsed };
     private SettingsSearchBox? _search;
 
@@ -780,6 +782,7 @@ public partial class MainWindow : Window
         base.OnDpiChanged(oldDpi, newDpi);
         Hairline.Use(newDpi.DpiScaleX);
         FitTextToDpi(newDpi.DpiScaleX);
+        FitBrand();
     }
 
     private void FitTextToDpi(double scale)
@@ -884,13 +887,13 @@ public partial class MainWindow : Window
     private void UpdateBadgeState()
     {
         var u = _app.Updates;
-        UpdateBadge.Visibility = u.Available ? Visibility.Visible : Visibility.Collapsed;
+        _updateBadge.Visibility = u.Available ? Visibility.Visible : Visibility.Collapsed;
         if (u.Latest is not { } r) return;
         bool downloading = u.State == UpdateState.Downloading;
-        UpdateBadge.IsEnabled = !downloading;
-        UpdateBadge.Content = downloading ? $"Downloading… {u.Progress:0%}" : "Update available";
+        _updateBadge.IsEnabled = !downloading;
+        _updateBadge.Content = downloading ? $"Downloading… {u.Progress:0%}" : "Update available";
         bool self = r.ExeUrl is not null && UpdateService.CanSelfInstall && !_app.Demo;
-        UpdateBadge.ToolTip = "A new version of Pit-Box is out. "
+        _updateBadge.ToolTip = "A new version of Pit-Box is out. "
             + (self ? "Click to download it, close Pit-Box, swap the file and start it again; your settings stay." : "Click to open the release page and download it.");
     }
 
@@ -1056,7 +1059,7 @@ public partial class MainWindow : Window
 
     private void FitBrand()
     {
-        Ui.FitLockup(LogoTile, Wordmark, maxHeight: TitleButtonHeight, width: 211, gap: 8);
+        Ui.FitWordmark(Wordmark, Theme.Brand.CrispSize(TitleButtonHeight, VisualTreeHelper.GetDpi(this).PixelsPerDip) ?? TitleButtonHeight);
         ShowThemeLink(ThemeManager.Current.Link);
         FitThemeLogo();
     }

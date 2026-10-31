@@ -27,6 +27,19 @@ internal sealed class OverlayPreviewMotion
     private readonly TranslateTransform _move = new();
     private readonly ScaleTransform _grow = new();
     private int _generation;
+    private bool _holding;
+    private const double HoverWash = 0.14;
+    private const double HeldWash = 0.26;
+
+    public bool Holding
+    {
+        get => _holding;
+        set
+        {
+            _holding = value;
+            _ring.Opacity = value ? HeldWash : HoverWash;
+        }
+    }
 
     public OverlayPreviewMotion(Canvas scene, Image preview, Func<IReadOnlyList<OverlayHit>> hits)
     {
@@ -34,9 +47,9 @@ internal sealed class OverlayPreviewMotion
         _preview = preview;
         _hits = hits;
         _preview.RenderTransform = new TransformGroup { Children = { _grow, _move } };
-        Hairline.Frame(_ring);
         Hairline.Frame(_startSize);
-        _ring.SetResourceReference(Border.BorderBrushProperty, "AccentText");
+        _ring.SetResourceReference(Border.BackgroundProperty, "AccentText");
+        _ring.Opacity = HoverWash;
         _startSize.SetResourceReference(Border.BorderBrushProperty, "AccentText");
         _startSize.Opacity = 0.6;
         scene.Children.Add(_layer);
@@ -78,111 +91,6 @@ internal sealed class OverlayPreviewMotion
             boxes[(hit.Group, hit.Metric)] = boxes.TryGetValue((hit.Group, hit.Metric), out var b) ? Rect.Union(b, r) : r;
         }
         return boxes;
-    }
-
-    public static BitmapSource? Crop(BitmapSource source, Rect box)
-    {
-        var pixels = new Int32Rect((int)Math.Floor(box.X), (int)Math.Floor(box.Y), (int)Math.Ceiling(box.Width) + 1, (int)Math.Ceiling(box.Height) + 1);
-        pixels.Width = Math.Min(pixels.Width, source.PixelWidth - pixels.X);
-        pixels.Height = Math.Min(pixels.Height, source.PixelHeight - pixels.Y);
-        if (pixels.X < 0 || pixels.Y < 0 || pixels.Width <= 0 || pixels.Height <= 0) return null;
-        var copy = new CroppedBitmap(source, pixels);
-        copy.Freeze();
-        return copy;
-    }
-
-    private Image? Piece(Frame frame, Rect pixels)
-    {
-        if (Crop(frame.Source, pixels) is not { } crop) return null;
-        var place = frame.Place(new Rect(Math.Floor(pixels.X), Math.Floor(pixels.Y), crop.PixelWidth, crop.PixelHeight));
-        var image = new Image { Source = crop, Width = place.Width, Height = place.Height, Stretch = Stretch.Fill, SnapsToDevicePixels = true };
-        Canvas.SetLeft(image, place.X);
-        Canvas.SetTop(image, place.Y);
-        _layer.Children.Add(image);
-        return image;
-    }
-
-    private static Color? Backdrop(BitmapSource source)
-    {
-        int w = source.PixelWidth, h = source.PixelHeight;
-        if (w < 8 || h < 8) return null;
-        var pixel = new byte[4];
-        Color? best = null;
-        foreach (var (x, y) in new[] { (w / 2, 1), (1, h / 2), (w - 2, h / 2), (w / 2, h - 2), (4, 4), (w - 5, h - 5) })
-        {
-            source.CopyPixels(new Int32Rect(x, y, 1, 1), pixel, 4, 0);
-            if (pixel[3] > (best?.A ?? 0)) best = Color.FromArgb(pixel[3], pixel[2], pixel[1], pixel[0]);
-        }
-        return best;
-    }
-
-    private void RevealPreview(double ms, double from)
-    {
-        int generation = _generation;
-        var fade = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(ms), FillBehavior = FillBehavior.Stop };
-        fade.KeyFrames.Add(new DiscreteDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.Zero)));
-        fade.KeyFrames.Add(new DiscreteDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(ms * from))));
-        fade.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(ms))) { EasingFunction = Motion.Ease });
-        fade.Completed += (_, _) => { if (generation == _generation) _layer.Children.Clear(); };
-        _preview.Opacity = 1;
-        _preview.BeginAnimation(UIElement.OpacityProperty, fade);
-    }
-
-    public void Morph(Frame before, double ms = 340)
-    {
-        Stop();
-        if (!Motion.Flourish || Settled() is not { } now) return;
-        var was = Boxes(before.Hits);
-        var next = Boxes(now.Hits);
-        if (was.Count == next.Count && was.All(p => next.TryGetValue(p.Key, out var r) && r == p.Value) && before.Bounds.Size == now.Bounds.Size) return;
-        var duration = TimeSpan.FromMilliseconds(ms);
-
-        if (Backdrop(now.Source) is { } color)
-        {
-            var backdrop = new Rectangle { Fill = new SolidColorBrush(color), Width = now.Bounds.Width, Height = now.Bounds.Height };
-            Canvas.SetLeft(backdrop, now.At.X);
-            Canvas.SetTop(backdrop, now.At.Y);
-            _layer.Children.Add(backdrop);
-            backdrop.BeginAnimation(FrameworkElement.WidthProperty, new DoubleAnimation(before.Bounds.Width, now.Bounds.Width, duration) { EasingFunction = Motion.Ease, FillBehavior = FillBehavior.Stop });
-            backdrop.BeginAnimation(FrameworkElement.HeightProperty, new DoubleAnimation(before.Bounds.Height, now.Bounds.Height, duration) { EasingFunction = Motion.Ease, FillBehavior = FillBehavior.Stop });
-        }
-
-        foreach (var (key, rect) in next)
-        {
-            if (Piece(now, rect) is not { } image) continue;
-            if (was.TryGetValue(key, out var old))
-            {
-                var from = before.Place(old);
-                var to = now.Place(rect);
-                var shift = new TranslateTransform();
-                image.RenderTransform = shift;
-                shift.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(from.X - to.X, 0, duration) { EasingFunction = Motion.Ease, FillBehavior = FillBehavior.Stop });
-                shift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(from.Y - to.Y, 0, duration) { EasingFunction = Motion.Ease, FillBehavior = FillBehavior.Stop });
-            }
-            else
-            {
-                var enter = new DoubleAnimationUsingKeyFrames { Duration = duration, FillBehavior = FillBehavior.Stop };
-                enter.KeyFrames.Add(new DiscreteDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.Zero)));
-                enter.KeyFrames.Add(new DiscreteDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(ms * 0.3))));
-                enter.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(duration)) { EasingFunction = Motion.Ease });
-                image.BeginAnimation(UIElement.OpacityProperty, enter);
-                var wipe = new RectangleGeometry(new Rect(0, 0, image.Width, image.Height));
-                image.Clip = wipe;
-                wipe.BeginAnimation(RectangleGeometry.RectProperty, new RectAnimation(new Rect(0, 0, 0, image.Height), new Rect(0, 0, image.Width, image.Height), duration) { EasingFunction = Motion.Ease, FillBehavior = FillBehavior.Stop });
-            }
-        }
-
-        foreach (var (key, rect) in was)
-        {
-            if (next.ContainsKey(key) || Piece(before, rect) is not { } image) continue;
-            image.Opacity = 0;
-            image.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(ms * 0.6)) { FillBehavior = FillBehavior.Stop });
-            var lift = new TranslateTransform();
-            image.RenderTransform = lift;
-            lift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(0, -5, TimeSpan.FromMilliseconds(ms * 0.6)) { FillBehavior = FillBehavior.Stop });
-        }
-
-        RevealPreview(ms, 0.75);
     }
 
     public void Wipe(Frame before, bool glow, double ms = 450)
@@ -238,43 +146,6 @@ internal sealed class OverlayPreviewMotion
         fade.Completed += (_, _) => { if (generation == _generation) _layer.Children.Clear(); };
         old.BeginAnimation(UIElement.OpacityProperty, fade);
         _layer.Children.Add(old);
-    }
-
-    public void Hide()
-    {
-        if (!Motion.Flourish) return;
-        Stop();
-        _preview.Clip = new RectangleGeometry(Rect.Empty);
-    }
-
-    public void Boot(double ms = 520)
-    {
-        Stop();
-        if (!Motion.Flourish || Settled() is not { } now) return;
-        var bounds = now.Bounds;
-        var duration = TimeSpan.FromMilliseconds(ms);
-        int generation = _generation;
-        double width = _preview.ActualWidth, height = _preview.ActualHeight;
-        var reveal = new RectangleGeometry(new Rect(0, 0, width, 0));
-        _preview.Clip = reveal;
-        var grow = new RectAnimation(new Rect(0, 0, width, 0), new Rect(0, 0, width, height), duration) { FillBehavior = FillBehavior.Stop };
-        grow.Completed += (_, _) => { if (generation == _generation) _preview.Clip = null; };
-        reveal.BeginAnimation(RectangleGeometry.RectProperty, grow);
-
-        var scan = new Rectangle { Width = bounds.Width, Height = 2, Fill = Ui.Res<Brush>("AccentText"), Opacity = 0 };
-        Canvas.SetLeft(scan, bounds.X);
-        Canvas.SetTop(scan, bounds.Y);
-        var down = new TranslateTransform();
-        scan.RenderTransform = down;
-        down.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(0, bounds.Height, duration) { FillBehavior = FillBehavior.Stop });
-        var show = new DoubleAnimationUsingKeyFrames { Duration = duration + TimeSpan.FromMilliseconds(160), FillBehavior = FillBehavior.Stop };
-        show.KeyFrames.Add(new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.Zero)));
-        show.KeyFrames.Add(new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(duration)));
-        show.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(duration + TimeSpan.FromMilliseconds(160))));
-        show.Completed += (_, _) => { if (generation == _generation) _layer.Children.Clear(); };
-        scan.BeginAnimation(UIElement.OpacityProperty, show);
-        _layer.Children.Add(scan);
-        _preview.Opacity = 1;
     }
 
     public void Glide(Point from)

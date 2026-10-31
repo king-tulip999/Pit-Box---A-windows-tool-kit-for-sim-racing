@@ -13,10 +13,16 @@ internal sealed class PitExitFrame
     public bool[] OnPitRoad = new bool[64];
     public int[] TrackSurface = new int[64];
     public int[] ClassId = new int[64];
+    public int[] FastRepairsUsed = new int[64];
+    public bool[] Penalty = new bool[64];
+    public bool[] Meatball = new bool[64];
     public double ClassLapTime;
-    public double FuelToAdd;
-    public bool TiresPlanned;
+    public double FuelRequest;
+    public double Tank;
+    public double FuelPerLap;
+    public int TireCount;
     public double RepairTime;
+    public bool ServiceActive;
     public float FuelLevel;
     public bool Caution;
 }
@@ -30,6 +36,7 @@ internal sealed class PitExitPrediction
     public bool Unreliable;
     public double PitLoss;
     public double Stationary;
+    public double FuelAdded;
     public int CurrentClassPos;
     public int ProjectedClassPos;
     public ExitCar? Ahead;
@@ -42,11 +49,15 @@ internal sealed class PitExitPredictor
 {
     const int Bins = 256;
     const double TrafficWindow = 1.5;
+    const double StillStep = 0.19, StillPct = 5e-7;
 
-    const double FallbackLaneDelta = 25, FallbackFillRate = 2.5, FallbackTireExtra = 10, FallbackOppStop = 20;
+    const double FallbackLane = 25, FallbackTyreTime = 10, FallbackOppStop = 20;
+    const double FallbackFuelRate = 2.5, FallbackFuelStart = 0.7, FallbackFuelTail = 0.45, FallbackSettle = 0.06;
 
     readonly double[] _curve = new double[Bins];
     readonly PitTrack[] _pit = new PitTrack[64];
+    readonly double[] _lastStop = new double[64];
+    readonly ServiceTrack _service = new();
     readonly PitLossStore _store;
     PitLossModel _m = new();
     double _lap;
@@ -64,6 +75,8 @@ internal sealed class PitExitPredictor
         _m = _store.Get($"{trackId}|{carId}");
         Array.Fill(_curve, double.NaN);
         foreach (var p in _pit) p.Active = false;
+        Array.Clear(_lastStop);
+        _service.Reset();
         _seen = false;
     }
 
@@ -126,60 +139,107 @@ internal sealed class PitExitPredictor
 
     void TrackStops(PitExitFrame f)
     {
+        double now = f.SessionTime;
         for (int i = 0; i < 64; i++)
         {
             var p = _pit[i];
             bool onRoad = f.OnPitRoad[i];
-            bool inStall = f.TrackSurface[i] == 1;
+            float pct = f.LapDistPct[i];
 
             if (onRoad && !p.Active)
             {
                 p.Active = true;
-                p.Valid = !f.Caution && _seen && !inStall;
-                p.EntryTime = f.SessionTime;
-                p.EntryPct = f.LapDistPct[i];
-                p.StallTotal = 0;
-                p.StallStart = double.NaN;
-                p.Fuel = f.FuelLevel;
-                p.Tires = f.TiresPlanned;
-                p.Repairs = f.RepairTime > 0;
+                p.Seen = _seen && f.TrackSurface[i] != 1;
+                p.Valid = p.Seen && !f.Caution;
+                p.Irregular = false;
+                p.FastRepairs = f.FastRepairsUsed[i];
+                p.EntryTime = p.LastTime = now;
+                p.EntryPct = p.LastPct = pct;
+                p.Stopped = 0;
+                p.Stopping = false;
+                if (i == f.PlayerIdx) _service.Reset();
             }
             if (!p.Active) continue;
 
             if (f.TrackSurface[i] == -1) p.Valid = false;
-            if (inStall && double.IsNaN(p.StallStart)) p.StallStart = f.SessionTime;
-            if (!inStall && !double.IsNaN(p.StallStart))
+            if (f.TrackSurface[i] == -1 || f.Penalty[i] || f.Meatball[i] || f.FastRepairsUsed[i] > p.FastRepairs) p.Irregular = true;
+            if (now - p.LastTime >= StillStep)
             {
-                p.StallTotal += f.SessionTime - p.StallStart;
-                p.StallStart = double.NaN;
+                double moved = Math.Abs(pct - p.LastPct);
+                if (Math.Min(moved, 1 - moved) < StillPct)
+                {
+                    if (!p.Stopping)
+                    {
+                        p.Stopping = true;
+                        p.StopFrom = p.LastTime;
+                    }
+                    p.StopTo = now;
+                }
+                else p.EndStop();
+                p.LastTime = now;
+                p.LastPct = pct;
             }
+            if (i == f.PlayerIdx) _service.Sample(f);
 
             if (!onRoad)
             {
+                p.EndStop();
                 p.Active = false;
-                if (p.Valid && !f.Caution && _lap > 0) Learn(f, i, p);
+                bool sameClass = f.ClassId[i] == f.ClassId[f.PlayerIdx];
+                bool learned = p.Valid && sameClass && !f.Caution && _lap > 0 && LearnLane(f, i, p);
+                if (i == f.PlayerIdx) learned |= LearnService(p);
+                else if (p.Seen && !p.Irregular && p.Stopped > 2)
+                {
+                    _lastStop[i] = p.Stopped;
+                    if (sameClass)
+                    {
+                        _m.AddOppStop(p.Stopped);
+                        learned = true;
+                    }
+                }
+                if (learned) _store.Save();
             }
         }
     }
 
-    void Learn(PitExitFrame f, int i, PitTrack p)
+    bool LearnLane(PitExitFrame f, int i, PitTrack p)
     {
-        double lane = (f.SessionTime - p.EntryTime) - p.StallTotal - Span(p.EntryPct, f.LapDistPct[i]);
-        if (lane is > 0 and < 120) _m.LaneDelta = Blend(_m.LaneDelta, lane, ref _m.LaneSamples);
+        double lane = (f.SessionTime - p.EntryTime) - p.Stopped - Span(p.EntryPct, f.LapDistPct[i]);
+        if (lane is > 0 and < 120) _m.Lane = Blend(_m.Lane, lane, ref _m.LaneSamples);
+        _m.EntryPct = p.EntryPct;
+        return true;
+    }
 
-        if (i != f.PlayerIdx)
+    bool LearnService(PitTrack p)
+    {
+        var s = _service;
+        if (!s.SeenIdle || !s.Started || !s.Ended) return false;
+        double service = s.End - s.Start;
+        int n = s.Tyres;
+        bool fuelled = s.RiseAmount > 0.3 && s.RiseTime > 1;
+
+        if (fuelled) _m.FuelRate = Blend(_m.FuelRate, s.RiseAmount / s.RiseTime, ref _m.FuelSamples);
+        if (s.Repair)
         {
-            if (p.StallTotal > 2) _m.OppStop = Blend(_m.OppStop, p.StallTotal, ref _m.OppSamples);
+            if (fuelled) _m.RepairParallel = s.RepairOverlap;
         }
-        else if (!p.Repairs && p.StallTotal > 1)
+        else if (fuelled && s.Segments == 1)
         {
-            double added = f.FuelLevel - p.Fuel;
-            if (!p.Tires && added > 0.5)
-                _m.FillRate = Blend(_m.FillRate, added / p.StallTotal, ref _m.FuelSamples);
-            else if (p.Tires && _m.FillRate is double rate)
-                _m.TireExtra = Blend(_m.TireExtra, Math.Max(0, p.StallTotal - Math.Max(0, added) / rate), ref _m.TireSamples);
+            _m.FuelStart[n] = Blend(_m.FuelStart[n], s.FirstRise - s.Start, ref _m.FuelStartSamples[n]);
+            double tail = s.End - s.LastRise;
+            if (n == 0 || tail <= (_m.FuelTail ?? FallbackFuelTail) + 0.5)
+            {
+                _m.FuelTail = Blend(_m.FuelTail, tail, ref _m.TailSamples);
+                if (n > 0) _m.TyreBound[n] = Math.Min(_m.TyreBound[n] ?? double.MaxValue, service);
+            }
+            else _m.TyreTime[n] = Blend(_m.TyreTime[n], service, ref _m.TyreSamples[n]);
         }
-        _store.Save();
+        else if (!fuelled && s.RiseAmount <= 0 && n > 0)
+            _m.TyreTime[n] = Blend(_m.TyreTime[n], service, ref _m.TyreSamples[n]);
+
+        double settle = p.Stopped - service;
+        if (p.Valid && service > 0 && Math.Abs(settle) < 3) _m.Settle = Blend(_m.Settle, settle, ref _m.SettleSamples);
+        return true;
     }
 
     static double Blend(double? old, double sample, ref int n)
@@ -188,17 +248,41 @@ internal sealed class PitExitPredictor
         return old is double o ? o + (sample - o) / n : sample;
     }
 
+    internal double FuelToAdd(PitExitFrame f)
+    {
+        if (f.FuelRequest <= 0) return 0;
+        if (f.Tank <= 0) return f.FuelRequest;
+        float me = f.LapDistPct[f.PlayerIdx];
+        double toEntry = _m.EntryPct is double e && me >= 0 ? ((e - me) % 1 + 1) % 1 : 0;
+        double arrival = Math.Max(0, f.FuelLevel - f.FuelPerLap * toEntry);
+        return Math.Min(f.FuelRequest, Math.Max(0, f.Tank - arrival));
+    }
+
     PitExitPrediction Predict(PitExitFrame f)
     {
         var r = new PitExitPrediction();
         int me = f.PlayerIdx;
         if (_lap <= 0 || f.OnPitRoad[me] || f.TrackSurface[me] == -1 || f.LapDistPct[me] < 0) return r;
 
-        double lane = _m.LaneDelta ?? FallbackLaneDelta;
-        double fuelTime = f.FuelToAdd > 0 ? f.FuelToAdd / (_m.FillRate ?? FallbackFillRate) : 0;
-        r.Stationary = fuelTime + (f.TiresPlanned ? _m.TireExtra ?? FallbackTireExtra : 0) + f.RepairTime;
+        double lane = _m.Lane ?? FallbackLane;
+        double fuel = FuelToAdd(f);
+        int n = Math.Clamp(f.TireCount, 0, 4);
+        double fuelPart = fuel > 0
+            ? (_m.FuelStart[n] ?? _m.FuelStart[0] ?? FallbackFuelStart) + fuel / (_m.FuelRate ?? FallbackFuelRate) + (_m.FuelTail ?? FallbackFuelTail)
+            : 0;
+        double tyrePart = n > 0 ? _m.TyreTime[n] ?? Math.Min(FallbackTyreTime, _m.TyreBound[n] ?? double.MaxValue) : 0;
+        double service = Math.Max(fuelPart, tyrePart);
+        bool serviced = service > 0;
+        if (f.RepairTime > 0) service = _m.RepairParallel == true ? Math.Max(service, f.RepairTime) : service + f.RepairTime;
+
+        bool fuelKnown = fuel <= 0 || (_m.FuelRate != null && _m.FuelStart[n] != null && _m.FuelTail != null);
+        bool tyresKnown = n == 0 || _m.TyreTime[n] != null || (_m.TyreBound[n] is double bound && fuelKnown && fuelPart >= bound);
+        bool repairKnown = f.RepairTime <= 0 || !serviced || _m.RepairParallel != null;
+
+        r.FuelAdded = fuel;
+        r.Stationary = service > 0 ? service + (_m.Settle ?? FallbackSettle) : 0;
         r.PitLoss = lane + r.Stationary;
-        r.Calibrated = _m.LaneDelta != null && (f.FuelToAdd <= 0 || _m.FillRate != null) && (!f.TiresPlanned || _m.TireExtra != null);
+        r.Calibrated = _m.Lane != null && fuelKnown && tyresKnown && repairKnown;
         r.Unreliable = f.Caution;
         r.Valid = true;
 
@@ -238,14 +322,16 @@ internal sealed class PitExitPredictor
     {
         var p = _pit[i];
         if (!f.OnPitRoad[i] || !p.Active) return 0;
-        double opp = _m.OppStop ?? FallbackOppStop;
-        double stallNow = double.IsNaN(p.StallStart) ? 0 : f.SessionTime - p.StallStart;
-        double stall = stallNow > 0 ? Math.Max(stallNow, opp)
-                     : p.StallTotal > 0 ? p.StallTotal
-                     : opp;
+        double opp = ExpectedStop(i);
+        double stop = p.Stopping ? Math.Max(p.Stopped + p.StopTo - p.StopFrom, opp)
+                    : p.Stopped > 0 ? p.Stopped
+                    : opp;
         double lostSoFar = (f.SessionTime - p.EntryTime) - Span(p.EntryPct, f.LapDistPct[i]);
-        return Math.Max(0, lane + stall - lostSoFar);
+        return Math.Max(0, lane + stop - lostSoFar);
     }
+
+    internal double ExpectedStop(int i) =>
+        _pit[i].Active && _pit[i].Irregular ? 0 : _lastStop[i] > 0 ? _lastStop[i] : _m.OppStop() ?? FallbackOppStop;
 
     double Wrap(double x)
     {
@@ -257,19 +343,121 @@ internal sealed class PitExitPredictor
 
     sealed class PitTrack
     {
-        public bool Active, Valid, Tires, Repairs;
-        public double EntryTime, EntryPct, StallStart, StallTotal;
-        public float Fuel;
+        public bool Active, Seen, Valid, Irregular, Stopping;
+        public int FastRepairs;
+        public double EntryTime, EntryPct, LastTime, LastPct, StopFrom, StopTo, Stopped;
+
+        public void EndStop()
+        {
+            if (!Stopping) return;
+            Stopped += StopTo - StopFrom;
+            Stopping = false;
+        }
+    }
+
+    sealed class ServiceTrack
+    {
+        public bool SeenIdle, Started, Ended, Rising, Repair, RepairOverlap;
+        public double Start, End, LastTime, FirstRise, LastRise, RiseTime, RiseAmount;
+        public float LastLevel;
+        public int Tyres, Segments;
+
+        public void Reset()
+        {
+            SeenIdle = Started = Ended = Rising = Repair = RepairOverlap = false;
+            Start = End = LastTime = FirstRise = LastRise = RiseTime = RiseAmount = 0;
+            LastLevel = 0;
+            Tyres = Segments = 0;
+        }
+
+        public void Sample(PitExitFrame f)
+        {
+            double now = f.SessionTime;
+            float level = f.FuelLevel;
+            if (!f.ServiceActive)
+            {
+                if (!Started) SeenIdle = true;
+                else if (!Ended)
+                {
+                    Ended = true;
+                    End = now;
+                }
+                return;
+            }
+            if (Ended) return;
+            if (!Started)
+            {
+                Started = true;
+                Start = now;
+                Tyres = Math.Clamp(f.TireCount, 0, 4);
+                Repair = f.RepairTime > 0;
+            }
+            else if (now > LastTime)
+            {
+                if (level > LastLevel + 1e-4f)
+                {
+                    if (!Rising && ++Segments == 1) FirstRise = LastTime;
+                    Rising = true;
+                    LastRise = now;
+                    RiseTime += now - LastTime;
+                    RiseAmount += level - LastLevel;
+                    if (f.RepairTime > 0.5) RepairOverlap = true;
+                }
+                else Rising = false;
+            }
+            LastTime = now;
+            LastLevel = level;
+        }
     }
 }
 
 internal sealed class PitLossModel
 {
-    public double? LaneDelta { get; set; }
-    public double? FillRate { get; set; }
-    public double? TireExtra { get; set; }
-    public double? OppStop { get; set; }
-    public int LaneSamples, FuelSamples, TireSamples, OppSamples;
+    public const int Slots = 5;
+
+    public double? Lane { get; set; }
+    public double? EntryPct { get; set; }
+    public double? FuelRate { get; set; }
+    public double? FuelTail { get; set; }
+    public double? Settle { get; set; }
+    public bool? RepairParallel { get; set; }
+    public double?[] FuelStart { get; set; } = new double?[Slots];
+    public double?[] TyreTime { get; set; } = new double?[Slots];
+    public double?[] TyreBound { get; set; } = new double?[Slots];
+    public double[] OppRecent { get; set; } = [];
+    public int LaneSamples, FuelSamples, TailSamples, SettleSamples;
+    public int[] FuelStartSamples = new int[Slots], TyreSamples = new int[Slots];
+
+    const int OppKept = 9;
+
+    public double? OppStop()
+    {
+        if (OppRecent.Length == 0) return null;
+        var sorted = OppRecent.Order().ToArray();
+        int mid = sorted.Length / 2;
+        return sorted.Length % 2 == 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+    }
+
+    public void AddOppStop(double stop) => OppRecent = [.. OppRecent.TakeLast(OppKept - 1), stop];
+
+    public PitLossModel Sized()
+    {
+        OppRecent ??= [];
+        FuelStart = Fit(FuelStart);
+        TyreTime = Fit(TyreTime);
+        TyreBound = Fit(TyreBound);
+        FuelStartSamples = Fit(FuelStartSamples);
+        TyreSamples = Fit(TyreSamples);
+        return this;
+    }
+
+    static T[] Fit<T>(T[]? a)
+    {
+        if (a is { Length: Slots }) return a;
+        var b = new T[Slots];
+        if (a is not null) Array.Copy(a, b, Math.Min(a.Length, Slots));
+        return b;
+    }
 }
 
 internal sealed class PitLossStore
@@ -286,7 +474,7 @@ internal sealed class PitLossStore
     }
 
     public PitLossModel Get(string key) =>
-        _models.TryGetValue(key, out var m) ? m : _models[key] = new PitLossModel();
+        _models.TryGetValue(key, out var m) && m is not null ? m.Sized() : _models[key] = new PitLossModel();
 
     public void Save()
     {

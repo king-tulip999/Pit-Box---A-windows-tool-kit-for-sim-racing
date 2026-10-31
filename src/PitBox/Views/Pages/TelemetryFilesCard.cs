@@ -140,7 +140,7 @@ internal sealed class TelemetryFilesCard : ContentControl
     private static void OpenFolder(string folder)
     {
         if (!PitBox.Services.External.Allowed("open " + folder)) return;
-        try { Process.Start(new ProcessStartInfo("explorer.exe", $"\"{folder}\"") { UseShellExecute = true })?.Dispose(); }
+        try { Process.Start(new ProcessStartInfo(App.Explorer, $"\"{folder}\"") { UseShellExecute = true })?.Dispose(); }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException) { App.LogError(ex); }
     }
 }

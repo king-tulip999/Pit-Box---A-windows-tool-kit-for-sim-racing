@@ -318,6 +318,16 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
             row.Children.Add(repair);
             startup.Children.Add(row);
         }
+        else if (_startupState?.Exposed == true)
+        {
+            var row = Notice("ApricotSoft", "ApricotDeep", "I.Alert",
+                "Other programs can change the folder Pit-Box starts from, so they could get administrator rights through this startup entry. Moving it to Program Files closes that gap.");
+            var move = Ui.LabeledButton("I.Folder", "Move to Program Files", MoveToProgramFiles, "SoftButton");
+            move.IsEnabled = !_startupBusy;
+            Grid.SetColumn(move, 2);
+            row.Children.Add(move);
+            startup.Children.Add(row);
+        }
         if (_startupError is not null)
         {
             var banner = Ui.DangerBanner("Windows didn't let Pit-Box change its startup task",
@@ -338,6 +348,27 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         startup.Children.Add(Ui.SettingRow("Start in background",
             "Opens in the tray; keybinds, fans and the overlay run as normal.",
             Ui.Switch(U.StartMinimized, v => { U.StartMinimized = v; _app.Save(); })));
+    }
+
+    private async void MoveToProgramFiles()
+    {
+        if (_app.Demo || _startupBusy || !External.Allowed("move Pit-Box to Program Files")) return;
+        _startupBusy = true;
+        Build();
+        string? target = null, error = null;
+        await Task.Run(() =>
+        {
+            try { target = StartupManager.MoveToProgramFiles(); }
+            catch (Exception ex) { error = ex.Message; }
+        });
+        _startupBusy = false;
+        if (target is null)
+        {
+            _app.Notify("Pit-Box wasn't moved", error ?? "", NoticeKind.Warning, important: true);
+            Build();
+            return;
+        }
+        App.RelaunchAfterExit("", exe: target);
     }
 
     private void SetStartup(bool on)
@@ -580,7 +611,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         try
         {
             if (File.Exists(DiagnosticReport.LogPath))
-                Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{DiagnosticReport.LogPath}\"") { UseShellExecute = true })?.Dispose();
+                Process.Start(new ProcessStartInfo(App.Explorer, $"/select,\"{DiagnosticReport.LogPath}\"") { UseShellExecute = true })?.Dispose();
             else
             {
                 OpenFolder(ConfigStore.Folder);
@@ -1118,7 +1149,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         }
         try
         {
-            Process.Start(new ProcessStartInfo("cmd.exe", "/k winget install namazso.PawnIO -e && (echo. & echo Done. Restart Pit-Box to use it.) || (echo. & echo If it says exit code 1072, an earlier copy is still waiting to be removed: restart Windows, then install again.)") { UseShellExecute = true })?.Dispose();
+            Process.Start(new ProcessStartInfo(App.SystemExe("cmd"), "/k winget install namazso.PawnIO -e && (echo. & echo Done. Restart Pit-Box to use it.) || (echo. & echo If it says exit code 1072, an earlier copy is still waiting to be removed: restart Windows, then install again.)") { UseShellExecute = true })?.Dispose();
         }
         catch
         {
@@ -1132,7 +1163,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         try
         {
             Directory.CreateDirectory(folder);
-            Process.Start(new ProcessStartInfo("explorer.exe", folder) { UseShellExecute = true })?.Dispose();
+            Process.Start(new ProcessStartInfo(App.Explorer, folder) { UseShellExecute = true })?.Dispose();
         }
         catch { }
     }

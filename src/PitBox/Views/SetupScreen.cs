@@ -121,7 +121,7 @@ internal sealed class SetupScreen : UserControl
     {
         var stack = new StackPanel { Margin = new Thickness(0, 0, 0, 19) };
         var brand = new StackPanel { Orientation = Orientation.Horizontal };
-        var glyph = new BrandMark { Foreground = Ui.Res<Brush>("LogoFg") };
+        var glyph = new BrandMark { Foreground = Ui.Res<Brush>("LogoFg"), Accent = Ui.Res<Brush>("LogoAccent") };
         var tile = new Tile
         {
             Background = Ui.Res<Brush>("LogoBg"), BorderBrush = Ui.Res<Brush>("LogoEdge"),

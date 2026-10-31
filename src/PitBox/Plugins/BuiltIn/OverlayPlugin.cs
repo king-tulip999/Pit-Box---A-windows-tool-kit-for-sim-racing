@@ -12,7 +12,7 @@ internal sealed class OverlayPlugin : Plugin
     public override string Description => "FPS, temperatures, load and fan speeds on top of your game, toggled with a keybind.";
     public override string Icon => "I.Overlay";
     public override (string Soft, string Deep) Colors => ("ApricotSoft", "ApricotDeep");
-    public override int Order => 50;
+    public override int Order => 40;
 
     public override string Reads => "The sensors and frame rate it shows, at its update rate, only while it's on screen or its page is open.";
     public override string BackgroundWork =>

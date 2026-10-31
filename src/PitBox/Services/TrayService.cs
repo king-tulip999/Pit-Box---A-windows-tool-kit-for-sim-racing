@@ -93,7 +93,7 @@ internal sealed class TrayService : IDisposable
     {
         var spec = Themes.For(theme);
         var p = ThemeManager.Resolve(spec);
-        return $"{p.GetValueOrDefault("LogoBg")}|{p.GetValueOrDefault("LogoFg")}|{p.GetValueOrDefault("LogoEdge")}|{spec.Glow}|{spec.Radius}|{SystemInformation.SmallIconSize.Width}";
+        return $"{p.GetValueOrDefault("LogoBg")}|{p.GetValueOrDefault("LogoFg")}|{p.GetValueOrDefault("LogoAccent")}|{SystemInformation.SmallIconSize.Width}";
     }
 
     public void ShowBalloon(string title, string text, NoticeKind kind)
@@ -225,20 +225,11 @@ internal sealed class TrayService : IDisposable
             var visual = new System.Windows.Media.DrawingVisual();
             using (var dc = visual.RenderOpen())
             {
-                double r = size * (spec.Radius >= 1 ? 0.24 : spec.Radius >= 0.5 ? 0.22 : 0.10);
                 var face = new System.Windows.Rect(0, 0, size, size);
-                if (spec.Glow)
-                {
-                    dc.DrawRoundedRectangle(new System.Windows.Media.SolidColorBrush(p["LogoEdge"]), null, face, r, r);
-                    double ring = Math.Max(1.5, size * 0.09);
-                    face.Inflate(-ring, -ring);
-                    dc.DrawRoundedRectangle(new System.Windows.Media.SolidColorBrush(tile), null, face, Math.Max(0, r - ring), Math.Max(0, r - ring));
-                }
-                else
-                    dc.DrawRoundedRectangle(new System.Windows.Media.SolidColorBrush(tile), null, face, r, r);
+                dc.DrawRectangle(new System.Windows.Media.SolidColorBrush(tile), null, face);
 
                 if (glyphKey == Brand.TrayKey)
-                    Brand.Draw(dc, new System.Windows.Rect(0, 0, size, size), ink, 1);
+                    Brand.Draw(dc, face, ink, p["LogoAccent"], 1);
                 else
                     DrawGlyph(dc, glyphKey, size, ink);
             }

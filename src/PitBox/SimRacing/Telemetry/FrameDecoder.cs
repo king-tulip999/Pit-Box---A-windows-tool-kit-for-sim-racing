@@ -13,7 +13,7 @@ internal sealed class FrameDecoder
     private IrsdkVar? _pitFlags, _pitFuel, _repair, _optRepair, _pitStatus, _pitActive, _inStall, _fastRepair, _compound, _tow;
     private IrsdkVar? _air, _track, _wind, _windDir, _humidity, _fog, _precip, _wetness, _declaredWet;
     private IrsdkVar? _battery, _mguK, _deploy, _p2pCount, _p2pOn, _drs;
-    private IrsdkVar? _cPct, _cLap, _cLapDone, _cPos, _cClassPos, _cPit, _cSurface, _cEst, _cF2, _cLast, _cBest, _cCompound, _cFlags;
+    private IrsdkVar? _cPct, _cLap, _cLapDone, _cPos, _cClassPos, _cPit, _cSurface, _cEst, _cF2, _cLast, _cBest, _cCompound, _cFlags, _cFastRepairs;
     private readonly IrsdkVar?[] _coldPress = new IrsdkVar?[4], _tempL = new IrsdkVar?[4], _tempM = new IrsdkVar?[4], _tempR = new IrsdkVar?[4];
     private readonly IrsdkVar?[] _wearL = new IrsdkVar?[4], _wearM = new IrsdkVar?[4], _wearR = new IrsdkVar?[4];
     private static readonly string[] Corners = { "LF", "RF", "LR", "RR" };
@@ -56,7 +56,7 @@ internal sealed class FrameDecoder
         _cPct = V("CarIdxLapDistPct"); _cLap = V("CarIdxLap"); _cLapDone = V("CarIdxLapCompleted");
         _cPos = V("CarIdxPosition"); _cClassPos = V("CarIdxClassPosition"); _cPit = V("CarIdxOnPitRoad"); _cSurface = V("CarIdxTrackSurface");
         _cEst = V("CarIdxEstTime"); _cF2 = V("CarIdxF2Time"); _cLast = V("CarIdxLastLapTime"); _cBest = V("CarIdxBestLapTime");
-        _cCompound = V("CarIdxTireCompound"); _cFlags = V("CarIdxSessionFlags");
+        _cCompound = V("CarIdxTireCompound"); _cFlags = V("CarIdxSessionFlags"); _cFastRepairs = V("CarIdxFastRepairsUsed");
         for (int i = 0; i < 4; i++)
         {
             string c = Corners[i];
@@ -162,6 +162,7 @@ internal sealed class FrameDecoder
             f.CarLastLap[i] = D(_cLast, i) ?? -1;
             f.CarBestLap[i] = D(_cBest, i) ?? -1;
             f.CarTyreCompound[i] = I(_cCompound, i) ?? -1;
+            f.CarFastRepairsUsed[i] = I(_cFastRepairs, i) ?? -1;
             f.CarFlags[i] = D(_cFlags, i) is { } cf ? (RaceFlags)(uint)(int)cf : RaceFlags.None;
         }
     }

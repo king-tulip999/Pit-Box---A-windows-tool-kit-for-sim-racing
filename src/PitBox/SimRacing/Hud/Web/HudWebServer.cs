@@ -52,6 +52,8 @@ internal sealed class HudWebServer : IDisposable
 {
     private const string SocketGuid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
     private const int MaxRequest = 16 * 1024;
+    internal const int MaxClients = 32;
+    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(10);
 
     private readonly object _gate = new();
     private readonly List<HudWebClient> _clients = new();
@@ -149,7 +151,12 @@ internal sealed class HudWebServer : IDisposable
             {
                 tcp.NoDelay = true;
                 var stream = tcp.GetStream();
-                var request = await ReadRequest(stream, token).ConfigureAwait(false);
+                (string Path, Dictionary<string, string> Headers)? request;
+                using (var reading = CancellationTokenSource.CreateLinkedTokenSource(token))
+                {
+                    reading.CancelAfter(RequestTimeout);
+                    request = await ReadRequest(stream, reading.Token).ConfigureAwait(false);
+                }
                 if (request is null) return;
                 var (path, headers) = request.Value;
                 if (!headers.TryGetValue("host", out var host) || !LocalHost(host, Port))
@@ -160,6 +167,16 @@ internal sealed class HudWebServer : IDisposable
                 if (path.StartsWith("/ws/", StringComparison.Ordinal) && headers.TryGetValue("upgrade", out var up) && up.Equals("websocket", StringComparison.OrdinalIgnoreCase)
                     && headers.TryGetValue("sec-websocket-key", out var key) && _kinds.Contains(path[4..]))
                 {
+                    if (!LocalOrigin(headers.GetValueOrDefault("origin"), Port))
+                    {
+                        await Respond(stream, "403 Forbidden", "text/plain", "Forbidden"u8.ToArray(), token).ConfigureAwait(false);
+                        return;
+                    }
+                    if (Clients.Count >= MaxClients)
+                    {
+                        await Respond(stream, "503 Service Unavailable", "text/plain", "Too many overlays open"u8.ToArray(), token).ConfigureAwait(false);
+                        return;
+                    }
                     await Socket(stream, _overlays.First(o => o.Kind.Equals(path[4..], StringComparison.OrdinalIgnoreCase)).Kind, key, token).ConfigureAwait(false);
                     return;
                 }
@@ -172,6 +189,9 @@ internal sealed class HudWebServer : IDisposable
 
     internal static bool LocalHost(string host, int port) =>
         host.Equals($"127.0.0.1:{port}", StringComparison.OrdinalIgnoreCase) || host.Equals($"localhost:{port}", StringComparison.OrdinalIgnoreCase);
+
+    internal static bool LocalOrigin(string? origin, int port) =>
+        string.IsNullOrEmpty(origin) || origin.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && LocalHost(origin[7..], port);
 
     private static async Task<(string Path, Dictionary<string, string> Headers)?> ReadRequest(NetworkStream stream, CancellationToken token)
     {

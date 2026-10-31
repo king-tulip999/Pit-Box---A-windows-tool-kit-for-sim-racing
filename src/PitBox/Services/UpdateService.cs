@@ -163,10 +163,12 @@ internal sealed class UpdateService
             return;
         }
         var current = Environment.ProcessPath!;
-        var download = Path.Combine(App.ScratchFolder(current), $"PitBox-{Show(release.Version)}.download");
         string? installedBefore = S.InstalledTag;
+        string scratch = "", download = "";
         try
         {
+            scratch = App.Scratch(current);
+            download = Path.Combine(scratch, $"PitBox-{Show(release.Version)}.download");
             Set(UpdateState.Downloading);
             Progress = 0;
             using (var response = await Http.GetAsync(release.ExeUrl, HttpCompletionOption.ResponseHeadersRead))
@@ -201,11 +203,12 @@ internal sealed class UpdateService
 
             S.InstalledTag = release.Tag;
             _app.SaveNow();
-            App.RelaunchAfterExit("--updated", SwapSteps(current, download), current);
+            App.RelaunchAfterExit("--updated", SwapSteps(current, download), current, scratch);
         }
         catch (Exception ex)
         {
-            try { File.Delete(download); } catch { }
+            try { if (download.Length > 0) File.Delete(download); } catch { }
+            App.RemoveScratch(scratch);
             if (S.InstalledTag != installedBefore)
             {
                 S.InstalledTag = installedBefore;
