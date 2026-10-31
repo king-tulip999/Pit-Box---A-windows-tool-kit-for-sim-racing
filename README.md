@@ -10,7 +10,7 @@
 
 ---
 
-I got sick of switching monitors, audio, fan curves and overlays by hand every time I went from my desk to my sim rig, so I spent the last year building one app that does it all. It sits in the tray, sets the PC up for whatever I'm doing, and has grown into the toolkit I use every time I race in iRacing: overlays, setups, fuel, and a full history of my sessions with telemetry and replays. Now you get the chance to use it too!
+What started this journey. I got sick of doing everything by hand every time I went from my desk to my sim rig (and of paying for a handful of subscriptions just to race) so I spent the last couple years building one app that does it all. It sits in the tray, sets the PC up for whatever I’m doing, and has grown into the toolkit I use every time I race in iRacing: overlays, setups, fuel, and a full history of my sessions with telemetry and replays. Now you get the chance to use it too!
 
 **Contents:** [Features](#features) · [Getting started](#getting-started) · [Before you run it](#before-you-run-it) · [Limitations](#limitations) · [Updates and removal](#updates-and-removal) · [GRR League](#grr-league) · [Credits](#credits)
 
