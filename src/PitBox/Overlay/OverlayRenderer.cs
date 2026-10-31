@@ -358,9 +358,13 @@ internal sealed class OverlayRenderer : IDisposable
         _ => p.Text,
     };
 
+    private char _wideDigit;
+
     private float CellWidth(Cell c)
     {
-        float w = Measure(c.Template, _valueFont!);
+        if (_wideDigit == ' ')
+            _wideDigit = "0123456789".MaxBy(d => Measure(d.ToString(), _valueFont!));
+        float w = Measure(c.Template.Replace('0', _wideDigit), _valueFont!);
         if (c.Prefix.Length > 0) w += Measure(c.Prefix + " ", _unitFont!);
         if (c.Unit.Length > 0) w += Measure(c.Unit, _unitFont!) + 2 * _fontScale;
         return w;
@@ -436,9 +440,10 @@ internal sealed class OverlayRenderer : IDisposable
         _labelFont?.Dispose(); _valueFont?.Dispose(); _unitFont?.Dispose();
         _labelWidths.Clear(); _valueWidths.Clear(); _unitWidths.Clear();
         _fontScale = scale;
-        _labelFont = new Font(SharpText.Family, 11.5f * scale, FontStyle.Bold, GraphicsUnit.Pixel);
-        _valueFont = new Font(SharpText.Family + " SemiBold", 15f * scale, FontStyle.Regular, GraphicsUnit.Pixel);
-        _unitFont = new Font(SharpText.Family, 11f * scale, FontStyle.Regular, GraphicsUnit.Pixel);
+        _wideDigit = ' ';
+        _labelFont = new Font(OverlayFonts.Regular, 11.5f * scale, FontStyle.Bold, GraphicsUnit.Pixel);
+        _valueFont = new Font(OverlayFonts.Semibold, 15f * scale, FontStyle.Regular, GraphicsUnit.Pixel);
+        _unitFont = new Font(OverlayFonts.Regular, 11f * scale, FontStyle.Regular, GraphicsUnit.Pixel);
     }
 
     private static GraphicsPath RoundedRect(RectangleF r, float radius)

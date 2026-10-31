@@ -81,7 +81,7 @@ public sealed class MonitorLayoutView : FrameworkElement
             FormattedText? detail = null;
             if (!string.IsNullOrEmpty(t.Detail) && r.Height > 44)
             {
-                detail = new FormattedText(ThemeManager.Case(t.Detail), CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, DetailFace, Math.Clamp(size * 0.55, 7, 10), DetailBrush, dpi);
+                detail = new FormattedText(ThemeManager.Case(t.Detail), CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, DetailFace, Math.Clamp(size * 0.55, 9, 11), DetailBrush, dpi);
                 if (detail.Width > r.Width - 6)
                     detail = null;
                 else

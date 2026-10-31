@@ -82,7 +82,6 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         _profiles.Refresh();
         _app.Displays.Changed += OnDisplaysChanged;
         _app.DisplayProfiles.Changed += QueueProfiles;
-        Motion.Stagger(_body);
     }
 
     public void OnHidden()
@@ -135,7 +134,7 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
     private void BuildPage()
     {
         var titles = new StackPanel { Margin = Ui.HeaderMargin };
-        titles.Children.Add(Ui.PluginTitle(Plugins.PluginIds.Displays, "Displays"));
+        titles.Children.Add(Ui.PageTitle("Displays"));
         _body.Children.Add(titles);
         _body.Children.Add(_profiles);
         _body.Children.Add(_pendingBar);

@@ -46,6 +46,8 @@ internal sealed class SessionStatsService : IDisposable
 
     public event Action? Changed;
 
+    public int Generation { get; private set; }
+
     public Config.SessionStatsSettings Settings => _app.Config.SessionStats;
 
     public IReadOnlyCollection<int>? Leagues => Plugins.BuiltIn.SessionStatsPlugin.LeagueIds(_app);
@@ -177,6 +179,7 @@ internal sealed class SessionStatsService : IDisposable
         _ui.Post(_ =>
         {
             lock (_queueGate) _changedPosted = false;
+            Generation++;
             Changed?.Invoke();
         }, null);
     }
@@ -484,6 +487,7 @@ internal sealed class SessionStatsService : IDisposable
         _ui.Post(_ =>
         {
             Importing = progress;
+            Generation++;
             Changed?.Invoke();
         }, null);
     }

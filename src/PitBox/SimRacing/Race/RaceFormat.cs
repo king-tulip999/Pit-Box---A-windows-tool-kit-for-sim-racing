@@ -9,6 +9,8 @@ internal static class RaceFormat
 {
     public const string Missing = "–";
 
+    public static string About(string value) => "≈" + value;
+
     public static string Count(long n, string word) => n.ToString("N0", Inv) + " " + (n == 1 ? word : Plural(word));
 
     public static string Plural(string word) =>
@@ -32,6 +34,12 @@ internal static class RaceFormat
         string v = Math.Abs(s).ToString(decimals == 2 ? "0.00" : decimals == 3 ? "0.000" : "0.0", Inv);
         if (double.Parse(v, Inv) == 0) return v;
         return (s > 0 ? "+" : "−") + v;
+    }
+
+    public static string Signed(double value, string format, IFormatProvider? culture = null)
+    {
+        string magnitude = Math.Abs(value).ToString(format, culture ?? Inv);
+        return magnitude.Any(c => c is >= '1' and <= '9') ? (value < 0 ? "−" : "+") + magnitude : magnitude;
     }
 
     public static string Abs(double? seconds, int decimals = 1) =>

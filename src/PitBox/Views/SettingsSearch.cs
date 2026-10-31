@@ -81,7 +81,7 @@ internal static class SettingsIndex
         new("About Pit-Box", "About and updates: what Pit-Box is, update checks and the project page.", "Settings", "settings", "settings.about", "about version project page github info"),
         new("Open on", "The page Pit-Box opens on when it starts.", "Settings", "settings", "settings.startpage", "start page startup page default page home first page open last page used"),
         new("Keep on top", "Keep the window above other windows.", "Settings", "settings", "settings.ontop", "always on top pin topmost float"),
-        new("Theme", "Light, Dark, Custom (your own colors and name, or a preset such as Pastel), and GRR (with the GRR League plugin on); animations.", "Settings", "settings", "settings.look", "soft 2048 vanilla custom oled pastel dark mode light black color color animation appearance grr"),
+        new("Theme", "The Pits, Custom (your own colors and name, or a preset such as Pastel), and GRR (with the GRR League plugin on); animations.", "Settings", "settings", "settings.look", "soft 2048 vanilla custom oled pastel dark mode black color pits color animation appearance grr"),
         new("Custom colors", "Color sets for the Custom theme: pastel, neon, glow, night, nature, warm, racing, mono.", "Settings", "settings", "settings.customcolors", "custom color color oled theme preset palette accent background pastel neon cyberpunk glow"),
         new("Hardware access", "Admin rights and sensor driver status.", "Settings", "settings", "settings.access", "admin driver"),
         new("Tools", "Turn optional tools on or off.", "Settings", "settings", "settings.plugins", "module feature enable plugin plugins tools on off"),
@@ -111,7 +111,7 @@ internal static class SettingsIndex
             int score = 0;
             foreach (var w in words)
             {
-                int s = title.StartsWith(w) ? 100 : title.Contains(w) ? 60 : keys.Contains(w) ? 35 : cat.Contains(w) ? 15 : HasWordStarting(desc, w) ? 10 : 0;
+                int s = title.StartsWith(w, StringComparison.Ordinal) ? 100 : title.Contains(w) ? 60 : keys.Contains(w) ? 35 : cat.Contains(w) ? 15 : HasWordStarting(desc, w) ? 10 : 0;
                 if (s == 0) { score = 0; break; }
                 score += s;
             }

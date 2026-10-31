@@ -66,16 +66,18 @@ public partial class App : Application
         Views.Ui.InstallDropDownWheel();
         Theme.TipPlacement.Install();
         Views.Motion.InstallSwitches();
+        Views.TextBalance.Install();
 
         string? screenshotDir = ArgValue(e.Args, "--screenshots");
         bool fromStartup = e.Args.Contains("--minimized", StringComparer.OrdinalIgnoreCase);
         string? showcaseDir = ArgValue(e.Args, "--showcase");
         string? perfFile = ArgValue(e.Args, "--perf");
         string? monkeyDir = ArgValue(e.Args, "--monkey");
+        string? controlsDir = ArgValue(e.Args, "--controls");
         PerfProbe.File = perfFile;
         if (perfFile is not null) try { File.Delete(perfFile); } catch { }
-        Motion.FollowFocus = screenshotDir is null && showcaseDir is null && perfFile is null && monkeyDir is null;
-        bool demo = screenshotDir is not null || showcaseDir is not null || perfFile is not null || monkeyDir is not null || e.Args.Contains("--demo", StringComparer.OrdinalIgnoreCase);
+        Motion.FollowFocus = screenshotDir is null && showcaseDir is null && perfFile is null && monkeyDir is null && controlsDir is null;
+        bool demo = screenshotDir is not null || showcaseDir is not null || perfFile is not null || monkeyDir is not null || controlsDir is not null || e.Args.Contains("--demo", StringComparer.OrdinalIgnoreCase);
         bool fresh = e.Args.Contains("--fresh", StringComparer.OrdinalIgnoreCase);
         if (demo && ArgValue(e.Args, "--culture") is { } cultureName)
         {
@@ -120,7 +122,7 @@ public partial class App : Application
 
         int themeAt = Array.FindIndex(e.Args, a => a.Equals("--theme", StringComparison.OrdinalIgnoreCase));
         bool themed = themeAt >= 0 && themeAt + 1 < e.Args.Length;
-        var asked = themed ? AppTheme.Named(e.Args[themeAt + 1]) : AppTheme.Light;
+        var asked = themed ? AppTheme.Named(e.Args[themeAt + 1]) : AppTheme.Dark;
         if (demo && screenshotDir is null && themed) config.Ui.Theme = asked;
         if (showcaseDir is not null)
         {
@@ -134,6 +136,11 @@ public partial class App : Application
             if (ScreenshotRunner.Quick)
                 config.Ui.Animations = false;
         }
+        if (controlsDir is not null)
+        {
+            config.Ui.Theme = asked;
+            config.Ui.Animations = false;
+        }
         PerfProbe.Mark("config");
         Grr.GrrResources.Install();
         if (Plugins.PluginStates.IsEnabled(config.Plugins, Grr.GrrPlugin.PluginId, Grr.GrrPlugin.OnByDefault))
@@ -146,7 +153,7 @@ public partial class App : Application
 
         _services = new AppServices(demo, config);
         PerfProbe.Mark("services");
-        _services.Start(withTray: screenshotDir is null && showcaseDir is null && perfFile is null);
+        _services.Start(withTray: screenshotDir is null && showcaseDir is null && perfFile is null && controlsDir is null);
         PerfProbe.Mark("started");
 
         var window = new MainWindow(_services);
@@ -164,6 +171,11 @@ public partial class App : Application
         if (screenshotDir is not null)
         {
             ScreenshotRunner.Run(window, screenshotDir);
+            return;
+        }
+        if (controlsDir is not null)
+        {
+            ControlSweep.Run(window, controlsDir);
             return;
         }
         if (monkeyDir is not null)
@@ -185,6 +197,7 @@ public partial class App : Application
 
         if (config.Ui.StartMinimized && _services.Tray is { } trayIcon)
         {
+            window.ScheduleTrim();
             if (!fromStartup || !config.Ui.TrayTipShown)
             {
                 config.Ui.TrayTipShown = true;
@@ -286,7 +299,7 @@ public partial class App : Application
     private void OnUiException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         e.Handled = true;
-        if (_starting && !ScreenshotRunner.Active && !MonkeyRunner.Active && PerfProbe.File is null && !_trayWired && MainWindow is not { IsVisible: true })
+        if (_starting && !ScreenshotRunner.Active && !MonkeyRunner.Active && !ControlSweep.Active && PerfProbe.File is null && !_trayWired && MainWindow is not { IsVisible: true })
         {
             LogError(e.Exception);
             try { AppServices.Current?.Hardware.EmergencyRestore(); } catch { }
@@ -311,6 +324,11 @@ public partial class App : Application
         if (MonkeyRunner.Active)
         {
             MonkeyRunner.RecordError(ex);
+            return;
+        }
+        if (ControlSweep.Active)
+        {
+            ControlSweep.RecordError(ex);
             return;
         }
         if (PerfProbe.File is { } perf)

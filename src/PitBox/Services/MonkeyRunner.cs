@@ -364,8 +364,8 @@ internal static class MonkeyRunner
         int now = TickHandlers(app);
         if (now > baseline) Problem($"tick handlers on the first page grew from {baseline} to {now}");
         await Task.Delay(700);
-        if (window.PageMove.Y != 0 && !window.PageMove.HasAnimatedProperties)
-            Problem($"the page stayed {window.PageMove.Y:0} px off its place after the page animation");
+        if (!window.PagesSettled)
+            Problem("a page stayed faded after the page animation");
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();

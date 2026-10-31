@@ -103,8 +103,8 @@ internal sealed partial class HudMontage : IDisposable
                 break;
             }
         }
-        _nameFont = new Font(SharpText.Family + " SemiBold", 15.5f * _scale, GraphicsUnit.Pixel);
-        _textFont = new Font(SharpText.Family, 13f * _scale, GraphicsUnit.Pixel);
+        _nameFont = new Font(OverlayFonts.Semibold, 15.5f * _scale, GraphicsUnit.Pixel);
+        _textFont = new Font(OverlayFonts.Regular, 13f * _scale, GraphicsUnit.Pixel);
     }
 
     internal static string Short(string description)

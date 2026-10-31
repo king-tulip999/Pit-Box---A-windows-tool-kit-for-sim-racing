@@ -19,11 +19,10 @@ public readonly struct OverlayColorPreset : IEquatable<OverlayColorPreset>
 
     public OverlayColorPreset(string id) => _id = string.IsNullOrWhiteSpace(id) ? null : id.Trim();
 
-    public string Id => _id ?? AppTheme.Light.Id;
+    public string Id => _id ?? AppTheme.Dark.Id;
 
     public static readonly OverlayColorPreset Custom = new("Custom");
     public static readonly OverlayColorPreset App = new("FollowApp");
-    public static readonly OverlayColorPreset Light = For(AppTheme.Light);
     public static readonly OverlayColorPreset Dark = For(AppTheme.Dark);
     public static readonly OverlayColorPreset CustomTheme = For(AppTheme.Custom);
 
@@ -37,9 +36,7 @@ public readonly struct OverlayColorPreset : IEquatable<OverlayColorPreset>
 
     public static OverlayColorPreset Named(string? name) => name?.Trim().ToLowerInvariant() switch
     {
-        null or "" or "app" => Light,
-        "dark" or "default" => Dark,
-        "light" => Light,
+        null or "" or "app" or "dark" or "default" or "light" => Dark,
         "highcontrast" or "oledpastel" => CustomTheme,
         "custom" => Custom,
         "followapp" => App,
@@ -273,7 +270,7 @@ internal sealed class OverlayColorPresetConverter : System.Text.Json.Serializati
         if (reader.TokenType != System.Text.Json.JsonTokenType.String)
         {
             reader.Skip();
-            return OverlayColorPreset.Light;
+            return OverlayColorPreset.Dark;
         }
         return OverlayColorPreset.Named(reader.GetString());
     }

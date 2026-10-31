@@ -15,7 +15,7 @@ internal sealed class SetupTree : Grid
 {
     public const double RowHeight = 30, Indent = 20, GapHeight = 12;
     private const double NameSize = 13.5, MetaSize = 12.5, IconSize = 16;
-    private const double Threshold = 6, NameMax = 820;
+    private const double Threshold = 6, NameMax = 820, NameRoom = 120;
 
     private readonly StackPanel _rows = new();
     private readonly Canvas _overlay = new() { IsHitTestVisible = false };
@@ -111,7 +111,7 @@ internal sealed class SetupTree : Grid
         Grid.SetColumn(icon, 2);
         grid.Children.Add(icon);
 
-        var name = TextCase.Verbatim(new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 0, 6, 0) });
+        var name = TextCase.Verbatim(new TrimRow { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 0, 6, 0) });
         string stem = node.IsFolder ? node.Name : System.IO.Path.GetFileNameWithoutExtension(node.Name);
         name.Children.Add(TextFit.TipWhenTrimmed(new TextBlock
         {
@@ -139,6 +139,18 @@ internal sealed class SetupTree : Grid
         if (node.IsFolder && fresh > 0) metaText.Foreground = Ui.Res<Brush>("AccentText");
         Grid.SetColumn(metaText, 4);
         grid.Children.Add(metaText);
+        double metaWidth = -1, lead = depth * Indent + 4 + 48;
+        grid.SizeChanged += (_, e) =>
+        {
+            if (metaWidth < 0)
+            {
+                metaText.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                metaWidth = metaText.DesiredSize.Width + metaText.Margin.Right;
+            }
+            bool fits = e.NewSize.Width - lead - metaWidth >= NameRoom;
+            metaText.Visibility = fits ? Visibility.Visible : Visibility.Collapsed;
+            grid.ToolTip = fits ? null : meta;
+        };
 
         var row = new Tile
         {

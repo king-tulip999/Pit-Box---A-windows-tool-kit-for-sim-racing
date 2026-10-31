@@ -189,7 +189,7 @@ internal sealed class FovSection : StackPanel
             _presets.SelectedIndex = 0;
         };
         _tools.Children.Add(_presets);
-        var units = Ui.Segmented(new[] { Units.Cm, Units.In }, Imperial ? 1 : 0, i => { S.Imperial = i == 1; _app.Save(); BuildInputs(); Recalculate(); }, "Units", new[] { "Centimetres", "Inches" });
+        var units = Ui.Segmented(new[] { Units.Cm, Units.In }, Imperial ? 1 : 0, i => { S.Imperial = i == 1; _app.Save(); BuildInputs(); Recalculate(); }, "Units", new[] { "Centimeters", "Inches" });
         units.ToolTip = "Units for distances and sizes";
         DockPanel.SetDock(units, Dock.Left);
         _toolRow.Children.Add(units);
@@ -389,7 +389,9 @@ internal sealed class FovSection : StackPanel
         _inputs.Children.Add(Row("Resolution", resRow, "Native resolution: sets the aspect ratio (when “From resolution”) and pixels per degree."));
 
         var curve = new StackPanel { Orientation = Orientation.Horizontal };
-        curve.Children.Add(Ui.Switch(screen.Curved, v => Change(() => screen.Curved = v, rebuild: true)));
+        var curved = Ui.Switch(screen.Curved, v => Change(() => screen.Curved = v, rebuild: true));
+        System.Windows.Automation.AutomationProperties.SetName(curved, "Curved");
+        curve.Children.Add(curved);
         if (screen.Curved)
         {
             var radius = new ComboBox { Width = 78, Margin = new Thickness(8, 0, 0, 0) };
@@ -640,6 +642,8 @@ internal sealed class FovSection : StackPanel
         return ring;
     }
 
+    private static string ColorName(string key) => key switch { "Warn" => "Amber", "Danger" => "Red", _ => key };
+
     private void PickColor(FrameworkElement anchor, FovSetup setup)
     {
         var popup = new Popup { PlacementTarget = anchor, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true, PopupAnimation = PopupAnimation.Fade };
@@ -661,8 +665,9 @@ internal sealed class FovSection : StackPanel
                 Padding = new Thickness(2), Margin = new Thickness(2), BorderThickness = new Thickness(2), CornerRadius = ThemeManager.Round(6),
                 BorderBrush = mine ? Ui.Res<Brush>("Heading") : Brushes.Transparent, Background = Brushes.Transparent,
                 Cursor = System.Windows.Input.Cursors.Hand,
-                ToolTip = mine ? "This setup's color" : owner is null ? null : $"Used by {owner.Name} (it takes this setup's color)",
+                ToolTip = mine ? "This setup's color" : owner is null ? ColorName(key) : $"Used by {owner.Name} (it takes this setup's color)",
             };
+            System.Windows.Automation.AutomationProperties.SetName(choice, ColorName(key));
             if (!mine)
             {
                 choice.MouseEnter += (_, _) => choice.BorderBrush = Ui.Res<Brush>("LineStrong");
@@ -880,6 +885,7 @@ internal sealed class FovSection : StackPanel
     private static Grid Row(string label, UIElement control, string? help)
     {
         var grid = new Grid { Margin = new Thickness(0, 3, 0, 3) };
+        Ui.NameFor(control, label);
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         var name = new TextBlock { Foreground = Ui.Res<Brush>("TextMuted"), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 6, 0), Background = Brushes.Transparent, ToolTip = help };

@@ -22,14 +22,11 @@ internal sealed class OverlayPreviewMotion
     private readonly Image _preview;
     private readonly Func<IReadOnlyList<OverlayHit>> _hits;
     private readonly Canvas _layer = new() { IsHitTestVisible = false };
-    private readonly Path _shade = new() { IsHitTestVisible = false, Visibility = Visibility.Collapsed };
     private readonly Border _ring = new() { IsHitTestVisible = false, Visibility = Visibility.Collapsed };
     private readonly Border _startSize = new() { IsHitTestVisible = false, Visibility = Visibility.Collapsed };
     private readonly TranslateTransform _move = new();
     private readonly ScaleTransform _grow = new();
     private int _generation;
-
-    public double Shown { get; private set; } = 1;
 
     public OverlayPreviewMotion(Canvas scene, Image preview, Func<IReadOnlyList<OverlayHit>> hits)
     {
@@ -42,12 +39,7 @@ internal sealed class OverlayPreviewMotion
         _ring.SetResourceReference(Border.BorderBrushProperty, "AccentText");
         _startSize.SetResourceReference(Border.BorderBrushProperty, "AccentText");
         _startSize.Opacity = 0.6;
-        var shade = Ui.Res<Brush>("Bg").CloneCurrentValue();
-        shade.Opacity = 0.55;
-        shade.Freeze();
-        _shade.Fill = shade;
         scene.Children.Add(_layer);
-        scene.Children.Add(_shade);
         scene.Children.Add(_ring);
         scene.Children.Add(_startSize);
     }
@@ -74,21 +66,7 @@ internal sealed class OverlayPreviewMotion
         _layer.Children.Clear();
         _preview.Clip = null;
         _preview.BeginAnimation(UIElement.OpacityProperty, null);
-        _preview.Opacity = Shown;
-    }
-
-    public void SetShown(bool shown, bool animate)
-    {
-        double to = shown ? 1 : 0.4;
-        if (to == Shown) return;
-        Shown = to;
-        _layer.Opacity = to;
-        if (animate && Motion.Flourish) Motion.To(_preview, UIElement.OpacityProperty, to, 240);
-        else
-        {
-            _preview.BeginAnimation(UIElement.OpacityProperty, null);
-            _preview.Opacity = to;
-        }
+        _preview.Opacity = 1;
     }
 
     private static Dictionary<(string Group, OverlayMetric? Metric), Rect> Boxes(IReadOnlyList<OverlayHit> hits)
@@ -144,9 +122,9 @@ internal sealed class OverlayPreviewMotion
         var fade = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(ms), FillBehavior = FillBehavior.Stop };
         fade.KeyFrames.Add(new DiscreteDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.Zero)));
         fade.KeyFrames.Add(new DiscreteDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(ms * from))));
-        fade.KeyFrames.Add(new EasingDoubleKeyFrame(Shown, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(ms))) { EasingFunction = Motion.Ease });
+        fade.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(ms))) { EasingFunction = Motion.Ease });
         fade.Completed += (_, _) => { if (generation == _generation) _layer.Children.Clear(); };
-        _preview.Opacity = Shown;
+        _preview.Opacity = 1;
         _preview.BeginAnimation(UIElement.OpacityProperty, fade);
     }
 
@@ -275,14 +253,13 @@ internal sealed class OverlayPreviewMotion
         if (!Motion.Flourish || Settled() is not { } now) return;
         var bounds = now.Bounds;
         var duration = TimeSpan.FromMilliseconds(ms);
-        if (Backdrop(now.Source) is { } color)
-        {
-            var backdrop = new Rectangle { Fill = new SolidColorBrush(color), Width = bounds.Width, Height = bounds.Height };
-            Canvas.SetLeft(backdrop, bounds.X);
-            Canvas.SetTop(backdrop, bounds.Y);
-            backdrop.BeginAnimation(FrameworkElement.HeightProperty, new DoubleAnimation(0, bounds.Height, duration) { FillBehavior = FillBehavior.Stop });
-            _layer.Children.Add(backdrop);
-        }
+        int generation = _generation;
+        double width = _preview.ActualWidth, height = _preview.ActualHeight;
+        var reveal = new RectangleGeometry(new Rect(0, 0, width, 0));
+        _preview.Clip = reveal;
+        var grow = new RectAnimation(new Rect(0, 0, width, 0), new Rect(0, 0, width, height), duration) { FillBehavior = FillBehavior.Stop };
+        grow.Completed += (_, _) => { if (generation == _generation) _preview.Clip = null; };
+        reveal.BeginAnimation(RectangleGeometry.RectProperty, grow);
 
         var scan = new Rectangle { Width = bounds.Width, Height = 2, Fill = Ui.Res<Brush>("AccentText"), Opacity = 0 };
         Canvas.SetLeft(scan, bounds.X);
@@ -294,28 +271,11 @@ internal sealed class OverlayPreviewMotion
         show.KeyFrames.Add(new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.Zero)));
         show.KeyFrames.Add(new DiscreteDoubleKeyFrame(1, KeyTime.FromTimeSpan(duration)));
         show.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(duration + TimeSpan.FromMilliseconds(160))));
+        show.Completed += (_, _) => { if (generation == _generation) _layer.Children.Clear(); };
         scan.BeginAnimation(UIElement.OpacityProperty, show);
         _layer.Children.Add(scan);
-
-        foreach (var rect in Rows(now))
-        {
-            if (Piece(now, rect) is not { } row) continue;
-            var delay = TimeSpan.FromMilliseconds(ms * rect.Y / Math.Max(1, now.Source.PixelHeight));
-            var slide = new TranslateTransform();
-            row.RenderTransform = slide;
-            var appear = new DoubleAnimationUsingKeyFrames { Duration = delay + TimeSpan.FromMilliseconds(260), FillBehavior = FillBehavior.Stop };
-            appear.KeyFrames.Add(new DiscreteDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.Zero)));
-            appear.KeyFrames.Add(new DiscreteDoubleKeyFrame(0, KeyTime.FromTimeSpan(delay)));
-            appear.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(delay + TimeSpan.FromMilliseconds(260))) { EasingFunction = Motion.Ease });
-            row.BeginAnimation(UIElement.OpacityProperty, appear);
-            slide.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(-10, 0, TimeSpan.FromMilliseconds(260)) { BeginTime = delay, EasingFunction = Motion.Ease, FillBehavior = FillBehavior.Stop });
-        }
-        RevealPreview(ms + 420, 0.8);
+        _preview.Opacity = 1;
     }
-
-    private static IEnumerable<Rect> Rows(Frame frame) =>
-        frame.Hits.GroupBy(h => (int)Math.Round(h.Rect.Y + h.Rect.Height / 2))
-            .Select(g => g.Select(h => new Rect(h.Rect.X, h.Rect.Y, h.Rect.Width, h.Rect.Height)).Aggregate(Rect.Union));
 
     public void Glide(Point from)
     {
@@ -361,16 +321,16 @@ internal sealed class OverlayPreviewMotion
     {
         if (group is null || Capture() is not { } frame || Boxes(frame.Hits).TryGetValue((group, metric), out var pixels) is false)
         {
-            _shade.Visibility = _ring.Visibility = Visibility.Collapsed;
+            _ring.Visibility = Visibility.Collapsed;
             return;
         }
         var spot = frame.Place(pixels);
         spot.Inflate(2, 2);
-        _shade.Data = new CombinedGeometry(GeometryCombineMode.Exclude, new RectangleGeometry(frame.Bounds), new RectangleGeometry(spot));
+        spot = new Rect(Math.Round(spot.X), Math.Round(spot.Y), Math.Round(spot.Width), Math.Round(spot.Height));
         _ring.Width = spot.Width;
         _ring.Height = spot.Height;
         Canvas.SetLeft(_ring, spot.X);
         Canvas.SetTop(_ring, spot.Y);
-        _shade.Visibility = _ring.Visibility = Visibility.Visible;
+        _ring.Visibility = Visibility.Visible;
     }
 }

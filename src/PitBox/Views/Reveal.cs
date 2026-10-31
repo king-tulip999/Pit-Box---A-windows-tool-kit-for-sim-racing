@@ -6,7 +6,7 @@ namespace PitBox.Views;
 
 internal static class Reveal
 {
-    private static readonly IEasingFunction Pop = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.5 };
+    private static readonly IEasingFunction Pop = Motion.Frozen(new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.5 });
 
     public static void Once(FrameworkElement element, Action hold, Action play)
     {

@@ -85,8 +85,8 @@ public sealed class CurveEditor : FrameworkElement
     }
 
     private Rect Plot => ReadOnly
-        ? new(28, 5, Math.Max(8, ActualWidth - 28 - 8), Math.Max(8, ActualHeight - 5 - 16))
-        : new(37, 10, Math.Max(8, ActualWidth - 37 - 13), Math.Max(8, ActualHeight - 10 - 24));
+        ? new(34, 6, Math.Max(8, ActualWidth - 34 - 8), Math.Max(8, ActualHeight - 6 - 18))
+        : new(42, 10, Math.Max(8, ActualWidth - 42 - 13), Math.Max(8, ActualHeight - 10 - 26));
 
     internal IReadOnlyList<CurvePoint> Points => _points;
 
@@ -260,14 +260,14 @@ public sealed class CurveEditor : FrameworkElement
         {
             double y = Hairline.Snap(ToScreen(MinTemp, pct).Y, px);
             dc.DrawLine(pct == 0 ? axisPen : gridPen, new Point(plot.Left, y), new Point(plot.Right, y));
-            var t = Text($"{pct}%", 8.5, label, dpi);
+            var t = Text($"{pct}%", 10.5, label, dpi);
             dc.DrawText(t, new Point(plot.Left - t.Width - 6, y - t.Height / 2));
         }
         for (int t = 20; t <= 100; t += ReadOnly ? 20 : 10)
         {
             double x = Hairline.Snap(ToScreen(t, 0).X, px);
             dc.DrawLine(t == 20 ? axisPen : gridPen, new Point(x, plot.Top), new Point(x, plot.Bottom));
-            var text = Text($"{t}°", 8.5, label, dpi);
+            var text = Text($"{t}°", 10.5, label, dpi);
             dc.DrawText(text, new Point(x - text.Width / 2, plot.Bottom + 5));
         }
 
@@ -339,7 +339,7 @@ public sealed class CurveEditor : FrameworkElement
         else dc.DrawLine(_livePen, new Point(x, plot.Top), new Point(x, plot.Bottom));
         if (_liveText is null || _liveTextKey != (caption, live, dpi))
         {
-            _liveText = Text(caption, 9, live, dpi, Bold);
+            _liveText = Text(caption, 11, live, dpi, Bold);
             _liveTextKey = (caption, live, dpi);
         }
         var t = _liveText;
@@ -362,7 +362,7 @@ public sealed class CurveEditor : FrameworkElement
             if (active)
             {
                 string label = $"{_points[i].Temp:0} °C → {_points[i].Percent:0}%";
-                var t = Text(label, 9.5, ThemeManager.Brush("TooltipText", Brushes.White), dpi, Bold);
+                var t = Text(label, 11, ThemeManager.Brush("TooltipText", Brushes.White), dpi, Bold);
                 double bx = Math.Max(plot.Left, Math.Min(s.X - t.Width / 2 - 8, plot.Right - t.Width - 16));
                 double by = s.Y - r - t.Height - 14 < plot.Top ? s.Y + r + 8 : s.Y - r - t.Height - 14;
                 dc.DrawGeometry(ThemeManager.Brush("TooltipBg", Brushes.DimGray), null, Tile.Shape(new Rect(bx, by, t.Width + 16, t.Height + 6), ThemeManager.Round(6)));

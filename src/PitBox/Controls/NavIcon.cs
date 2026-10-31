@@ -331,6 +331,36 @@ public sealed class NavIcon : Viewbox
         return path;
     }
 
+    private LiveStroke DrawLive(Geometry data, double stroke = Stroke)
+    {
+        var pen = new Pen { Thickness = stroke, StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round };
+        BindingOperations.SetBinding(pen, Pen.BrushProperty, new Binding(nameof(Foreground)) { Source = this });
+        var live = new LiveStroke(pen) { Data = data };
+        _canvas.Children.Add(live);
+        return live;
+    }
+
+    private sealed class LiveStroke : FrameworkElement
+    {
+        public static readonly DependencyProperty DataProperty = DependencyProperty.Register(nameof(Data), typeof(Geometry), typeof(LiveStroke),
+            new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender | FrameworkPropertyMetadataOptions.SubPropertiesDoNotAffectRender));
+
+        public Geometry? Data { get => (Geometry?)GetValue(DataProperty); set => SetValue(DataProperty, value); }
+
+        public Pen Pen { get; }
+
+        public LiveStroke(Pen pen)
+        {
+            Pen = pen;
+            IsHitTestVisible = false;
+        }
+
+        protected override void OnRender(DrawingContext dc)
+        {
+            if (Data is { } data) dc.DrawGeometry(null, Pen, data);
+        }
+    }
+
     private void DrawWithoutLayout(Geometry data)
     {
         var pen = new Pen { Thickness = Stroke, StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round };
@@ -847,7 +877,7 @@ public sealed class NavIcon : Viewbox
         foreach (var (data, x, y, at) in keys)
         {
             var ring = new EllipseGeometry(new Point(x, y), 0.8, 0.8);
-            var wave = Draw(ring, stroke: 1);
+            var wave = DrawLive(ring, stroke: 1);
             wave.Opacity = 0;
             Animate(ring, EllipseGeometry.RadiusXProperty, Keys(EaseOut, (0, 0.8), (at, 0.8), (at + 0.38, 3), (Period, 3)), Hold);
             Animate(ring, EllipseGeometry.RadiusYProperty, Keys(EaseOut, (0, 0.8), (at, 0.8), (at + 0.38, 3), (Period, 3)), Hold);
@@ -881,10 +911,10 @@ public sealed class NavIcon : Viewbox
             static double Top(double p) => 13.6 + 5.4 * p * p;
             static double Bottom(double p) => Math.Min(19.2, Top(p) + 0.5 + 1.8 * p);
             var dash = new LineGeometry(new Point(12, Top(phase)), new Point(12, Bottom(phase)));
-            var path = Draw(dash);
+            var path = DrawLive(dash);
             Animate(dash, LineGeometry.StartPointProperty, SampledPoints(u => new Point(12, Top(P(u))), 128));
             Animate(dash, LineGeometry.EndPointProperty, SampledPoints(u => new Point(12, Bottom(P(u))), 128));
-            Animate(path, Shape.StrokeThicknessProperty, Sampled(0, u => 1 + 1.1 * P(u), 128));
+            Animate(path.Pen, Pen.ThicknessProperty, Sampled(0, u => 1 + 1.1 * P(u), 128));
             Animate(path, UIElement.OpacityProperty, Sampled(0, u =>
             {
                 double p = P(u);
@@ -925,8 +955,8 @@ public sealed class NavIcon : Viewbox
             var bottom = c.Bottom;
             var high = new LineGeometry(new Point(x, top0 - up), new Point(x, top0));
             var low = new LineGeometry(new Point(x, top0 + height0), new Point(x, top0 + height0 + down));
-            Draw(high);
-            Draw(low);
+            DrawLive(high);
+            DrawLive(low);
             Animate(high, LineGeometry.StartPointProperty, Over(t => new Point(x, Eased(t, top) - up)));
             Animate(high, LineGeometry.EndPointProperty, Over(t => new Point(x, Eased(t, top))));
             Animate(low, LineGeometry.StartPointProperty, Over(t => new Point(x, Eased(t, bottom))));
@@ -996,7 +1026,7 @@ public sealed class NavIcon : Viewbox
                 double phase = i / 3.0 + (y > 10 ? 0.17 : 0), row = y;
                 double Left(double u) => 26 - 32 * ((u * Rushes + phase) % 1);
                 var streak = new LineGeometry(new Point(0, y), new Point(0, y));
-                var path = Draw(streak, stroke: 1.2);
+                var path = DrawLive(streak, stroke: 1.2);
                 path.Opacity = 0;
                 Animate(streak, LineGeometry.StartPointProperty, SampledPoints(u => new Point(Math.Clamp(Left(u), 0, 24), row), 216));
                 Animate(streak, LineGeometry.EndPointProperty, SampledPoints(u => new Point(Math.Clamp(Left(u) + 3.2, 0, 24), row), 216));
@@ -1115,9 +1145,9 @@ public sealed class NavIcon : Viewbox
             var left = new LineGeometry(new Point(3, y), new Point(x - Gap, y));
             var right = new LineGeometry(new Point(x + Gap, y), new Point(21, y));
             var knob = new EllipseGeometry(new Point(x, y), 2, 2);
-            Draw(left);
-            Draw(right);
-            Draw(knob);
+            DrawLive(left);
+            DrawLive(right);
+            DrawLive(knob);
             double KnobX(double p) => Middle + Reach * Math.Sin(2 * Math.PI * turns * p + phase);
             Animate(left, LineGeometry.EndPointProperty, SampledPoints(p => new Point(KnobX(p) - Gap, y)));
             Animate(right, LineGeometry.StartPointProperty, SampledPoints(p => new Point(KnobX(p) + Gap, y)));

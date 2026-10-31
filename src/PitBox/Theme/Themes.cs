@@ -10,9 +10,11 @@ internal sealed record ThemeSpec
     public required bool Dark { get; init; }
     public required IReadOnlyDictionary<string, System.Windows.Media.Color> Colors { get; init; }
 
-    public string DisplayFont { get; init; } = "Bahnschrift, Segoe UI";
-    public string UiFont { get; init; } = "Bahnschrift, Segoe UI";
-    public string MonoFont { get; init; } = "Consolas, Segoe UI";
+    public const string Saira = "./Assets/Fonts/Saira/#Saira, Segoe UI";
+
+    public string DisplayFont { get; init; } = Saira;
+    public string UiFont { get; init; } = Saira;
+    public string MonoFont { get; init; } = Saira;
     public string? MetricFont { get; init; }
     public FontWeight HeadingWeight { get; init; } = FontWeights.Bold;
     public FontStyle HeadingStyle { get; init; } = FontStyles.Normal;
@@ -48,29 +50,15 @@ internal sealed record ThemeSpec
     public double GlowStrength { get; init; } = 1;
     public bool CornerGlow { get; init; }
     public bool StepsClimb { get; init; } = true;
-
-    public required AppTheme Partner { get; init; }
 }
 
 internal static class Themes
 {
-    public static ThemeSpec? Variant(ThemeSpec spec)
-    {
-        var partner = For(spec.Partner);
-        return partner.Id != spec.Id && partner.Partner == spec.Id && partner.Dark != spec.Dark ? partner : null;
-    }
-
-    public static readonly ThemeSpec Light = new()
-    {
-        Id = AppTheme.Light, Name = "Light", Dark = false, Colors = Palettes.Light, Partner = AppTheme.Dark,
-        Outline = "ButtonEdge",
-    };
-
     private static readonly Thickness Hairline = new(1);
 
     public static readonly ThemeSpec Dark = new()
     {
-        Id = AppTheme.Dark, Name = "Dark", Dark = true, Colors = Palettes.Dark, Partner = AppTheme.Light,
+        Id = AppTheme.Dark, Name = "The Pits", Dark = true, Colors = Palettes.Dark,
         CardEdge = Hairline, LogoEdge = new(0),
         StepsClimb = false, Outline = "ScrollThumbBrushDrag",
         BackdropBg = Palettes.Hex("#0A0D16"), BackdropLine = Palettes.Hex("#171925"),
@@ -78,12 +66,12 @@ internal static class Themes
 
     public static readonly ThemeSpec Custom = new()
     {
-        Id = AppTheme.Custom, Name = DefaultCustomName, Dark = true, Colors = CustomPalette.Default, Partner = AppTheme.Light,
+        Id = AppTheme.Custom, Name = DefaultCustomName, Dark = true, Colors = CustomPalette.Default,
         CardEdge = Hairline, LogoEdge = new(1.5),
         Glow = true, GlowStrength = 0.45, StepsClimb = false,
     };
 
-    public static readonly ThemeSpec[] BuiltIn = { Light, Dark, Custom };
+    public static readonly ThemeSpec[] BuiltIn = { Dark, Custom };
 
     private static ThemeSpec[] _all = BuiltIn;
 

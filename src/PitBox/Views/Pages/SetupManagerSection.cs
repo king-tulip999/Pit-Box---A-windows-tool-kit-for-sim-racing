@@ -813,10 +813,11 @@ internal sealed class SetupManagerSection : StackPanel
         void Count(int n, string label, string brush)
         {
             var cell = new StackPanel { Margin = new Thickness(0, 0, 22, 0) };
-            var number = RaceParts.Big(n.ToString(System.Globalization.CultureInfo.CurrentCulture), 44, brush, italic: true);
+            var number = RaceParts.Big(n.ToString(System.Globalization.CultureInfo.CurrentCulture), 44, brush);
             number.HorizontalAlignment = HorizontalAlignment.Left;
+            number.Margin = new Thickness(0, 0, 0, -9);
             cell.Children.Add(number);
-            cell.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption") });
+            cell.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(1, 0, 0, 0) });
             cell.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             cell.Tag = cell.DesiredSize.Width;
             counts.Children.Add(cell);
@@ -1118,7 +1119,7 @@ internal sealed class SetupManagerSection : StackPanel
             var g = new Grid { Margin = new Thickness(0, 8, 0, 0) };
             g.ColumnDefinitions.Add(new ColumnDefinition());
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            g.Children.Add(new TextBox { Text = path, IsReadOnly = true, TextWrapping = TextWrapping.Wrap, FontFamily = Ui.Res<FontFamily>("MonoFont"), FontSize = 9.5 });
+            g.Children.Add(new TextBox { Text = path, IsReadOnly = true, TextWrapping = TextWrapping.Wrap, FontFamily = Ui.Res<FontFamily>("MonoFont"), FontSize = 11.5 });
             var copy = Ui.IconButton("I.Copy", "Copy the path", () =>
             {
                 try { Clipboard.SetText(path); _app.Notify("Path copied", path, NoticeKind.Success); }

@@ -80,7 +80,6 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         RenderPreview();
         _wasVisible = O.Visible;
         ShowOffBadge();
-        _motion.SetShown(O.Visible, false);
         if (O.Visible && Motion.Flourish)
         {
             _motion.Hide();
@@ -92,7 +91,6 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         _app.Displays.Changed += OnDisplaysChanged;
         _app.Network.Acquire("Overlay page");
         _app.Frames.Acquire("Overlay page");
-        if (!_embedded) Motion.Stagger(_body);
     }
 
     public void OnHidden()
@@ -114,7 +112,6 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         if (O.Visible == _wasVisible) return;
         _wasVisible = O.Visible;
         ShowOffBadge();
-        _motion.SetShown(O.Visible, true);
         if (O.Visible) _motion.Boot();
     }
 
@@ -122,7 +119,7 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
 
     private void Blink()
     {
-        if (!Motion.Flourish) return;
+        if (!Motion.Flourish || !O.Visible) return;
         _liveDot.BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(1, 0.3, TimeSpan.FromMilliseconds(Math.Min(320, RefreshMs * 0.8))) { FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop });
     }
 
@@ -179,7 +176,8 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
     {
         if (!_embedded)
             BuildTitle();
-        BuildStatus();
+        else
+            BuildStatus();
 
         var columns = new Grid();
         columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -195,10 +193,15 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
     {
         var header = new Grid { Margin = Ui.HeaderMargin };
         var titles = new StackPanel();
-        titles.Children.Add(Ui.PluginTitle(Plugins.PluginIds.Overlay, "Performance Overlay"));
+        titles.Children.Add(Ui.PageTitle("Performance Overlay"));
         header.Children.Add(titles);
+        Detached(_visible);
+        _visible.Content = null;
+        header.Children.Add(Ui.PageSwitch("Show the overlay", _visible, ShowHelp));
         _body.Children.Add(header);
     }
+
+    private const string ShowHelp = "Shows over borderless and windowed games, not exclusive fullscreen. Nothing is injected into the game, so it's safe with anti-cheat. On some setups a window on top of the game can stop Windows using its lowest-latency presentation mode; hide the overlay with the keybind for races if you notice it.";
 
     private OverlayLayout? _built;
 
@@ -492,8 +495,12 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         _motion.Glide(from);
     }
 
+    private (string? Group, OverlayMetric? Metric) _lit;
+
     private void Light(string? group, OverlayMetric? metric)
     {
+        if (_lit == (group, metric)) return;
+        _lit = (group, metric);
         _motion.Spotlight(group, metric);
         if (_litRow is { } was)
         {
@@ -539,7 +546,7 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
             row.Children.Add(Wrapped(b));
         }
         row.Children.Add(Wrapped(Ui.LabeledButton("I.Plus", "New layout", () => _ = NewLayoutAsync(copy: false), "PrimaryButton")));
-        var reset = Ui.LabeledButton("I.Restore", "Reset to default", () => _ = ResetLayoutAsync(), "GhostButton");
+        var reset = Ui.LabeledButton("I.Undo", "Reset to default", () => _ = ResetLayoutAsync(), "GhostButton");
         reset.ToolTip = "Puts every setting of this layout back as it comes with Pit-Box";
         row.Children.Add(Wrapped(reset));
         stack.Children.Add(row);
@@ -638,6 +645,8 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
     {
         _metricRows.Clear();
         _litRow = null;
+        _lit = default;
+        _motion.Spotlight(null, null);
         var metrics = new StackPanel { Margin = new Thickness(0, 11, 0, 0) };
         metrics.Children.Add(Ui.Text("What to show", "H2"));
         var cards = new MasonryPanel { MinColumnWidth = MetricCardWidth, MaxColumns = 4, Gap = 8, Margin = new Thickness(0, 10, 0, 0) };
@@ -655,7 +664,7 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
     {
         var name = new TextBlock { Text = group, Style = Ui.Res<Style>("Eyebrow"), VerticalAlignment = VerticalAlignment.Center };
         var count = new Odometer(10.5, "TextFaint", italic: false, heavy: false) { RollMs = 360, Margin = new Thickness(7, 0, 0, 0) };
-        var all = new Button { Style = Ui.Res<Style>("GhostButton"), Height = 22, MinWidth = 0, Padding = new Thickness(7, 0, 7, 0), FontSize = 10.5, VerticalAlignment = VerticalAlignment.Center };
+        var all = new Button { Style = Ui.Res<Style>("GhostButton"), Height = 22, MinWidth = 0, Padding = new Thickness(7, 0, 7, 0), FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center };
         if (entries.Count < 2) all.Visibility = Visibility.Hidden;
         var head = new DockPanel { Margin = new Thickness(10, 6, 6, 6), LastChildFill = false };
         DockPanel.SetDock(all, Dock.Right);
@@ -909,7 +918,7 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
     private async Task ResetLayoutAsync()
     {
         var layout = L;
-        if (!await _window.Confirm($"Reset “{layout.Name}” to default?", "What it shows, its order, names, look and place on screen go back to the defaults.", "Reset"))
+        if (!await _window.Confirm($"Reset “{layout.Name}” to default?", "What it shows, its order, names, look and place on screen go back to the defaults.", "Reset", danger: true))
             return;
         var fresh = new OverlayLayout { Name = layout.Name };
         fresh.Complete();
@@ -983,6 +992,7 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
             return;
         }
         PlacePreview();
+        if (_lit.Group is not null) _motion.Spotlight(_lit.Group, _lit.Metric);
     }
 
     public IEnumerable<(string Name, Func<Task> Enter)> ScreenshotStates()

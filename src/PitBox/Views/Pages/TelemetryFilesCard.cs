@@ -28,6 +28,8 @@ internal sealed class TelemetryFilesCard : ContentControl
         _ = LoadAsync();
     }
 
+    internal void Reload() => _ = LoadAsync();
+
     private async Task LoadAsync()
     {
         int version = ++_version;

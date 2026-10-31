@@ -233,7 +233,7 @@ internal static class StatsSessions
 
     internal static TextBlock Time(double? seconds, string brush = "Heading")
     {
-        var t = new TextBlock { Text = seconds is { } s ? StatFormat.LapTime(s) : "–", FontWeight = FontWeights.SemiBold, FontSize = 10.5 };
+        var t = new TextBlock { Text = seconds is { } s ? StatFormat.LapTime(s) : "–", FontWeight = FontWeights.SemiBold, FontSize = 12 };
         t.SetResourceReference(TextBlock.FontFamilyProperty, "MetricFont");
         t.SetResourceReference(TextBlock.ForegroundProperty, seconds is null ? "TextFaint" : brush);
         System.Windows.Documents.Typography.SetNumeralAlignment(t, FontNumeralAlignment.Tabular);

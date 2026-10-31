@@ -1,5 +1,4 @@
 using System.Drawing;
-using System.Drawing.Text;
 using System.IO;
 using System.Runtime.InteropServices;
 
@@ -9,45 +8,7 @@ internal static class HudArt
 {
     private const string Assets = "pack://application:,,,/PitBox;component/Assets/";
     private static readonly object Gate = new();
-    private static PrivateFontCollection? _fonts;
-    private static FontFamily? _display;
-    private static bool _tried;
     private static readonly Dictionary<string, Image?> Cars = new(StringComparer.OrdinalIgnoreCase);
-
-    public static (FontFamily Family, FontStyle Style) Display
-    {
-        get
-        {
-            lock (Gate)
-            {
-                if (!_tried)
-                {
-                    _tried = true;
-                    _display = LoadFont("Fonts/Condensed/BarlowCondensed-ExtraBoldItalic.ttf");
-                }
-                return _display is not null ? (_display, FontStyle.Italic) : (FontFamily.GenericSansSerif, FontStyle.Bold | FontStyle.Italic);
-            }
-        }
-    }
-
-    private static FontFamily? LoadFont(string path)
-    {
-        try
-        {
-            var bytes = Read(path);
-            if (bytes is null) return null;
-            _fonts = new PrivateFontCollection();
-            var memory = Marshal.AllocCoTaskMem(bytes.Length);
-            Marshal.Copy(bytes, 0, memory, bytes.Length);
-            _fonts.AddMemoryFont(memory, bytes.Length);
-            return _fonts.Families.FirstOrDefault();
-        }
-        catch (Exception ex) when (ex is IOException or ArgumentException or ExternalException or InvalidOperationException or UriFormatException)
-        {
-            App.LogError(ex);
-            return null;
-        }
-    }
 
     private static byte[]? Read(string path)
     {

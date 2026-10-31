@@ -86,7 +86,7 @@ public sealed class ArrangementCanvas : Canvas
         if (before.Count > 0 && Views.Motion.Flourish) Morph(before);
     }
 
-    private static readonly IEasingFunction Settle = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.4 };
+    private static readonly IEasingFunction Settle = Motion.Frozen(new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.4 });
 
     private void Morph(Dictionary<string, Rect> before)
     {
@@ -159,7 +159,7 @@ public sealed class ArrangementCanvas : Canvas
         }
     }
 
-    private static readonly IEasingFunction Ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+    private static readonly IEasingFunction Ease = Motion.Ease;
 
     private Border BuildVisual(ArrangeTile tile)
     {
@@ -193,8 +193,8 @@ public sealed class ArrangementCanvas : Canvas
             HorizontalAlignment = HorizontalAlignment.Center,
             FontFamily = ThemeManager.RaceFace.FontFamily,
         });
-        stack.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = tile.Name, FontSize = 9.5, HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(5, 0, 5, 0) }));
-        stack.Children.Add(new TextBlock { Text = tile.Detail, FontSize = 9.5, Opacity = 0.8, HorizontalAlignment = HorizontalAlignment.Center });
+        stack.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = tile.Name, FontSize = 11, HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(5, 0, 5, 0) }));
+        stack.Children.Add(new TextBlock { Text = tile.Detail, FontSize = 11, Opacity = 0.8, HorizontalAlignment = HorizontalAlignment.Center });
         grid.Children.Add(stack);
         if (tile.Primary)
         {
@@ -206,7 +206,7 @@ public sealed class ArrangementCanvas : Canvas
                 Margin = new Thickness(5),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Top,
-                Child = new TextBlock { Text = "Main", FontSize = 9, Foreground = ThemeManager.Brush("OnAccent", Brushes.Black), FontWeight = FontWeights.SemiBold },
+                Child = new TextBlock { Text = "Main", FontSize = 11, Foreground = ThemeManager.Brush("OnAccent", Brushes.Black), FontWeight = FontWeights.SemiBold },
             });
         }
     }

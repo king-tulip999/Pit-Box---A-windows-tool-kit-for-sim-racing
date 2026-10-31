@@ -100,6 +100,7 @@ internal sealed class AppServices : IDisposable
     {
         Plugins.StartEnabled();
         Hotkeys.RegisterAll();
+        PerfProbe.Mark("hotkeys");
         if (withTray)
             Tray = new TrayService(this);
         _tick.Start();

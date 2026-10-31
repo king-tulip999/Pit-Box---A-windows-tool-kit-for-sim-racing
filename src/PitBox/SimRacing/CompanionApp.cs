@@ -185,7 +185,10 @@ internal sealed class CompanionApp
                 return null;
         }
         if (_app.Demo)
+        {
+            if (!quiet) _app.Notify($"Starting {Spec.Name}", "Demo: nothing was started.", NoticeKind.Info);
             return null;
+        }
         var error = ProcessLauncher.Launch(ExePath!);
         if (error is null && !quiet)
             _app.Notify($"Starting {Spec.Name}", "", NoticeKind.Success);

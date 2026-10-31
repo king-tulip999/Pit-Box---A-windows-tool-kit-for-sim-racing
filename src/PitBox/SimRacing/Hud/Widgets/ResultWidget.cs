@@ -147,13 +147,18 @@ internal sealed class ResultWidget : HudWidget
             float x = pad;
             bool Chip(string label, string value, Color valueColor, Color? edge = null)
             {
-                float lw = label.Length > 0 ? p.Measure(label, p.SmallBold) : 0, vw = p.Measure(value, p.Small), cw = lw + vw + (label.Length > 0 ? 20 : 14) * d;
+                float lw = label.Length > 0 ? p.Measure(label, p.SmallBold) : 0, vw = p.Measure(value, p.Small), cw = lw + vw + (label.Length > 0 ? 28 : 14) * d;
                 if (x + cw > w - pad) return false;
                 var r = new RectangleF(x, y, cw, chipH);
                 p.Fill(r, edge is { } e ? HudPalette.Alpha(e, 40) : p.Sunken(0.25));
                 p.Outline(r, edge ?? p.P.Line);
-                if (label.Length > 0) p.Text(label, p.SmallBold, p.P.Muted, new RectangleF(x + 7 * d, y, lw + 2, chipH), HAlign.Left, VAlign.Center, false);
-                p.Text(value, p.Small, valueColor, new RectangleF(x + (label.Length > 0 ? 12 * d + lw : 7 * d), y, vw + 2, chipH), HAlign.Left, VAlign.Center, false);
+                if (label.Length > 0)
+                {
+                    p.Text(label, p.SmallBold, p.P.Muted, new RectangleF(x + 7 * d, y, lw + 2, chipH), HAlign.Left, VAlign.Center, false);
+                    float divider = MathF.Round(x + 14 * d + lw);
+                    p.Line(divider, y + 5 * d, divider, y + chipH - 5 * d, p.P.Line);
+                }
+                p.Text(value, p.Small, valueColor, new RectangleF(x + (label.Length > 0 ? 21 * d + lw : 7 * d), y, vw + 2, chipH), HAlign.Left, VAlign.Center, false);
                 x += cw + 5 * d;
                 return true;
             }
@@ -162,8 +167,9 @@ internal sealed class ResultWidget : HudWidget
                 if (!card.Official) Chip("Hosted", "Ratings unchanged", p.P.Text);
                 else if (card.IRating is { } ir)
                 {
-                    string change = card.IRatingChange is { } c ? $" {(c >= 0 ? "+" : "−")}{Math.Abs(Math.Round(c)):0} est." : "";
-                    Chip("iR", ir.ToString("N0", CultureInfo.InvariantCulture) + change, card.IRatingChange is > 0 ? p.P.GoodText : card.IRatingChange is < 0 ? p.P.DangerText : p.P.Text);
+                    double? rounded = card.IRatingChange is { } c ? Math.Round(c) : null;
+                    string change = rounded is { } r ? $" {RaceFormat.Signed(r, "0")} est." : "";
+                    Chip("iR", ir.ToString("N0", CultureInfo.InvariantCulture) + change, rounded is > 0 ? p.P.GoodText : rounded is < 0 ? p.P.DangerText : p.P.Text);
                 }
             }
             if (Has("incidents") && card.Incidents is { } inc) Chip("Inc", inc + "x", p.P.Text);

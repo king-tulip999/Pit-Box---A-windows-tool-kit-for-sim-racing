@@ -6,7 +6,7 @@ I got sick of switching monitors, audio, fan curves and overlays by hand every t
 
 ## What's in it
 
-Every tool can be switched off, and when one's off it runs nothing in the background. Every tool sits in a sidebar (drag to reorder), with its sections listed under it. There are themes (Light, Dark, or your own colors, with presets to start from) over a blueprint drawing of a race track with cars lapping it (switch them off with **Moving cars** in Settings → Appearance), and `Ctrl+F` searches every setting in the app. Keybinds can be keyboard shortcuts or a button on your wheel or button box.
+Every tool can be switched off, and when one's off it runs nothing in the background. Every tool sits in a sidebar (drag to reorder), with its sections listed under it. There are themes (The Pits, or your own colors, with presets to start from) over a contour-line background, animations can be switched off in Settings → Appearance, and `Ctrl+F` searches every setting in the app. Keybinds can be keyboard shortcuts or a button on your wheel or button box.
 
 ### Sim Racing Tools (iRacing)
 
@@ -143,7 +143,8 @@ Pit-Box is built on these, each under its own licence:
 | [TraceEvent](https://github.com/microsoft/perfview) (Microsoft) | Frame counting for the FPS readouts | MIT |
 | [.NET, WPF and Windows Forms](https://github.com/dotnet) (Microsoft) | The app framework | MIT |
 | [Lucide](https://lucide.dev) | Icons (some adapted) | ISC |
-| [Barlow](https://github.com/jpt/barlow) by Jeremy Tribby | GRR theme font, race result cards | SIL Open Font License 1.1 |
+| [Saira](https://github.com/Omnibus-Type/Saira) by Omnibus-Type | The app font | SIL Open Font License 1.1 |
+| [Barlow](https://github.com/jpt/barlow) by Jeremy Tribby | Logo and the iRacing Overlay's numbers | SIL Open Font License 1.1 |
 | [SIMRacingApps](https://github.com/SIMRacingApps/SIMRacingAppsServer) by Jeffrey Gilliam | Track centreline and pit lane routes for Session Stats' track maps | Apache 2.0 |
 | Track map drawings by [iRacing](https://www.iracing.com), collected in [racing-track-maps-vector](https://github.com/meowmachine/racing-track-maps-vector) by meowmachine | Track maps for Session Stats and the iRacing Overlay | © iRacing.com Motorsport Simulations, LLC |
 | [PawnIO](https://pawnio.eu) | Optional driver for CPU and motherboard sensors (not bundled; installed separately) | See its site |
@@ -155,6 +156,6 @@ Inspired by (no code or assets from these are used):
 
 Thanks to the [GRR League](https://www.grassrootsracing.org) for letting the GRR plugin use its site data and logo.
 
-Full licence texts ship with the components (for example `NOTICES.md` inside the track map library and `Barlow-OFL.txt` beside the fonts).
+Full licence texts ship with the components (for example `NOTICES.md` inside the track map library and `Saira-OFL.txt` / `Barlow-OFL.txt` beside the fonts).
 
 iRacing is a trademark of iRacing.com Motorsport Simulations, LLC. Trading Paints and Garage 61 belong to their owners. Pit-Box isn't affiliated with or endorsed by any of them.

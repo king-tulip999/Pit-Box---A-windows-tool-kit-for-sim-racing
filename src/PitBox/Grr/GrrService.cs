@@ -166,12 +166,7 @@ internal sealed class GrrService
                 }
                 catch (Exception ex)
                 {
-                    return (league, data: (GrrLeagueData?)null, text: (string?)null, problem: ex switch
-                    {
-                        TaskCanceledException => "the GRR website didn't answer in time",
-                        HttpRequestException => ex.Message,
-                        _ => "the feed couldn't be read",
-                    });
+                    return (league, data: (GrrLeagueData?)null, text: (string?)null, problem: Describe(ex));
                 }
             }).ToList();
             foreach (var (league, data, text, problem) in await Task.WhenAll(reads))
@@ -195,6 +190,14 @@ internal sealed class GrrService
             Raise();
         }
     }
+
+    internal static string Describe(Exception ex) => ex switch
+    {
+        TaskCanceledException => "the GRR website didn't answer in time",
+        HttpRequestException { StatusCode: { } code } => $"the GRR website answered with an error ({(int)code})",
+        HttpRequestException => "the GRR website couldn't be reached",
+        _ => "the feed couldn't be read",
+    };
 
     private static void Save(string league, string text)
     {

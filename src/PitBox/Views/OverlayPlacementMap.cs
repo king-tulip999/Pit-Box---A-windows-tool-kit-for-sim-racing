@@ -22,6 +22,8 @@ internal sealed class OverlayPlacementMap : Grid
     private readonly Canvas _canvas = new() { Height = MapHeight, ClipToBounds = true };
     private readonly List<Border> _monitors = new();
     private readonly Border _mini;
+    private readonly Border _hover;
+    private List<Rect> _boxes = new();
     private readonly TranslateTransform _glide = new();
     private readonly TextBlock _note;
 
@@ -32,10 +34,14 @@ internal sealed class OverlayPlacementMap : Grid
         _screens = ReadScreens();
         RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var tip = new TextBlock { Text = "Click a corner of a monitor to move the overlay there.", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8) };
+        Children.Add(tip);
+        SetRow(_canvas, 1);
         Children.Add(_canvas);
         _note = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0), Visibility = Visibility.Collapsed };
         _note.SetResourceReference(TextBlock.ForegroundProperty, "WarnDeep");
-        SetRow(_note, 1);
+        SetRow(_note, 2);
         Children.Add(_note);
 
         foreach (var screen in _screens)
@@ -48,7 +54,7 @@ internal sealed class OverlayPlacementMap : Grid
             number.SetResourceReference(TextBlock.FontFamilyProperty, "RaceFont");
             number.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
             tag.Children.Add(number);
-            if (screen.Primary) tag.Children.Add(new TextBlock { Text = ThemeManager.Case("Primary"), Style = Ui.Res<Style>("Caption"), HorizontalAlignment = HorizontalAlignment.Center });
+            if (screen.Primary) tag.Children.Add(new TextBlock { Text = ThemeManager.Case("Main"), Style = Ui.Res<Style>("Caption"), HorizontalAlignment = HorizontalAlignment.Center });
             face.Children.Add(tag);
             face.ColumnDefinitions.Add(new ColumnDefinition());
             face.ColumnDefinitions.Add(new ColumnDefinition());
@@ -72,6 +78,10 @@ internal sealed class OverlayPlacementMap : Grid
         }
         _mini = new Border { Width = MiniWidth, Height = MiniHeight, BorderThickness = new Thickness(3, 1, 1, 1), Child = lines, IsHitTestVisible = false, RenderTransform = _glide, Background = Brushes.Transparent };
         _mini.SetResourceReference(Border.BorderBrushProperty, "Accent");
+        _hover = Hairline.Frame(new Border { Width = MiniWidth, Height = MiniHeight, IsHitTestVisible = false, Visibility = Visibility.Collapsed, Opacity = 0.8 });
+        _hover.SetResourceReference(Border.BorderBrushProperty, "AccentText");
+        _hover.SetResourceReference(Border.BackgroundProperty, "AccentSoft");
+        _canvas.Children.Add(_hover);
         _canvas.Children.Add(_mini);
         _canvas.SizeChanged += (_, e) => { if (e.WidthChanged) Place(animate: false); };
     }
@@ -98,9 +108,9 @@ internal sealed class OverlayPlacementMap : Grid
         AutomationProperties.SetName(target, name);
         SetColumn(target, right ? 1 : 0);
         SetRow(target, bottom ? 1 : 0);
-        target.MouseEnter += (_, _) => target.SetResourceReference(Border.BackgroundProperty, "Hover");
-        target.MouseLeave += (_, _) => target.Background = Brushes.Transparent;
-        target.MouseLeftButtonUp += (_, e) => { Pick(screen, corner); e.Handled = true; };
+        target.MouseLeftButtonUp += (_, e) => { Pick(screen, corner); ShowHover(null, corner); e.Handled = true; };
+        target.MouseEnter += (_, _) => ShowHover(screen, corner);
+        target.MouseLeave += (_, _) => ShowHover(null, corner);
         target.KeyDown += (_, e) =>
         {
             if (e.Key is not (Key.Enter or Key.Space)) return;
@@ -108,6 +118,27 @@ internal sealed class OverlayPlacementMap : Grid
             e.Handled = true;
         };
         return target;
+    }
+
+    private void ShowHover(Screen? screen, OverlayCorner corner)
+    {
+        var layout = _layout();
+        int index = screen is { } s ? _screens.IndexOf(s) : -1;
+        if (index < 0 || index >= _boxes.Count || (layout.Corner == corner && Chosen(layout) == screen))
+        {
+            _hover.Visibility = Visibility.Collapsed;
+            return;
+        }
+        var at = CornerOf(_boxes[index], corner);
+        Canvas.SetLeft(_hover, at.X);
+        Canvas.SetTop(_hover, at.Y);
+        _hover.Visibility = Visibility.Visible;
+    }
+
+    private static Point CornerOf(Rect box, OverlayCorner corner)
+    {
+        bool right = corner is OverlayCorner.TopRight or OverlayCorner.BottomRight, bottom = corner is OverlayCorner.BottomLeft or OverlayCorner.BottomRight;
+        return new Point(right ? box.Right - MiniWidth - Inset : box.X + Inset, bottom ? box.Bottom - MiniHeight - Inset : box.Y + Inset);
     }
 
     private static string Words(OverlayCorner corner) => corner switch
@@ -158,6 +189,7 @@ internal sealed class OverlayPlacementMap : Grid
     {
         var boxes = Fit(_screens.Select(s => s.Bounds).ToList(), _canvas.ActualWidth, MapHeight, Gap);
         if (boxes.Count != _screens.Count) return;
+        _boxes = boxes;
         var layout = _layout();
         var chosen = Chosen(layout);
         for (int i = 0; i < boxes.Count; i++)
@@ -171,14 +203,13 @@ internal sealed class OverlayPlacementMap : Grid
         }
 
         bool missing = layout.Monitor != "primary" && !_screens.Any(s => string.Equals(s.Id, layout.Monitor, StringComparison.OrdinalIgnoreCase));
-        _note.Text = "The saved monitor isn't connected, so the overlay shows on the primary monitor.";
+        _note.Text = "The saved monitor isn't connected, so the overlay shows on the main display.";
         _note.Visibility = missing ? Visibility.Visible : Visibility.Collapsed;
 
         int index = chosen is { } c ? _screens.IndexOf(c) : 0;
         if (index < 0) return;
-        var box = boxes[index];
-        bool right = layout.Corner is OverlayCorner.TopRight or OverlayCorner.BottomRight, bottom = layout.Corner is OverlayCorner.BottomLeft or OverlayCorner.BottomRight;
-        double x = right ? box.Right - MiniWidth - Inset : box.X + Inset, y = bottom ? box.Bottom - MiniHeight - Inset : box.Y + Inset;
+        var corner = CornerOf(boxes[index], layout.Corner);
+        double x = corner.X, y = corner.Y;
         var from = new Point(Canvas.GetLeft(_mini), Canvas.GetTop(_mini));
         Canvas.SetLeft(_mini, x);
         Canvas.SetTop(_mini, y);

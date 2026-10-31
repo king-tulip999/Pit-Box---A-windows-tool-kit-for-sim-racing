@@ -32,7 +32,8 @@ internal static class Motion
             work();
             return;
         }
-        var timer = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Background, dispatcher) { Interval = TimeSpan.FromMilliseconds(Math.Min(wait, 100)) };
+        bool started = PageAnimatesFrom <= Environment.TickCount64;
+        var timer = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Background, dispatcher) { Interval = TimeSpan.FromMilliseconds(started ? wait : Math.Min(wait, 40)) };
         timer.Tick += (_, _) =>
         {
             timer.Stop();
@@ -41,7 +42,58 @@ internal static class Motion
         timer.Start();
     }
 
-    public static readonly IEasingFunction Ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+    public const int UserIdleMs = 350, UserIdleWaitMs = 4000;
+
+    public static void WhenUserIdle(System.Windows.Threading.Dispatcher dispatcher, Action work)
+    {
+        long giveUp = Environment.TickCount64 + UserIdleWaitMs;
+        AfterPageSettles(dispatcher, () => WaitForStillInput(dispatcher, work, giveUp));
+    }
+
+    private static void WaitForStillInput(System.Windows.Threading.Dispatcher dispatcher, Action work, long giveUp)
+    {
+        long since = SinceLastInput();
+        if (since >= UserIdleMs || Environment.TickCount64 >= giveUp)
+        {
+            dispatcher.BeginInvoke(work, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            return;
+        }
+        var timer = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Background, dispatcher) { Interval = TimeSpan.FromMilliseconds(UserIdleMs - since) };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            WaitForStillInput(dispatcher, work, giveUp);
+        };
+        timer.Start();
+    }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct LastInputInfo
+    {
+        public uint Size;
+        public uint Time;
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool GetLastInputInfo(ref LastInputInfo info);
+
+    private static long SinceLastInput()
+    {
+        var info = new LastInputInfo { Size = (uint)System.Runtime.InteropServices.Marshal.SizeOf<LastInputInfo>() };
+        return GetLastInputInfo(ref info) ? unchecked((uint)Environment.TickCount - info.Time) : long.MaxValue;
+    }
+
+    public const int PageFadeMs = 160, SwapMs = 240, RevealMs = 200;
+
+    public const double SwapDistance = 12;
+
+    public static readonly IEasingFunction Ease = Frozen(new CubicEase { EasingMode = EasingMode.EaseOut });
+
+    internal static IEasingFunction Frozen(EasingFunctionBase ease)
+    {
+        ease.Freeze();
+        return ease;
+    }
 
     public static bool Enabled => AppServices.Current?.Animations ?? true;
 
@@ -66,6 +118,7 @@ internal static class Motion
     {
         if (!Enabled)
         {
+            element.BeginAnimation(UIElement.OpacityProperty, null);
             element.Opacity = 1;
             return;
         }
@@ -77,35 +130,42 @@ internal static class Motion
             element.RenderTransform = move;
         }
 
-        var begin = TimeSpan.FromMilliseconds(delayMs);
-        var duration = TimeSpan.FromMilliseconds(durationMs);
-        element.Opacity = 0;
-        var fade = new DoubleAnimation(0, 1, duration) { BeginTime = begin, EasingFunction = Ease };
-        fade.Completed += (_, _) =>
-        {
-            element.BeginAnimation(UIElement.OpacityProperty, null);
-            element.Opacity = 1;
-            move.BeginAnimation(TranslateTransform.YProperty, null);
-            move.Y = 0;
-        };
-        element.BeginAnimation(UIElement.OpacityProperty, fade);
-        move.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(distance, 0, duration) { BeginTime = begin, EasingFunction = Ease });
+        element.Opacity = 1;
+        move.Y = 0;
+        element.BeginAnimation(UIElement.OpacityProperty, Held(0, 1, delayMs, durationMs));
+        move.BeginAnimation(TranslateTransform.YProperty, Held(distance, 0, delayMs, durationMs));
     }
 
-    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Panel, object> Entered = new();
-
-    public static void Stagger(Panel panel, double stepMs = 30, double maxDelayMs = 180)
+    private static DoubleAnimationUsingKeyFrames Held(double from, double to, double delayMs, double durationMs)
     {
-        if (Entered.TryGetValue(panel, out _))
-            return;
-        Entered.Add(panel, true);
-        int i = 0;
-        foreach (UIElement child in panel.Children)
+        var anim = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(delayMs + durationMs), FillBehavior = FillBehavior.Stop };
+        anim.KeyFrames.Add(new DiscreteDoubleKeyFrame(from, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+        if (delayMs > 0) anim.KeyFrames.Add(new DiscreteDoubleKeyFrame(from, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(delayMs))));
+        anim.KeyFrames.Add(new EasingDoubleKeyFrame(to, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(delayMs + durationMs)), Ease));
+        anim.Freeze();
+        return anim;
+    }
+
+    public static void InTurns(IEnumerable<UIElement> elements)
+    {
+        var later = elements.Where(e => e.Visibility == Visibility.Visible).ToList();
+        if (later.Count == 0) return;
+        foreach (var element in later) element.Visibility = Visibility.Collapsed;
+        int next = 0;
+        void Reveal()
         {
-            if (child.Visibility != Visibility.Visible)
-                continue;
-            Enter(child, Math.Min(maxDelayMs, i++ * stepMs));
+            later[next++].Visibility = Visibility.Visible;
+            if (next < later.Count) later[next].Dispatcher.BeginInvoke(Reveal, System.Windows.Threading.DispatcherPriority.Background);
         }
+        later[0].Dispatcher.BeginInvoke(Reveal, System.Windows.Threading.DispatcherPriority.Background);
+    }
+
+    public static void FadeIn(UIElement element, double durationMs = PageFadeMs)
+    {
+        element.BeginAnimation(UIElement.OpacityProperty, null);
+        element.Opacity = 1;
+        if (!Enabled || durationMs <= 0) return;
+        element.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(durationMs)) { FillBehavior = FillBehavior.Stop });
     }
 
     public static void FadeTo(UIElement element, double to, double durationMs = 200, Action? done = null)
@@ -126,7 +186,7 @@ internal static class Motion
         element.BeginAnimation(UIElement.OpacityProperty, anim);
     }
 
-    private static readonly IEasingFunction Spring = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.6 };
+    private static readonly IEasingFunction Spring = Frozen(new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.6 });
 
     public static void InstallPress()
     {

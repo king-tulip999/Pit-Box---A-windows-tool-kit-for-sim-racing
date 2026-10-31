@@ -34,7 +34,7 @@ internal static class FovExchange
         if (setup.BezelMm < 0)
             notes.Add("iRacing has no negative bezel, so it gets 0 mm.");
         if (setup.Triple && setup.MixedSides)
-            notes.Add("iRacing has one size for all three screens, so it gets the centre screen's.");
+            notes.Add("iRacing has one size for all three screens, so it gets the center screen's.");
         return notes;
     }
 

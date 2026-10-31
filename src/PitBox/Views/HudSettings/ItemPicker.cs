@@ -127,7 +127,7 @@ internal sealed class ItemPicker : StackPanel
     {
         var popup = new Popup
         {
-            PlacementTarget = anchor, Placement = PlacementMode.Custom, StaysOpen = false, AllowsTransparency = true,
+            PlacementTarget = anchor, Placement = PlacementMode.Custom, StaysOpen = false, AllowsTransparency = true, PopupAnimation = PopupAnimation.Fade,
             CustomPopupPlacementCallback = (size, target, _) => new[] { new CustomPopupPlacement(new Point(target.Width - size.Width, target.Height), PopupPrimaryAxis.Horizontal) },
             Child = new Tile { Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(8), Margin = new Thickness(0, 3, 0, 0), Child = card, MaxWidth = 308 },
         };

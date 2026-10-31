@@ -81,7 +81,22 @@ internal sealed partial class RaceHudWidgets
             grid.Children.Add(pane);
             Root = grid;
         }
+        Root.Unloaded += (_, _) => ReleaseNative();
         Fill();
+    }
+
+    private void ReleaseNative()
+    {
+        _previewTimer?.Stop();
+        _painter.ReleaseText();
+        _trialPainter.ReleaseText();
+        _picturePainter.ReleaseText();
+        _previewBitmap?.Dispose();
+        _previewBitmap = null;
+        _trialBitmap?.Dispose();
+        _trialBitmap = null;
+        _pictureBitmap?.Dispose();
+        _pictureBitmap = null;
     }
 
     private readonly bool _inPage;
@@ -222,7 +237,7 @@ internal sealed partial class RaceHudWidgets
 
     private void PreviewFrame()
     {
-        if (Environment.TickCount64 - _heartbeat > 800) { _previewTimer!.Stop(); return; }
+        if (Environment.TickCount64 - _heartbeat > 800 || !Root.IsLoaded) { _previewTimer!.Stop(); return; }
         if (_dragging) return;
         if (_preview is null || Selected() is not { } w) return;
         _section.Preview.Advance(Host);
@@ -438,7 +453,7 @@ internal sealed partial class RaceHudWidgets
             Changed();
             Fill();
         }, "GhostButton");
-        home.ToolTip = "Puts this widget in the middle of the main monitor, e.g. when it's off screen or behind something";
+        home.ToolTip = "Puts this widget in the middle of the main display, e.g. when it's off screen or behind something";
         rows.Add(SettingRows.Row("", null, false, home));
         return rows;
     }

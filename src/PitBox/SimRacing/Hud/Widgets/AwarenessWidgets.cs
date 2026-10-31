@@ -67,7 +67,7 @@ internal sealed class TrafficWidget : HudWidget
             var gapBox = rest.Right(64, out rest);
             p.Text((gap > 0 ? "▲ " : "▼ ") + RaceFormat.Abs(gap), p.Bold, gap > 0 ? p.P.Text : faster ? p.P.WarnText : p.P.Text, gapBox, HAlign.Right);
             var info = rest.Right(80, out rest);
-            string meet = closing && v.Race.Gaps.TimeToCatch(car, gap) is { } t && t < 120 ? $"~{t:0} {Units.S}" : trend is > 0.01 ? "opening" : "";
+            string meet = closing && v.Race.Gaps.TimeToCatch(car, gap) is { } t && t < 120 ? RaceFormat.About($"{t:0} {Units.S}") : trend is > 0.01 ? "opening" : "";
             p.Text(meet, p.Small, p.P.Muted, info, HAlign.Right);
             p.Text(d?.Name ?? $"Car {car}", p.Body, p.P.Text, rest.Inflated(-4, 0), HAlign.Left);
             y += rowH;

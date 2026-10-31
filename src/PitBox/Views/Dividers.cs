@@ -7,11 +7,11 @@ namespace PitBox.Views;
 internal static class Dividers
 {
     private static Color _accent;
-    private static (Brush Halo, Brush Core, Brush Fade)? _brushes, _upright;
+    private static (Brush Halo, Brush Core, Brush Fade)? _brushes, _upright, _leading;
 
-    public static void Draw(DrawingContext dc, double left, double right, double y)
+    public static void Draw(DrawingContext dc, double left, double right, double y, bool fromStart = false)
     {
-        if (right - left < 40 || Brushes(vertical: false) is not var (halo, core, fade)) return;
+        if (right - left < 40 || Brushes(vertical: false, fromStart) is not var (halo, core, fade)) return;
         dc.PushOpacityMask(fade);
         dc.DrawRectangle(halo, null, new Rect(left, y - 5, right - left, 11));
         dc.DrawRectangle(core, null, new Rect(left, y, right - left, 1));
@@ -29,19 +29,20 @@ internal static class Dividers
 
     private static ThemeSpec? _spec;
 
-    private static (Brush, Brush, Brush)? Brushes(bool vertical)
+    private static (Brush, Brush, Brush)? Brushes(bool vertical, bool fromStart = false)
     {
         if (Ui.Res<Brush>("Accent") is not SolidColorBrush { Color: var accent }) return null;
         if (_accent != accent || !ReferenceEquals(_spec, ThemeManager.Current))
         {
             _accent = accent;
             _spec = ThemeManager.Current;
-            _brushes = _upright = null;
+            _brushes = _upright = _leading = null;
         }
-        return vertical ? _upright ??= Make(accent, true) : _brushes ??= Make(accent, false);
+        if (vertical) return _upright ??= Make(accent, true, false);
+        return fromStart ? _leading ??= Make(accent, false, true) : _brushes ??= Make(accent, false, false);
     }
 
-    private static (Brush, Brush, Brush) Make(Color accent, bool vertical)
+    private static (Brush, Brush, Brush) Make(Color accent, bool vertical, bool fromStart)
     {
         var spec = ThemeManager.Current;
         double glow = spec.GlowStrength * (spec.Dark ? 0.22 : 0.16), line = spec.Dark ? 0.7 : 0.85;
@@ -52,10 +53,19 @@ internal static class Dividers
         halo.GradientStops.Add(new GradientStop(A(glow), 0.5));
         halo.GradientStops.Add(new GradientStop(A(0), 1));
         var fade = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = along };
-        fade.GradientStops.Add(new GradientStop(Colors.Transparent, 0));
-        fade.GradientStops.Add(new GradientStop(Colors.Black, 0.18));
-        fade.GradientStops.Add(new GradientStop(Colors.Black, 0.82));
-        fade.GradientStops.Add(new GradientStop(Colors.Transparent, 1));
+        if (fromStart)
+        {
+            fade.GradientStops.Add(new GradientStop(Colors.Black, 0));
+            fade.GradientStops.Add(new GradientStop(Colors.Black, 0.25));
+            fade.GradientStops.Add(new GradientStop(Colors.Transparent, 1));
+        }
+        else
+        {
+            fade.GradientStops.Add(new GradientStop(Colors.Transparent, 0));
+            fade.GradientStops.Add(new GradientStop(Colors.Black, 0.18));
+            fade.GradientStops.Add(new GradientStop(Colors.Black, 0.82));
+            fade.GradientStops.Add(new GradientStop(Colors.Transparent, 1));
+        }
         var core = new SolidColorBrush(A(line));
         halo.Freeze();
         fade.Freeze();
@@ -72,5 +82,7 @@ internal sealed class DividerLine : FrameworkElement
         Height = 9;
     }
 
-    protected override void OnRender(DrawingContext dc) => Dividers.Draw(dc, 0, ActualWidth, Math.Floor(ActualHeight / 2));
+    public bool FromStart { get; set; }
+
+    protected override void OnRender(DrawingContext dc) => Dividers.Draw(dc, 0, ActualWidth, Math.Floor(ActualHeight / 2), FromStart);
 }

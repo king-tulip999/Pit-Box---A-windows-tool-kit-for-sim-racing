@@ -849,7 +849,7 @@ internal sealed class StandingsWidget : HudWidget
                 case "laps":
                     int leader = block[0].CarIdx;
                     if (f.CurrentSession?.Laps is not > 0 && f.SessionTimeRemain is { } left && v.Race.PaceOf(leader) is { } pace && pace > 0)
-                        parts.Add("~" + RaceFormat.Count((long)(f.CarLapCompleted[leader] + Math.Ceiling(left / pace) + 1), "lap"));
+                        parts.Add(RaceFormat.About(RaceFormat.Count((long)(f.CarLapCompleted[leader] + Math.Ceiling(left / pace) + 1), "lap")));
                     break;
             }
         return string.Join(" · ", parts);
@@ -1074,7 +1074,7 @@ internal static class Strips
     {
         var f = v.Frame;
         if (f.CurrentSession?.Laps is > 0 && f.SessionLapsRemain is { } laps) return laps <= 0 ? "Final" : laps.ToString(CultureInfo.InvariantCulture);
-        return v.Race.LapsToGo(f) is { } togo ? "~" + Math.Ceiling(togo).ToString(CultureInfo.InvariantCulture) : null;
+        return v.Race.LapsToGo(f) is { } togo ? RaceFormat.About(Math.Ceiling(togo).ToString(CultureInfo.InvariantCulture)) : null;
     }
 
     public static string Short(TelemetryFrame f, int car) =>

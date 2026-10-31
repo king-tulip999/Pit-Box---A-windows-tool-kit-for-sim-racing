@@ -260,7 +260,6 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
         Layout(animate: false);
         _shown = true;
         _view.SetActive(true);
-        Motion.Stagger(_body);
         _view.BuildLater(Visible());
     }
 

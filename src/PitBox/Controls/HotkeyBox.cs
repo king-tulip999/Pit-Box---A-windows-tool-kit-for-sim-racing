@@ -17,7 +17,7 @@ public sealed class HotkeyBox : TextBox
     private bool _paused, _recording;
     private Window? _window;
     private readonly Popup _hint;
-    private readonly TextBlock _hintText = new() { FontSize = 9.5, TextWrapping = TextWrapping.Wrap, MaxWidth = 227 };
+    private readonly TextBlock _hintText = new() { FontSize = 11, TextWrapping = TextWrapping.Wrap, MaxWidth = 227 };
     private KeyCaps? _caps;
 
     public string? Hotkey { get; private set; }
@@ -54,7 +54,7 @@ public sealed class HotkeyBox : TextBox
         Hairline.Frame(border);
         _hint = new Popup
         {
-            PlacementTarget = this, Placement = PlacementMode.Bottom, VerticalOffset = 3, AllowsTransparency = true,
+            PlacementTarget = this, Placement = PlacementMode.Bottom, VerticalOffset = 3, AllowsTransparency = true, PopupAnimation = PopupAnimation.Fade,
             StaysOpen = true, Focusable = false, IsHitTestVisible = false, Child = border,
         };
         RenderOptions.SetClearTypeHint(border, ClearTypeHint.Enabled);
@@ -258,11 +258,11 @@ public sealed class HotkeyBox : TextBox
             {
                 if (i > 0)
                 {
-                    var plus = new FormattedText(ThemeManager.Case("+"), System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, typeface, 10, text, null, TextFormattingMode.Display, dip);
+                    var plus = new FormattedText(ThemeManager.Case("+"), System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, typeface, 11, text, null, TextFormattingMode.Display, dip);
                     dc.DrawText(plus, new Point(x + 3, y + (height - plus.Height) / 2));
                     x += plus.Width + 6;
                 }
-                var label = new FormattedText(ThemeManager.Case(_keys[i]), System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, typeface, 10, text, null, TextFormattingMode.Display, dip);
+                var label = new FormattedText(ThemeManager.Case(_keys[i]), System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, typeface, 11, text, null, TextFormattingMode.Display, dip);
                 double width = Math.Round(label.Width + 12);
                 dc.DrawRectangle(fill, edge, new Rect(x + 0.5, y + 0.5, width, height));
                 dc.DrawText(label, new Point(x + 6.5, y + 0.5 + (height - label.Height) / 2));

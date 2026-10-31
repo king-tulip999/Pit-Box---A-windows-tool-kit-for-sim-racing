@@ -31,7 +31,7 @@ internal sealed class SettingsSearchBox : Grid
         Children.Add(icon);
         _popup = new Popup
         {
-            PlacementTarget = _box, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true,
+            PlacementTarget = _box, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true, PopupAnimation = PopupAnimation.Fade,
             Child = new Tile { Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(5), Margin = new Thickness(0, 0, 11, 11), Child = _results },
         };
         RenderOptions.SetClearTypeHint(_popup.Child, ClearTypeHint.Enabled);

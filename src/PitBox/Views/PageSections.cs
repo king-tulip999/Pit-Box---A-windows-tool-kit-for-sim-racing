@@ -1,7 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using PitBox.Controls;
 
 namespace PitBox.Views;
 
@@ -26,6 +25,13 @@ internal interface ISectionedPage
     event Action? SectionsChanged;
 }
 
+internal interface IStagedBuild
+{
+    bool Done { get; }
+
+    bool BuildStep();
+}
+
 internal sealed record SectionDef(string Id, string Title, string Subtitle, string Icon, Func<UIElement> Build,
     string? Anchor = null, Action? Shown = null, Action? Hidden = null, FrameworkElement? Tools = null, bool Beta = false);
 
@@ -41,9 +47,9 @@ internal sealed class SectionView
 
     private readonly Dictionary<string, Entry> _entries = new(StringComparer.OrdinalIgnoreCase);
     private readonly Grid _content = new();
-    private readonly NavIcon _icon = new() { Width = 28, Height = 28, Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock _title = TextFit.TipWhenTrimmed(new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
     private readonly Border _beta = Ui.BetaChip();
+    private readonly TrimRow _name;
     private readonly TextBlock _subtitle = new() { TextWrapping = TextWrapping.Wrap, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 3, 0, 0) };
     private readonly ContentControl _tools = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
     private readonly StackPanel _right = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
@@ -56,13 +62,9 @@ internal sealed class SectionView
         _scroll = scroll;
         _title.Style = Ui.Res<Style>("H1");
         _subtitle.Style = Ui.Res<Style>("Muted");
-        var name = new DockPanel { LastChildFill = true, Background = Brushes.Transparent };
-        name.MouseEnter += (_, _) => _icon.IsActive = true;
-        name.MouseLeave += (_, _) => _icon.IsActive = false;
-        name.Children.Add(_icon);
-        name.Children.Add(new TrimRow { VerticalAlignment = VerticalAlignment.Center, Children = { _title, _beta } });
+        _name = new TrimRow { VerticalAlignment = VerticalAlignment.Center, Background = Brushes.Transparent, Children = { _title, _beta } };
         _right.Children.Add(_tools);
-        _heading.Children.Add(Ui.SplitRow(name, _right));
+        _heading.Children.Add(Ui.SplitRow(_name, _right));
         _heading.Children.Add(_subtitle);
     }
 
@@ -88,13 +90,19 @@ internal sealed class SectionView
 
     public FrameworkElement? Host(string id) => _entries.TryGetValue(id, out var e) ? e.Host : null;
 
-    public bool Built(string id) => _entries.TryGetValue(id, out var e) && e.Built;
+    public bool Built(string id) => _entries.TryGetValue(id, out var e) && Done(e);
+
+    private static bool Done(Entry entry) => entry.Built && entry.Host.Child is not IStagedBuild { Done: false };
 
     private void Build(Entry entry)
     {
-        if (entry.Built) return;
-        entry.Built = true;
-        entry.Host.Child = entry.Def.Build();
+        if (!entry.Built)
+        {
+            entry.Built = true;
+            entry.Host.Child = entry.Def.Build();
+        }
+        if (entry.Host.Child is IStagedBuild staged)
+            while (staged.BuildStep()) { }
     }
 
     public SectionDef? Empty { get; set; }
@@ -114,9 +122,30 @@ internal sealed class SectionView
 
     public void BuildLater(IEnumerable<string> ids)
     {
+        var queue = new Queue<Entry>();
         foreach (var id in ids)
-            if (_entries.TryGetValue(id, out var entry) && !entry.Built)
-                Motion.AfterPageSettles(_content.Dispatcher, () => Build(entry));
+            if (_entries.TryGetValue(id, out var entry) && !Done(entry))
+                queue.Enqueue(entry);
+        if (queue.Count > 0) Motion.WhenUserIdle(_content.Dispatcher, () => BuildNext(queue));
+    }
+
+    private void BuildNext(Queue<Entry> queue)
+    {
+        if (!_content.IsLoaded) return;
+        while (queue.TryPeek(out var entry))
+        {
+            if (Services.HitchWatch.On) Services.HitchWatch.Note = "prebuild " + entry.Def.Id;
+            if (!entry.Built)
+            {
+                entry.Built = true;
+                entry.Host.Child = entry.Def.Build();
+                if (entry.Host.Child is not IStagedBuild) queue.Dequeue();
+                break;
+            }
+            if (entry.Host.Child is IStagedBuild staged && staged.BuildStep()) break;
+            queue.Dequeue();
+        }
+        if (queue.Count > 0) Motion.WhenUserIdle(_content.Dispatcher, () => BuildNext(queue));
     }
 
     public void Show(string? id, bool animate = true)
@@ -136,14 +165,11 @@ internal sealed class SectionView
         _heading.Visibility = def is null ? Visibility.Collapsed : Visibility.Visible;
         if (def is null) return;
         if (next is not null) Build(next);
-        _icon.Glyph = def.Icon;
-        _icon.SetResourceReference(NavIcon.ForegroundProperty, "Accent");
-        _title.Text = def.Title;
+        Ui.SetTitle(_title, def.Title);
         _beta.Visibility = def.Beta ? Visibility.Visible : Visibility.Collapsed;
-        _title.SetResourceReference(TextBlock.ForegroundProperty, "Accent");
         _subtitle.Text = def.Subtitle;
         _subtitle.Visibility = next is null && def.Subtitle.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
-        _icon.ToolTip = def.Subtitle.Length > 0 ? def.Subtitle : null;
+        _name.ToolTip = def.Subtitle.Length > 0 ? def.Subtitle : null;
         _tools.Content = def.Tools;
         _tools.Visibility = def.Tools is null ? Visibility.Collapsed : Visibility.Visible;
         if (next is null) return;
@@ -157,8 +183,8 @@ internal sealed class SectionView
         }
         if (animate && _active)
         {
-            Motion.Enter(next.Host, distance: 12, durationMs: 240);
-            Motion.Enter(_heading, distance: 6, durationMs: 200);
+            Motion.FadeIn(next.Host);
+            Motion.FadeIn(_heading);
         }
     }
 

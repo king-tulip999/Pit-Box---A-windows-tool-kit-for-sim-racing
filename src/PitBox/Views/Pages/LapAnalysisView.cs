@@ -106,7 +106,7 @@ internal static class LapAnalysisView
             swatch.SetResourceReference(Border.BackgroundProperty, line.BrushKey);
             if (line.Reference && !s.Single) swatch.Opacity = 0.6;
             chip.Children.Add(swatch);
-            chip.Children.Add(new TextBlock { Text = line.Label, Style = Ui.Res<Style>("Body"), FontSize = 10.5, VerticalAlignment = VerticalAlignment.Center });
+            chip.Children.Add(new TextBlock { Text = line.Label, Style = Ui.Res<Style>("Body"), FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center });
             if (line.Reference && !s.Single) chip.Children.Add(new TextBlock { Text = "Reference", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(5, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
             int lapNumber = data.Laps.FirstOrDefault(l => ReferenceEquals(l.Trace, line.Trace)).Lap;
             if (lapNumber > 0)
@@ -146,7 +146,7 @@ internal static class LapAnalysisView
                 new[] { "The lap in its color", "The lap colored by speed: slow to fast" })
             : Ui.Segmented(new[] { "Laps", "Speed", "Delta" }, (int)s.MapColors, i => { s.MapColors = (MapColors)i; s.RaiseCursor(); }, "lapMapColors",
                 new[] { "Each lap in its color", "The first lap colored by speed: slow to fast", "The first lap colored by where it gains (or loses) time on the reference" });
-        var reset = Ui.LabeledButton("I.Restore", "Reset zoom", s.ResetZoom);
+        var reset = Ui.LabeledButton("I.Undo", "Reset zoom", s.ResetZoom);
         reset.IsEnabled = false;
         s.ZoomChanged += () => reset.IsEnabled = s.Zoomed;
         var lanesButton = Ui.LabeledButton("I.Sliders", "Lanes", () => { });
@@ -309,7 +309,7 @@ internal static class LapAnalysisView
         var content = new ContentControl();
         var popup = new Popup
         {
-            PlacementTarget = anchor, Placement = PlacementMode.Custom, StaysOpen = false, AllowsTransparency = true,
+            PlacementTarget = anchor, Placement = PlacementMode.Custom, StaysOpen = false, AllowsTransparency = true, PopupAnimation = PopupAnimation.Fade,
             CustomPopupPlacementCallback = (size, target, _) => new[] { new CustomPopupPlacement(new Point(target.Width - size.Width, target.Height), PopupPrimaryAxis.Horizontal) },
             Child = new Tile { Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(13, 10, 13, 11), Margin = new Thickness(0, 3, 0, 0), Width = 211, Child = content },
         };
@@ -435,7 +435,7 @@ internal static class LapAnalysisView
 
     internal static string Format(string lane, double v) => lane switch
     {
-        "delta" => (v < 0 ? "−" : "+") + Math.Abs(v).ToString("0.000", CultureInfo.CurrentCulture),
+        "delta" => PitBox.SimRacing.Race.RaceFormat.Signed(v, "0.000", CultureInfo.CurrentCulture),
         "latg" => v.ToString("0.00", CultureInfo.CurrentCulture),
         "gear" => v < 0 ? "R" : v == 0 ? "N" : v.ToString("0", CultureInfo.CurrentCulture),
         _ => v.ToString("0", CultureInfo.CurrentCulture),
@@ -448,7 +448,7 @@ internal static class LapAnalysisView
 
     internal static Color Mix(Color a, Color b, double t) => Color.FromRgb((byte)(a.R + (b.R - a.R) * t), (byte)(a.G + (b.G - a.G) * t), (byte)(a.B + (b.B - a.B) * t));
 
-    internal static FormattedText Text(Visual v, string s, Brush brush, double size = 9, bool bold = false) =>
+    internal static FormattedText Text(Visual v, string s, Brush brush, double size = 10.5, bool bold = false) =>
         new(ThemeManager.Case(s), CultureInfo.CurrentCulture, FlowDirection.LeftToRight, ThemeManager.UiFace(bold: bold), size, brush, VisualTreeHelper.GetDpi(v).PixelsPerDip);
 }
 

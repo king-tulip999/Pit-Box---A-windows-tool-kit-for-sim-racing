@@ -147,6 +147,7 @@ internal static class StatsSessionView
                 int c = 0;
                 bool traced = d.Traced.Contains(lap.Lap);
                 var tick = new CheckBox { IsChecked = ticked.Contains(lap.Lap), IsEnabled = traced, VerticalAlignment = VerticalAlignment.Center };
+                System.Windows.Automation.AutomationProperties.SetName(tick, $"Lap {lap.Lap}");
                 var tickHost = new Border { Child = tick, Background = Brushes.Transparent, ToolTip = traced ? "Tick to analyze (up to 4)" : "No trace for this lap (not in a telemetry file, or not kept)" };
                 int number = lap.Lap;
                 tick.Click += (_, _) =>
@@ -532,7 +533,7 @@ internal static class StatsSessionView
                     double from = runStart == 0 ? Left : (X(runStart - 1) + X(runStart)) / 2, to = i == _laps.Count ? ActualWidth - Right : (X(i - 1) + X(i)) / 2;
                     if ((_laps[runStart].Run ?? 1) % 2 == 0) dc.DrawRectangle(band, null, new Rect(from, Top, Math.Max(0, to - from), bottom - Top));
                     if (runStart > 0) dc.DrawLine(runPen, new Point(Hairline.Snap(from, px), Top), new Point(Hairline.Snap(from, px), bottom));
-                    var name = Text($"Run {_laps[runStart].Run ?? 1}", bold: true, size: 9);
+                    var name = Text($"Run {_laps[runStart].Run ?? 1}", bold: true, size: 10.5);
                     dc.DrawText(name, new Point(from + 6, bottom - name.Height - 3));
                 }
                 runStart = i;
@@ -572,7 +573,7 @@ internal static class StatsSessionView
                     }
                     up.Freeze();
                     dc.DrawGeometry(Ui.Res<Brush>("TextMuted"), null, up);
-                    var actual = Text(StatFormat.LapTime(_laps[i].Time), size: 9);
+                    var actual = Text(StatFormat.LapTime(_laps[i].Time), size: 10.5);
                     dc.DrawText(actual, new Point(Math.Min(p.X + 8, ActualWidth - actual.Width), p.Y + 6));
                 }
                 if (i % step == 0 || i == _laps.Count - 1)

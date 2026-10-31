@@ -28,7 +28,7 @@ public static class TextCase
 
     public static string Upper(string text) => Spaced(Capitals(text), joined: true);
 
-    private static string Capitals(string text)
+    public static string Capitals(string text)
     {
         foreach (char ch in text)
             if (char.IsLower(ch)) return text.ToUpperInvariant();
@@ -133,7 +133,7 @@ public static class TextCase
 
     private static void JoinRuns(InlineCollection inlines)
     {
-        foreach (var inline in inlines)
+        foreach (var inline in inlines.ToList())
         {
             if (inline is Run run && !BindingOperations.IsDataBound(run, Run.TextProperty))
             {
@@ -143,6 +143,15 @@ public static class TextCase
             else if (inline is Span span) JoinRuns(span.Inlines);
         }
     }
+
+    public static readonly DependencyProperty TightProperty = DependencyProperty.RegisterAttached(
+        "Tight", typeof(bool), typeof(TextCase), new PropertyMetadata(false));
+
+    public static bool GetTight(DependencyObject d) => (bool)d.GetValue(TightProperty);
+
+    public static void SetTight(DependencyObject d, bool value) => d.SetValue(TightProperty, value);
+
+    private static bool Untracked(TextBlock tb) => GetTight(tb) || IsMono(tb.FontFamily);
 
     public static readonly DependencyProperty UpperProperty = DependencyProperty.RegisterAttached(
         "Upper", typeof(bool), typeof(TextCase), new PropertyMetadata(false, OnUpperChanged));
@@ -188,11 +197,11 @@ public static class TextCase
         if (!HasInlines(tb) || tb.Inlines.Count <= 1)
         {
             string text = tb.Text;
-            string upper = KeepNameWhole(IsMono(tb.FontFamily) ? Capitals(Plain(text)) : Upper(text));
+            string upper = KeepNameWhole(Untracked(tb) ? Capitals(Plain(text)) : Upper(text));
             if (upper != text) tb.SetCurrentValue(TextBlock.TextProperty, upper);
             return;
         }
-        UpperRuns(tb.Inlines, IsMono(tb.FontFamily));
+        UpperRuns(tb.Inlines, Untracked(tb));
     }
 
     private static readonly DependencyProperty RawProperty = DependencyProperty.RegisterAttached("Raw", typeof(string), typeof(TextCase));
@@ -202,7 +211,7 @@ public static class TextCase
         if ((string?)tb.GetValue(RawProperty) == text) return;
         tb.SetValue(RawProperty, text);
         bool cased = GetUpper(tb) && !GetVerbatim(tb) && tb.IsLoaded && !BindingOperations.IsDataBound(tb, TextBlock.TextProperty);
-        tb.Text = KeepNameWhole(cased ? IsMono(tb.FontFamily) ? Capitals(Plain(text)) : Upper(text) : text);
+        tb.Text = KeepNameWhole(cased ? Untracked(tb) ? Capitals(Plain(text)) : Upper(text) : text);
     }
 
     private static readonly Dictionary<FontFamily, bool> Mono = new();

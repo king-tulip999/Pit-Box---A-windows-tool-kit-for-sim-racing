@@ -47,7 +47,7 @@ internal static class TraceSettings
         var body = new StackPanel { Width = 308 };
         var popup = new Popup
         {
-            PlacementTarget = anchor, Placement = PlacementMode.Custom, StaysOpen = false, AllowsTransparency = true,
+            PlacementTarget = anchor, Placement = PlacementMode.Custom, StaysOpen = false, AllowsTransparency = true, PopupAnimation = PopupAnimation.Fade,
             CustomPopupPlacementCallback = (size, target, _) => new[] { new CustomPopupPlacement(new Point(target.Width - size.Width, target.Height), PopupPrimaryAxis.Horizontal) },
             Child = new Tile { Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(15, 11, 15, 13), Margin = new Thickness(0, 3, 0, 0), Child = body },
         };
@@ -173,11 +173,12 @@ internal static class TraceSettings
     private static FrameworkElement Row(string label, FrameworkElement control, string? help)
     {
         var row = new DockPanel { Margin = new Thickness(0, 0, 0, 8), ToolTip = help };
+        Ui.NameFor(control, label);
         control.VerticalAlignment = VerticalAlignment.Center;
         DockPanel.SetDock(control, Dock.Right);
         row.Children.Add(control);
         var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        text.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Body"), FontSize = 10.5 });
+        text.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Body"), FontSize = 12 });
         if (help is not null) text.Children.Add(new TextBlock { Text = help, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 1, 10, 0) });
         row.Children.Add(text);
         return row;

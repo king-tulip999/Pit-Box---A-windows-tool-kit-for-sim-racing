@@ -6,7 +6,7 @@ namespace PitBox.Theme;
 internal static class RaceLook
 {
     public const int Places = 4;
-    public const string FontPath = "./Assets/Fonts/Condensed/#Barlow Condensed";
+    public const string FontPath = "./Assets/Fonts/Saira/Condensed/#Saira Condensed";
 
     private static readonly Color[] DarkPlaces = { Color.FromRgb(0xFF, 0xB2, 0x24), Color.FromRgb(0xC9, 0xCE, 0xD6), Color.FromRgb(0xD9, 0x9A, 0x63) };
     private static readonly Color[] LightPlaces = { Color.FromRgb(0xB8, 0x86, 0x0B), Color.FromRgb(0x6E, 0x76, 0x81), Color.FromRgb(0xA0, 0x61, 0x2A) };

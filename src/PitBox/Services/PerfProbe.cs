@@ -132,6 +132,7 @@ internal static class PerfProbe
                 window.Navigate("stats");
                 await Task.Delay(3000);
                 await Idle("idle_stats", window, lines);
+                await InvalidElements("stats", window, lines);
                 Motion.SetWindowActive(false, force: true);
                 await Task.Delay(1500);
                 await Idle("idle_stats_unfocused", window, lines);
@@ -169,6 +170,9 @@ internal static class PerfProbe
             window.TrimWhileHidden();
             await Task.Delay(2000);
             await Idle("idle_hidden_trimmed", window, lines);
+            me.Refresh();
+            Put("hidden_trimmed_private_mb", me.PrivateMemorySize64 / 1048576.0);
+            Put("hidden_trimmed_gc_committed_mb", GC.GetGCMemoryInfo().TotalCommittedBytes / 1048576.0);
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GC.Collect();

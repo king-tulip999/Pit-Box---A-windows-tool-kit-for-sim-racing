@@ -9,13 +9,16 @@ using PitBox.Theme;
 
 namespace PitBox.Views;
 
-internal sealed record SidebarPage(string Key, string Title, string Icon);
+internal sealed record SidebarPage(string Key, string Title);
 
 internal sealed class Sidebar : Border, IFrameStep
 {
     public const double PanelWidth = 214;
 
-    private const double RowHeight = 49, SubRowHeight = 32, Indent = 11, IconSize = 39, SubIconSize = 22, TextSize = 14, SubTextSize = 13, PictureWidth = 2;
+    private const double RowHeight = 42, SubRowHeight = 31, Indent = 15, TextSize = 16, SubTextSize = 14.5, SubTextInset = 14;
+    private const double MaxTextSize = 19, SubShare = 0.8, RowPerText = 2.05, SubRowPerText = 1.95;
+    private const double DashInset = 12, DashWidth = 6, DashGap = 10, DashThickness = 2, LitWidth = 2;
+    private const double TabShift = 8, TabMs = Motion.SwapMs;
 
     public event Action<string>? PageClicked;
     public event Action<string, string>? SectionClicked;
@@ -24,12 +27,12 @@ internal sealed class Sidebar : Border, IFrameStep
 
     private readonly StackPanel _pages = new();
     private readonly Grid _track = new();
-    private readonly Border _glider = new() { BorderThickness = new Thickness(2, 0, 0, 0), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, IsHitTestVisible = false, Visibility = Visibility.Collapsed };
+    private readonly Border _glider = new() { HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, IsHitTestVisible = false, Visibility = Visibility.Collapsed };
     private readonly TranslateTransform _glide = new();
     private Row? _arriving;
     private Point _glideFrom;
     private double _glideFromHeight, _glideStart;
-    private const double GlideMs = 360;
+    private const double GlideMs = Motion.SwapMs;
     private readonly StackPanel _footer = new() { Margin = new Thickness(6, 5, 6, 6) };
     private readonly ScrollViewer _scroll;
     private readonly Dictionary<string, Group> _groups = new(StringComparer.OrdinalIgnoreCase);
@@ -52,9 +55,10 @@ internal sealed class Sidebar : Border, IFrameStep
     {
         public required Border Box;
         public required Border Bar;
-        public required NavIcon Icon;
+        public Border? Dash;
         public required TextBlock Text;
-        public bool Selected, Hover, HasChild, Arriving;
+        public required TranslateTransform Tab;
+        public bool Selected, Hover, HasChild, Arriving, Tabbed;
         public bool Sub;
     }
 
@@ -66,7 +70,6 @@ internal sealed class Sidebar : Border, IFrameStep
         SetResourceReference(BorderBrushProperty, "Line");
         SetResourceReference(CornerRadiusProperty, "R.Card");
         _glider.SetResourceReference(BackgroundProperty, "AccentSoft");
-        _glider.SetResourceReference(BorderBrushProperty, "Accent");
         _glider.RenderTransform = _glide;
         _track.Children.Add(_glider);
         _track.Children.Add(_pages);
@@ -85,15 +88,66 @@ internal sealed class Sidebar : Border, IFrameStep
         Child = root;
         AutomationProperties.SetName(this, "Tools");
         _pageDrag = new DragList(_pages, keys => PagesMoved?.Invoke(keys));
+        _pages.SizeChanged += (_, e) => { if (e.WidthChanged) FitText(); };
+    }
+
+    private double _textSize = TextSize;
+
+    private double PageRoom => _pages.ActualWidth - (DashInset + DashWidth + DashGap) - (6 + TabShift);
+
+    private double SubRoom => _pages.ActualWidth - Indent - 1 - SubTextInset - 6;
+
+    private const double MeasureSize = 100;
+
+    private static double WidthPerPoint(TextBlock text)
+    {
+        double size = text.FontSize;
+        text.FontSize = MeasureSize;
+        text.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        double width = text.DesiredSize.Width - text.Margin.Left - text.Margin.Right;
+        text.FontSize = size;
+        return Math.Ceiling(width + 1) / MeasureSize;
+    }
+
+    private static double Fitted(IEnumerable<TextBlock> texts, double room, double max)
+    {
+        double widest = 0;
+        foreach (var text in texts) widest = Math.Max(widest, WidthPerPoint(text));
+        if (widest <= 0 || room <= 0) return max;
+        return Math.Min(max, Math.Floor(room / widest * 2) / 2);
+    }
+
+    private static void SizeRow(Row row, double size, double perText)
+    {
+        row.Text.FontSize = size;
+        row.Box.Height = Math.Round(size * perText);
+    }
+
+    private void FitText()
+    {
+        if (_pages.ActualWidth <= 0) return;
+        _textSize = Fitted(_groups.Where(g => g.Key != _settingsKey).Select(g => g.Value.Row.Text), PageRoom, MaxTextSize);
+        foreach (var group in _groups.Values)
+        {
+            SizeRow(group.Row, _textSize, RowPerText);
+            FitSections(group);
+        }
+    }
+
+    private void FitSections(Group group)
+    {
+        if (_pages.ActualWidth <= 0 || group.SubRows.Count == 0) return;
+        double size = Fitted(group.SubRows.Values.Select(r => r.Text), SubRoom, Math.Floor(_textSize * SubShare * 2) / 2);
+        foreach (var row in group.SubRows.Values) SizeRow(row, size, SubRowPerText);
     }
 
     private Group MakeGroup(SidebarPage p, Func<bool> dragging)
     {
-        var row = MakeRow(p.Title, p.Icon, RowHeight, IconSize, sub: false);
+        var row = MakeRow(p.Title, RowHeight, sub: false);
         row.Box.MouseLeftButtonUp += (_, e) => { if (!dragging()) { e.Handled = true; PageClicked?.Invoke(p.Key); } };
         OnActivate(row.Box, () => PageClicked?.Invoke(p.Key));
         var subList = new StackPanel();
-        var guide = Hairline.Frame(new Border { Margin = new Thickness(Indent, 2, 0, 6), Padding = new Thickness(3, 0, 0, 0), Child = subList }, Sides.Left);
+        var guide = Hairline.Frame(new Border { Margin = new Thickness(Indent, 2, 0, 6), Child = subList }, Sides.Left);
         guide.SetResourceReference(BorderBrushProperty, "Line");
         var subHost = new Border { ClipToBounds = true, Child = guide, Visibility = Visibility.Collapsed };
         var group = new Group { Page = p, Row = row, SubHost = subHost, SubList = subList };
@@ -104,7 +158,7 @@ internal sealed class Sidebar : Border, IFrameStep
     public void Build(IReadOnlyList<SidebarPage> pages, SidebarPage settings, FrameworkElement searchButton, FrameworkElement searchHost, FrameworkElement? themeButton)
     {
         _settingsKey = settings.Key;
-        string signature = ThemeManager.Current.Id + "|" + string.Join("|", pages.Select(p => $"{p.Key}:{p.Title}:{p.Icon}"));
+        string signature = ThemeManager.Current.Id + "|" + string.Join("|", pages.Select(p => $"{p.Key}:{p.Title}"));
         if (signature == _signature) return;
         _signature = signature;
         _pages.Children.Clear();
@@ -142,11 +196,12 @@ internal sealed class Sidebar : Border, IFrameStep
         line.Children.Add(settingsGroup.Row.Box);
         _footer.Children.Add(line);
         _footer.Children.Add(settingsGroup.SubHost);
+        FitText();
     }
 
     private string? _settingsKey;
 
-    private static readonly string[] AccentKeys = ["Accent", "AccentSoft"];
+    private static readonly string[] AccentKeys = ["Accent", "AccentSoft", "AccentText"];
 
     public void UseAccent(ResourceDictionary? theme)
     {
@@ -155,9 +210,23 @@ internal sealed class Sidebar : Border, IFrameStep
             if (theme?[key] is { } value) Resources[key] = value;
             else Resources.Remove(key);
         }
+        foreach (var group in _groups.Values)
+        {
+            Paint(group.Row);
+            foreach (var sub in group.SubRows.Values) Paint(sub);
+        }
     }
 
+    private bool _instant;
+
     public void Select(string? key, Func<string, SectionList?> sectionsOf, bool allOpen, bool animate = true)
+    {
+        _instant = !animate;
+        try { SelectRows(key, sectionsOf, allOpen, animate); }
+        finally { _instant = false; }
+    }
+
+    private void SelectRows(string? key, Func<string, SectionList?> sectionsOf, bool allOpen, bool animate)
     {
         var leaving = Filled();
         foreach (var (k, group) in _groups)
@@ -230,7 +299,7 @@ internal sealed class Sidebar : Border, IFrameStep
 
     private void FillSections(Group group, IReadOnlyList<PageSection> sections, string? current, bool movable)
     {
-        string signature = movable + "|" + string.Join("|", sections.Select(s => $"{s.Id}:{s.Title}:{s.Icon}"));
+        string signature = movable + "|" + string.Join("|", sections.Select(s => $"{s.Id}:{s.Title}"));
         if (signature != group.SubSignature)
         {
             group.SubSignature = signature;
@@ -242,13 +311,14 @@ internal sealed class Sidebar : Border, IFrameStep
             foreach (var section in sections)
             {
                 var id = section.Id;
-                var row = MakeRow(section.Title, section.Icon, SubRowHeight, SubIconSize, sub: true);
+                var row = MakeRow(section.Title, SubRowHeight, sub: true);
                 row.Box.MouseLeftButtonUp += (_, e) => { if (!drag.Dragging) { e.Handled = true; SectionClicked?.Invoke(page, id); } };
                 OnActivate(row.Box, () => SectionClicked?.Invoke(page, id));
                 group.SubRows[id] = row;
                 group.SubList.Children.Add(row.Box);
                 if (movable) drag.Add(row.Box, row.Box, id);
             }
+            FitSections(group);
         }
         foreach (var (id, row) in group.SubRows)
         {
@@ -286,7 +356,6 @@ internal sealed class Sidebar : Border, IFrameStep
             if (!open) host.Visibility = Visibility.Collapsed;
         };
         host.BeginAnimation(HeightProperty, anim);
-        if (open) Motion.Stagger(group.SubList, 24, 140);
     }
 
     private static void OnActivate(Border box, Action activate)
@@ -299,23 +368,28 @@ internal sealed class Sidebar : Border, IFrameStep
         };
     }
 
-    private Row MakeRow(string title, string icon, double height, double iconSize, bool sub)
+    private Row MakeRow(string title, double height, bool sub)
     {
-        var bar = new Border { Width = 2, HorizontalAlignment = HorizontalAlignment.Left, Visibility = Visibility.Hidden };
+        var bar = new Border { Width = LitWidth, Margin = new Thickness(-LitWidth / 2, 0, 0, 0), HorizontalAlignment = HorizontalAlignment.Left, Visibility = Visibility.Hidden };
         bar.SetResourceReference(BackgroundProperty, "Accent");
-        double iconWidth = NavIcon.IsPicture(icon) ? iconSize * PictureWidth : iconSize;
-        var glyph = new NavIcon { Glyph = icon, Width = iconWidth, Height = iconSize, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(sub ? 8 : 5, 0, sub ? 10 : 8, 0) };
         var text = TextFit.TipWhenTrimmed(new TextBlock
         {
             Text = title, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis,
-            FontSize = sub ? SubTextSize : TextSize, FontWeight = sub ? FontWeights.Normal : FontWeights.SemiBold, Margin = new Thickness(0, 0, 6, 0),
+            FontSize = sub ? SubTextSize : TextSize, FontWeight = FontWeights.Bold,
+            Margin = new Thickness(sub ? SubTextInset : DashInset + DashWidth + DashGap, 0, 6 + (sub ? 0 : TabShift), 0),
         });
-        var line = new DockPanel { LastChildFill = true };
-        line.Children.Add(glyph);
-        line.Children.Add(text);
+        text.SetResourceReference(TextBlock.FontFamilyProperty, "RaceFont");
+        TextCase.SetTight(text, true);
+        TextCase.SetUpper(text, true);
         var face = new Grid();
-        face.Children.Add(line);
+        face.Children.Add(text);
         face.Children.Add(bar);
+        Border? dash = null;
+        if (!sub)
+        {
+            dash = new Border { Width = DashWidth, Height = DashThickness, Margin = new Thickness(DashInset, 0, 0, 0), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, SnapsToDevicePixels = true };
+            face.Children.Add(dash);
+        }
         var box = new Tile
         {
             Height = height, Child = face, Cursor = Cursors.Hand, Focusable = true, Background = Brushes.Transparent,
@@ -324,7 +398,9 @@ internal sealed class Sidebar : Border, IFrameStep
         box.SetResourceReference(CornerRadiusProperty, "R.Control");
         AutomationProperties.SetName(box, title);
         KeyboardNavigation.SetIsTabStop(box, true);
-        var row = new Row { Box = box, Bar = bar, Icon = glyph, Text = text, Sub = sub };
+        var tab = new TranslateTransform();
+        text.RenderTransform = tab;
+        var row = new Row { Box = box, Bar = bar, Dash = dash, Text = text, Tab = tab, Sub = sub };
         box.MouseEnter += (_, _) => { row.Hover = true; Paint(row); };
         box.MouseLeave += (_, _) => { row.Hover = false; Paint(row); };
         box.GotKeyboardFocus += (_, _) => { row.Hover = true; Paint(row); };
@@ -334,18 +410,39 @@ internal sealed class Sidebar : Border, IFrameStep
         return row;
     }
 
-    private static void Paint(Row row)
+    private void Paint(Row row)
     {
         bool filled = row.Selected && !row.HasChild && !row.Arriving;
-        row.Bar.Visibility = filled ? Visibility.Visible : Visibility.Hidden;
+        row.Bar.Visibility = row.Sub && row.Selected ? Visibility.Visible : Visibility.Hidden;
+        row.Dash?.SetResourceReference(BackgroundProperty, row.Selected ? "Accent" : "LineStrong");
         if (filled) row.Box.SetResourceReference(BackgroundProperty, "AccentSoft");
         else if (row.Hover) row.Box.SetResourceReference(BackgroundProperty, "Hover");
         else row.Box.Background = Brushes.Transparent;
-        string tone = row.Selected ? "Accent" : row.Hover ? "Heading" : "TextMuted";
+        string tone = row.Selected || row.Hover ? "Heading" : "TextMuted";
         row.Text.SetResourceReference(TextBlock.ForegroundProperty, tone);
-        row.Icon.SetResourceReference(NavIcon.ForegroundProperty, tone);
-        row.Text.FontWeight = row.Selected || !row.Sub ? FontWeights.SemiBold : FontWeights.Normal;
-        row.Icon.IsActive = row.Selected || row.Hover;
+        TabOver(row, row.Selected && !row.Sub);
+    }
+
+    private void TabOver(Row row, bool tabbed)
+    {
+        if (row.Tabbed == tabbed) return;
+        row.Tabbed = tabbed;
+        double to = tabbed ? TabShift : 0;
+        if (_instant || !row.Box.IsLoaded || !Motion.Enabled)
+        {
+            row.Tab.BeginAnimation(TranslateTransform.XProperty, null);
+            row.Tab.X = to;
+            row.Dash?.BeginAnimation(WidthProperty, null);
+            if (row.Dash is not null) row.Dash.Width = DashWidth + to;
+            return;
+        }
+        double from = row.Tab.X;
+        var duration = TimeSpan.FromMilliseconds(TabMs);
+        row.Tab.X = to;
+        row.Tab.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(from, to, duration) { EasingFunction = Motion.Ease, FillBehavior = FillBehavior.Stop });
+        if (row.Dash is null) return;
+        row.Dash.Width = DashWidth + to;
+        row.Dash.BeginAnimation(WidthProperty, new DoubleAnimation(DashWidth + from, DashWidth + to, duration) { EasingFunction = Motion.Ease, FillBehavior = FillBehavior.Stop });
     }
 
     private sealed class DragList

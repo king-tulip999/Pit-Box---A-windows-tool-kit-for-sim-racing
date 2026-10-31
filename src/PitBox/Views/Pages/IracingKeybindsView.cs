@@ -55,7 +55,7 @@ internal sealed class KeybindsBoard : StackPanel
 {
     private enum Filter { All, Set, NotSet, Changed, Wheel }
 
-    private const double RailWidth = 290, RowHeight = 36, SlotWidth = 26, GearWidth = 86;
+    private const double RailWidth = 320, RowHeight = 36, SlotWidth = 26, GearWidth = 86;
     private static string? _lastGroup;
 
     private readonly AppServices _app;
@@ -82,12 +82,39 @@ internal sealed class KeybindsBoard : StackPanel
         _app = app;
         _ws = ws;
         _keys = app.IracingKeys;
+        _search.TextChanged += (_, _) =>
+        {
+            if (_quiet) return;
+            _query = _search.Text.Trim();
+            if (_find is not null) { _quiet = true; _findBox.SetHotkey(null); _quiet = false; _find = null; }
+            _clash = null;
+            Render();
+        };
+        _findBox.ToolTip = "Press a key combination to see what it does";
+        _findBox.HotkeyChanged += hk =>
+        {
+            _find = hk;
+            if (hk is not null && _query.Length > 0) { _quiet = true; _search.Text = ""; _quiet = false; _query = ""; }
+            _clash = null;
+            Refresh();
+        };
+        _findBox.Margin = new Thickness(6, 0, 12, 0);
         Build();
+    }
+
+    private static void Detach(FrameworkElement part)
+    {
+        switch (part.Parent)
+        {
+            case Panel panel: panel.Children.Remove(part); break;
+            case Decorator decorator: decorator.Child = null; break;
+        }
     }
 
     private void Build()
     {
         Children.Clear();
+        foreach (var part in new FrameworkElement[] { _summary, _filters, _rail, _pane, _search, _findBox }) Detach(part);
         _keys.Refresh();
         _entries = Load();
         Children.Add(Band());
@@ -260,13 +287,7 @@ internal sealed class KeybindsBoard : StackPanel
             foreach (var choice in IracingKeybindsView.ProfileChoices(_keys))
             {
                 var item = new MenuItem { Header = choice.Text, IsCheckable = true, IsChecked = string.Equals(choice.Id, _keys.Profile ?? "", StringComparison.OrdinalIgnoreCase) };
-                item.Click += (_, _) =>
-                {
-                    _keys.SelectProfile(choice.Id == _keys.DefaultProfile ? null : choice.Id);
-                    _app.Save();
-                    _clash = null;
-                    Build();
-                };
+                item.Click += (_, _) => PickProfile(choice.Id);
                 menu.Items.Add(item);
             }
             menu.IsOpen = true;
@@ -330,24 +351,7 @@ internal sealed class KeybindsBoard : StackPanel
 
     private FrameworkElement Toolbar()
     {
-        _search.TextChanged += (_, _) =>
-        {
-            if (_quiet) return;
-            _query = _search.Text.Trim();
-            if (_find is not null) { _quiet = true; _findBox.SetHotkey(null); _quiet = false; _find = null; }
-            _clash = null;
-            Render();
-        };
-        _findBox.ToolTip = "Press a key combination to see what it does";
-        _findBox.HotkeyChanged += hk =>
-        {
-            _find = hk;
-            if (hk is not null && _query.Length > 0) { _quiet = true; _search.Text = ""; _quiet = false; _query = ""; }
-            _clash = null;
-            Refresh();
-        };
         var row = new DockPanel { Margin = new Thickness(0, 0, 0, 12), LastChildFill = false };
-        _findBox.Margin = new Thickness(6, 0, 12, 0);
         row.Children.Add(_search);
         row.Children.Add(_findBox);
         row.Children.Add(_filters);
@@ -851,6 +855,16 @@ internal sealed class KeybindsBoard : StackPanel
             if (cur is ButtonBase) return true;
         return false;
     }
+
+    private void PickProfile(string? id)
+    {
+        _keys.SelectProfile(id == _keys.DefaultProfile ? null : id);
+        _app.Save();
+        _clash = null;
+        Build();
+    }
+
+    public void ShowOtherProfile() => PickProfile(IracingKeybindsView.ProfileChoices(_keys).FirstOrDefault(c => c.Id != (_keys.Profile ?? _keys.DefaultProfile))?.Id);
 
     public void ShowFilter(string which)
     {

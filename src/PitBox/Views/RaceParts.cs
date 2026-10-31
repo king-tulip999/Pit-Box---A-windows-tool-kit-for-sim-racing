@@ -340,9 +340,17 @@ internal static class RaceParts
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal };
         row.Children.Add(Big(label, 12.5, "TextMuted", italic: false, heavy: false));
-        row.Children.Add(new TextBlock { Text = value, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center }
+        row.Children.Add(ChipDivider());
+        row.Children.Add(new TextBlock { Text = value, Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center }
             .Also(t => t.SetResourceReference(TextBlock.ForegroundProperty, "Text")));
         return Chip(row, tip: tip);
+    }
+
+    private static Border ChipDivider()
+    {
+        var line = Hairline.Rule(new Border { Height = 12, Margin = new Thickness(7, 0, 7, 0), VerticalAlignment = VerticalAlignment.Center }, Orientation.Vertical);
+        line.SetResourceReference(Border.BackgroundProperty, "LineStrong");
+        return line;
     }
 
     public static IEnumerable<Border> Ratings(SessionSummary s)
@@ -362,7 +370,8 @@ internal static class RaceParts
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal };
         row.Children.Add(Big(label, 12.5, "TextMuted", italic: false, heavy: false));
-        var shown = new TextBlock { Text = value is { } v ? format(v) : RaceFormat.Missing, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        row.Children.Add(ChipDivider());
+        var shown = new TextBlock { Text = value is { } v ? format(v) : RaceFormat.Missing, Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center };
         shown.SetResourceReference(TextBlock.ForegroundProperty, value is null ? "TextFaint" : "Text");
         row.Children.Add(shown);
         if (value is not null && delta is { } d)

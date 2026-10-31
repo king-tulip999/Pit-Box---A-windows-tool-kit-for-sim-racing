@@ -45,6 +45,7 @@ internal static class SettingRows
     public static Grid Row(string label, string? help, bool inlineHelp, FrameworkElement control)
     {
         var grid = new Grid { Margin = new Thickness(0, 2, 0, 2) };
+        Ui.NameFor(control, label);
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(LabelWidth) });
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto, MinHeight = 28 });

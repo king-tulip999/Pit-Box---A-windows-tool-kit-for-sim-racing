@@ -46,10 +46,7 @@ internal static class GrrTheme
 
     public static ThemeSpec Spec => _spec ??= new()
     {
-        Id = Id, Name = "GRR", Dark = true, Colors = Palette, Partner = AppTheme.Light,
-        DisplayFont = "./Assets/Fonts/Condensed/#Barlow Condensed, Bahnschrift SemiBold SemiCondensed, Bahnschrift SemiCondensed, Arial Narrow, Segoe UI",
-        UiFont = "./Assets/Fonts/#Barlow, Segoe UI Variable Text, Segoe UI",
-        MonoFont = "./Assets/Fonts/Condensed/#Barlow Condensed, Bahnschrift SemiCondensed, Arial Narrow, Segoe UI",
+        Id = Id, Name = "GRR", Dark = true, Colors = Palette,
         HeadingWeight = FontWeights.ExtraBold, MonoLabels = true,
         Radius = 0, ChipRadius = 0,
         CardEdge = new Thickness(1), LogoEdge = new Thickness(0),
@@ -99,7 +96,6 @@ internal static class GrrTheme
 
     private static readonly Dictionary<string, Dictionary<string, Color>> PodiumByTheme = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["Light"] = new Dictionary<string, Color> { ["Podium1Bg"] = Hex("#F8E7A8"), ["Podium1Edge"] = Hex("#C9A227"), ["Podium1Fg"] = Hex("#6B5000"), ["Podium2Bg"] = Hex("#E6E8EC"), ["Podium2Edge"] = Hex("#9AA1AB"), ["Podium2Fg"] = Hex("#3E444D"), ["Podium3Bg"] = Hex("#F2D2B6"), ["Podium3Edge"] = Hex("#B0682E"), ["Podium3Fg"] = Hex("#6E3A12") },
         ["Dark"] = new Dictionary<string, Color> { ["Podium1Bg"] = Hex("#3A3115"), ["Podium1Edge"] = Hex("#D9AE35"), ["Podium1Fg"] = Hex("#F7D873"), ["Podium2Bg"] = Hex("#2B2F35"), ["Podium2Edge"] = Hex("#A7AEB8"), ["Podium2Fg"] = Hex("#E6E9ED"), ["Podium3Bg"] = Hex("#3A2416"), ["Podium3Edge"] = Hex("#C47A45"), ["Podium3Fg"] = Hex("#F0B88E") },
         ["CustomTheme"] = new Dictionary<string, Color> { ["Podium1Bg"] = Hex("#241C00"), ["Podium1Edge"] = Hex("#E0B020"), ["Podium1Fg"] = Hex("#FFD45A"), ["Podium2Bg"] = Hex("#18191B"), ["Podium2Edge"] = Hex("#B8BEC6"), ["Podium2Fg"] = Hex("#E8ECF0"), ["Podium3Bg"] = Hex("#26140A"), ["Podium3Edge"] = Hex("#D0773A"), ["Podium3Fg"] = Hex("#F5AA74") },
         ["Grr"] = new Dictionary<string, Color> { ["Podium1Bg"] = Hex("#2E2A0E"), ["Podium1Edge"] = Hex("#E8B931"), ["Podium1Fg"] = Hex("#F2D06B"), ["Podium2Bg"] = Hex("#20251F"), ["Podium2Edge"] = Hex("#B7C0B8"), ["Podium2Fg"] = Hex("#E8ECE8"), ["Podium3Bg"] = Hex("#2E1E12"), ["Podium3Edge"] = Hex("#C98450"), ["Podium3Fg"] = Hex("#F0B88E") },

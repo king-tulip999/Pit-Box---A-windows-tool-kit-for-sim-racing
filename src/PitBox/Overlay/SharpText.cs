@@ -12,13 +12,12 @@ internal enum TextAlign { Left, Center, Right }
 
 internal sealed class SharpText : IDisposable
 {
-    public const string Family = "Bahnschrift";
-
     private readonly record struct Run(string Text, float Size, int Weight, Color Color, RectangleF Box, TextAlign Align);
 
     private static ID2D1Factory? _d2d;
     private static IDWriteFactory? _dwrite;
     private static IDWriteRenderingParams? _rendering;
+    private static IDWriteFontCollection? _fonts;
     private static bool _failed;
     private static readonly Dictionary<(float, int, TextAlign), IDWriteTextFormat> Formats = new();
     private static readonly Dictionary<(string, float, int), float> Widths = new();
@@ -38,6 +37,7 @@ internal sealed class SharpText : IDisposable
             _d2d = D2D1.D2D1CreateFactory<ID2D1Factory>(Vortice.Direct2D1.FactoryType.SingleThreaded);
             _dwrite = DWrite.DWriteCreateFactory<IDWriteFactory>(Vortice.DirectWrite.FactoryType.Shared);
             _rendering = _dwrite.CreateCustomRenderingParams(1.8f, 1f, 0f, PixelGeometry.Flat, RenderingMode.NaturalSymmetric);
+            _fonts = OverlayFonts.Collection(_dwrite);
             return true;
         }
         catch (Exception ex) when (ex is SharpGen.Runtime.SharpGenException or DllNotFoundException or EntryPointNotFoundException)
@@ -52,7 +52,9 @@ internal sealed class SharpText : IDisposable
     {
         var key = (MathF.Round(size * 4) / 4, weight, align);
         if (Formats.TryGetValue(key, out var f)) return f;
-        f = _dwrite!.CreateTextFormat(Family, (FontWeight)weight, Vortice.DirectWrite.FontStyle.Normal, FontStretch.Normal, key.Item1);
+        f = _fonts is null
+            ? _dwrite!.CreateTextFormat("Segoe UI", (FontWeight)weight, Vortice.DirectWrite.FontStyle.Normal, FontStretch.Normal, key.Item1)
+            : _dwrite!.CreateTextFormat(OverlayFonts.Family, _fonts, (FontWeight)weight, Vortice.DirectWrite.FontStyle.Normal, FontStretch.Normal, key.Item1, "en-us");
         f.WordWrapping = WordWrapping.NoWrap;
         f.ParagraphAlignment = ParagraphAlignment.Near;
         f.TextAlignment = align switch { TextAlign.Center => TextAlignment.Center, TextAlign.Right => TextAlignment.Trailing, _ => TextAlignment.Leading };

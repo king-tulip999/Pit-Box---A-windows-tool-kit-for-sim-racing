@@ -6,7 +6,6 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using PitBox.Controls;
-using PitBox.Plugins;
 using PitBox.Plugins.BuiltIn;
 using PitBox.Services;
 using PitBox.SessionStats;
@@ -54,7 +53,7 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         };
         var header = new StackPanel { Margin = Ui.HeaderMargin };
         var left = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
-        var title = Ui.PluginTitle(PluginIds.SessionStats, "Session Stats");
+        var title = Ui.PageTitle("Session Stats");
         title.Margin = new Thickness(0, 0, 23, 0);
         left.Children.Add(title);
         left.Children.Add(_driverPlate);
@@ -166,9 +165,17 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
     public void OnShown()
     {
         _shown = true;
-        if (Stats is { } stats) stats.Changed += OnStatsChanged;
-        Refresh();
-        Motion.Stagger(_body);
+        if (Stats is { } stats)
+        {
+            stats.Changed += OnStatsChanged;
+            if (_built.Length > 0 && Inputs(stats) == _built)
+            {
+                _progress.Content = StatsUi.Progress(stats);
+                if (_sessionId is null) _telemetry?.Reload();
+            }
+            else Refresh();
+        }
+        else Refresh();
     }
 
     public void OnHidden()
@@ -395,9 +402,18 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         }
     }
 
+    private string _built = "";
+    private TelemetryFilesCard? _telemetry;
+
+    private string Inputs(SessionStatsService stats) =>
+        $"{stats.Generation}|{stats.Store is null}|{stats.Problem}|{string.Join(",", stats.Leagues ?? Array.Empty<int>())}|{DateTime.UtcNow.Ticks / TimeSpan.TicksPerHour}|"
+        + System.Text.Json.JsonSerializer.Serialize(stats.Settings, Config.ConfigStore.JsonOptions);
+
     private async Task RefreshCore(bool restoreOffset)
     {
+        _built = "";
         if (!_shown || Stats is not { } stats) return;
+        string inputs = Inputs(stats);
         int version = ++_version;
         _progress.Content = StatsUi.Progress(stats);
         if (stats.Problem is { } problem) { _content.Content = Ui.DangerBanner("Stats unavailable", problem); return; }
@@ -411,7 +427,12 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
             _content.Content = new Tile { Style = Ui.Res<Style>("Card"), Child = Ui.Text(StatsSessionsNote(stats), "Muted") };
             return;
         }
-        if (_sessionId is not null) { await RefreshDrill(stats, store, version); return; }
+        if (_sessionId is not null)
+        {
+            await RefreshDrill(stats, store, version);
+            if (version == _version && _shown) _built = inputs;
+            return;
+        }
         var q = stats.Query();
         var range = stats.Range;
         var results = await stats.EvaluateAsync(stats.Available, q);
@@ -433,12 +454,19 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         {
             page.Children.Add(new Tile { Style = Ui.Res<Style>("Card"), Child = Ui.Text("No sessions in this range yet: pick a longer one to see the rest.", "Muted") });
             _content.Content = page;
+            _built = inputs;
             return;
         }
         var sessionsCard = StatsSessions.Card(sessions, traced, _filter, stats.Settings, Refresh, s => Open(s.Id), TraceSettings.Button(_app, stats, _window), races);
-        page.Children.Add(StatsSections.Page(results, charts, stats, q, Changed, sessionsCard, races.Card(sessions.FirstOrDefault(RaceParts.Raced))));
-        page.Children.Add(new TelemetryFilesCard(_app, _window, stats) { Margin = new Thickness(0, Ui.PanelSpacing, 0, 0) });
+        var sections = StatsSections.Page(results, charts, stats, q, Changed, sessionsCard, races.Card(sessions.FirstOrDefault(RaceParts.Raced)));
+        page.Children.Add(sections);
+        page.Children.Add(_telemetry = new TelemetryFilesCard(_app, _window, stats) { Margin = new Thickness(0, Ui.PanelSpacing, 0, 0) });
+        if (!restoreOffset && sections is Panel parts)
+            Motion.InTurns(parts.Children.Cast<UIElement>().Skip(2).Append(_telemetry));
+        bool arriving = _content.Content is null;
         _content.Content = page;
+        if (arriving) Motion.FadeIn(page);
+        _built = inputs;
         if (restoreOffset)
         {
             double offset = _overviewOffset;
@@ -1513,7 +1541,7 @@ internal static class StatsCharts
                 DockPanel.SetDock(picture, Dock.Left);
                 line.Children.Add(picture);
             }
-            line.Children.Add(new TextBlock { Text = name, Style = Ui.Res<Style>("Body"), FontSize = 10.5, FontWeight = place == 1 ? FontWeights.SemiBold : FontWeights.Normal, VerticalAlignment = VerticalAlignment.Center });
+            line.Children.Add(new TextBlock { Text = name, Style = Ui.Res<Style>("Body"), FontSize = 12, FontWeight = place == 1 ? FontWeights.SemiBold : FontWeights.Normal, VerticalAlignment = VerticalAlignment.Center });
             stack.Children.Add(line);
             var track = new Grid { Height = 5, Margin = new Thickness(18, 0, 0, 0), ToolTip = line.ToolTip };
             track.SetResourceReference(Panel.BackgroundProperty, "MeterTrack");
@@ -1556,7 +1584,7 @@ internal static class StatsCharts
             var swatch = new Border { Width = 8, Height = 8, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center };
             swatch.SetResourceReference(Border.BackgroundProperty, look.Brush);
             item.Children.Add(swatch);
-            item.Children.Add(new TextBlock { Text = look.Name, Style = Ui.Res<Style>("Body"), FontSize = 10.5, VerticalAlignment = VerticalAlignment.Center });
+            item.Children.Add(new TextBlock { Text = look.Name, Style = Ui.Res<Style>("Body"), FontSize = 12, VerticalAlignment = VerticalAlignment.Center });
             var figure = new TextBlock { Text = $"{StatFormat.Duration(seconds)} · {seconds / total:P0}", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
             item.Children.Add(figure);
             legend.Children.Add(item);
@@ -1650,7 +1678,7 @@ internal static class StatsCharts
 
         protected double Dpi => VisualTreeHelper.GetDpi(this).PixelsPerDip;
 
-        protected FormattedText Text(string s, Brush? brush = null, bool bold = false, double size = 9) =>
+        protected FormattedText Text(string s, Brush? brush = null, bool bold = false, double size = 10.5) =>
             new(ThemeManager.Case(s), CultureInfo.CurrentCulture, FlowDirection.LeftToRight, ThemeManager.UiFace(bold: bold), size, brush ?? Ui.Res<Brush>("TextMuted"), Dpi);
 
         protected Func<double, double> LapAxis(DrawingContext dc, double lo, double hi, double step)
@@ -1756,7 +1784,7 @@ internal static class StatsCharts
                 dc.DrawEllipse(accent, current || i == Hover ? ring : null, At(i), r, r);
             }
             var last = At(_points.Count - 1);
-            var best = Text(StatFormat.LapTime(_points[^1].Lap), Ui.Res<Brush>("Heading"), bold: true, size: 10);
+            var best = Text(StatFormat.LapTime(_points[^1].Lap), Ui.Res<Brush>("Heading"), bold: true, size: 11);
             double bx = last.X + 10 + best.Width <= w ? last.X + 10 : last.X - 10 - best.Width;
             dc.DrawText(best, new Point(bx, Math.Max(0, last.Y - best.Height - 4)));
         }

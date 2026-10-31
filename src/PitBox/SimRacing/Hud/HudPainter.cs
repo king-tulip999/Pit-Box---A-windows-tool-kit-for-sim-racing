@@ -244,13 +244,9 @@ internal sealed class HudPainter : IDisposable
 
     private float TextHeight(Font font) => _textHeights.TryGetValue(font, out var h) ? h : _textHeights[font] = font.GetHeight();
 
-    private static readonly FontFamily Regular = Family(SharpText.Family, "Segoe UI"), Semibold = Family(SharpText.Family + " SemiBold", "Segoe UI Semibold");
+    private static readonly FontFamily Regular = OverlayFonts.Regular, Semibold = OverlayFonts.Semibold;
 
-    private static FontFamily Family(string name, string fallback)
-    {
-        try { return new FontFamily(name); }
-        catch (ArgumentException) { return new FontFamily(fallback); }
-    }
+    private static readonly Matrix Lean = new(1, 0, -0.2f, 1, 0, 0);
 
     private Font LabelFont(float px)
     {
@@ -812,9 +808,10 @@ internal sealed class HudPainter : IDisposable
         var key = (text, px);
         if (_display.TryGetValue(key, out var known)) return known;
         if (_display.Count >= MaxCached) { foreach (var x in _display.Values) x.Path.Dispose(); _display.Clear(); }
-        var (family, style) = HudArt.Display;
+        var (family, style) = OverlayFonts.Display;
         var path = new GraphicsPath();
         path.AddString(text, family, (int)style, px, PointF.Empty, StringFormat.GenericTypographic);
+        path.Transform(Lean);
         var box = path.GetBounds();
         if (box.Width <= 0 || box.Height <= 0) box = new RectangleF(0, 0, Math.Max(1, text.Length * px * 0.5f), px * 0.7f);
         return _display[key] = (path, box);
@@ -857,6 +854,8 @@ internal sealed class HudPainter : IDisposable
         _measureBitmap.Dispose();
         _sharp.Dispose();
     }
+
+    public void ReleaseText() => _sharp.Dispose();
 
     private readonly SharpText _sharp = new();
     private readonly Dictionary<Font, (float Size, bool Bold)> _fontSpecs = new();

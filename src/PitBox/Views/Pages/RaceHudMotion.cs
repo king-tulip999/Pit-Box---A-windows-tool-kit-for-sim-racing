@@ -7,7 +7,7 @@ namespace PitBox.Views.Pages;
 
 internal sealed partial class RaceHudWidgets
 {
-    private const double RiseStepMs = 60, RiseDistance = 8, RiseMs = 260, CrossFadeMs = 300;
+    private const double CrossFadeMs = 300;
 
     private readonly Canvas _navLayer = new() { IsHitTestVisible = false };
     private RadioButton? _navChecked;
@@ -59,8 +59,7 @@ internal sealed partial class RaceHudWidgets
     private void RiseIn(Panel body)
     {
         string? shownFor = _general ? null : _selected;
-        if (_filledOnce && shownFor != _enteredFor && Motion.Flourish)
-            for (int i = 0; i < body.Children.Count; i++) Motion.Enter(body.Children[i], i * RiseStepMs, RiseDistance, RiseMs);
+        if (_filledOnce && shownFor != _enteredFor && Motion.Flourish) Motion.FadeIn(body);
         _filledOnce = true;
         _enteredFor = shownFor;
     }

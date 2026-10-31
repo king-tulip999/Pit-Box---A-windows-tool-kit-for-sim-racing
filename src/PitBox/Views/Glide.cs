@@ -7,7 +7,7 @@ namespace PitBox.Views;
 
 internal static class Glide
 {
-    public const double Ms = 360;
+    public const double Ms = Motion.SwapMs;
 
     public static Rect? Of(FrameworkElement? element, Visual layer)
     {

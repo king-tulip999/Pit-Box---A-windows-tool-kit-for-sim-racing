@@ -24,7 +24,7 @@ internal interface IHudEditorHost
     Task<bool> Confirm(string title, string message, string confirmText, bool danger);
 }
 
-internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdit, IHudEditorHost
+internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdit, IHudEditorHost, IStagedBuild
 {
     private static readonly string[] Tabs = { "Widgets", "Alerts", "Fuel", "Overlay settings" };
     private const int WidgetsTab = 0, AlertsTabIndex = 1, FuelTabIndex = 2, SettingsTab = 3;
@@ -42,13 +42,15 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     private RaceHudWidgets? _widgets;
     private Action? _tick;
 
-    public PreviewSource Preview { get; }
+    private PreviewSource? _preview;
+    private int _steps;
+
+    public PreviewSource Preview => _preview ??= new PreviewSource(() => S);
 
     public RaceHudSection(AppServices app, MainWindow window)
     {
         _app = app;
         _window = window;
-        Preview = new PreviewSource(() => S);
         _timer.Tick += (_, _) => { Preview.Advance(Host); RefreshStatus(); _tick?.Invoke(); };
 
         var top = new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, 10) };
@@ -68,7 +70,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         top.Child = topStack;
         Children.Add(top);
 
-        _segments = Ui.PageTabs(Tabs, 0, i => { _tab = i; Build(); }, "hudtabs");
+        _segments = Ui.PageTabs(Tabs, 0, i => { _tab = i; Build(); Motion.FadeIn(_body); }, "hudtabs");
         _segments.HorizontalAlignment = HorizontalAlignment.Left;
         _segments.VerticalAlignment = VerticalAlignment.Center;
         var tabRow = Ui.SplitRow(_segments, _arrange);
@@ -78,7 +80,26 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         Ui.Anchor(this, "simracing.hud");
         RefreshStatus();
         RefreshArrange();
+    }
+
+    public bool Done => _steps >= 2;
+
+    public bool BuildStep()
+    {
+        if (_steps == 0)
+        {
+            _ = Preview;
+            _steps = 1;
+            return true;
+        }
+        if (_steps != 1) return false;
         Build();
+        return true;
+    }
+
+    private void Finish()
+    {
+        while (BuildStep()) { }
     }
 
     private Tile? _rulesCard;
@@ -142,6 +163,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
 
     public void OnShown()
     {
+        Finish();
         if (_shown) return;
         _shown = true;
         if (Host is { } h)
@@ -241,6 +263,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
 
     private void Build()
     {
+        _steps = 2;
         _tick = null;
         _rules = null;
         _ruleCount = null;
@@ -257,7 +280,6 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         if (_tab == AlertsTabIndex) Ui.Anchor((FrameworkElement)_body.Child, AlertsAnchor);
         else if (_tab == SettingsTab) Ui.Anchor((FrameworkElement)_body.Child, SettingsAnchor);
         if (_widgets is not null) _tick = _widgets.Tick;
-        Motion.Stagger(_body.Child as Panel ?? new StackPanel());
     }
 
     private static Tile Group(string title, string? caption, params UIElement[] rows)
@@ -300,7 +322,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             foreach (var w in copy.Widgets) w.Id = HudWidgetConfig.NewId(w.Kind);
             AddLayout(copy);
         });
-        var reset = Ui.LabeledButton("I.Restore", "Reset to default", async () =>
+        var reset = Ui.LabeledButton("I.Undo", "Reset to default", async () =>
         {
             string name = ShownLayout;
             if (!await _window.Confirm($"Reset “{name}” to the default layout?", "Its widgets, their places and settings go back to how the overlay starts. Duplicate it first to keep this version.", "Reset", danger: true)) return;
@@ -373,6 +395,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             rules.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
             RefreshRuleCount();
         });
+        System.Windows.Automation.AutomationProperties.SetName(useRules, "Switch layouts automatically");
         var switchLabel = new TextBlock { Text = "Switch layouts automatically", FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
         Ui.AddInfo(switchLabel, "Rules pick a layout by session, class, car and track. The most specific matching rule wins, then the higher one; with none, the layout picked on the left shows.");
         useRules.VerticalAlignment = VerticalAlignment.Center;
@@ -565,7 +588,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
 
         var box = new Popup
         {
-            PlacementTarget = anchor, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true,
+            PlacementTarget = anchor, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true, PopupAnimation = PopupAnimation.Fade,
             Child = new Tile { Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(15, 11, 15, 13), Margin = new Thickness(0, 5, 0, 0), Child = stack },
         };
         RenderOptions.SetClearTypeHint(box.Child, ClearTypeHint.Enabled);
@@ -1219,6 +1242,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             SettingsAnchor => SettingsTab,
             _ => -1,
         };
+        Finish();
         if (tab < 0 || tab == _tab) return false;
         SelectTab(tab);
         return true;

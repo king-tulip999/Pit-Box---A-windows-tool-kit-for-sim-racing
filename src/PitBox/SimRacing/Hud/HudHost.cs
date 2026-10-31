@@ -799,7 +799,7 @@ internal sealed class HudHost : IDisposable
         for (float y = 0; y < size.Height; y += step, n++) g.DrawLine(n % 4 == 0 ? major : minor, 0, y, size.Width, y);
         if (!label) return;
         string text = $"Snap grid · {setting} px";
-        using var font = new Font(PitBox.Overlay.SharpText.Family + " SemiBold", 26, FontStyle.Regular, GraphicsUnit.Pixel);
+        using var font = new Font(PitBox.Overlay.OverlayFonts.Semibold, 26, FontStyle.Regular, GraphicsUnit.Pixel);
         var box = g.MeasureString(text, font);
         var r = new RectangleF((size.Width - box.Width) / 2 - 18, (size.Height - box.Height) / 2 - 10, box.Width + 36, box.Height + 20);
         using (var bg = new SolidBrush(Color.FromArgb(235, p.Surface))) g.FillRectangle(bg, r);
@@ -824,13 +824,25 @@ internal sealed class HudHost : IDisposable
 
     public void RenderPreview(HudWidgetConfig config, RaceState race, HudPainter painter, float scale, ref Bitmap? bitmap)
     {
-        var def = HudCatalog.Find(config.Kind) ?? throw new InvalidOperationException("Unknown widget " + config.Kind);
         int w = Math.Max(1, (int)Math.Round(config.W * scale)), h = Math.Max(1, (int)Math.Round(config.H * scale));
         if (bitmap is null || bitmap.Width != w || bitmap.Height != h)
         {
             bitmap?.Dispose();
             bitmap = new Bitmap(w, h, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
         }
+        DrawPreview(config, race, painter, scale);
+        painter.End(_previewSurface.Dc, _previewSurface.Size);
+        using var copy = Graphics.FromImage(bitmap);
+        copy.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceCopy;
+        copy.DrawImageUnscaled(_previewSurface.Bitmap!, 0, 0);
+    }
+
+    public void MeasurePreview(HudWidgetConfig config, RaceState race, HudPainter painter) => DrawPreview(config, race, painter, 1f);
+
+    private void DrawPreview(HudWidgetConfig config, RaceState race, HudPainter painter, float scale)
+    {
+        var def = HudCatalog.Find(config.Kind) ?? throw new InvalidOperationException("Unknown widget " + config.Kind);
+        int w = Math.Max(1, (int)Math.Round(config.W * scale)), h = Math.Max(1, (int)Math.Round(config.H * scale));
         var g = _previewSurface.Ensure(new Size(w, h));
         painter.Simulated = race.Frame.Simulated;
         painter.MarkSimulated = false;
@@ -845,10 +857,6 @@ internal sealed class HudHost : IDisposable
         var view = new HudView { Frame = race.Frame, Race = race, Settings = Settings, Config = config, Options = preview.Options, Def = def };
         widget.Draw(painter, view);
         painter.FinishPanels();
-        painter.End(_previewSurface.Dc, _previewSurface.Size);
-        using var copy = Graphics.FromImage(bitmap);
-        copy.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceCopy;
-        copy.DrawImageUnscaled(_previewSurface.Bitmap!, 0, 0);
     }
 
     private readonly PitBox.Overlay.DibSurface _previewSurface = new();

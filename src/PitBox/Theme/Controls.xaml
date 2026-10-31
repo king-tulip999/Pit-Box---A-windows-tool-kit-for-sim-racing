@@ -63,11 +63,12 @@
         <Setter Property="th:TextCase.KeepName" Value="True" />
     </Style>
     <Style x:Key="H1" TargetType="TextBlock">
-        <Setter Property="th:TextCase.Upper" Value="{DynamicResource Caps}" />
+        <Setter Property="th:TextCase.Upper" Value="True" />
+        <Setter Property="th:TextCase.Tight" Value="True" />
         <Setter Property="th:TextCase.KeepName" Value="True" />
-        <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
-        <Setter Property="FontSize" Value="24.5" />
-        <Setter Property="FontWeight" Value="{DynamicResource HeadingWeight}" />
+        <Setter Property="FontFamily" Value="{DynamicResource RaceFont}" />
+        <Setter Property="FontSize" Value="34" />
+        <Setter Property="FontWeight" Value="ExtraBold" />
         <Setter Property="FontStyle" Value="{DynamicResource HeadingStyle}" />
         <Setter Property="Foreground" Value="{DynamicResource Heading}" />
     </Style>
@@ -75,7 +76,7 @@
         <Setter Property="th:TextCase.Upper" Value="{DynamicResource Caps}" />
         <Setter Property="th:TextCase.KeepName" Value="True" />
         <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
-        <Setter Property="FontSize" Value="14.5" />
+        <Setter Property="FontSize" Value="15.5" />
         <Setter Property="FontWeight" Value="{DynamicResource HeadingWeight}" />
         <Setter Property="FontStyle" Value="{DynamicResource HeadingStyle}" />
         <Setter Property="Foreground" Value="{DynamicResource Heading}" />
@@ -83,7 +84,7 @@
     <Style x:Key="H3" TargetType="TextBlock">
         <Setter Property="th:TextCase.Upper" Value="{DynamicResource Caps}" />
         <Setter Property="th:TextCase.KeepName" Value="True" />
-        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="FontSize" Value="13.5" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="FontStyle" Value="{DynamicResource HeadingStyle}" />
         <Setter Property="Foreground" Value="{DynamicResource Heading}" />
@@ -91,7 +92,7 @@
     <Style x:Key="Body" TargetType="TextBlock">
         <Setter Property="th:TextCase.Upper" Value="{DynamicResource Caps}" />
         <Setter Property="th:TextCase.KeepName" Value="True" />
-        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontSize" Value="13" />
         <Setter Property="Foreground" Value="{DynamicResource Text}" />
         <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
@@ -101,7 +102,7 @@
     <Style x:Key="Caption" TargetType="TextBlock">
         <Setter Property="th:TextCase.Upper" Value="{DynamicResource Caps}" />
         <Setter Property="th:TextCase.KeepName" Value="True" />
-        <Setter Property="FontSize" Value="11.5" />
+        <Setter Property="FontSize" Value="12" />
         <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
         <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
@@ -109,7 +110,7 @@
     <Style x:Key="Eyebrow" TargetType="TextBlock">
         <Setter Property="th:TextCase.Upper" Value="{DynamicResource Caps}" />
         <Setter Property="th:TextCase.KeepName" Value="True" />
-        <Setter Property="FontSize" Value="11.5" />
+        <Setter Property="FontSize" Value="12" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="Foreground" Value="{DynamicResource EyebrowText}" />
     </Style>
@@ -178,7 +179,7 @@
         <Setter Property="c:Tile.Chamfer" Value="True" />
         <Setter Property="Padding" Value="6,2" />
         <Setter Property="Margin" Value="0,0,5,5" />
-        <Setter Property="TextElement.FontSize" Value="10.5" />
+        <Setter Property="TextElement.FontSize" Value="11.5" />
         <Setter Property="TextElement.FontWeight" Value="SemiBold" />
         <Setter Property="TextElement.Foreground" Value="{DynamicResource TextMuted}" />
     </Style>
@@ -233,7 +234,8 @@
         <Setter Property="Padding" Value="11,2,11,2" />
         <!-- one control height everywhere (= ComboBox, IconButton, Segment, title bar buttons) -->
         <Setter Property="MinHeight" Value="28" />
-        <Setter Property="FontSize" Value="11.5" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="FontSize" Value="12" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
@@ -303,12 +305,12 @@
          so on / off reads the same everywhere; off = GhostButton (Ui.SetToggled swaps the two) -->
     <Style x:Key="SelectedButton" TargetType="Button" BasedOn="{StaticResource Btn}">
         <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource AccentText}" />
-        <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+        <Setter Property="Foreground" Value="{DynamicResource Text}" />
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
                 <Setter Property="Background" Value="{DynamicResource AccentSoftHover}" />
-                <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+                <Setter Property="Foreground" Value="{DynamicResource Text}" />
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
                 <Setter Property="Background" Value="{DynamicResource SurfaceAlt}" />
@@ -372,6 +374,7 @@
     <!-- quiet: transparent until hovered, for rows that already sit in a list or chip (program picker rows, a chip's ×) -->
     <Style x:Key="QuietButton" TargetType="Button" BasedOn="{StaticResource Btn}">
         <Setter Property="MinHeight" Value="0" />
+        <Setter Property="VerticalAlignment" Value="Stretch" />
         <Setter Property="Height" Value="NaN" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderBrush" Value="Transparent" />
@@ -509,7 +512,7 @@
         <Setter Property="MinHeight" Value="32" />
         <Setter Property="Margin" Value="0,0,0,2" />
         <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
-        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontSize" Value="12" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
         <Setter Property="GroupName" Value="Nav" />
@@ -541,8 +544,8 @@
                         </MultiTrigger>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentSoft}" />
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentText}" />
-                            <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                            <Setter Property="Foreground" Value="{DynamicResource Text}" />
                             <Setter Property="FontWeight" Value="Bold" />
                         </Trigger>
                     </ControlTemplate.Triggers>
@@ -651,7 +654,7 @@
     <Style x:Key="Segment" TargetType="RadioButton">
         <Setter Property="ContentTemplateSelector" Value="{StaticResource CasedContent}" />
         <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
-        <Setter Property="FontSize" Value="11.5" />
+        <Setter Property="FontSize" Value="12" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Padding" Value="9,0" />
         <Setter Property="Height" Value="28" />
@@ -672,10 +675,10 @@
                             <Setter Property="Foreground" Value="{DynamicResource Heading}" />
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
-                            <!-- the app's one "selected" look (SelectedButton, theme cards, list rows): tint, accent edge, accent text -->
+                            <!-- the app's one "selected" look (SelectedButton, theme cards, list rows): tint, accent edge, body text -->
                             <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentSoft}" />
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentText}" />
-                            <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                            <Setter Property="Foreground" Value="{DynamicResource Text}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.45" />
@@ -718,7 +721,7 @@
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentSoft}" />
                             <Setter TargetName="Mark" Property="Background" Value="{DynamicResource AccentText}" />
-                            <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+                            <Setter Property="Foreground" Value="{DynamicResource Heading}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.45" />
@@ -735,8 +738,10 @@
         <Setter Property="BorderBrush" Value="{DynamicResource InputEdge}" />
         <Setter Property="BorderThickness" Value="{DynamicResource HairlineEdge}" />
         <Setter Property="Foreground" Value="{DynamicResource Text}" />
-        <Setter Property="Padding" Value="7,6" />
-        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Padding" Value="7,2" />
+        <Setter Property="MinHeight" Value="28" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="FontSize" Value="13" />
         <Setter Property="CaretBrush" Value="{DynamicResource AccentText}" />
         <Setter Property="SelectionBrush" Value="{DynamicResource Accent}" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -787,7 +792,7 @@
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentSoft}" />
-                            <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+                            <Setter Property="Foreground" Value="{DynamicResource Heading}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -803,6 +808,7 @@
         <Setter Property="Foreground" Value="{DynamicResource Text}" />
         <Setter Property="Padding" Value="10,5,26,5" />
         <Setter Property="MinHeight" Value="28" />
+        <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="FontSize" Value="11.5" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
@@ -1135,7 +1141,7 @@
                                 </Grid.ColumnDefinitions>
                                 <c:Icon x:Name="Check" Data="{StaticResource I.Check}" Width="11" Height="11" HorizontalAlignment="Left" Foreground="{DynamicResource AccentText}" Visibility="Hidden" />
                                 <ContentPresenter Grid.Column="1" ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center" />
-                                <TextBlock Grid.Column="2" Text="{TemplateBinding InputGestureText}" Foreground="{DynamicResource TextFaint}" FontSize="9.5" Margin="19,0,0,0" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="2" Text="{TemplateBinding InputGestureText}" Foreground="{DynamicResource TextFaint}" FontSize="11" Margin="19,0,0,0" VerticalAlignment="Center" />
                                 <c:Icon x:Name="Arrow" Grid.Column="3" Data="{StaticResource I.ChevronRight}" Width="10" Height="10" Margin="10,0,0,0" Foreground="{DynamicResource TextMuted}" Visibility="Collapsed" />
                             </Grid>
                         </c:Tile>
@@ -1181,7 +1187,7 @@
         <Setter Property="ContentTemplateSelector" Value="{StaticResource CasedTip}" />
         <Setter Property="Background" Value="{DynamicResource TooltipBg}" />
         <Setter Property="Foreground" Value="{DynamicResource TooltipText}" />
-        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontSize" Value="12" />
         <Setter Property="HasDropShadow" Value="False" />
         <!-- anchored under its control (above when there's no room), never over it: TipPlacement -->
         <Setter Property="Placement" Value="Custom" />
@@ -1189,7 +1195,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ToolTip">
-                    <c:Tile Background="{TemplateBinding Background}" BorderBrush="{DynamicResource TooltipEdge}" BorderThickness="{DynamicResource HairlineEdge}" CornerRadius="{DynamicResource R.Tooltip}" c:Tile.Chamfer="True" Padding="8,5" MaxWidth="259">
+                    <c:Tile Background="{TemplateBinding Background}" BorderBrush="{DynamicResource TooltipEdge}" BorderThickness="{DynamicResource HairlineEdge}" CornerRadius="{DynamicResource R.Tooltip}" c:Tile.Chamfer="True" Padding="10,7" MaxWidth="320">
                         <ContentPresenter>
                             <ContentPresenter.Resources>
                                 <Style TargetType="TextBlock">

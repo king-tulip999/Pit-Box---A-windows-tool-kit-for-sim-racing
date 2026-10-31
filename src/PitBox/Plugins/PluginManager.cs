@@ -42,7 +42,10 @@ internal sealed class PluginManager
     public void StartEnabled()
     {
         foreach (var plugin in All.Where(IsEnabled))
+        {
             TryStart(plugin);
+            if (PerfProbe.File is not null) PerfProbe.Mark("plugin_" + plugin.Id);
+        }
         Changed?.Invoke();
     }
 

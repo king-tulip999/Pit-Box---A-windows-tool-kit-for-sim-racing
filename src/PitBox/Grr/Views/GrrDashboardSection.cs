@@ -104,8 +104,20 @@ internal sealed class GrrDashboardSection : StackPanel
         _app.Grr.Changed += OnChanged;
         _app.Tick += OnTick;
         _app.Grr.Acquire(Consumer);
-        _shape = "";
-        Build();
+        if (_content.Content is null || _shape != Shape() || !Inputs().Equals(_built))
+        {
+            _shape = "";
+            Build();
+        }
+        else OnTick();
+    }
+
+    private (string? League, object? Data, bool Busy, object? Theme, string? Driver, string Leagues) _built;
+
+    private (string? League, object? Data, bool Busy, object? Theme, string? Driver, string Leagues) Inputs()
+    {
+        var league = League;
+        return (league, league is null ? null : _app.Grr.Data(league), _app.Grr.Busy, PageTheme, Driver, string.Join("|", _app.Config.Grr.Leagues));
     }
 
     public void OnHidden()
@@ -161,6 +173,7 @@ internal sealed class GrrDashboardSection : StackPanel
     {
         if (!_held) return;
         using var scope = Ui.Scope(PageTheme);
+        _built = Inputs();
         var shape = Shape();
         var league = League;
         if (_builtLeague != (league ?? "")) { _eventKey = null; _session = -1; _allStandings = _allResults = false; _builtLeague = league ?? ""; }
@@ -286,7 +299,7 @@ internal sealed class GrrDashboardSection : StackPanel
         else text = grr.FetchedAt(League!) is { } t ? $"Updated {GrrParts.Ago(t)}" : "Not read yet";
         if (_freshnessText != text) { _freshnessText = text; _freshness.Text = text; }
         _freshness.Foreground = Ui.Res<Brush>(brush);
-        _freshness.FontSize = 10;
+        _freshness.FontSize = 11.5;
         _freshness.ToolTip = tip;
     }
 
@@ -597,7 +610,7 @@ internal sealed class GrrDashboardSection : StackPanel
             driverCell.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var who = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             var line = new TrimRow();
-            line.Children.Add(new TextBlock { Text = name(row), FontSize = 11, FontWeight = weight, Foreground = Ui.Res<Brush>(fg), TextTrimming = TextTrimming.CharacterEllipsis, ToolTip = name(row), VerticalAlignment = VerticalAlignment.Center });
+            line.Children.Add(new TextBlock { Text = name(row), FontSize = 12, FontWeight = weight, Foreground = Ui.Res<Brush>(fg), TextTrimming = TextTrimming.CharacterEllipsis, ToolTip = name(row), VerticalAlignment = VerticalAlignment.Center });
             if (marks?.Invoke(row) is { } m)
             {
                 m.Margin = new Thickness(3, 0, 0, 0);
@@ -613,7 +626,7 @@ internal sealed class GrrDashboardSection : StackPanel
                 var col = columns[c];
                 var t = TextFit.TipWhenTrimmed(new TextBlock
                 {
-                    Text = col.Value(row) ?? "–", FontSize = 10.5, FontWeight = weight, Foreground = Ui.Res<Brush>(col == columns[^1] ? "Heading" : col.Right ? "TextMuted" : "Text"),
+                    Text = col.Value(row) ?? "–", FontSize = 11.5, FontWeight = weight, Foreground = Ui.Res<Brush>(col == columns[^1] ? "Heading" : col.Right ? "TextMuted" : "Text"),
                     TextAlignment = col.Right ? TextAlignment.Right : TextAlignment.Left, Margin = new Thickness(0, 0, col.Right ? 8 : 6, 0), VerticalAlignment = VerticalAlignment.Center,
                     TextTrimming = TextTrimming.CharacterEllipsis, IsHitTestVisible = false, Typography = { NumeralAlignment = FontNumeralAlignment.Tabular },
                 });
@@ -833,7 +846,7 @@ internal sealed class GrrDashboardSection : StackPanel
             System.Windows.Automation.AutomationProperties.SetName(fl, "Fastest lap");
             row.Children.Add(fl);
         }
-        row.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = name, FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>("Text"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center }));
+        row.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = name, FontSize = 11.5, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>("Text"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center }));
         return row;
     }
 

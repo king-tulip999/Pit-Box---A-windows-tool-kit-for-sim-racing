@@ -314,7 +314,7 @@ internal sealed class FuelWidget : HudWidget
                     if (togo is not null && plan is not null)
                     {
                         color = plan.Reliability switch { EstimateReliability.High => p.P.GoodText, EstimateReliability.Moderate => p.P.WarnText, _ => p.P.DangerText };
-                        if (plan.Reliability == EstimateReliability.Moderate || plan.LapsToGoForecast) value = "~" + value;
+                        if (plan.Reliability == EstimateReliability.Moderate || plan.LapsToGoForecast) value = RaceFormat.About(value);
                         dot = true;
                     }
                     break;
@@ -351,7 +351,9 @@ internal sealed class FuelWidget : HudWidget
             var valueBox = new RectangleF(cell.X, cell.Y + lh + 1, cell.Width, cell.Height - lh - 1);
             if (dot)
             {
-                float d = 3 * p.Density, w = p.Measure(value, p.Bold) + d * 2 + 4;
+                float d = 3 * p.Density;
+                if (p.Measure(value, p.Bold) + d * 2 + 4 > valueBox.Width && value.EndsWith(" LAPS", StringComparison.Ordinal)) value = value[..^5];
+                float w = p.Measure(value, p.Bold) + d * 2 + 4;
                 float x = align switch { HAlign.Right => valueBox.Right - w, HAlign.Center => valueBox.X + (valueBox.Width - w) / 2, _ => valueBox.X };
                 p.Dot(x + d, valueBox.Y + valueBox.Height / 2, d, color);
                 p.Text(value, p.Bold, color, new RectangleF(x + d * 2 + 4, valueBox.Y, valueBox.Right - x - d * 2 - 4, valueBox.Height), HAlign.Left, VAlign.Center);

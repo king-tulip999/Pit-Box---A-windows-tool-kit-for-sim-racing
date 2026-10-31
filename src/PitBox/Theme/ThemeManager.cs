@@ -7,12 +7,13 @@ namespace PitBox.Theme;
 
 internal static class ThemeManager
 {
-    public static ThemeSpec Current { get; private set; } = Themes.Light;
+    public static ThemeSpec Current { get; private set; } = Themes.Dark;
 
     public static bool Dark => Current.Dark;
 
     public static event Action? Changed;
     public static event Action? Changing;
+    public static event Action? Applying;
 
     public static readonly List<Action<ThemeSpec, IReadOnlyDictionary<string, Color>, ResourceDictionary>> ExtraTokens = new();
 
@@ -44,6 +45,7 @@ internal static class ThemeManager
     public static void Apply(AppTheme theme)
     {
         var spec = Themes.For(theme);
+        if (_applied is not null) Applying?.Invoke();
         if (_applied is not null && spec != Current) Changing?.Invoke();
         Current = spec;
         _ui = _uiBold = _display = null;

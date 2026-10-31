@@ -20,8 +20,8 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <!-- every theme: contour lines (Assets/BackdropLines.png, a mask recoloured per theme) with short accent streaks running
-                 along them (Assets/BackdropPaths.bin), behind the whole window; the sidebar shows a blurred copy (GlassPane) -->
+            <!-- every theme: contour lines (Assets/BackdropLines.png, a mask recoloured per theme),
+                 behind the whole window; the sidebar shows a blurred copy (GlassPane) -->
             <v:TopographyBackdrop x:Name="Backdrop" Grid.RowSpan="2" />
 
             <!-- title bar (draggable; buttons opt out of the caption area) -->
@@ -38,7 +38,7 @@
                     </StackPanel>
                     <!-- only while a newer version is available (collapsed = no space); same install as Settings → Updates -->
                     <Button x:Name="UpdateBadge" Style="{StaticResource PrimaryButton}" Visibility="Collapsed" Margin="13,0,0,0" Padding="8,5"
-                            VerticalAlignment="Center" FontSize="9.5" WindowChrome.IsHitTestVisibleInChrome="True" />
+                            VerticalAlignment="Center" FontSize="11" WindowChrome.IsHitTestVisibleInChrome="True" />
                 </StackPanel>
                 <StackPanel x:Name="CaptionButtons" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
                     <Button x:Name="MinButton" Style="{StaticResource CaptionButton}" WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Minimize">
@@ -68,8 +68,8 @@
                 </Button>
             </DockPanel>
 
-            <!-- the accent line between the title bar and the page, as between a page's panels; spans the window -->
-            <v:DividerLine x:Name="TitleRule" Grid.Row="0" VerticalAlignment="Bottom" Margin="23,0,23,0" />
+            <!-- the accent line between the title bar and the page: solid at the left edge, fading out to the right -->
+            <v:DividerLine x:Name="TitleRule" Grid.Row="0" VerticalAlignment="Bottom" Margin="0,0,23,0" FromStart="True" />
 
             <!-- the sidebar (Views/Sidebar.cs: every tool, the open tool's sections, Settings) beside the page, left or right
                  (UiSettings.SidebarRight) -->
@@ -81,11 +81,7 @@
                 </Grid.ColumnDefinitions>
                 <ContentControl x:Name="SidebarHost" Grid.Column="0" Focusable="False" Margin="13,11,0,13" />
                 <Grid x:Name="PageArea" Grid.Column="1" ClipToBounds="True">
-                    <ContentControl x:Name="PageContent" Focusable="False">
-                        <ContentControl.RenderTransform>
-                            <TranslateTransform x:Name="PageMove" />
-                        </ContentControl.RenderTransform>
-                    </ContentControl>
+                    <ContentControl x:Name="PageContent" Focusable="False" />
                 </Grid>
             </Grid>
 

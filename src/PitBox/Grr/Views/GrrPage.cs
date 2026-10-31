@@ -76,7 +76,7 @@ internal sealed class GrrPage : UserControl, IPage, IScreenshotStates, ISectione
     {
         using var scope = Ui.Scope(_theme);
         string name = CurrentSection is { } league ? GrrLeagues.Name(league) : "GRR League";
-        _title.Content = Ui.PluginTitle(GrrPlugin.PluginId, name);
+        _title.Content = Ui.PageTitle(name);
     }
 
     public void ShowSection(string id)
@@ -87,7 +87,7 @@ internal sealed class GrrPage : UserControl, IPage, IScreenshotStates, ISectione
         _dashboard.ShowLeague();
         _scroll.ScrollToTop();
         Changed();
-        if (_shown && Motion.Enabled) Motion.Enter(_dashboard, distance: 12, durationMs: 240);
+        if (_shown) Motion.FadeIn(_dashboard);
     }
 
     public bool ShowSectionOf(DependencyObject target) => false;

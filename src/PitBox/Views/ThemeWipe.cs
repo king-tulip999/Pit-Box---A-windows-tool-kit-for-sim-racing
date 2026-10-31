@@ -11,13 +11,13 @@ internal sealed class ThemeWipe : IFrameStep
 
     private readonly Grid _host;
     private readonly Image _shot;
-    private readonly double _start;
+    private double _start = double.NaN;
+    private int _frames;
 
     private ThemeWipe(Grid host, Image shot)
     {
         _host = host;
         _shot = shot;
-        _start = FrameDriver.Now;
     }
 
     private static ThemeWipe? _running;
@@ -37,20 +37,28 @@ internal sealed class ThemeWipe : IFrameStep
         host.Children.Add(shot);
         var wipe = new ThemeWipe(host, shot);
         _running = wipe;
-        wipe.Step(wipe._start);
+        wipe.Clip(0);
         FrameDriver.Run(wipe);
     }
 
     public bool Step(double now)
     {
+        if (++_frames < 2) return true;
+        if (double.IsNaN(_start)) _start = now;
         double t = (now - _start) / WipeMs;
         if (t >= 1)
         {
             End();
             return false;
         }
+        Clip(FrameDriver.EaseOut(t));
+        return true;
+    }
+
+    private void Clip(double progress)
+    {
         double w = _shot.Width, h = _shot.Height, lean = h * Lean;
-        double x = -lean + FrameDriver.EaseOut(t) * (w + lean);
+        double x = -lean + progress * (w + lean);
         var keep = new StreamGeometry();
         using (var g = keep.Open())
         {
@@ -61,7 +69,6 @@ internal sealed class ThemeWipe : IFrameStep
         }
         keep.Freeze();
         _shot.Clip = keep;
-        return true;
     }
 
     private void End()

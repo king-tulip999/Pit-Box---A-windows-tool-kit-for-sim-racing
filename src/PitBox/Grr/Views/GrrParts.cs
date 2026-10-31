@@ -213,7 +213,7 @@ internal static class GrrParts
             Margin = new Thickness(5, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, ToolTip = tip,
             Child = new TextBlock
             {
-                Text = text, FontSize = 9.5, FontWeight = FontWeights.Bold, Foreground = Ui.Res<Brush>(family + "Deep"),
+                Text = text, FontSize = 11, FontWeight = FontWeights.Bold, Foreground = Ui.Res<Brush>(family + "Deep"),
                 HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
             },
         };

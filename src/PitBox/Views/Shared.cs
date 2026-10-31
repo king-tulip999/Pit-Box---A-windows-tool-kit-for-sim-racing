@@ -67,7 +67,7 @@ internal static class IdentifyDisplays
                     {
                         new TextBlock { Text = monitor.Label, FontSize = 78, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, Foreground = (Brush)Application.Current.FindResource("AccentText"), FontFamily = (FontFamily)Application.Current.FindResource("DisplayFont") },
                         new TextBlock { Text = monitor.Name, FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, Foreground = (Brush)Application.Current.FindResource("Text") },
-                        new TextBlock { Text = $"{monitor.Width}×{monitor.Height} · {monitor.Hz} {Units.Hz}" + (monitor.Primary ? " · main" : ""), FontSize = 9.5, Margin = new Thickness(0, 2, 0, 0), HorizontalAlignment = HorizontalAlignment.Center, Foreground = (Brush)Application.Current.FindResource("TextMuted") },
+                        new TextBlock { Text = $"{monitor.Width}×{monitor.Height} · {monitor.Hz} {Units.Hz}" + (monitor.Primary ? " · main" : ""), FontSize = 11, Margin = new Thickness(0, 2, 0, 0), HorizontalAlignment = HorizontalAlignment.Center, Foreground = (Brush)Application.Current.FindResource("TextMuted") },
                     },
                 },
             };
@@ -144,12 +144,11 @@ internal sealed class Collapsible : StackPanel
     private readonly FrameworkElement? _tools;
     private readonly Border? _frame, _bar, _accent;
     private readonly TextBlock _subtitle;
-    private bool _hover, _deferred;
+    private bool _hover;
 
-    public Collapsible(string title, string subtitle, string icon, (string Soft, string Deep) colors, bool expanded, Func<UIElement> build, Action<bool> toggled, FrameworkElement? tools = null, bool eager = false, bool framed = false, bool deferred = false)
+    public Collapsible(string title, string subtitle, string icon, (string Soft, string Deep) colors, bool expanded, Func<UIElement> build, Action<bool> toggled, FrameworkElement? tools = null, bool eager = false, bool framed = false)
     {
         _build = build;
-        _deferred = deferred && !eager;
         _toggled = toggled;
         _tools = tools;
         Margin = new Thickness(0, 0, 0, Ui.PanelSpacing);
@@ -276,27 +275,17 @@ internal sealed class Collapsible : StackPanel
 
     public void Toggle()
     {
-        _deferred = false;
         Expanded = !Expanded;
         Apply();
+        if (Expanded && IsLoaded) Motion.FadeIn(_content, Motion.RevealMs);
         _toggled(Expanded);
-    }
-
-    public bool Deferred => _deferred;
-
-    public bool BuildDeferred()
-    {
-        if (!_deferred) return false;
-        _deferred = false;
-        Apply();
-        return true;
     }
 
     private void Apply()
     {
         _chevron.Data = Ui.Res<Geometry>(Expanded ? "I.ChevronDown" : "I.ChevronRight");
         if (_chevronEnd is not null) _chevronEnd.Data = _chevron.Data;
-        if (Expanded && _content.Child is null && !_deferred)
+        if (Expanded && _content.Child is null)
             _content.Child = _build();
         _content.Visibility = Expanded ? Visibility.Visible : Visibility.Collapsed;
         _subtitle.Visibility = Expanded || _subtitle.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
@@ -487,7 +476,7 @@ internal static class Ui
     public static readonly DependencyProperty DialogBaseWidthProperty =
         DependencyProperty.RegisterAttached("DialogBaseWidth", typeof(double), typeof(Ui), new PropertyMetadata(double.NaN));
 
-    private static void NameFor(UIElement control, string label)
+    internal static void NameFor(UIElement control, string label)
     {
         if (label.Length > 0 && string.IsNullOrEmpty(System.Windows.Automation.AutomationProperties.GetName(control)))
             System.Windows.Automation.AutomationProperties.SetName(control, label);
@@ -671,29 +660,37 @@ internal static class Ui
         return null;
     }
 
-    public static StackPanel PluginTitle(string pluginId, string text)
-    {
-        var plugin = AppServices.Current?.Plugins.Find(pluginId);
-        return PageTitle(plugin is { Pages.Count: > 0 } ? plugin.Pages[0].Icon : plugin?.Icon, text);
-    }
-
-    public static StackPanel PageTitle(string? glyph, string text)
+    public static StackPanel PageTitle(string text)
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        var icon = new NavIcon
-        {
-            Glyph = glyph,
-            Width = 28, Height = 28, Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center,
-        };
-        icon.SetResourceReference(NavIcon.ForegroundProperty, "Accent");
-        row.Background = Brushes.Transparent;
-        row.MouseEnter += (_, _) => icon.IsActive = true;
-        row.MouseLeave += (_, _) => icon.IsActive = false;
-        row.Children.Add(icon);
         var title = Text(text, "H1");
         title.VerticalAlignment = VerticalAlignment.Center;
-        title.SetResourceReference(TextBlock.ForegroundProperty, "Accent");
+        SetTitle(title, text);
         row.Children.Add(title);
+        return row;
+    }
+
+    public static void SetTitle(TextBlock title, string text)
+    {
+        int space = text.IndexOf(' ');
+        var lead = new Run(TextCase.Capitals(space < 0 ? text : text[..space]));
+        lead.SetResourceReference(TextElement.ForegroundProperty, "AccentText");
+        TextCase.SetVerbatim(title, true);
+        title.Inlines.Clear();
+        title.Inlines.Add(lead);
+        if (space >= 0) title.Inlines.Add(new Run(TextCase.Capitals(text[space..])));
+        title.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
+    }
+
+    public static StackPanel PageSwitch(string label, CheckBox toggle, string? help = null)
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+        row.Children.Add(new TextBlock { Text = label, Style = Res<Style>("Body"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
+        if (help is not null) row.Children.Add(HudSettings.HelpTip.For(help, label));
+        toggle.VerticalAlignment = VerticalAlignment.Center;
+        toggle.Margin = new Thickness(10, 0, 0, 0);
+        AutomationProperties.SetName(toggle, label);
+        row.Children.Add(toggle);
         return row;
     }
 
@@ -719,7 +716,15 @@ internal static class Ui
         return b;
     }
 
-    public static void SetToggled(Button button, bool on) => button.Style = Res<Style>(on ? "SelectedButton" : "GhostButton");
+    public static void SetToggled(Button button, bool on)
+    {
+        button.Style = Res<Style>(on ? "SelectedButton" : "GhostButton");
+        if (button.IsKeyboardFocused && InputManager.Current.MostRecentInputDevice is not KeyboardDevice)
+        {
+            Keyboard.ClearFocus();
+            button.Focus();
+        }
+    }
 
     public static StackPanel IconLabel(string icon, string label, double iconSize = 12, double? fontSize = null)
     {
@@ -967,6 +972,11 @@ internal static class Ui
 
     private const double SettingTextMin = 146;
 
+    public const double SettingTitleKeep = 210;
+
+    internal static bool StacksSettingControl(double room, double textWidth, double titleWidth, double longestWord, bool titleOnly) =>
+        room < Math.Max(Math.Max(Math.Min(textWidth, titleOnly ? 100 : SettingTextMin), longestWord), Math.Min(titleWidth, SettingTitleKeep));
+
     public const double SettingLabelMax = 260;
 
     public const double SettingControlLane = 190;
@@ -1010,23 +1020,22 @@ internal static class Ui
         var margin = fe.Margin;
         bool stacked = false;
         string? measuredFor = null;
-        double natural = 0, longest = 0;
+        double natural = 0, longest = 0, titleWidth = 0;
         void Fit()
         {
             if (grid.ActualWidth <= 0) return;
             fe.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-            string key = title + "\n" + description;
+            string key = title + "\n" + description + "\n" + text.Children.Count;
             if (key != measuredFor)
             {
                 text.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
                 natural = text.DesiredSize.Width - text.Margin.Right;
+                titleWidth = text.Children[0].DesiredSize.Width + 2;
                 longest = LongestWord(heading) + 2;
                 measuredFor = key;
             }
-            bool titleOnly = description is null;
             double room = grid.ActualWidth - fe.DesiredSize.Width - 18;
-            double needed = Math.Max(Math.Min(natural, titleOnly ? 100 : SettingTextMin), longest);
-            bool stack = room < needed;
+            bool stack = StacksSettingControl(room, natural, titleWidth, longest, titleOnly: text.Children.Count == 1);
             double laneMin = stack ? 0 : fe.DesiredSize.Width;
             if (lane.MinWidth != laneMin) lane.MinWidth = laneMin;
             if (stack == stacked) return;
@@ -1191,7 +1200,7 @@ internal static class Ui
         string color = area switch { "Display" => "Slate", "Audio" => "Plum", "Fans" => "Sage", "Apps" => "Coral", "Power" => "Apricot", "Same" => "Sage", _ => "Accent" };
         var row = new DockPanel { Margin = new Thickness(0, 2, 0, 2) };
         row.Children.Add(new System.Windows.Shapes.Ellipse { Width = 6, Height = 6, Fill = Res<Brush>(color), Margin = new Thickness(2, 5, 7, 0), VerticalAlignment = VerticalAlignment.Top });
-        row.Children.Add(new TextBlock { Text = text, Style = Res<Style>("Body"), FontSize = 10, TextWrapping = TextWrapping.Wrap });
+        row.Children.Add(new TextBlock { Text = text, Style = Res<Style>("Body"), FontSize = 12, TextWrapping = TextWrapping.Wrap });
         return row;
     }
 
@@ -1212,7 +1221,7 @@ internal static class Ui
 
     public static StackPanel SliderWithValue(double min, double max, double value, Func<double, string> format, Action<double> changed, double width = 146, double step = 1)
     {
-        var label = new TextBlock { Width = 42, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Foreground = Res<Brush>("TextMuted"), FontSize = 10 };
+        var label = new TextBlock { Width = 42, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Foreground = Res<Brush>("TextMuted"), FontSize = 12 };
         var slider = new Slider { Minimum = min, Maximum = max, Value = value, Width = width, IsSnapToTickEnabled = true, TickFrequency = step, SmallChange = step, LargeChange = step * 5 };
         label.Text = format(value);
         slider.ValueChanged += (_, e) =>

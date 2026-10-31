@@ -16,9 +16,27 @@ public static class TipPlacement
     private static FrameworkElement? _owner;
     private static Point? _pointer;
 
-    public static void Install() =>
+    public static void Install()
+    {
         EventManager.RegisterClassHandler(typeof(FrameworkElement), FrameworkElement.ToolTipOpeningEvent,
             new ToolTipEventHandler((sender, _) => Remember(sender as FrameworkElement)), true);
+        EventManager.RegisterClassHandler(typeof(ToolTip), ToolTip.OpenedEvent, new RoutedEventHandler(CloseWithOwner), true);
+    }
+
+    private static void CloseWithOwner(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ToolTip tip || tip.PlacementTarget is not UIElement owner) return;
+        DependencyPropertyChangedEventHandler? hidden = null;
+        RoutedEventHandler? closed = null;
+        hidden = (_, _) => { if (!owner.IsVisible) tip.IsOpen = false; };
+        closed = (_, _) =>
+        {
+            owner.IsVisibleChanged -= hidden;
+            tip.Closed -= closed;
+        };
+        owner.IsVisibleChanged += hidden;
+        tip.Closed += closed;
+    }
 
     private static void Remember(FrameworkElement? owner)
     {

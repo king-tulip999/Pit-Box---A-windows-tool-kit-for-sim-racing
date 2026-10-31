@@ -61,7 +61,7 @@ internal sealed partial class IracingControllerSection : StackPanel
         }
         if (!_ws.Demo && LayoutGuard.CaptureIfEmpty(Session, S.SavedLayout)) _app.Save();
 
-        var tabs = Ui.PageTabs(Tabs, _tabIndex, i => { _tabIndex = i; ShowTab(); }, "TiTab");
+        var tabs = Ui.PageTabs(Tabs, _tabIndex, i => { _tabIndex = i; ShowTab(); Motion.FadeIn(_tab); }, "TiTab");
         tabs.HorizontalAlignment = HorizontalAlignment.Left;
         tabs.VerticalAlignment = VerticalAlignment.Center;
         var tools = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
@@ -72,6 +72,8 @@ internal sealed partial class IracingControllerSection : StackPanel
         {
             var modes = Ui.Combo(_ws.Modes.Select(m => new Choice(m.File, m.Label + " graphics")), Session.RendererFile, c => _ = SwitchMode(c.Id!), 138);
             modes.ToolTip = "Which display mode's graphics file to show (iRacing keeps one per mode)";
+            modes.VerticalAlignment = VerticalAlignment.Center;
+            modes.Margin = new Thickness(Ui.ButtonGap, 0, Ui.InlineGap, 0);
             tools.Children.Add(modes);
             _modes = modes;
         }
@@ -215,7 +217,7 @@ internal sealed partial class IracingControllerSection : StackPanel
             var buttons = new StackPanel { Orientation = Orientation.Horizontal };
             buttons.Children.Add(Ui.LabeledButton("I.Eye", "Review", () => _ = Review(), "GhostButton"));
             var discard = Ui.LabeledButton("I.Undo", "Discard", () => _ = DiscardAsync(), "GhostButton");
-            discard.Margin = new Thickness(3, 0, 3, 0);
+            discard.Margin = new Thickness(Ui.ButtonGap, 0, Ui.ButtonGap, 0);
             buttons.Children.Add(discard);
             buttons.Children.Add(_writeButton = Ui.LabeledButton("I.Save", "Write to iRacing", () => _ = Write(), "PrimaryButton"));
             Grid.SetColumn(buttons, 1);
@@ -415,7 +417,7 @@ internal sealed partial class IracingControllerSection : StackPanel
         for (int i = 0; i < actions.Length; i++)
         {
             var (label, run) = actions[i];
-            var b = new Button { Content = label, Style = Ui.Res<Style>(i == 0 && label != "Ignore" ? "SoftButton" : "GhostButton"), Margin = new Thickness(3, 0, 0, 0) };
+            var b = new Button { Content = label, Style = Ui.Res<Style>(i == 0 && label != "Ignore" ? "SoftButton" : "GhostButton"), Margin = new Thickness(Ui.ButtonGap, 0, 0, 0) };
             b.Click += (_, _) => run();
             buttons.Children.Add(b);
         }
@@ -466,7 +468,7 @@ internal sealed partial class IracingControllerSection : StackPanel
             var reset = Ui.LabeledButton("I.Undo", "Reset to default", () => { Session.SetDraft(s, std); ShowTab(); }, "SoftButton");
             buttons.Children.Add(reset);
         }
-        var keep = new Button { Content = "Keep mine", Style = Ui.Res<Style>("GhostButton"), Margin = new Thickness(3, 0, 0, 0), ToolTip = "It's on purpose: stop listing it until it changes" };
+        var keep = new Button { Content = "Keep mine", Style = Ui.Res<Style>("GhostButton"), Margin = new Thickness(Ui.ButtonGap, 0, 0, 0), ToolTip = "It's on purpose: stop listing it until it changes" };
         keep.Click += (_, _) => { Session.Ignore(s); _app.Save(); ShowTab(); };
         buttons.Children.Add(keep);
         Grid.SetColumn(buttons, 2);
@@ -534,7 +536,7 @@ internal sealed partial class IracingControllerSection : StackPanel
         _tab.Children.Add(layout);
         bool side = false;
 
-        var search = new TextBox { Width = 194, Text = _search, Tag = "Search names, keys and values", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) };
+        var search = new TextBox { Width = 230, Text = _search, Tag = "Search names, keys and values", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) };
         var onlyChanged = Ui.LabeledButton("I.Sliders", "Changed only", () => { });
         onlyChanged.ToolTip = "Show only settings that differ from iRacing's default or aren't saved yet";
         onlyChanged.Margin = new Thickness(0, 0, 6, 0);
@@ -1219,7 +1221,7 @@ internal sealed partial class IracingControllerSection : StackPanel
         if (!blank)
         {
             var reset = Ui.IconButton("I.X", "Clear: back to the default folder", () => set(""));
-            reset.Margin = new Thickness(3, 0, 0, 0);
+            reset.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0);
             panel.Children.Add(reset);
         }
         return panel;
@@ -1314,7 +1316,7 @@ internal sealed partial class IracingControllerSection : StackPanel
         grid.Children.Add(text);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         buttons.Children.Add(Ui.LabeledButton("I.Eye", "Compare", () => _ = Compare(b), "GhostButton"));
-        var restore = Ui.LabeledButton("I.Restore", "Restore", () => _ = Restore(b), "GhostButton");
+        var restore = Ui.LabeledButton("I.Undo", "Restore", () => _ = Restore(b), "GhostButton");
         restore.Margin = new Thickness(5, 0, 2, 0);
         buttons.Children.Add(restore);
         buttons.Children.Add(Ui.IconButton("I.Trash", "Delete this backup", () => _ = DeleteBackup(b)));
@@ -1439,6 +1441,7 @@ internal sealed partial class IracingControllerSection : StackPanel
         yield return ("keybinds-find", () => { _tabIndex = 1; Build(); _keybinds?.ShowFind("T"); return Task.CompletedTask; });
         yield return ("keybinds-find-free", () => { _tabIndex = 1; Build(); _keybinds?.ShowFind("Ctrl+Alt+J"); return Task.CompletedTask; });
         yield return ("keybinds-clash", () => { _tabIndex = 1; Build(); _keybinds?.ShowClash("Ignition", "Starter"); return Task.CompletedTask; });
+        yield return ("keybinds-other-profile", () => { _tabIndex = 1; Build(); _keybinds?.ShowOtherProfile(); _keybinds?.ShowOtherProfile(); return Task.CompletedTask; });
         yield return ("search", () => { _tabIndex = 0; _search = "fps"; Build(); return Task.CompletedTask; });
         yield return ("changed-only", () => { _tabIndex = 0; _search = ""; _changedOnly = true; Build(); return Task.CompletedTask; });
         yield return ("back-to-start", () => { _tabIndex = 0; _search = ""; _changedOnly = false; Build(); return Task.CompletedTask; });

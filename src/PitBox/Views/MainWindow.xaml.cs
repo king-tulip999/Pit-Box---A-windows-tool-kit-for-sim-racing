@@ -6,7 +6,6 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using System.Windows.Media.Effects;
 using System.Windows.Threading;
 using PitBox.Controls;
 using PitBox.Plugins;
@@ -26,7 +25,6 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, Func<FrameworkElement>> _factories = new();
     private readonly Dictionary<string, FrameworkElement> _pages = new();
     internal FrameworkElement? PageOf(string key) => _pages.GetValueOrDefault(key);
-    private long _lastNavigation;
     private string? _current;
 
     public string? CurrentPage => _current;
@@ -52,13 +50,14 @@ public partial class MainWindow : Window
         PageArea.SizeChanged += (_, _) => { if (ModalLayer.Visibility == Visibility.Visible) PlaceModal(); };
         StateChanged += (_, _) => RememberBounds();
 
-        PageArea.Children.Add(_wipe);
+        PageContent.Content = _pageHost;
         BuildNav();
         FitBrand();
         ApplyThemeIcon();
         _app.Plugins.Changed += OnPluginsChanged;
         ThemeManager.Changed += OnThemeChanged;
         ThemeManager.Changing += OnThemeChanging;
+        ThemeManager.Applying += OnThemeApplying;
         IsVisibleChanged += (_, _) => { UpdatePageSensors(); UpdatePageActive(); ScheduleTrim(); };
         _trimTimer.Tick += (_, _) => { _trimTimer.Stop(); if (!OnScreen) TrimWhileHidden(); };
 
@@ -74,6 +73,7 @@ public partial class MainWindow : Window
         SourceInitialized += (_, _) =>
         {
             Hairline.Use(VisualTreeHelper.GetDpi(this).DpiScaleX);
+            FitTextToDpi(VisualTreeHelper.GetDpi(this).DpiScaleX);
             SquareCorners();
             ApplyBackdrop();
             (PresentationSource.FromVisual(this) as HwndSource)?.AddHook(WatchSizeMove);
@@ -137,6 +137,7 @@ public partial class MainWindow : Window
 
         DeactivatePage();
         var page = EnsurePage(key);
+        var leaving = _current is not null ? _pages.GetValueOrDefault(_current) : null;
 
         _current = key;
         Show(page);
@@ -150,8 +151,8 @@ public partial class MainWindow : Window
 
         UpdatePageSensors();
         UpdatePageActive();
-        page.UpdateLayout();
-        if (!_themeRebuild) Swipe();
+        if (_themeRebuild) SettlePages();
+        else Crossfade(leaving, page);
         RecordHistory();
     }
 
@@ -174,7 +175,6 @@ public partial class MainWindow : Window
     internal void SetSidebarAccent(ResourceDictionary? theme) => _sidebar.UseAccent(theme);
 
     private ISectionedPage? _watched;
-    private (string? Page, string? Section) _lastSection;
 
     private ISectionedPage? CurrentSectioned => _current is not null ? _pages.GetValueOrDefault(_current) as ISectionedPage : null;
 
@@ -188,10 +188,6 @@ public partial class MainWindow : Window
 
     private void OnSectionsChanged()
     {
-        var shown = (_current, CurrentSectioned?.CurrentSection);
-        if (shown.Item1 == _lastSection.Page && shown.Item2 is not null && _lastSection.Section is not null
-            && !string.Equals(shown.Item2, _lastSection.Section, StringComparison.OrdinalIgnoreCase)) _wipe.Play();
-        _lastSection = (shown.Item1, shown.Item2);
         SyncSidebar();
         RecordHistory();
     }
@@ -273,81 +269,73 @@ public partial class MainWindow : Window
         StepHistory(e.ChangedButton == MouseButton.XButton1 ? -1 : 1);
     }
 
-    private static readonly BlurEffect SwipeBlur = new() { Radius = 0, RenderingBias = RenderingBias.Performance };
+    private EventHandler? _pendingFade;
+    private FrameworkElement? _leaving, _arriving;
 
-    private EventHandler? _pendingSwipe;
+    internal bool PagesSettled => _pendingFade is null && _leaving is null
+        && _pageHost.Children.OfType<FrameworkElement>().All(p => p.Opacity == 1 || p.HasAnimatedProperties);
 
-    private readonly PageWipe _wipe = new();
-
-    private void Swipe()
+    private void Crossfade(FrameworkElement? from, FrameworkElement to)
     {
-        long now = Environment.TickCount64;
-        bool quick = now - _lastNavigation < 300;
-        _lastNavigation = now;
-        if (_pendingSwipe is not null)
-        {
-            CompositionTarget.Rendering -= _pendingSwipe;
-            _pendingSwipe = null;
-        }
-        PageContent.BeginAnimation(OpacityProperty, null);
-        PageMove.BeginAnimation(TranslateTransform.YProperty, null);
-        SwipeBlur.BeginAnimation(BlurEffect.RadiusProperty, null);
-        PageContent.Effect = null;
-        PageContent.Opacity = 1;
-        PageMove.Y = 0;
+        SettlePages();
         Motion.PageSettlesAt = 0;
-        if (!Motion.Enabled || Showcase.ShowcaseRunner.Active)
+        if (!Motion.Flourish || !PcClass.Effects || Showcase.ShowcaseRunner.Active || from is null || ReferenceEquals(from, to) || !ReferenceEquals(from.Parent, _pageHost))
             return;
-        bool effects = PcClass.Effects && !quick;
-        if (!quick) _wipe.Play();
-        double fromY = quick ? -12 : -48, fromOpacity = quick ? 0.7 : 0.35;
-        PageMove.Y = fromY;
-        if (PcClass.Effects) PageContent.Opacity = fromOpacity;
-        if (effects)
-        {
-            SwipeBlur.Radius = 6;
-            PageContent.Effect = SwipeBlur;
-        }
-        if (!ScreenshotRunner.Active) (Motion.PageAnimatesFrom, Motion.PageSettlesAt) = (long.MaxValue / 2, now + 2000);
+        _leaving = from;
+        _arriving = to;
+        from.Visibility = Visibility.Visible;
+        from.IsHitTestVisible = false;
+        to.Opacity = 0;
+        long now = Environment.TickCount64;
+        (Motion.PageAnimatesFrom, Motion.PageSettlesAt) = (long.MaxValue / 2, now + 2000);
         int frames = 0;
-        _pendingSwipe = (_, _) =>
+        _pendingFade = (_, _) =>
         {
             if (++frames < 2) return;
-            CompositionTarget.Rendering -= _pendingSwipe;
-            _pendingSwipe = null;
-            StartSwipe(quick, effects);
+            CompositionTarget.Rendering -= _pendingFade;
+            _pendingFade = null;
+            StartCrossfade(from, to);
         };
-        CompositionTarget.Rendering += _pendingSwipe;
+        CompositionTarget.Rendering += _pendingFade;
     }
 
-    private void StartSwipe(bool quick, bool effects)
+    private void StartCrossfade(FrameworkElement from, FrameworkElement to)
     {
         long now = Environment.TickCount64;
-        if (!ScreenshotRunner.Active) (Motion.PageAnimatesFrom, Motion.PageSettlesAt) = (now, now + (quick ? 130 : 460));
-        PageMove.Y = 0;
-        PageContent.Opacity = 1;
-        if (quick)
+        (Motion.PageAnimatesFrom, Motion.PageSettlesAt) = (now, now + Motion.PageFadeMs);
+        var time = TimeSpan.FromMilliseconds(Motion.PageFadeMs);
+        var fadeOut = new DoubleAnimation(1, 0, time) { FillBehavior = FillBehavior.HoldEnd };
+        fadeOut.Completed += (_, _) =>
         {
-            var short_ = TimeSpan.FromMilliseconds(130);
-            if (PcClass.Effects) PageContent.BeginAnimation(OpacityProperty, new DoubleAnimation(0.7, 1, short_) { EasingFunction = Motion.Ease, FillBehavior = FillBehavior.Stop });
-            PageMove.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(-12, 0, short_) { EasingFunction = Motion.Ease, FillBehavior = FillBehavior.Stop });
-            return;
-        }
-        var fade = TimeSpan.FromMilliseconds(240);
-        if (PcClass.Effects) PageContent.BeginAnimation(OpacityProperty, new DoubleAnimation(0.35, 1, fade) { EasingFunction = Motion.Ease, FillBehavior = FillBehavior.Stop });
-        PageMove.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(-48, 0, TimeSpan.FromMilliseconds(460)) { EasingFunction = PageDrop, FillBehavior = FillBehavior.Stop });
-        if (!effects) return;
-        SwipeBlur.Radius = 0;
-        var blur = new DoubleAnimation(8, 0, fade) { EasingFunction = Motion.Ease };
-        blur.Completed += (_, _) =>
-        {
-            if (PageContent.Effect == SwipeBlur && SwipeBlur.Radius == 0)
-                PageContent.Effect = null;
+            if (ReferenceEquals(_leaving, from)) SettlePages();
         };
-        SwipeBlur.BeginAnimation(BlurEffect.RadiusProperty, blur);
+        to.Opacity = 1;
+        to.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, time) { FillBehavior = FillBehavior.Stop });
+        from.BeginAnimation(OpacityProperty, fadeOut);
     }
 
-    private static readonly IEasingFunction PageDrop = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.55 };
+    private void SettlePages()
+    {
+        if (_pendingFade is not null)
+        {
+            CompositionTarget.Rendering -= _pendingFade;
+            _pendingFade = null;
+        }
+        if (_arriving is { } arriving)
+        {
+            _arriving = null;
+            arriving.BeginAnimation(OpacityProperty, null);
+            arriving.Opacity = 1;
+        }
+        if (_leaving is { } leaving)
+        {
+            _leaving = null;
+            if (!ReferenceEquals(leaving, _current is not null ? _pages.GetValueOrDefault(_current) : null)) leaving.Visibility = Visibility.Collapsed;
+            leaving.BeginAnimation(OpacityProperty, null);
+            leaving.Opacity = 1;
+            leaving.IsHitTestVisible = true;
+        }
+    }
 
     private bool _pageActive;
 
@@ -419,17 +407,10 @@ public partial class MainWindow : Window
         var pages = new List<SidebarPage>();
         foreach (var plugin in _app.Plugins.Active)
             foreach (var page in plugin.Pages.Where(p => _nav.ContainsKey(p.Key)))
-                pages.Add(new SidebarPage(page.Key, page.Title, page.Icon));
+                pages.Add(new SidebarPage(page.Key, page.Title));
         pages = pages.OrderBy(p => keys.IndexOf(p.Key)).ToList();
-        _sidebar.Build(pages, new SidebarPage("settings", "Settings", "I.Tune"), _searchButton, _searchHost, ThemeButton());
+        _sidebar.Build(pages, new SidebarPage("settings", "Settings"), _searchButton, _searchHost, null);
         SyncSidebar(animate: false);
-    }
-
-    private Button? ThemeButton()
-    {
-        if (Themes.Variant(ThemeManager.Current) is { } variant)
-            return Ui.IconButton(ThemeManager.Current.Dark ? "I.Sun" : "I.Moon", $"Switch to {variant.Name}", () => _app.SetTheme(variant.Id));
-        return null;
     }
 
     internal void SetNavOrder(IReadOnlyList<string> keys)
@@ -475,6 +456,11 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnThemeApplying()
+    {
+        if (!Showcase.ShowcaseRunner.Active) DropPages(keepCurrent: true);
+    }
+
     private void OnThemeChanging()
     {
         if (OnScreen && !Showcase.ShowcaseRunner.Active) ThemeWipe.Begin(Root, ContentArea);
@@ -507,7 +493,7 @@ public partial class MainWindow : Window
 
     private readonly DispatcherTimer _trimTimer = new(DispatcherPriority.Background) { Interval = TimeSpan.FromMinutes(1) };
 
-    private void ScheduleTrim()
+    internal void ScheduleTrim()
     {
         _trimTimer.Stop();
         if (!OnScreen && !ScreenshotRunner.Active) _trimTimer.Start();
@@ -516,8 +502,15 @@ public partial class MainWindow : Window
     internal void TrimWhileHidden()
     {
         DropPages(keepCurrent: true);
+        Dispatcher.BeginInvoke(new Action(CompactMemory), DispatcherPriority.ContextIdle);
+    }
+
+    private void CompactMemory()
+    {
+        if (OnScreen) return;
         GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
         GC.WaitForPendingFinalizers();
+        GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
         try { using var me = System.Diagnostics.Process.GetCurrentProcess(); SetProcessWorkingSetSize(me.Handle, -1, -1); }
         catch (Exception ex) { App.LogError(ex); }
     }
@@ -537,17 +530,21 @@ public partial class MainWindow : Window
         }
     }
 
+    private readonly Grid _pageHost = new();
+
     private void Show(FrameworkElement page)
     {
-        PageContent.Content = page;
+        if (!ReferenceEquals(page.Parent, _pageHost)) _pageHost.Children.Add(page);
+        foreach (UIElement child in _pageHost.Children)
+            child.Visibility = ReferenceEquals(child, page) ? Visibility.Visible : Visibility.Collapsed;
         page.UpdateLayout();
     }
 
-    internal bool Showing(FrameworkElement page) => ReferenceEquals(PageContent.Content, page);
+    internal bool Showing(FrameworkElement page) => ReferenceEquals(page.Parent, _pageHost) && page.Visibility == Visibility.Visible;
 
     private void RemovePage(string key)
     {
-        if (_pages.Remove(key, out var page) && ReferenceEquals(PageContent.Content, page)) PageContent.Content = null;
+        if (_pages.Remove(key, out var page)) _pageHost.Children.Remove(page);
     }
 
     private void UpdatePageSensors()
@@ -782,6 +779,14 @@ public partial class MainWindow : Window
     {
         base.OnDpiChanged(oldDpi, newDpi);
         Hairline.Use(newDpi.DpiScaleX);
+        FitTextToDpi(newDpi.DpiScaleX);
+    }
+
+    private void FitTextToDpi(double scale)
+    {
+        bool scaled = scale > 1.01 && !ScreenshotRunner.DrawsAt96;
+        TextOptions.SetTextFormattingMode(this, scaled ? TextFormattingMode.Ideal : TextFormattingMode.Display);
+        TextOptions.SetTextRenderingMode(this, scaled ? TextRenderingMode.Grayscale : TextRenderingMode.ClearType);
     }
 
     private bool Remembers => !_app.Demo && !ScreenshotRunner.Active;
@@ -989,7 +994,7 @@ public partial class MainWindow : Window
         ModalLayer.BeginAnimation(OpacityProperty, null);
         ModalLayer.Opacity = 0;
         Motion.FadeTo(ModalLayer, 1, 160);
-        Motion.Enter(ModalContent, distance: 12, durationMs: 240);
+        Motion.Enter(ModalContent, distance: Motion.SwapDistance, durationMs: Motion.SwapMs);
         _focusBeforeModal ??= Keyboard.FocusedElement as IInputElement;
         Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
         {
@@ -1149,7 +1154,7 @@ public partial class MainWindow : Window
     {
         var card = DialogCard(title, message, out var buttons);
         var box = new TextBox { Text = maxLength > 0 && initial.Length > maxLength ? initial[..maxLength].TrimEnd() : initial, MaxLength = maxLength, Margin = new Thickness(0, 11, 0, 0) };
-        var error = new TextBlock { Foreground = (Brush)FindResource("Danger"), FontSize = 10, Margin = new Thickness(0, 5, 0, 0), Visibility = Visibility.Collapsed };
+        var error = new TextBlock { Foreground = (Brush)FindResource("Danger"), FontSize = 12, Margin = new Thickness(0, 5, 0, 0), Visibility = Visibility.Collapsed };
         ((StackPanel)card.Child).Children.Insert(2, box);
         ((StackPanel)card.Child).Children.Insert(3, error);
 

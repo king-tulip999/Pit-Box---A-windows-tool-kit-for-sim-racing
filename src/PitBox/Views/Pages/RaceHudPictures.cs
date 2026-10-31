@@ -16,7 +16,7 @@ internal sealed partial class RaceHudWidgets
     private readonly Dictionary<string, UIElement> _presetDots = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<SettingGroup, FrameworkElement> _groupCards = new();
     private readonly HudPainter _picturePainter = new() { Items = new(), Regions = new() };
-    private readonly Dictionary<string, IReadOnlyList<ImageSource>?> _pictures = new();
+    private static readonly Dictionary<string, IReadOnlyList<ImageSource>?> PictureMemo = new();
     private System.Drawing.Bitmap? _pictureBitmap;
 
     private void ShowPresetState(HudWidgetConfig w, HudWidgetDef def)
@@ -33,9 +33,10 @@ internal sealed partial class RaceHudWidgets
         if (Host is not { } host || choices.Count == 0) return null;
         string signature = $"{w.Kind}|{settingId}|{w.W:0}x{w.H:0}|{_previewPixels:0.00}|"
             + string.Join("/", choices.Select(ch => string.Join(",", ch.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => kv.Key + "=" + kv.Value)))) + "|"
-            + string.Join(";", w.Options.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => kv.Key + "=" + kv.Value));
-        if (_pictures.TryGetValue(signature, out var cached)) return cached;
-        if (_pictures.Count >= PictureCache) _pictures.Clear();
+            + string.Join(";", w.Options.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => kv.Key + "=" + kv.Value)) + "|"
+            + System.Text.Json.JsonSerializer.Serialize(host.Settings.Appearance, ConfigStore.JsonOptions);
+        if (PictureMemo.TryGetValue(signature, out var cached)) return cached;
+        if (PictureMemo.Count >= PictureCache) PictureMemo.Clear();
         var names = def.EditorDef.RegionsOf(settingId).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var race = _section.Preview.Race;
         var copy = w.Copy();
@@ -54,14 +55,14 @@ internal sealed partial class RaceHudWidgets
             foreach (var choice in choices)
             {
                 Pick(choice);
-                host.RenderPreview(copy, race, _picturePainter, 1f, ref _pictureBitmap);
+                host.MeasurePreview(copy, race, _picturePainter);
                 var boxes = (_picturePainter.Regions ?? new()).Where(r => names.Contains(r.Id)).Select(r => r.Box)
                     .Concat((_picturePainter.Items ?? new()).Where(i => names.Contains(i.Key)).Select(i => i.Box));
                 foreach (var box in boxes) area = area is { } a ? System.Drawing.RectangleF.Union(a, box) : box;
             }
             if (area is not { Width: >= 4, Height: >= 4 } found)
             {
-                _pictures[signature] = null;
+                PictureMemo[signature] = null;
                 return null;
             }
             found.Inflate((float)PicturePadX, (float)PicturePadY);
@@ -81,18 +82,18 @@ internal sealed partial class RaceHudWidgets
                     new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height));
                 if (crop.Width < 1 || crop.Height < 1)
                 {
-                    _pictures[signature] = null;
+                    PictureMemo[signature] = null;
                     return null;
                 }
                 images.Add(Crop(bitmap, crop, k));
             }
-            _pictures[signature] = images;
+            PictureMemo[signature] = images;
             return images;
         }
         catch (Exception ex)
         {
             App.LogError(ex);
-            _pictures[signature] = null;
+            PictureMemo[signature] = null;
             return null;
         }
     }

@@ -105,13 +105,12 @@ public readonly struct AppTheme : IEquatable<AppTheme>
 
     public AppTheme(string id) => _id = string.IsNullOrWhiteSpace(id) ? null : id.Trim();
 
-    public string Id => _id ?? "Light";
+    public string Id => _id ?? "Dark";
 
-    public static readonly AppTheme Light = new("Light");
     public static readonly AppTheme Dark = new("Dark");
     public static readonly AppTheme Custom = new("CustomTheme");
 
-    internal static readonly AppTheme[] Numbered = { Light, Dark, Light, Dark, Custom };
+    internal static readonly AppTheme[] Numbered = { Dark, Dark, Dark, Dark, Custom };
 
     public bool Equals(AppTheme other) => string.Equals(Id, other.Id, StringComparison.OrdinalIgnoreCase);
     public override bool Equals(object? obj) => obj is AppTheme other && Equals(other);
@@ -122,8 +121,7 @@ public readonly struct AppTheme : IEquatable<AppTheme>
 
     public static AppTheme Named(string? name) => name?.Trim().ToLowerInvariant() switch
     {
-        null or "" or "light" or "softlight" or "light2048" or "vanillalight" => Light,
-        "dark" or "vanilladark" or "dark2048" or "softdark" => Dark,
+        null or "" or "light" or "softlight" or "light2048" or "vanillalight" or "dark" or "vanilladark" or "dark2048" or "softdark" => Dark,
         "oledneon" or "customtheme" => Custom,
         _ => new AppTheme(name),
     };
@@ -138,10 +136,10 @@ internal sealed class AppThemeConverter : JsonConverter<AppTheme>
             case System.Text.Json.JsonTokenType.String:
                 return AppTheme.Named(reader.GetString());
             case System.Text.Json.JsonTokenType.Number:
-                return reader.TryGetInt32(out int i) && i >= 0 && i < AppTheme.Numbered.Length ? AppTheme.Numbered[i] : AppTheme.Light;
+                return reader.TryGetInt32(out int i) && i >= 0 && i < AppTheme.Numbered.Length ? AppTheme.Numbered[i] : AppTheme.Dark;
             default:
                 reader.Skip();
-                return AppTheme.Light;
+                return AppTheme.Dark;
         }
     }
 

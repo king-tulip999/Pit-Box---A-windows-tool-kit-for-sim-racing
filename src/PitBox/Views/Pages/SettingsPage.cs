@@ -110,7 +110,6 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         {
             _builtFor = built;
             Build();
-            Motion.Stagger(_body);
         }
         if (!s_pawnIoOffered)
         {
@@ -156,7 +155,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
     private void Build()
     {
         _body.Children.Clear();
-        var heading = Ui.PageTitle("I.Tune", "Settings");
+        var heading = Ui.PageTitle("Settings");
         heading.Margin = Ui.HeaderMargin;
         _body.Children.Add(heading);
         _sections.Children.Clear();

@@ -681,6 +681,8 @@ internal static class ScreenshotRunner
         SavePng(bitmap, path);
     }
 
+    internal static void CaptureWindow(Window window, string path) => Capture(window, path);
+
     private static void Capture(Window window, string path)
     {
         if (RealDpi)

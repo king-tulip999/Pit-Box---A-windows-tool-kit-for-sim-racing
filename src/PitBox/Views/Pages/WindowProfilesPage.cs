@@ -3,7 +3,6 @@ using System.Windows.Controls;
 using System.Windows.Threading;
 using PitBox.Config;
 using PitBox.Controls;
-using PitBox.Plugins;
 using PitBox.Services;
 using PitBox.Theme;
 using PitBox.WindowProfiles;
@@ -39,15 +38,16 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
     public void OnShown()
     {
         _shown = true;
+        bool sameLayout = _mapLayout is null;
         _mapLayout = null;
         Watch();
-        Build();
+        if (sameLayout && _body.Children.Count > 0 && Inputs() == _built) _ = ScanAsync();
+        else Build();
         _app.Watcher.Started += OnProcess;
         _app.Watcher.Stopped += OnProcess;
         _app.WindowProfiles.Changed += OnChanged;
         _app.Displays.Changed += QueueBuild;
         _window.Activated += OnActivated;
-        Motion.Stagger(_body);
     }
 
     public void OnHidden()
@@ -97,12 +97,28 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
         _app.Demo ? p.ProcessName.Equals("SimHubWPF.exe", StringComparison.OrdinalIgnoreCase) || p.ProcessName.Equals("RRRE64.exe", StringComparison.OrdinalIgnoreCase)
             : p.ProcessName.Length > 0 && _app.Watcher.IsRunning(p.ProcessName);
 
+    private string _built = "";
+
+    private string Inputs()
+    {
+        var text = new System.Text.StringBuilder(System.Text.Json.JsonSerializer.Serialize(S, ConfigStore.JsonOptions));
+        foreach (var p in S.Profiles) text.Append(Running(p) ? '1' : '0');
+        try
+        {
+            foreach (var m in _app.Displays.GetMonitors()) text.Append('|').Append(m.Key).Append(m.Active).Append(m.Number).Append(',').Append(m.X).Append(',').Append(m.Y).Append(',').Append(m.Width).Append(',').Append(m.Height);
+        }
+        catch { text.Append("|monitors?"); }
+        foreach (var d in _app.Config.Displays.Profiles) text.Append('|').Append(d.Name).Append(d.Layout?.Paths.GetHashCode()).Append(d.Layout?.Modes.GetHashCode());
+        return text.ToString();
+    }
+
     private void Build()
     {
         S.Normalize();
+        _built = Inputs();
         _body.Children.Clear();
         var header = new Grid { Margin = Ui.HeaderMargin };
-        header.Children.Add(Ui.PluginTitle(PluginIds.WindowProfiles, "Window Profiles"));
+        header.Children.Add(Ui.PageTitle("Window Profiles"));
         _body.Children.Add(header);
         _screens = Screens();
         _layouts = SavedLayouts();
@@ -339,16 +355,9 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
 
     private StackPanel AutoApplySwitch()
     {
-        var label = new TextBlock { Text = "Apply automatically", Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
         var toggle = Ui.Switch(S.AutoApply, v => { S.AutoApply = v; _app.WindowProfiles.RaiseChanged(); });
-        toggle.VerticalAlignment = VerticalAlignment.Center;
-        System.Windows.Automation.AutomationProperties.SetName(toggle, "Apply automatically");
-        var row = new StackPanel
-        {
-            Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center,
-            ToolTip = S.AutoApply ? "Each profile set to apply when its program starts does so." : "Off: profiles apply only with Apply, their keybind or the tray.",
-            Children = { label, toggle },
-        };
+        var row = Ui.PageSwitch("Apply automatically", toggle,
+            "On: each profile set to apply when its program starts does so. Off: profiles apply only with Apply, their keybind or the tray.");
         Ui.Anchor(row, AutoAnchor);
         return row;
     }

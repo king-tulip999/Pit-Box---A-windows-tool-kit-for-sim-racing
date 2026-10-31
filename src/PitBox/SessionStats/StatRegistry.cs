@@ -213,7 +213,7 @@ internal static class StatFormat
         StatKind.Fuel => imperial ? $"{v * 0.264172:N1} {Units.Gal}" : $"{v:N1} {Units.L}",
         StatKind.Temp => imperial ? $"{v * 9 / 5 + 32:0} °F" : $"{v:0} °C",
         StatKind.LapTime => LapTime(v),
-        StatKind.LapDelta => (v < 0 ? "−" : "+") + Math.Abs(v).ToString("0.000", C) + " " + Units.S,
+        StatKind.LapDelta => SimRacing.Race.RaceFormat.Signed(v, "0.000", C) + " " + Units.S,
         StatKind.Seconds => v.ToString(v < 10 ? "0.000" : "0.0", C) + " " + Units.S,
         StatKind.Percent => $"{v:0}%",
         StatKind.Position => "P" + v.ToString("0.0", C),

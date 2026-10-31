@@ -9,8 +9,8 @@ internal static class RaceArrival
 {
     private const double SlamMs = 420, CarFromMs = 160, CarMs = 640, BarsFromMs = 620, BarsMs = 760;
 
-    private static readonly IEasingFunction Slam = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.35 };
-    private static readonly IEasingFunction Drive = new ExponentialEase { EasingMode = EasingMode.EaseOut, Exponent = 5 };
+    private static readonly IEasingFunction Slam = Motion.Frozen(new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.35 });
+    private static readonly IEasingFunction Drive = Motion.Frozen(new ExponentialEase { EasingMode = EasingMode.EaseOut, Exponent = 5 });
 
     public static void When(FrameworkElement card, FrameworkElement position, FrameworkElement climb, Stripe stripe, LapStrip? laps)
     {

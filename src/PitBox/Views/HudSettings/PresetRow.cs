@@ -6,7 +6,7 @@ using PitBox.Theme;
 
 namespace PitBox.Views.HudSettings;
 
-internal sealed class PresetRow : DockPanel
+internal sealed class PresetRow : WrapPanel
 {
     private readonly List<(string Name, RadioButton Button)> _buttons = new();
     private readonly Border _custom;
@@ -20,7 +20,6 @@ internal sealed class PresetRow : DockPanel
     {
         _presets = presets;
         Margin = new Thickness(0, 0, 0, 10);
-        LastChildFill = false;
         var label = new TextBlock { Text = "Preset", Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
         Children.Add(label);
         var panel = new WrapPanel();
@@ -42,10 +41,9 @@ internal sealed class PresetRow : DockPanel
         };
         Children.Add(_custom);
         _changed.SetResourceReference(TextBlock.ForegroundProperty, "AccentText");
-        Children.Add(_changed);
         _back = Ui.LabeledButton("I.Undo", "Back", () => { if (_nearest is { } p) apply(p); }, "GhostButton");
         _back.Margin = new Thickness(8, 0, 0, 0);
-        Children.Add(_back);
+        Children.Add(new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { _changed, _back } });
     }
 
     private static string Tip(string name) => name switch
