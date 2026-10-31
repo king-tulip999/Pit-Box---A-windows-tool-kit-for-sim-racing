@@ -83,6 +83,32 @@ internal static class PerfProbe
                     opened.SetResult();
                     Put($"open_{pass}_{key}_input_wait_ms", await input);
                 }
+            foreach (var pass in new[] { "first", "again" })
+                foreach (var key in window.NavKeys)
+                {
+                    if (window.SectionsOf(key) is not { Sections: { Count: > 1 } sections }) continue;
+                    foreach (var section in sections)
+                    {
+                        string from = window.NavKeys.First(k => k != key);
+                        window.Navigate(from);
+                        await Rendered(window);
+                        await Task.Delay(400);
+                        var opened = new TaskCompletionSource();
+                        var input = LongestInputWait(window, opened.Task);
+                        await Task.Delay(50);
+                        var clock = Stopwatch.StartNew();
+                        double firstFrame = 0;
+                        void OnFirstFrame(object? s, EventArgs e) { CompositionTarget.Rendering -= OnFirstFrame; firstFrame = clock.Elapsed.TotalMilliseconds; }
+                        CompositionTarget.Rendering += OnFirstFrame;
+                        _stage = $"section {pass} {key}.{section.Id}";
+                        window.OpenSection(key, section.Id);
+                        await Rendered(window);
+                        Put($"section_{pass}_{key}.{section.Id}_first_frame_ms", firstFrame);
+                        Put($"section_{pass}_{key}.{section.Id}_ms", clock.Elapsed.TotalMilliseconds);
+                        opened.SetResult();
+                        Put($"section_{pass}_{key}.{section.Id}_input_wait_ms", await input);
+                    }
+                }
             var original = Theme.ThemeManager.Current.Id;
             foreach (var theme in Theme.Themes.All.Where(t => t.Id != original).Append(Theme.ThemeManager.Current))
             {

@@ -196,7 +196,7 @@ public partial class MainWindow : Window
 
     internal void RefreshSidebar() => SyncSidebar();
 
-    private SectionList? SectionsOf(string key)
+    internal SectionList? SectionsOf(string key)
     {
         if (_pages.GetValueOrDefault(key) is ISectionedPage page) return new SectionList(page.Sections, page.CurrentSection, page.SectionsMovable);
         if (key == "settings") return SettingsPage.SectionsFor(_app);

@@ -44,7 +44,7 @@ internal sealed class SetupManagerSection : StackPanel
         _app = app;
         _window = window;
         _classFilter = new HashSet<string>(S.ClassFilter, StringComparer.OrdinalIgnoreCase);
-        _store = new SetupStore(S, app.Demo);
+        _store = new SetupStore(S, app.Demo && Environment.GetEnvironmentVariable("PB_REAL_SETUPS") is null);
         _store.Changed += () => { Prune(); RenderAll(); };
 
         Children.Add(_intro);
