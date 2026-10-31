@@ -12,7 +12,86 @@
 
 What started this journey. I got sick of doing everything by hand every time I went from my desk to my sim rig (and of paying for a handful of subscriptions just to race) so I spent the last couple years building one app that does it all. It sits in the tray, sets the PC up for whatever I’m doing, and has grown into the toolkit I use every time I race in iRacing: overlays, setups, fuel, and a full history of my sessions with telemetry and replays. Now you get the chance to use it too!
 
-**Contents:** [Getting started](#getting-started) · [Before you run it](#before-you-run-it) · [Limitations](#limitations) · [Updates and removal](#updates-and-removal) · [GRR League](#grr-league) · [Credits](#credits)
+**Contents:** [Features](#features) · [Getting started](#getting-started) · [Before you run it](#before-you-run-it) · [Limitations](#limitations) · [Updates and removal](#updates-and-removal) · [GRR League](#grr-league) · [Credits](#credits)
+
+---
+
+## Features
+
+### Sim racing tools (iRacing)
+
+#### iRacing Overlay
+
+[![Watch the iRacing Overlay showcase](screenshots/hud-showcase.jpg)](https://www.youtube.com/watch?v=PLWhXW9Hh0A)
+
+- **Widgets:** Relative, Standings, Fuel and strategy, Lap timing and delta, Lap history, Tires, Weather and track, Wind, Session, Race events, Multiclass traffic, Alerts, Track map, Inputs, a Result card after the race and a Data block for any single value.
+- **Inputs:** throttle, brake, clutch and steering with gear, speed and RPM, as a scrolling trace, a round tach or a low strip.
+- **Pit exit:** the Fuel widget shows where a stop right now would put you: your class position, the cars ahead and behind, traffic, and a ghost on a track strip. It learns the pit lane, fill rate and tire time per track and car.
+- **Your layout:** every widget can be set up however you like, with layouts that switch by car / class / track.
+- **In-game editor:** `Ctrl+Alt+E`, so you never have to leave the car.
+- **Browser sources:** every widget is also a web page on your PC only (`127.0.0.1`), for a wheel screen, a tablet browser or OBS. Off by default (iRacing Overlay → Settings → Browser sources).
+
+#### iRacing Setup Manager
+
+- All your setups sorted by car and class.
+- Rename, move, import share packs and pick up new downloads.
+- Fuel planning lives in the iRacing Overlay's **Fuel** tab.
+
+#### iRacing Controller
+
+- **Settings:** iRacing's settings in plain language. Search, see what differs from iRacing's defaults and reset it.
+- **Keybinds:** your in-sim keybinds per control profile, grouped the way iRacing groups them, with keys drawn as keycaps and wheel buttons marked.
+- **Find a key** shows what a key combo does; filters show what's set, not set, changed or on the wheel.
+- Setting a key that's already used offers to swap them or keep both.
+- Any change can be undone from its row, and everything gets backed up before it's changed.
+
+#### FOV Calculator
+
+- Single and triple screens, compare rigs, and write the result straight into iRacing.
+- Tells you when iRacing's FOV doesn't match your rig, or your side screens aren't at the best angle.
+
+#### Companion apps
+
+- Start Trading Paints and Garage 61 with Pit-Box or when iRacing starts, and stop them from the same place.
+- Car pictures across the app can show your own paint.
+
+### Displays
+
+- Turn monitors on and off, arrange them, duplicate one onto another and give them your own names.
+- Set resolution, refresh rate, HDR, taskbar, wallpapers and audio.
+- Save it all as profiles (mine are *Desk* and *Sim rig*) and switch between them with a keybind.
+- Layout changes ask you to keep them and go back by themselves after 15 seconds if you don't.
+
+### Window Profiles
+
+Pick a program and give its window an exact size and spot: a game stretched across triple screens, held at a fixed resolution, or moved onto a side screen, with its borders removed.
+
+- **Presets** cover your own displays, triple 1080p / 1440p / 4K and common window sizes.
+- **Applying:** when the program starts (with a delay for games that resize themselves), with a keybind, from the tray or with one click.
+- **Groups** move several programs at once.
+- Each profile shows a small picture of where its window goes on your displays.
+
+### Performance Overlay
+
+- FPS, 1% lows, average FPS and temperatures, usage and more drawn over your game.
+- Drag its readings into whatever order you want, keep several layouts, and reset any of them to the default.
+
+### Fan Control
+
+- Curves, presets, calibration and an emergency failsafe.
+- Each fan has its own limits: minimum, fan stop, how fast it may speed up or slow down.
+- If the hardware stops answering, the fans go back to the BIOS / driver until it's back.
+- When you quit you can keep your curves running in a small background helper (its own tray icon), or hand the fans back to the BIOS / driver.
+
+### Session Stats
+
+Your iRacing history, kept on your PC.
+
+- **History:** laps, time, results, ratings, incidents and personal bests by week / month / season, with a picture of each car. Panels can be dragged into your own order.
+- **Result cards:** every race gets one with your finish, positions gained, rating changes, pace, consistency and awards (Win, Podium, Clean race, Personal best, Charger and more).
+- **Lap analysis:** open any session for its laps and sectors, then compare laps on telemetry traces or a top-down replay. Export a lap to share and import other people's.
+- **Tire wear** is tracked per run from the pit-stall readings.
+- **Old telemetry:** reads your old iRacing telemetry files so your history doesn't start from zero, can switch on iRacing's telemetry recording, and can clear out files it has already read.
 
 ---
 
