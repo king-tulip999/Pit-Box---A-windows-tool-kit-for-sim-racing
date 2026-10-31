@@ -39,6 +39,12 @@ public sealed class RaceHudSettings
 
     public HudUnits Units { get; set; } = HudUnits.Metric;
 
+    public const int DefaultWebPort = 8642, MinWebPort = 1024, MaxWebPort = 65535;
+
+    public bool WebOverlays { get; set; }
+
+    public int WebPort { get; set; } = DefaultWebPort;
+
     public const int MinGrid = 2, MaxGrid = 64, GridStep = 2;
 
     public int GridSize { get; set; } = 12;
@@ -175,6 +181,7 @@ public sealed class RaceHudSettings
         bool before2 = Version < 2;
         Version = CurrentVersion;
         Appearance ??= new();
+        if (WebPort is < MinWebPort or > MaxWebPort) WebPort = DefaultWebPort;
         var builtIn = defaults();
         if (!Layouts.Any(l => l is not null && IsDefaultName(l.Name ?? ""))) Layouts.Add(builtIn[0]);
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

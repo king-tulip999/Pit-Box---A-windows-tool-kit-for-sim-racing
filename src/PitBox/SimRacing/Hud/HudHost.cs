@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using PitBox.Config;
 using PitBox.Services;
+using PitBox.SimRacing.Hud.Web;
 using PitBox.SimRacing.Race;
 using PitBox.SimRacing.Telemetry;
 using WinForms = System.Windows.Forms;
@@ -31,6 +32,15 @@ internal sealed class HudHost : IDisposable
     private long _warmUpSequence = long.MinValue / 2;
     private (bool Connected, SessionKind Kind, string? Car, int? Track, int Num) _sessionKey;
     private IReadOnlyList<HudMonitor>? _monitors;
+    private HudWebServer? _web;
+    private readonly HudWebRenderer _webRenderer = new();
+    private bool _webDirty = true;
+
+    public string? WebProblem { get; private set; }
+
+    public int? WebPort => _web is { Running: true } w ? w.Port : null;
+
+    private int WebClients => _web?.Clients.Count ?? 0;
 
     private sealed class Slot
     {
@@ -56,7 +66,7 @@ internal sealed class HudHost : IDisposable
     public HudHost(AppServices app)
     {
         _app = app;
-        Race = new RaceState(() => Settings);
+        Race = new RaceState(() => Settings, app.PitLoss);
         _timer.Tick += (_, _) => SafeTick();
         app.Telemetry.StatusChanged += OnStatusChanged;
         app.Telemetry.SimStarted += OnSimStarted;
@@ -116,12 +126,40 @@ internal sealed class HudHost : IDisposable
             if (_editing) EndEdit(keep: true);
             _preview = false;
         }
+        SyncWeb();
         Refresh();
+    }
+
+    public void SyncWeb()
+    {
+        bool automated = ScreenshotRunner.Active || MonkeyRunner.Active || ControlSweep.Active || PerfProbe.File is not null;
+        if (!_active || !Settings.WebOverlays || automated)
+        {
+            _web?.Stop();
+            WebProblem = null;
+            return;
+        }
+        if (_web is null)
+        {
+            _web = new HudWebServer(HudWebRenderer.Overlays);
+            _web.ClientsChanged += () => System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
+            {
+                _webDirty = true;
+                Refresh();
+            });
+        }
+        string? problem = _web.Start(Settings.WebPort);
+        if (problem is not null && problem != WebProblem) _app.Notify("Browser sources didn't start", problem, NoticeKind.Warning);
+        WebProblem = problem;
+        _web.ThemeCss = HudWebRenderer.ThemeCss(CurrentPalette());
+        _webDirty = true;
     }
 
     public void SettingsChanged(bool save = true)
     {
         _palette = null;
+        _webDirty = true;
+        if (_web is { Running: true } web) web.ThemeCss = HudWebRenderer.ThemeCss(CurrentPalette());
         if (save) Save();
         foreach (var s in _slots.Values) s.Dirty = true;
         Refresh();
@@ -188,7 +226,7 @@ internal sealed class HudHost : IDisposable
         Refresh();
     }
 
-    private bool WantsTelemetry => _active && (Settings.Enabled && !_app.Demo || _preview || _editing || _watchers > 0);
+    private bool WantsTelemetry => _active && (Settings.Enabled && !_app.Demo || _preview || _editing || _watchers > 0 || WebClients > 0);
 
     private void Refresh()
     {
@@ -316,6 +354,12 @@ internal sealed class HudHost : IDisposable
                 }
             }
             if (s.Dirty || due && s.LastSeq != frame.Sequence) Draw(s, frame);
+        }
+        if (_web?.Clients is { Count: > 0 } clients)
+        {
+            try { fastest = Math.Max(fastest, _webRenderer.Render(clients, frame, Race, Settings, Settings.Layout(_layoutName), Palette, _webDirty)); }
+            catch (Exception ex) { LogOnce("web", ex); }
+            _webDirty = false;
         }
         if (_toolbarDirty && _toolbar is not null) { _toolbarDirty = false; _toolbar.Draw(this); }
         if (fastest == 0 && !_editing && !_preview && frame.Status == SimStatus.NotRunning)
@@ -491,6 +535,8 @@ internal sealed class HudHost : IDisposable
     private void OnThemeChanged()
     {
         TakeThemeAccent();
+        _webDirty = true;
+        if (_web is { Running: true } web) web.ThemeCss = HudWebRenderer.ThemeCss(CurrentPalette());
         foreach (var s in _slots.Values) s.Dirty = true;
     }
 
@@ -879,6 +925,8 @@ internal sealed class HudHost : IDisposable
         _timer.Dispose();
         HideGrid();
         CloseWindows();
+        _web?.Dispose();
+        _webRenderer.Dispose();
         _previewSurface.Dispose();
         _toolbar = null;
         if (_holding) { _holding = false; _app.Telemetry.Release(Consumer); }

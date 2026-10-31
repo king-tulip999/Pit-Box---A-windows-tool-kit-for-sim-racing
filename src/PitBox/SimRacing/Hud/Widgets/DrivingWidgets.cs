@@ -171,6 +171,7 @@ internal sealed class FuelWidget : HudWidget
         new("plan", "Plan state", "No stop, window open, pit needed… as a colored band"),
         new("figures", "Big figures", "Large numbers (Big figures shows)"),
         new("table", "Last / average / most table", "Columns of rates, rows of per lap, laps and refuel (Table columns / rows)"),
+        new("pitexit", "Pit exit", "Where a stop now would put you: class position, the cars ahead and behind, traffic, and a ghost on a track strip. Learns the pit lane, fill rate and tire time per track and car"),
     };
 
     public static IReadOnlyList<HudOption> Options { get; } = new[]
@@ -257,6 +258,7 @@ internal sealed class FuelWidget : HudWidget
                 case "plan": PlanBand(p, v, box, plan, measured); break;
                 case "figures": Figures_(p, v, box, level, plan, lowLaps); break;
                 case "table": TablePart(p, v, box, level, plan); break;
+                case "pitexit": PitExitPart(p, v, box); break;
             }
             area = new RectangleF(area.X, area.Y + gap, area.Width, Math.Max(0, area.Height - gap));
         }
@@ -285,6 +287,7 @@ internal sealed class FuelWidget : HudWidget
         "grid" => v.Options.Columns("gridRows").Count == 0 || v.Options.Columns("gridCols").Count == 0 ? 0
             : p.LineHeight(p.Label) + 4 + Math.Min(2, v.Options.Columns("gridRows").Count) * (p.LineHeight(p.Body) + 4 * p.Density),
         "plan" => p.LineHeight(p.Bold) + 8 * p.Density,
+        "pitexit" => p.LineHeight(p.Label) + p.LineHeight(p.Bold) + p.LineHeight(p.Small) + 14 * p.Density,
         "figures" => v.Options.Columns("top").Count > 0 ? p.ValueStatHeight() : 0,
         "table" => v.Options.Columns("cols").Count == 0 || v.Options.Columns("rows").Count == 0 ? 0
             : p.LineHeight(p.Label) + 4 + (p.LineHeight(p.Bold) + 5 * p.Density + 2),
@@ -580,6 +583,73 @@ internal sealed class FuelWidget : HudWidget
                 p.Text(text, c == avgAt ? p.Bold : p.Body, color, new RectangleF(r.X + labelW + c * cw, row.Y, cw, row.Height), HAlign.Center, VAlign.Center);
             }
             y += rowH + 2;
+        }
+    }
+
+    private static void PitExitPart(HudPainter p, HudView v, RectangleF box)
+    {
+        var f = v.Frame;
+        var x = v.Race.PitExit;
+        bool valid = x is { Valid: true }, grey = x is { Valid: true, Unreliable: true }, rough = valid && !x!.Calibrated;
+        Color strong = grey ? p.P.Faint : rough ? p.P.Muted : p.P.Heading, plain = grey ? p.P.Faint : rough ? p.P.Muted : p.P.Text;
+        string Mark(string s) => rough ? RaceFormat.About(s) : s;
+        float lh = p.LineHeight(p.Label), vh = p.LineHeight(p.Bold), sh = p.LineHeight(p.Small);
+        p.Text("PIT EXIT", p.Label, p.LabelColor, new RectangleF(box.X, box.Y, box.Width / 2, lh), HAlign.Left, VAlign.Top, false);
+        var head = new RectangleF(box.X, box.Y + lh, box.Width, vh);
+        if (!valid)
+        {
+            p.Text(f.OnPitRoad ? "In pit" : RaceFormat.Missing, p.Bold, p.P.Faint, head, HAlign.Left, VAlign.Center, false);
+        }
+        else
+        {
+            string pos = Mark("P" + x!.ProjectedClassPos.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            p.Text(pos, p.Bold, strong, head, HAlign.Left, VAlign.Center, false);
+            int change = x.CurrentClassPos - x.ProjectedClassPos;
+            if (change != 0)
+            {
+                float pw = p.Measure(pos, p.Bold) + 6 * p.Density;
+                string delta = (change > 0 ? "+" : "−") + Math.Abs(change).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                p.Text(delta, p.SmallBold, grey ? p.P.Faint : change > 0 ? p.P.GoodText : p.P.DangerText, new RectangleF(head.X + pw, head.Y, head.Width / 2 - pw, head.Height), HAlign.Left, VAlign.Center, false);
+            }
+            bool clean = x.Traffic.Count == 0;
+            string tag = clean ? "CLEAN AIR" : "TRAFFIC " + x.Traffic.Count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            float tw = p.Measure(tag, p.Label) + 12 * p.Density, th = lh + 4 * p.Density;
+            var bg = grey ? p.Raised(0.12) : clean ? p.P.GoodSoft : p.P.WarnSoft;
+            p.Pill(new RectangleF(box.Right - tw, head.Y + (vh - th) / 2, tw, th), tag, bg, p.Label, grey ? p.P.Faint : clean ? p.P.GoodText : p.P.WarnText);
+        }
+        var names = new RectangleF(box.X, head.Bottom + 2 * p.Density, box.Width, sh);
+        Neighbour(p, v, names.Left(names.Width / 2 - 4 * p.Density, out _), "AHEAD", valid ? x!.Ahead : null, HAlign.Left, plain, rough);
+        Neighbour(p, v, names.Right(names.Width / 2 - 4 * p.Density, out _), "BEHIND", valid ? x!.Behind : null, HAlign.Right, plain, rough);
+        var strip = new RectangleF(box.X, names.Bottom + 5 * p.Density, box.Width, 4 * p.Density);
+        p.Fill(strip, HudPalette.Alpha(p.P.LineStrong, 140));
+        float r = 3.5f * p.Density, cy = strip.Y + strip.Height / 2;
+        if (f.LapDistPct is { } me and >= 0) p.Dot(strip.X + (float)me * strip.Width, cy, r, grey ? p.P.Faint : p.P.Player);
+        if (valid)
+        {
+            float gx = strip.X + x!.GhostPct * strip.Width;
+            p.G.DrawEllipse(p.Pen(grey ? p.P.Faint : p.P.Heading, 1.5f), gx - r, cy - r, r * 2, r * 2);
+        }
+    }
+
+    private static void Neighbour(HudPainter p, HudView v, RectangleF r, string label, ExitCar? car, HAlign align, Color color, bool rough)
+    {
+        float lw = p.Measure(label, p.Label) + 5 * p.Density;
+        string text = RaceFormat.Missing;
+        if (car is { } c && v.Frame.Session.ByCar.TryGetValue(c.CarIdx, out var d))
+        {
+            string name = d.AbbrevName.Length > 0 ? d.AbbrevName : d.Name;
+            string gap = Math.Abs(c.Gap).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+            text = name + "  " + (rough ? RaceFormat.About(gap) : gap);
+        }
+        if (align == HAlign.Left)
+        {
+            p.Text(label, p.Label, p.LabelColor, new RectangleF(r.X, r.Y, lw, r.Height), HAlign.Left, VAlign.Center, false);
+            p.Text(text, p.Small, color, new RectangleF(r.X + lw, r.Y, r.Width - lw, r.Height), HAlign.Left, VAlign.Center);
+        }
+        else
+        {
+            p.Text(label, p.Label, p.LabelColor, new RectangleF(r.Right - lw, r.Y, lw, r.Height), HAlign.Right, VAlign.Center, false);
+            p.Text(text, p.Small, color, new RectangleF(r.X, r.Y, r.Width - lw, r.Height), HAlign.Right, VAlign.Center);
         }
     }
 

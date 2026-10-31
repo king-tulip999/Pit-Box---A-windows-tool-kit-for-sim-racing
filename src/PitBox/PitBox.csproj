@@ -48,6 +48,7 @@
   <ItemGroup>
     <!-- iRacing settings catalog (Sim Racing Tools → iRacing Controller). -->
     <EmbeddedResource Include="SimRacing\IracingFiles\catalog.json" />
+    <EmbeddedResource Include="SimRacing\Hud\Web\Pages\*" LogicalName="web/%(Filename)%(Extension)" />
     <EmbeddedResource Include="Assets\TrackMaps.zip" LogicalName="TrackMaps.zip" Condition="Exists('Assets\TrackMaps.zip')" />
   </ItemGroup>
 

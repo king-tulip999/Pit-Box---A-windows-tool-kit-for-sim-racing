@@ -1,0 +1,17 @@
+html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }
+body.overlay { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
+body.overlay canvas { display: block; image-rendering: auto; }
+
+body.index { overflow: auto; background: var(--app-bg, #000); color: var(--app-text, #ddd); font: 14px Bahnschrift, "Segoe UI", sans-serif; padding: 24px; }
+body.index h1 { font-size: 22px; font-weight: 600; color: var(--app-heading, #fff); margin: 0 0 4px; }
+body.index p.note { color: var(--app-muted, #999); margin: 0 0 24px; }
+body.index .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 24px; }
+body.index .card { background: var(--app-surface, #111); border: 1px solid var(--app-line, #333); padding: 12px; }
+body.index .head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; min-width: 0; }
+body.index .name { font-weight: 600; color: var(--app-heading, #fff); white-space: nowrap; }
+body.index a { color: var(--app-muted, #999); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+body.index a:hover { color: var(--app-accent, #db156b); }
+body.index button { height: 28px; padding: 0 12px; border: 1px solid var(--app-line-strong, #444); background: transparent; color: var(--app-text, #ddd); font: inherit; cursor: pointer; border-radius: 0; }
+body.index button:hover { border-color: var(--app-accent, #db156b); }
+body.index .well { background: repeating-conic-gradient(var(--app-panel, #121417) 0 25%, var(--app-bg, #000) 0 50%) 0 0 / 16px 16px; display: flex; align-items: center; justify-content: center; }
+body.index iframe { border: 0; display: block; background: transparent; max-width: 100%; }

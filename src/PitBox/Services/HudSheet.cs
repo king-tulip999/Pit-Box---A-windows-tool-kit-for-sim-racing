@@ -69,6 +69,18 @@ internal static class HudSheet
             }
             race.Frame.Flags = flags;
 
+            var inputs = HudCatalog.Find("inputs")!;
+            foreach (var (file, style, show) in new[] { ("inputs-tach", "tach", ""), ("inputs-strip", "strip", ""), ("inputs-trimmed", "trace", "throttle,brake,speed"), ("inputs-strip-trimmed", "strip", "throttle,brake,rpm,trace") })
+            {
+                var config = new HudWidgetConfig { Options = { ["style"] = style } };
+                if (show.Length > 0) config.Options["show"] = show;
+                var size = inputs.Natural!(new HudOptions(inputs, config));
+                Save(inputs, size.Width, size.Height, Path.Combine(dir, file + ".png"), 1, config.Options.Select(kv => (kv.Key, kv.Value)).ToArray());
+            }
+
+            var fuel = HudCatalog.Find("fuel")!;
+            Save(fuel, fuel.W, 150, Path.Combine(dir, "fuel-pitexit.png"), 1, ("parts", "header,pitexit"));
+
             foreach (var kind in new[] { "relative", "standings", "fuel" })
                 Save(HudCatalog.Find(kind)!, HudCatalog.Find(kind)!.W, HudCatalog.Find(kind)!.H, Path.Combine(dir, kind + "@150.png"), 1.5f);
 

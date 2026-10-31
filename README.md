@@ -16,30 +16,17 @@ Every tool can be switched off, and when one's off it runs nothing in the backgr
 
 Relative, Standings, Fuel and strategy, Lap timing and delta, Lap history, Tires, Weather and track, Wind, Session, Race events, Multiclass traffic, Alerts, Track map, a Result card after the race and a Data block for any single value. Every widget can be set up however you like, with layouts that switch by car / class / track, and an in-game editor (`Ctrl+Alt+E`) so you never have to leave the car.
 
-<p>
-  <img src="screenshots/iracing-overlay.png" alt="iRacing Overlay" width="49%">
-  <img src="screenshots/overlay-widget-editor.png" alt="Overlay widget editor" width="49%">
-</p>
-
-![Every iRacing Overlay widget](screenshots/all-overlays.png)
-
 #### iRacing Setup Manager
 
 All your setups sorted by car and class. Rename, move, import share packs and pick up new downloads. Fuel planning lives in the iRacing Overlay's **Fuel** tab.
-
-![iRacing Setup Manager](screenshots/iracing-setup-manager.png)
 
 #### iRacing Controller
 
 iRacing's settings in plain language (search, see what differs from iRacing's defaults and reset it), plus your in-sim keybinds per control profile, grouped the way iRacing groups them, with keys drawn as keycaps and wheel buttons marked. **Find a key** shows what a key combo does, filters show what's set, not set, changed or on the wheel, and setting a key that's already used offers to swap them or keep both. Any change can be undone from its row, and everything gets backed up before it's changed.
 
-![iRacing Controller](screenshots/iracing-controller.png)
-
 #### FOV Calculator
 
 Single and triple screens, compare rigs, and write the result straight into iRacing. It tells you when iRacing's FOV doesn't match your rig, or your side screens aren't at the best angle.
-
-![FOV Calculator](screenshots/fov-calculator.png)
 
 #### Companion apps
 
@@ -49,49 +36,21 @@ Start Trading Paints and Garage 61 with Pit-Box or when iRacing starts, and stop
 
 Your iRacing history, kept on your PC. Laps, time, results, ratings, incidents and personal bests by week / month / season, with a picture of each car. Every race gets a result card with your finish, positions gained, rating changes, pace, consistency and awards (Win, Podium, Clean race, Personal best, Charger and more). Panels can be dragged into your own order. Open any session for its laps and sectors, then compare laps on telemetry traces or a top-down replay. You can export a lap to share and import other people's. Tire wear is tracked per run from the pit-stall readings. It also reads your old iRacing telemetry files, so your history doesn't start from zero, and can switch on iRacing's telemetry recording and clear out files it has already read.
 
-![Session Stats](screenshots/session-stats.png)
-
-<p>
-  <img src="screenshots/session-laps.png" alt="Session laps" width="49%">
-  <img src="screenshots/lap-analysis.png" alt="Lap analysis" width="49%">
-</p>
-
-![Lap replay](screenshots/lap-replay.png)
-
 ### Performance Overlay
 
 FPS, 1% lows, average FPS and temperatures, usage and more drawn over your game: drag its readings into whatever order you want, keep several layouts, and reset any of them to the default.
-
-<p>
-  <img src="screenshots/performance-overlay.png" alt="Performance Overlay" width="49%">
-</p>
 
 ### Fan Control
 
 Curves, presets, calibration and an emergency failsafe. Each fan has its own limits (minimum, fan stop, how fast it may speed up or slow down), and if the hardware stops answering the fans go back to the BIOS / driver until it's back. When you quit you can keep your curves running in a small background helper (its own tray icon), or hand the fans back to the BIOS / driver.
 
-<p>
-  <img src="screenshots/fan-control.png" alt="Fan Control" width="49%">
-  <img src="screenshots/fan-curves.png" alt="Fan curves" width="49%">
-</p>
-
 ### Window Profiles
 
 Pick a program and give its window an exact size and spot: a game stretched across triple screens, held at a fixed resolution, or moved onto a side screen, with its borders removed. Presets cover your own displays, triple 1080p / 1440p / 4K and common window sizes. Profiles apply when the program starts (with a delay for games that resize themselves), with a keybind, from the tray or with one click, and groups move several programs at once. Each profile shows a small picture of where its window goes on your displays.
 
-<p>
-  <img src="screenshots/window-profiles.png" alt="Window Profiles" width="49%">
-  <img src="screenshots/window-profile-editor.png" alt="Window profile editor" width="49%">
-</p>
-
 ### Displays
 
 Turn monitors on and off, arrange them, duplicate one onto another, give them your own names, and set resolution, refresh rate, HDR, taskbar, wallpapers and audio. Save it all as profiles (mine are *Desk* and *Sim rig*) and switch between them with a keybind. Layout changes ask you to keep them and go back by themselves after 15 seconds if you don't.
-
-<p>
-  <img src="screenshots/displays.png" alt="Displays" width="49%">
-  <img src="screenshots/display-profile-editor.png" alt="Display profile editor" width="49%">
-</p>
 
 ## Getting started
 

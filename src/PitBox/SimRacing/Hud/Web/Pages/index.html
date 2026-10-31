@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pit-Box overlays</title>
+<link rel="stylesheet" href="/hud.css">
+</head>
+<body class="index">
+<h1>Overlays</h1>
+<p class="note">Each overlay follows its widget's options in Pit-Box and shows nothing outside a session.</p>
+<div class="grid" id="grid"></div>
+<script src="/hud.js"></script>
+<script>
+(function () {
+  var overlays = {{overlays}};
+  var grid = document.getElementById("grid");
+  overlays.forEach(function (o) {
+    var card = document.createElement("div");
+    card.className = "card";
+    var head = document.createElement("div");
+    head.className = "head";
+    var name = document.createElement("span");
+    name.className = "name";
+    name.textContent = o.name;
+    var link = document.createElement("a");
+    link.href = o.url;
+    link.target = "_blank";
+    link.textContent = o.url;
+    var copy = document.createElement("button");
+    copy.textContent = "Copy URL";
+    copy.addEventListener("click", function () {
+      navigator.clipboard.writeText(o.url).then(function () {
+        copy.textContent = "Copied";
+        setTimeout(function () { copy.textContent = "Copy URL"; }, 1200);
+      });
+    });
+    head.append(name, link, copy);
+    var well = document.createElement("div");
+    well.className = "well";
+    var frame = document.createElement("iframe");
+    frame.src = o.url;
+    frame.width = Math.round(o.w);
+    frame.height = Math.round(o.h);
+    frame.title = o.name;
+    frame.dataset.kind = o.kind;
+    well.style.height = Math.round(o.h) + "px";
+    well.appendChild(frame);
+    card.append(head, well);
+    grid.appendChild(card);
+  });
+})();
+</script>
+</body>
+</html>

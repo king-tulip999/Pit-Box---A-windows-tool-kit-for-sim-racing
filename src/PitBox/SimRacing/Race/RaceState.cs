@@ -38,9 +38,10 @@ internal sealed class RaceState
     private double? _bestLap;
     private bool _windowWasOpen;
 
-    public RaceState(Func<RaceHudSettings> settings)
+    public RaceState(Func<RaceHudSettings> settings, PitLossStore? pitLoss = null)
     {
         _settings = settings;
+        _pitExit = new PitExitFeed(pitLoss ?? new PitLossStore(null));
         Alerts = new AlertEngine(def => ChoiceFor(settings(), def));
         Laps.LapCompleted += OnLap;
     }
@@ -74,6 +75,10 @@ internal sealed class RaceState
     public int StintStartLap { get; private set; }
 
     public FuelPlan? Fuel { get; private set; }
+
+    private readonly PitExitFeed _pitExit;
+
+    public PitExitPrediction? PitExit => _pitExit.Latest;
 
     public double? FuelPerLap { get; private set; }
 
@@ -303,6 +308,7 @@ internal sealed class RaceState
             UpdateFuel(f, s);
             CheckAlerts(f, s);
         }
+        if (!f.IsReplayPlaying) _pitExit.Update(f, Fuel, Tank);
         Alerts.Visible(Now);
     }
 
@@ -317,6 +323,7 @@ internal sealed class RaceState
     {
         Laps.Clear();
         Gaps.Clear();
+        _pitExit.Reset();
         _spotter.Reset();
         _startPositions.Clear();
         _pitStops.Clear();

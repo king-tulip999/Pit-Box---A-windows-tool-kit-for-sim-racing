@@ -21,6 +21,8 @@ internal sealed class HudPalette
     public Color Player, PlayerText;
     public Color Lapping = Color.FromArgb(0xF8, 0x71, 0x71), Lapped = Color.FromArgb(0x60, 0xA5, 0xFA);
     public Color Fastest = Color.FromArgb(0xB0, 0x6B, 0xFF);
+    public Color ThrottleInput = Hex(0x3DDC84), BrakeInput = Hex(0xFF3B4E), ClutchInput = Hex(0x4C9AFF), SteerInput = Hex(0xC9D1DE), AbsInput = Hex(0xFFB020);
+    public Color InputTrack = Hex(0x1A2130), TraceBack = Hex(0x111725), InputTicks = Hex(0x3A4456), RedZone = Hex(0x4A1622);
     public Color? MapTrack, MapEdge, MapPit, MapCars;
 
     public static readonly Color FlagGreen = Color.FromArgb(0x1E, 0xA8, 0x4A), FlagYellow = Color.FromArgb(0xFF, 0xD0, 0x1A),
@@ -68,6 +70,8 @@ internal sealed class HudPalette
                 Danger = danger, DangerText = Readable(danger), DangerSoft = Mix(surface, danger, 0.2), Gold = warn, Slate = muted, Plum = Mix(accent, muted, 0.5), Silver = Mix(muted, text, 0.5), Bronze = Mix(warn, danger, 0.35),
                 Player = Hex(c.YourRow, d.YourRow), PlayerText = Hex(c.YourRowText, d.YourRowText),
                 Lapping = Hex(c.Lapping, d.Lapping), Lapped = Hex(c.Lapped, d.Lapped), Fastest = Hex(c.FastestLap, d.FastestLap),
+                ThrottleInput = good, BrakeInput = danger, ClutchInput = Hex(c.Lapped, d.Lapped), SteerInput = Mix(muted, text, 0.6), AbsInput = warn,
+                InputTrack = Mix(surface, lines, 0.45), TraceBack = Mix(surface, bg, 0.5), InputTicks = lines, RedZone = Mix(surface, danger, 0.3),
                 MapTrack = Hex(c.MapTrack, d.MapTrack), MapEdge = Hex(c.MapEdge, d.MapEdge), MapPit = Hex(c.MapPit, d.MapPit), MapCars = Hex(c.MapCars, d.MapCars),
             };
             CustomCache[key] = p;
@@ -109,6 +113,7 @@ internal sealed class HudPainter : IDisposable
     private readonly Dictionary<(Font, string), float> _widths = new();
     private readonly Dictionary<(Font, string[]), float> _widest = new();
     private readonly StringFormat[] _formats = new StringFormat[18];
+    private readonly Dictionary<(int, float), Pen> _flatPens = new();
     private Pen? _dashed;
     private readonly Bitmap _measureBitmap = new(1, 1);
     private readonly Graphics _measure;
@@ -292,6 +297,14 @@ internal sealed class HudPainter : IDisposable
         if (_pens.TryGetValue(key, out var p)) return p;
         if (_pens.Count >= MaxCached) { foreach (var x in _pens.Values) x.Dispose(); _pens.Clear(); }
         return _pens[key] = new Pen(c, width) { LineJoin = LineJoin.Round, StartCap = LineCap.Round, EndCap = LineCap.Round };
+    }
+
+    public Pen FlatPen(Color c, float width)
+    {
+        var key = (c.ToArgb(), width);
+        if (_flatPens.TryGetValue(key, out var p)) return p;
+        if (_flatPens.Count >= MaxCached) { foreach (var x in _flatPens.Values) x.Dispose(); _flatPens.Clear(); }
+        return _flatPens[key] = new Pen(c, width) { LineJoin = LineJoin.Miter, StartCap = LineCap.Flat, EndCap = LineCap.Flat };
     }
 
     private StringFormat Format(HAlign h, VAlign v, bool ellipsis)
@@ -847,6 +860,7 @@ internal sealed class HudPainter : IDisposable
         foreach (var x in _display.Values) x.Path.Dispose();
         foreach (var b in _brushes.Values) b.Dispose();
         foreach (var p in _pens.Values) p.Dispose();
+        foreach (var p in _flatPens.Values) p.Dispose();
         foreach (var f in _formats) f?.Dispose();
         _dashed?.Dispose();
         foreach (var s in _shapes.Values) s.Dispose();

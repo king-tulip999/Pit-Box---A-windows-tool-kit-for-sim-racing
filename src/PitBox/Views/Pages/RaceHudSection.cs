@@ -293,6 +293,28 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         return new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, 10), Child = stack };
     }
 
+    private static Tile BrowserSources(AppServices app, RaceHudSettings S, Func<HudHost?> host, Action changed, Action rebuild)
+    {
+        void Apply()
+        {
+            changed();
+            host()?.SyncWeb();
+            rebuild();
+        }
+        var port = new NumberBox(S.WebPort, "", 75) { Minimum = RaceHudSettings.MinWebPort, Maximum = RaceHudSettings.MaxWebPort, Step = 1 };
+        port.ValueChanged += v => { S.WebPort = (int)v; Apply(); };
+        System.Windows.Automation.AutomationProperties.SetName(port, "Port");
+        int? running = host()?.WebPort;
+        var open = Ui.LabeledButton("I.External", "Open the overlay list", () => Ui.OpenUrl(SimRacing.Hud.Web.HudWebServer.Url(S.WebPort)), "GhostButton");
+        open.IsEnabled = running is not null;
+        var group = Group("Browser sources", "Each widget as a web page on this PC only (127.0.0.1), for a wheel screen or streaming software. Pages follow the widget's options and stay blank outside a session.",
+            Ui.SettingRow("Browser sources", null, Ui.Switch(S.WebOverlays, on => { S.WebOverlays = on; Apply(); })),
+            Ui.SettingRow("Port", host()?.WebProblem, port),
+            Ui.SettingRow("Overlay list", null, open));
+        Ui.Anchor(group, WebAnchor);
+        return group;
+    }
+
     private static TextBlock Caption(string text, double top = 6) => new()
     {
         Text = text, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, top, 0, 0),
@@ -683,6 +705,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
                 Ui.Switch(!S.Interactive, on => { S.Interactive = !on; changed(); })),
             Ui.SettingRow("Units", null, Ui.Segmented(new[] { "Metric", "Imperial" }, (int)S.Units, i => { S.Units = (HudUnits)i; changed(); }, "hudunits"),
                 D(() => S.Units == HudUnits.Metric, () => S.Units = HudUnits.Metric, "Metric"))));
+        root.Children.Add(BrowserSources(app, S, Host, changed, rebuild));
         var keys = new KeybindTree(app, e => e.Id.StartsWith("hud.", StringComparison.Ordinal), skip: 2, label: ShortKeybindLabel, flat: true) { Style = null, Padding = new Thickness(0), Margin = new Thickness(-5, 5, 0, 0) };
         root.Children.Add(new Tile
         {
@@ -1230,7 +1253,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         Build();
     }
 
-    public const string LayoutsAnchor = "simracing.hud.layouts", AlertsAnchor = "simracing.hud.alerts", FuelAnchor = "simracing.hud.fuelformulas", SettingsAnchor = "simracing.hud.settings";
+    public const string LayoutsAnchor = "simracing.hud.layouts", AlertsAnchor = "simracing.hud.alerts", FuelAnchor = "simracing.hud.fuelformulas", SettingsAnchor = "simracing.hud.settings", WebAnchor = "simracing.hud.web";
 
     public bool ShowTabFor(string anchor)
     {
@@ -1239,7 +1262,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             LayoutsAnchor => WidgetsTab,
             AlertsAnchor => AlertsTabIndex,
             FuelAnchor => FuelTabIndex,
-            SettingsAnchor => SettingsTab,
+            SettingsAnchor or WebAnchor => SettingsTab,
             _ => -1,
         };
         Finish();

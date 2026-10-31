@@ -15,6 +15,7 @@ internal sealed record DriverEntry
     public string CarName { get; init; } = "";
     public string CarShortName { get; init; } = "";
     public string CarPath { get; init; } = "";
+    public int CarId { get; init; }
     public string CarDesign { get; init; } = "";
     public string NumberDesign { get; init; } = "";
     public int ClassId { get; init; }
@@ -91,6 +92,9 @@ internal sealed class SessionInfo
 
     public double? ShiftLightFirstRpm { get; init; }
     public double? ShiftRpm { get; init; }
+    public double? BlinkRpm { get; init; }
+    public double? RedlineRpm { get; init; }
+    public double? IdleRpm { get; init; }
     public string PlayerSetupName { get; init; } = "";
 
     public double? PitBoxPct { get; init; }
@@ -146,6 +150,7 @@ internal sealed class SessionInfo
             CarName = SessionYaml.Str(d, "CarScreenName") ?? "",
             CarShortName = SessionYaml.Str(d, "CarScreenNameShort") ?? SessionYaml.Str(d, "CarScreenName") ?? "",
             CarPath = SessionYaml.Str(d, "CarPath") ?? "",
+            CarId = SessionYaml.Int(d, "CarID") ?? 0,
             CarDesign = SessionYaml.Str(d, "CarDesignStr") ?? "",
             NumberDesign = SessionYaml.Str(d, "CarNumberDesignStr") ?? "",
             ClassId = SessionYaml.Int(d, "CarClassID") ?? 0,
@@ -227,6 +232,9 @@ internal sealed class SessionInfo
             PlayerEstLapTime = SessionYaml.Num(driverInfo, "DriverCarEstLapTime") is > 0 and var lap ? lap : null,
             ShiftLightFirstRpm = SessionYaml.Num(driverInfo, "DriverCarSLFirstRPM") is > 0 and var slFirst ? slFirst : null,
             ShiftRpm = SessionYaml.Num(driverInfo, "DriverCarSLShiftRPM") is > 0 and var slShift ? slShift : null,
+            BlinkRpm = SessionYaml.Num(driverInfo, "DriverCarSLBlinkRPM") is > 0 and var slBlink ? slBlink : null,
+            RedlineRpm = SessionYaml.Num(driverInfo, "DriverCarRedLine") is > 0 and var redline ? redline : null,
+            IdleRpm = SessionYaml.Num(driverInfo, "DriverCarIdleRPM") is > 0 and var idle ? idle : null,
             PlayerSetupName = SessionYaml.Str(driverInfo, "DriverSetupName") ?? "",
             PitBoxPct = SessionYaml.Num(driverInfo, "DriverPitTrkPct") is >= 0 and <= 1 and var box ? box : null,
             TrackDirection = SessionYaml.Str(weekend, "TrackDirection") ?? "",

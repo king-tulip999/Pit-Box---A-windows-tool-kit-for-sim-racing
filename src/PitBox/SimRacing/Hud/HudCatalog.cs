@@ -43,6 +43,9 @@ internal static class HudCatalog
         new("result", "Race result", "Your finish as a card once you take the checkered flag: position and places gained, the car, iRating, incidents, awards, best and average lap, consistency and every lap's time.", 300, 470, () => new ResultWidget())
             { MinW = 240, MinH = 200, DefaultHz = 2, Options = ResultWidget.Options, Editor = Editors.ResultEditor.Def, HideWhenEmpty = true,
               Limits = "The iRating change is an estimate from the field's ratings and your finish. Awards compare this race with the ones Session Stats has recorded, so they need Session Stats on." },
+        new("inputs", "Inputs", "Throttle, brake, clutch and steering with gear, speed and RPM: as a trace, a round tach or a low strip.", 450, 104, () => new InputsWidget())
+            { MinW = 225, MinH = 50, DefaultHz = 30, Options = InputsWidget.Options, Editor = Editors.InputsEditor.Def, Natural = InputsWidget.Natural,
+              Limits = "The shift point, limiter flash and RPM scale come from iRacing's figures for your car." },
         new("block", "Data block", "Any single value (live, session or calculated) as a number, bar or graph.", 170, 80, () => new BlockWidget())
             { MinW = 150, MinH = 72, DefaultHz = 10, Options = BlockWidget.Options, Editor = Editors.BlockEditor.Def },
     };

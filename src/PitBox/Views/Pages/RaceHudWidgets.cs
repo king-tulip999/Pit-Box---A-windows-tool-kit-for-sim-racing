@@ -529,6 +529,23 @@ internal sealed partial class RaceHudWidgets
         reset.ToolTip = "Puts this widget's display options back as they were when it was added (place and size stay)";
         reset.Margin = new Thickness(0, 0, 6, 0);
         actions.Children.Add(reset);
+        int? port = Host?.WebPort;
+        var copyUrl = Ui.LabeledButton("I.Copy", "Copy URL", () =>
+        {
+            if (Host?.WebPort is not { } live) return;
+            string url = SimRacing.Hud.Web.HudWebServer.Url(live, w.Kind);
+            try
+            {
+                Clipboard.SetText(url);
+                _app.Notify("URL copied", url, NoticeKind.Success);
+            }
+            catch (System.Runtime.InteropServices.ExternalException) { }
+        });
+        copyUrl.IsEnabled = port is not null;
+        copyUrl.ToolTip = port is null ? "Turn on Browser sources in the overlay's Settings tab" : "This widget as a browser source; it follows these options";
+        ToolTipService.SetShowOnDisabled(copyUrl, true);
+        copyUrl.Margin = new Thickness(0, 0, 6, 0);
+        actions.Children.Add(copyUrl);
         return actions;
     }
 
@@ -666,6 +683,7 @@ internal sealed partial class RaceHudWidgets
 
     private void SetValues(HudWidgetConfig w, HudWidgetDef def, IReadOnlyDictionary<string, string?> values)
     {
+        var naturalBefore = def.Natural?.Invoke(new HudOptions(def, w));
         foreach (var (key, value) in values)
         {
             if (def.Option(key) is not { } o) continue;
@@ -677,6 +695,12 @@ internal sealed partial class RaceHudWidgets
                 w.H = Math.Max(1, w.H + t1 + b1 - t0 - b0);
             }
             if (value is null || value == o.Default) w.Options.Remove(key); else w.Options[key] = value;
+        }
+        if (naturalBefore is { } before && def.Natural!(new HudOptions(def, w)) is var after && after != before && before.Height > 0)
+        {
+            double factor = w.H / before.Height;
+            w.W = Math.Clamp(Math.Round(after.Width * factor), Math.Max(def.MinW, HudWidgetConfig.MinSize), HudWidgetConfig.MaxSize);
+            w.H = Math.Clamp(Math.Round(after.Height * factor), Math.Max(def.MinH, HudWidgetConfig.MinSize), HudWidgetConfig.MaxSize);
         }
         Changed();
         if (_preview is not null) DrawPreview(w);

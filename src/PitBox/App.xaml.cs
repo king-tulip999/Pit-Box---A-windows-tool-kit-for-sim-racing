@@ -22,6 +22,11 @@ public partial class App : Application
             FanService.Run(this);
             return;
         }
+        if (Array.FindIndex(e.Args, a => string.Equals(a, WebPreview.Arg, StringComparison.OrdinalIgnoreCase)) is >= 0 and var webAt)
+        {
+            WebPreview.Run(this, webAt + 1 < e.Args.Length ? e.Args[webAt + 1] : null);
+            return;
+        }
         if (ArgValue(e.Args, HudSheet.Arg) is { } sheetFolder)
         {
             HudSheet.Run(this, sheetFolder);

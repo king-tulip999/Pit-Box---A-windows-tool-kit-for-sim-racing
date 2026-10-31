@@ -65,6 +65,7 @@ internal sealed class TelemetryFrame
     public TrackSurface? PlayerSurface;
     public int? PlayerPosition, PlayerClassPosition;
     public double? Speed, Rpm, Throttle, Brake, Clutch, Steering, SteeringMax;
+    public double? ThrottleRaw, BrakeRaw, ClutchRaw;
     public int? Gear;
     public double? Fuel, FuelPct, FuelUsePerHour;
     public int? Lap, LapCompleted;
@@ -135,6 +136,7 @@ internal sealed class TelemetryFrame
         PlayerSurface = null;
         PlayerPosition = PlayerClassPosition = null;
         Speed = Rpm = Throttle = Brake = Clutch = Steering = SteeringMax = null;
+        ThrottleRaw = BrakeRaw = ClutchRaw = null;
         Gear = null;
         Fuel = FuelPct = FuelUsePerHour = null;
         Lap = LapCompleted = null;

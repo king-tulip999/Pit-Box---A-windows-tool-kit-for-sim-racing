@@ -32,7 +32,7 @@ internal static class FuelEditor
         {
             new(HudPreset.Minimal, V(("parts", "header,gauge"), ("head", "togo,nextpit"))),
             new(HudPreset.Standard, V()),
-            new(HudPreset.Everything, V(("parts", "header,gauge,grid,plan,figures,table"), ("head", "togo,nextpit,pitby,stops,add,level"),
+            new(HudPreset.Everything, V(("parts", "header,gauge,grid,plan,figures,table,pitexit"), ("head", "togo,nextpit,pitby,stops,add,level"),
                 ("gridRows", "curr,avg,avgN,max,min,last"), ("gridCols", "use,laps,refuel,finish"), ("title", true))),
         },
     };

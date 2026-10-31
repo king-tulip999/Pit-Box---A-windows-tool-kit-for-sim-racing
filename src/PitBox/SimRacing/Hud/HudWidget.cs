@@ -60,6 +60,7 @@ internal sealed record HudWidgetDef(string Kind, string Name, string Description
     public bool Clickable { get; init; }
     public bool? HideWhenEmpty { get; init; }
     public Editors.HudEditorDef? Editor { get; init; }
+    public Func<HudOptions, SizeF>? Natural { get; init; }
 
     private Editors.HudEditorDef? _plain;
     public Editors.HudEditorDef EditorDef => Editor ?? (_plain ??= Editors.HudEditorDef.Plain(this));

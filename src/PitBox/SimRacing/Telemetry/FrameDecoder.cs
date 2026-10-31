@@ -5,7 +5,7 @@ internal sealed class FrameDecoder
     private IReadOnlyDictionary<string, IrsdkVar> _vars = new Dictionary<string, IrsdkVar>();
     private IrsdkVar? _sessionNum, _sessionState, _sessionFlags, _sessionTime, _sessionTimeRemain, _sessionTimeTotal, _lapsRemain, _lapsRemainEx, _lapsTotal, _raceLaps;
     private IrsdkVar? _isOnTrack, _inGarage, _replay, _playerIdx, _camIdx, _onPitRoad, _surface, _playerPos, _playerClassPos;
-    private IrsdkVar? _speed, _rpm, _gear, _throttle, _brake, _clutch, _steer, _steerMax;
+    private IrsdkVar? _speed, _rpm, _gear, _throttle, _brake, _clutch, _steer, _steerMax, _throttleRaw, _brakeRaw, _clutchRaw;
     private IrsdkVar? _fuel, _fuelPct, _fuelPerHour, _lap, _lapCompleted, _lapPct, _lapDist, _lapCur, _lapLast, _lapBest;
     private IrsdkVar? _dBest, _dBestOk, _dSession, _dSessionOk, _dOptimal, _dOptimalOk;
     private IrsdkVar? _inc, _teamInc, _drvInc, _warnings, _oilTemp, _oilPress, _waterTemp, _fuelPress, _voltage;
@@ -32,6 +32,7 @@ internal sealed class FrameDecoder
         _playerPos = V("PlayerCarPosition"); _playerClassPos = V("PlayerCarClassPosition");
         _speed = V("Speed"); _rpm = V("RPM"); _gear = V("Gear"); _throttle = V("Throttle"); _brake = V("Brake"); _clutch = V("Clutch");
         _steer = V("SteeringWheelAngle"); _steerMax = V("SteeringWheelAngleMax");
+        _throttleRaw = V("ThrottleRaw"); _brakeRaw = V("BrakeRaw"); _clutchRaw = V("ClutchRaw");
         _fuel = V("FuelLevel"); _fuelPct = V("FuelLevelPct"); _fuelPerHour = V("FuelUsePerHour");
         _lap = V("Lap"); _lapCompleted = V("LapCompleted"); _lapPct = V("LapDistPct"); _lapDist = V("LapDist");
         _lapCur = V("LapCurrentLapTime"); _lapLast = V("LapLastLapTime"); _lapBest = V("LapBestLapTime");
@@ -101,6 +102,7 @@ internal sealed class FrameDecoder
 
         f.Speed = D(_speed); f.Rpm = D(_rpm); f.Gear = I(_gear);
         f.Throttle = D(_throttle); f.Brake = D(_brake); f.Clutch = D(_clutch);
+        f.ThrottleRaw = D(_throttleRaw); f.BrakeRaw = D(_brakeRaw); f.ClutchRaw = D(_clutchRaw);
         f.Steering = D(_steer); f.SteeringMax = D(_steerMax) is > 0 and var sm ? sm : null;
         f.Fuel = D(_fuel); f.FuelPct = D(_fuelPct); f.FuelUsePerHour = D(_fuelPerHour);
         f.Lap = I(_lap); f.LapCompleted = I(_lapCompleted);

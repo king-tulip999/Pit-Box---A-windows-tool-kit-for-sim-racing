@@ -97,6 +97,9 @@ internal sealed class DemoTelemetry
             PlayerEstLapTime = 108.5,
             ShiftLightFirstRpm = 6500,
             ShiftRpm = 8400,
+            BlinkRpm = 8650,
+            RedlineRpm = 8750,
+            IdleRpm = 1100,
         };
     }
 
@@ -150,6 +153,8 @@ internal sealed class DemoTelemetry
     }
 
     public void Fill(TelemetryFrame f) => Fill(f, Stopwatch.GetElapsedTime(_start).TotalSeconds);
+
+    public void FillAt(TelemetryFrame f, double sessionTime) => Fill(f, sessionTime - StartOffset);
 
     public void Fill(TelemetryFrame f, double since)
     {
