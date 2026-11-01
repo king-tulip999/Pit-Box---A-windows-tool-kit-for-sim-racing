@@ -581,6 +581,7 @@ internal static class ControlSweep
             try { target.Element.BringIntoView(); } catch (InvalidOperationException) { }
             int errors = ErrorCount;
             int blocked = Blocked.Count;
+            if (AppServices.Current is { } app) SaveWatch.Rebase(app);
             string before = Fingerprint(window);
             var popupsBefore = OpenPopups().Count;
             bool modalBefore = window.ModalLayer.Visibility == Visibility.Visible;
@@ -603,6 +604,7 @@ internal static class ControlSweep
             if (effects.Count == 0 && after != before) effects.Add("changed the view");
             if (effects.Count == 0 && outcome is "pressed" or "clicked") AddIssue(row, "no visible effect");
             if (ErrorCount > errors) AddIssue(row, $"error ({ErrorCount - errors})");
+            if (AppServices.Current is { } saving && SaveWatch.Unsaved(saving) is { } unsaved) AddIssue(row, "changed a setting without saving: " + unsaved);
             row.Outcome = outcome + (effects.Count > 0 ? "; " + string.Join("; ", effects) : "");
             Log($"  {item.Kind} “{item.Label}” {item.Tip} → {row.Outcome}");
             if (depth < MaxDepth && (modal || popup || toast && window.Toasts.Children[^1] is DependencyObject t && HasControl(t)))

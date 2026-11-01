@@ -405,10 +405,10 @@ internal sealed class GrrDashboardSection : StackPanel
             var table = data.Standings![me.Class];
             var main = new WrapPanel { Margin = new Thickness(0, 13, 0, 0) };
             var place = new StackPanel { Orientation = Orientation.Horizontal };
-            place.Children.Add(Rolling($"P{me.Row.Rank}", 44, tier + "Text"));
+            place.Children.Add(Figure($"P{me.Row.Rank}", 44, tier + "Text"));
             var of = GrrParts.Caption($"of {table.Count}");
             of.VerticalAlignment = VerticalAlignment.Bottom;
-            of.Margin = new Thickness(7, 0, 0, 7);
+            of.Margin = new Thickness(7, 0, 0, GrrParts.BaselineBottom(44, 12, figureLines: true));
             place.Children.Add(of);
             main.Children.Add(Stat("Championship", place, null, big: true));
             int at = table.ToList().IndexOf(me.Row);
@@ -435,12 +435,12 @@ internal sealed class GrrDashboardSection : StackPanel
     }
 
     private static StackPanel Stat(string label, string value, string? note = null, bool big = false) =>
-        Stat(label, Rolling(value, big ? 44 : 22, "Heading"), note, big);
+        Stat(label, Figure(value, big ? 44 : 24, "Heading"), note, big);
 
-    private static Odometer Rolling(string value, double size, string brush)
+    private static TextBlock Figure(string value, double size, string brush)
     {
-        var number = new Odometer(size, brush, italic: true) { CountUpOnLoad = true, RollMs = 900, HorizontalAlignment = HorizontalAlignment.Left };
-        number.Set(value);
+        var number = RaceParts.LiveFigure(value, size, brush);
+        number.HorizontalAlignment = HorizontalAlignment.Left;
         return number;
     }
 

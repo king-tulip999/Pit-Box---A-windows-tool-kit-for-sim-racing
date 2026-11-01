@@ -420,11 +420,16 @@ internal sealed partial class IracingControllerSection
 
     private sealed class AreaBand : Tile
     {
-        private readonly Odometer _total = Number("Heading"), _changed = Number("AccentText"), _unsaved = Number("AccentText");
+        private readonly TextBlock _total = Number("Heading"), _changed = Number("AccentText"), _unsaved = Number("AccentText");
         private readonly StackPanel _stairs = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Bottom, Height = 34 };
         private readonly FrameworkElement _stairsCell;
 
-        private static Odometer Number(string brush) => new(26, brush, italic: false, heavy: false) { HorizontalAlignment = HorizontalAlignment.Left, RollMs = 520 };
+        private static TextBlock Number(string brush)
+        {
+            var number = RaceParts.LiveFigure("", 26, brush, italic: false, heavy: false);
+            number.HorizontalAlignment = HorizontalAlignment.Left;
+            return number;
+        }
 
         public AreaBand()
         {
@@ -451,9 +456,9 @@ internal sealed partial class IracingControllerSection
         public void Show(IReadOnlyList<Setting> listed)
         {
             var c = CultureInfo.CurrentCulture;
-            _total.Set(listed.Count.ToString(c));
-            _changed.Set(listed.Count(s => s.IsModified).ToString(c));
-            _unsaved.Set(listed.Count(s => s.IsChanged).ToString(c));
+            TextCase.Set(_total, listed.Count.ToString(c));
+            TextCase.Set(_changed, listed.Count(s => s.IsModified).ToString(c));
+            TextCase.Set(_unsaved, listed.Count(s => s.IsChanged).ToString(c));
             _stairs.Children.Clear();
             foreach (var s in listed.Where(s => SettingShapes.Of(s.Def) == SettingShape.Level))
             {

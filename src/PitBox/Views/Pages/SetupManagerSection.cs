@@ -304,7 +304,7 @@ internal sealed class SetupManagerSection : StackPanel
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.Children.Add(new Icon { Data = Ui.Res<Geometry>(item.IsPack ? "I.Layers" : "I.FileText"), Width = 13, Height = 13, Foreground = Ui.Res<Brush>("TextMuted"), VerticalAlignment = VerticalAlignment.Center });
         var name = new StackPanel { Margin = new Thickness(8, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
-        name.Children.Add(TextCase.Verbatim(new TextBlock { Text = item.Name, Style = Ui.Res<Style>("Body"), TextTrimming = TextTrimming.CharacterEllipsis, ToolTip = TextCase.VerbatimTip(item.Path) }));
+        name.Children.Add(TextCase.Verbatim(new TextBlock { Text = item.Name, Style = Ui.Res<Style>("Body"), TextTrimming = TextTrimming.CharacterEllipsis, ToolTip = TextCase.PathTip(item.Path) }));
         string what = item.IsPack ? $"Share pack · {SetupTree.Plural(item.Entries.Count, "setup")}" : SetupTree.Size(item.Size);
         name.Children.Add(new TextBlock { Text = $"{what} · {Ago(item.Modified)}", Style = Ui.Res<Style>("Caption") });
         Grid.SetColumn(name, 1);
@@ -1090,6 +1090,7 @@ internal sealed class SetupManagerSection : StackPanel
             try { Clipboard.SetText(path); _app.Notify("Path copied", path, NoticeKind.Success); }
             catch { }
         }, "QuietIconButton");
+        copy.ToolTip = TextCase.PathTip("Copy the folder's path: " + path);
         copy.Width = copy.Height = 21;
         copy.MinHeight = 0;
         copy.Margin = new Thickness(6, 0, 0, 0);
@@ -1126,6 +1127,7 @@ internal sealed class SetupManagerSection : StackPanel
                 catch { }
             }, "QuietIconButton");
             copy.VerticalAlignment = VerticalAlignment.Top;
+            copy.Margin = new Thickness(6, 0, 0, 0);
             Grid.SetColumn(copy, 1);
             g.Children.Add(copy);
             stack.Children.Add(g);

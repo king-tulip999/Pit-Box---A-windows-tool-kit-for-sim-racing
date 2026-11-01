@@ -24,6 +24,9 @@ internal static class HudCatalog
             { MinW = 160, MinH = 50, DefaultHz = 10, Options = AlertsWidget.Options, Editor = Editors.AlertsEditor.Def, HideWhenEmpty = true },
         new("traffic", "Multiclass traffic", "Other classes within a few seconds, closing rates and when you'll meet.", 320, 160, () => new TrafficWidget())
             { MinW = 180, MinH = 70, DefaultHz = 5, Options = TrafficWidget.Options, Editor = Editors.TrafficEditor.Def, HideWhenEmpty = true },
+        new("radar", "Car radar", "The cars around you from above: alongside in red from iRacing's spotter signal, ahead and behind in amber getting stronger as they close, with the distance to the nearest.", 140, 220, () => new RadarWidget())
+            { MinW = 80, MinH = 110, DefaultHz = 30, Options = RadarWidget.Options, Editor = Editors.RadarEditor.Def, HideWhenEmpty = true,
+              Limits = "iRacing doesn't publish where other cars are across the track, only which side is taken, so with a car on each side Pit-Box can't tell which is which. Car lengths are learned from your first few overlaps; until then ahead and behind show as lines." },
         new("tyres", "Tires", "Pressures, temperatures (inner / middle / outer) and wear for each corner.", 280, 180, () => new TyresWidget())
             { MinW = 180, MinH = 124, DefaultHz = 2, Options = TyresWidget.Options, Editor = Editors.TyresEditor.Def,
               Limits = "iRacing updates tire data in the pit box, not while driving." },
@@ -38,12 +41,18 @@ internal static class HudCatalog
               Limits = "Cars are placed along the track's center line from their distance round the lap; tracks without a bundled map show none." },
         new("laps", "Lap history", "Your laps with deltas, what happened on them, fuel used, and consistency.", 320, 260, () => new LapsWidget())
             { MinW = 200, MinH = 110, DefaultHz = 2, Options = LapsWidget.Options, Editor = Editors.LapsEditor.Def },
+        new("goals", "Practice goals", "Targets for a practice run with live progress, as a lap list or big counters: clean or consistent laps in a row, laps close to your best or under a time, clean laps and clean minutes.", 300, 240, () => new GoalsWidget())
+            { MinW = 180, MinH = 80, DefaultHz = 2, Options = GoalsWidget.Options, Editor = Editors.GoalsEditor.Def, HideWhenEmpty = true, Natural = GoalsWidget.Natural,
+              Limits = "Counts the laps the overlay sees this session; laps with incident points or pit road don't count." },
+        new("notes", "Notes", "Your notes for this track and car: the next corner's note lights up as you get close, with the notes for the whole track under it.", 300, 140, () => new NotesWidget())
+            { MinW = 180, MinH = 60, DefaultHz = 5, Options = NotesWidget.Options, Editor = Editors.NotesEditor.Def, HideWhenEmpty = true,
+              Limits = "Notes are written in Session Stats, on the Performance card for each car and track." },
         new("events", "Race events", "A timeline of flags, pit stops, places gained or lost, incidents and best laps.", 320, 200, () => new EventsWidget())
             { MinW = 300, MinH = 130, DefaultHz = 2, Options = EventsWidget.Options, Editor = Editors.EventsEditor.Def },
-        new("result", "Race result", "Your finish as a card once you take the checkered flag: position and places gained, the car, iRating, incidents, awards, best and average lap, consistency and every lap's time.", 300, 470, () => new ResultWidget())
-            { MinW = 240, MinH = 200, DefaultHz = 2, Options = ResultWidget.Options, Editor = Editors.ResultEditor.Def, HideWhenEmpty = true,
+        new("result", "Race result", "Your finish once you take the checkered flag, as a card, a banner, a stamp or a lap chart: position and places gained, the car, iRating, incidents, awards, best and average lap, consistency and every lap's time.", 300, 448, () => new ResultWidget())
+            { MinW = 160, MinH = 120, DefaultHz = 2, Options = ResultWidget.Options, Editor = Editors.ResultEditor.Def, HideWhenEmpty = true, Natural = ResultWidget.Natural,
               Limits = "The iRating change is an estimate from the field's ratings and your finish. Awards compare this race with the ones Session Stats has recorded, so they need Session Stats on." },
-        new("inputs", "Inputs", "Throttle, brake, clutch and steering with gear, speed and RPM: as a trace, a round tach or a low strip.", 450, 104, () => new InputsWidget())
+        new("inputs", "Inputs", "Throttle, brake, clutch and steering with gear, speed and shift lights: as a trace or a low shift-light bar.", 420, 110, () => new InputsWidget())
             { MinW = 225, MinH = 50, DefaultHz = 30, Options = InputsWidget.Options, Editor = Editors.InputsEditor.Def, Natural = InputsWidget.Natural,
               Limits = "The shift point, limiter flash and RPM scale come from iRacing's figures for your car." },
         new("block", "Data block", "Any single value (live, session or calculated) as a number, bar or graph.", 170, 80, () => new BlockWidget())

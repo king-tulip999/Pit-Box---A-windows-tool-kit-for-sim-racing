@@ -14,7 +14,11 @@ internal sealed class SessionWidget : HudWidget
             new HudChoice("remain", "Time left"), new HudChoice("lapsleft", "Laps left", "Timed races: estimated from the pace"), new HudChoice("elapsed", "Time elapsed"),
             new HudChoice("lap", "Lap"), new HudChoice("pos", "Position"), new HudChoice("cpos", "Position in class"), new HudChoice("phase", "Phase"), new HudChoice("track", "Track"),
             new HudChoice("temps", "Air / track temperature"), new HudChoice("inc", "Incidents"), new HudChoice("clock", "Time of day"),
-            new HudChoice("finish", "Estimated finish (time of day)")),
+            new HudChoice("finish", "Estimated finish (time of day)"),
+            new HudChoice("irchange", "iRating gain / loss (est.)", "Races: what you'd gain or lose if the race finished in this order"),
+            new HudChoice("offtracks", "Off-tracks", "Every time all four wheels left the track this session, and where the last one was"),
+            new HudChoice("consistency", "Consistency", "Half the spread of your last 5 clean laps"),
+            new HudChoice("trend", "Track temperature trend", "Change over the last 10 minutes (needs 5 minutes of readings)")),
         HudOption.Bool("progress", "Progress bar", true),
     };
 
@@ -55,6 +59,19 @@ internal sealed class SessionWidget : HudWidget
                     double? togo = v.Race.Fuel?.LapsToGo ?? (f.SessionKind == SessionKind.Race ? v.Race.LapsToGo(f) : null);
                     double? left = session?.Laps is > 0 ? (togo is { } lt && LapMath.Stats(v.Race.Laps.Laps, 5)?.Average is { } avg ? lt * avg : null) : f.SessionTimeRemain;
                     cells.Add(("FINISH ~", left is { } s ? RaceFormat.TimeOfDay(DateTime.Now.AddSeconds(s)) : RaceFormat.Missing));
+                    break;
+                case "irchange":
+                    cells.Add(("IR ± EST.", v.Race.IRatingChangeOf(me) is { } ir ? RaceFormat.Signed(Math.Round(ir), "0") : RaceFormat.Missing));
+                    break;
+                case "offtracks":
+                    var limits = v.Race.TrackLimits;
+                    cells.Add(("OFF-TRACKS", limits.Count == 0 ? "0" : limits.Offs[^1].Pct >= 0 ? $"{limits.Count} · {v.Race.Turns.Where(limits.Offs[^1].Pct, caps: true)}" : limits.Count.ToString()));
+                    break;
+                case "consistency":
+                    cells.Add(("CONSISTENCY", RaceFormat.Spread(LapMath.Stats(v.Race.Laps.Laps, 5) is { Count: >= 3 } cs ? cs.Spread : null)));
+                    break;
+                case "trend":
+                    cells.Add(("TRACK 10 MIN", v.Race.Weather.TrackPerWindow is { } tr ? (tr < 0 ? "−" : "+") + RaceFormat.TempDelta(Math.Abs(tr), v.Units) : RaceFormat.Missing));
                     break;
             }
             if (cells.Count > before) ids.Add(id);
@@ -591,6 +608,7 @@ internal sealed class LapsWidget : HudWidget
             if (lap.PitLap) marks.Add("PIT");
             if (lap.IncidentsGained > 0) marks.Add($"{lap.IncidentsGained}x");
             if (lap.Caution) marks.Add("YEL");
+            if (v.Race.TrackLimits.OnLap(lap.Lap) is > 0 and var offs) marks.Add(offs > 1 ? $"OFF {offs}" : "OFF");
             if (marks.Count > 0) p.Text(string.Join(" ", marks), p.Tiny, p.P.WarnText, rest.Inflated(-6, 0), HAlign.Left);
             y += rowH;
         }

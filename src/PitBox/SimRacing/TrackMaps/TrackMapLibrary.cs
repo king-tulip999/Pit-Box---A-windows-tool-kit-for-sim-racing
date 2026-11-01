@@ -124,6 +124,9 @@ internal static class TrackMapLibrary
         return manifest?.FindByDisplay(display, config) is { } entry ? await ByKey(entry.Key).ConfigureAwait(false) : null;
     }
 
+    public static Task<TrackMap?> ForRace(Telemetry.SessionInfo s, bool sample) =>
+        sample ? ByKey(SampleKey) : ForSession(s.TrackId, s.TrackName, s.TrackDisplayName, s.TrackConfig);
+
     public static Task<TrackMap?> ByKey(string key)
     {
         lock (Lock)

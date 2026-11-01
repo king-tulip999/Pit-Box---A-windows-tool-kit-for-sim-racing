@@ -9,14 +9,15 @@ internal static class ResultEditor
         ContentTitle = "Shows",
         Groups = new HudGroup[]
         {
-            new("main", null, HudTab.Layout, true, O("seconds"), O("position"), O("colors"), O("nameFormat"), O("awardChips")),
+            new("main", null, HudTab.Layout, true, O("look"), O("seconds"), O("position"), O("colors"), O("nameFormat"),
+                O("awardChips") with { ShowIf = o => o.Choice("look") == Widgets.ResultWidget.Card }),
             new("show", "Shows", HudTab.Content, true, new PickerSetting("show", new HudCategory[]
             {
                 new("Top", "checker", "gain", "class", "car", "ribbon"),
                 new("Driver", "name", "carname", "track"),
                 new("Chips", "rating", "incidents", "awards"),
                 new("Stats", "best", "average", "consistency", "laps", "time", "strip"),
-            })),
+            }) { ShowIf = o => o.Choice("look") == Widgets.ResultWidget.Card }),
         },
         Presets = new HudPreset[]
         {

@@ -43,13 +43,27 @@ internal sealed class TelemetryService : IDisposable
 
     public event Action<SimStatus>? StatusChanged;
 
-    public Action<TelemetryFrame>? FrameObserver { get; set; }
+    private volatile Action<TelemetryFrame>[] _observers = Array.Empty<Action<TelemetryFrame>>();
+    private readonly object _observerLock = new();
+
+    public void AddObserver(Action<TelemetryFrame> observe)
+    {
+        lock (_observerLock)
+            if (Array.IndexOf(_observers, observe) < 0) _observers = _observers.Append(observe).ToArray();
+    }
+
+    public void RemoveObserver(Action<TelemetryFrame> observe)
+    {
+        lock (_observerLock) _observers = _observers.Where(o => o != observe).ToArray();
+    }
 
     private void Observe(TelemetryFrame f)
     {
-        if (FrameObserver is not { } observe) return;
-        try { observe(f); }
-        catch (Exception ex) { _lastError = ex.Message; FrameObserver = null; App.LogError(ex); }
+        foreach (var observe in _observers)
+        {
+            try { observe(f); }
+            catch (Exception ex) { _lastError = ex.Message; RemoveObserver(observe); App.LogError(ex); }
+        }
     }
 
     public SimStatus Status => _status;

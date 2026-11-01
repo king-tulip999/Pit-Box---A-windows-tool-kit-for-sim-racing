@@ -3,7 +3,7 @@ using System.IO.Compression;
 
 namespace PitBox.SessionStats;
 
-internal enum TraceChannel { Time, Speed, Throttle, Brake, Clutch, Steering, Gear, Rpm, LatAccel, LongAccel, X, Y, PushToPass = 16, Wind, WindDir, Yaw }
+internal enum TraceChannel { Time, Speed, Throttle, Brake, Clutch, Steering, Gear, Rpm, LatAccel, LongAccel, X, Y, PushToPass = 16, Wind, WindDir, Yaw, BrakeBias, Abs, Tc, OffTrack }
 
 internal sealed class LapTrace
 {
@@ -11,7 +11,9 @@ internal sealed class LapTrace
     private const byte Format = 1;
     private const double EarthRadius = 6371008.8;
     private static readonly int Channels = (int)Enum.GetValues<TraceChannel>().Max() + 1;
-    private static readonly double[] Scale = { 1000, 100, 255, 255, 255, 1000, 1, 1, 100, 100, 100, 100, 100, 100, 100, 100, 1, 100, 1000, 1000 };
+    private static readonly double[] Scale = { 1000, 100, 255, 255, 255, 1000, 1, 1, 100, 100, 100, 100, 100, 100, 100, 100, 1, 100, 1000, 1000, 1000, 100, 100, 1 };
+
+    public static bool Stepped(TraceChannel c) => c is TraceChannel.Gear or TraceChannel.PushToPass or TraceChannel.BrakeBias or TraceChannel.Abs or TraceChannel.Tc or TraceChannel.OffTrack;
 
     private readonly double[]?[] _data;
 
@@ -53,7 +55,7 @@ internal sealed class LapTrace
         int i = (int)at;
         if (i >= Points - 1) return v[Points - 1];
         double f = at - i;
-        return c is TraceChannel.Gear or TraceChannel.PushToPass ? v[f < 0.5 ? i : i + 1]
+        return Stepped(c) ? v[f < 0.5 ? i : i + 1]
             : c is TraceChannel.WindDir or TraceChannel.Yaw ? v[i] + Math.IEEERemainder(v[i + 1] - v[i], Math.Tau) * f
             : v[i] + (v[i + 1] - v[i]) * f;
     }
@@ -85,6 +87,15 @@ internal sealed class LapTrace
         while (hi - lo > 1) { int mid = (lo + hi) / 2; if (t[mid] <= time) lo = mid; else hi = mid; }
         double f = t[hi] > t[lo] ? (time - t[lo]) / (t[hi] - t[lo]) : 0;
         return Distance(lo) + f * StepM;
+    }
+
+    public static readonly TraceChannel[] NotShared = { TraceChannel.BrakeBias, TraceChannel.Abs, TraceChannel.Tc, TraceChannel.OffTrack };
+
+    public LapTrace Without(IReadOnlyCollection<TraceChannel> channels)
+    {
+        var copy = new LapTrace(StepM, LengthM, LapTime, OriginLat, OriginLon, Points);
+        for (int c = 0; c < Channels; c++) if (!channels.Contains((TraceChannel)c)) copy._data[c] = _data[c];
+        return copy;
     }
 
     public byte[] Encode()
@@ -160,7 +171,7 @@ internal sealed class LapTrace
                     if (b < 0x80) break;
                 }
                 last += (long)(z >> 1) ^ -(long)(z & 1);
-                values[i] = last / Scale[c];
+                values[i] = c < Scale.Length ? last / Scale[c] : last;
             }
             if (known) trace._data[c] = values;
         }
@@ -288,7 +299,8 @@ internal sealed class TraceBuilder
 {
     internal readonly record struct Sample(double Dist, double Pct, double Time, double Speed, double Throttle, double Brake, double? Clutch,
         double Steering, int Gear, double Rpm, double LatAccel, double LongAccel, double Lat, double Lon, double X = double.NaN, double Y = double.NaN,
-        bool? PushToPass = null, double? Wind = null, double? WindDir = null, double? Yaw = null);
+        bool? PushToPass = null, double? Wind = null, double? WindDir = null, double? Yaw = null,
+        double? BrakeBias = null, double? Abs = null, double? Tc = null, bool? OffTrack = null);
 
     private readonly List<Sample> _samples = new(8192);
     private readonly double _step;
@@ -340,6 +352,8 @@ internal sealed class TraceBuilder
         bool p2p = use.Any(s => s.PushToPass is not null);
         bool wind = use.Any(s => s.Wind is not null && s.WindDir is not null);
         bool yaw = use.All(s => s.Yaw is not null);
+        bool bias = use.All(s => s.BrakeBias is > 0), abs = use.All(s => s.Abs is not null), tc = use.All(s => s.Tc is not null);
+        bool off = use.Any(s => s.OffTrack == true);
         int j = 0;
         for (int i = 0; i < points; i++)
         {
@@ -360,6 +374,11 @@ internal sealed class TraceBuilder
             ch[TraceChannel.LatAccel][i] = L(a.LatAccel, b.LatAccel);
             ch[TraceChannel.LongAccel][i] = L(a.LongAccel, b.LongAccel);
             ch[TraceChannel.PushToPass][i] = (f < 0.5 ? a.PushToPass : b.PushToPass) == true ? 1 : 0;
+            var near = f < 0.5 ? a : b;
+            ch[TraceChannel.BrakeBias][i] = near.BrakeBias ?? 0;
+            ch[TraceChannel.Abs][i] = near.Abs ?? 0;
+            ch[TraceChannel.Tc][i] = near.Tc ?? 0;
+            ch[TraceChannel.OffTrack][i] = a.OffTrack == true || b.OffTrack == true ? 1 : 0;
             ch[TraceChannel.Wind][i] = L(a.Wind ?? b.Wind ?? 0, b.Wind ?? a.Wind ?? 0);
             double fromA = a.WindDir ?? b.WindDir ?? 0, fromB = b.WindDir ?? fromA;
             double from = fromA + Math.IEEERemainder(fromB - fromA, Math.Tau) * f;
@@ -375,7 +394,11 @@ internal sealed class TraceBuilder
         }
         if (!globe) Close(ch[TraceChannel.X], ch[TraceChannel.Y], use[0].X, use[0].Y, use[^1].X - use[0].X, use[^1].Y - use[0].Y);
         foreach (var (c, values) in ch)
-            if (c switch { TraceChannel.Clutch => clutch, TraceChannel.PushToPass => p2p, TraceChannel.Wind or TraceChannel.WindDir => wind, TraceChannel.Yaw => yaw, _ => true })
+            if (c switch
+            {
+                TraceChannel.Clutch => clutch, TraceChannel.PushToPass => p2p, TraceChannel.Wind or TraceChannel.WindDir => wind, TraceChannel.Yaw => yaw,
+                TraceChannel.BrakeBias => bias, TraceChannel.Abs => abs, TraceChannel.Tc => tc, TraceChannel.OffTrack => off, _ => true,
+            })
                 trace[c] = values;
         return trace;
     }

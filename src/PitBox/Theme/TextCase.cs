@@ -26,6 +26,8 @@ public static class TextCase
 
     public static ToolTip VerbatimTip(string text) => Verbatim(new ToolTip { Content = text });
 
+    public static ToolTip PathTip(string text) => VerbatimTip(text.Replace("\\", "\\\u200B"));
+
     public static string Upper(string text) => Spaced(Capitals(text), joined: true);
 
     public static string Capitals(string text)

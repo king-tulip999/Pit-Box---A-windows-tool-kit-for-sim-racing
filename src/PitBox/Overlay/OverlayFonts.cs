@@ -17,7 +17,7 @@ internal static class OverlayFonts
     private static readonly object Gate = new();
     private static List<byte[]>? _text;
     private static byte[]? _displayBytes;
-    private static PrivateFontCollection? _gdi;
+    private static PrivateFontCollection? _gdi, _displayGdi;
     private static FontFamily? _regular, _semibold, _display;
     private static bool _gdiTried;
     private static IDWriteInMemoryFontFileLoader? _loader;
@@ -52,21 +52,28 @@ internal static class OverlayFonts
             try
             {
                 _gdi = new PrivateFontCollection();
-                foreach (var bytes in _text!.Append(_displayBytes).OfType<byte[]>())
-                {
-                    var memory = Marshal.AllocCoTaskMem(bytes.Length);
-                    Marshal.Copy(bytes, 0, memory, bytes.Length);
-                    _gdi.AddMemoryFont(memory, bytes.Length);
-                }
+                foreach (var bytes in _text!) Add(_gdi, bytes);
                 _regular = _gdi.Families.FirstOrDefault(f => f.Name == Family);
                 _semibold = _gdi.Families.FirstOrDefault(f => f.Name == Family + " SemiBold");
-                _display = _gdi.Families.FirstOrDefault(f => f.Name.StartsWith(Family + " Condensed", StringComparison.Ordinal));
+                if (_displayBytes is { } display)
+                {
+                    _displayGdi = new PrivateFontCollection();
+                    Add(_displayGdi, display);
+                    _display = _displayGdi.Families.FirstOrDefault(f => f.Name.StartsWith(Family + " Condensed", StringComparison.Ordinal));
+                }
             }
             catch (Exception ex) when (ex is ArgumentException or ExternalException or IOException)
             {
                 App.LogError(ex);
             }
         }
+    }
+
+    private static void Add(PrivateFontCollection collection, byte[] bytes)
+    {
+        var memory = Marshal.AllocCoTaskMem(bytes.Length);
+        Marshal.Copy(bytes, 0, memory, bytes.Length);
+        collection.AddMemoryFont(memory, bytes.Length);
     }
 
     public static IDWriteFontCollection? Collection(IDWriteFactory factory)

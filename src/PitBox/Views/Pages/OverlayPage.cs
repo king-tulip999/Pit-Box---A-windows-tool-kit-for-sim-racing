@@ -535,7 +535,8 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
     private Tile MetricCard(string group, List<OverlayMetricEntry> entries)
     {
         var name = new TextBlock { Text = group, Style = Ui.Res<Style>("Eyebrow"), VerticalAlignment = VerticalAlignment.Center };
-        var count = new Odometer(10.5, "TextFaint", italic: false, heavy: false) { RollMs = 360, Margin = new Thickness(7, 0, 0, 0) };
+        var count = RaceParts.LiveFigure("", 10.5, "TextFaint", italic: false, heavy: false);
+        count.Margin = new Thickness(7, 0, 0, 0);
         var all = new Button { Style = Ui.Res<Style>("GhostButton"), Height = 22, MinWidth = 0, Padding = new Thickness(7, 0, 7, 0), FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center };
         if (entries.Count < 2) all.Visibility = Visibility.Hidden;
         var head = new DockPanel { Margin = new Thickness(10, 6, 6, 6), LastChildFill = false };
@@ -552,7 +553,7 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         void Sync()
         {
             int on = entries.Count(e => e.Enabled);
-            count.Set($"{on}/{entries.Count}");
+            TextCase.Set(count, $"{on}/{entries.Count}");
             all.Content = on == entries.Count ? "None" : "All";
             name.SetResourceReference(TextBlock.ForegroundProperty, on == 0 ? "TextFaint" : "EyebrowText");
         }

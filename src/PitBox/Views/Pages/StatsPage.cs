@@ -439,10 +439,10 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         var charts = await Task.Run(() => StatsCharts.Read(store, q, range, stats.Settings.TimelineCombo, stats.Settings.TimelinePickedUtc));
         var traces = stats.Traces;
         string driver = name ?? "";
-        var (sessions, traced, races) = await Task.Run(() =>
+        var (sessions, traced, races, goals) = await Task.Run(() =>
         {
             var list = store.Sessions(q.From, q.To);
-            return (list, traces?.SessionsWithTraces(list.Select(s => s.Id)) ?? new HashSet<long>(), RaceInfo.Read(store, driver));
+            return (list, traces?.SessionsWithTraces(list.Select(s => s.Id)) ?? new HashSet<long>(), RaceInfo.Read(store, driver), GoalsData.Read(store, stats.Settings, q.NowUtc));
         });
         await Motion.PageSettled(Dispatcher);
         if (version != _version || !_shown || _sessionId is not null) return;
@@ -458,7 +458,7 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
             return;
         }
         var sessionsCard = StatsSessions.Card(sessions, traced, _filter, stats.Settings, Refresh, s => Open(s.Id), TraceSettings.Button(_app, stats, _window), races);
-        var sections = StatsSections.Page(results, charts, stats, q, Changed, sessionsCard, races.Card(sessions.FirstOrDefault(RaceParts.Raced)));
+        var sections = StatsSections.Page(results, charts, stats, q, Changed, sessionsCard, races.Card(sessions.FirstOrDefault(RaceParts.Raced)), StatsGoals.Card(goals, stats, Changed));
         page.Children.Add(sections);
         page.Children.Add(_telemetry = new TelemetryFilesCard(_app, _window, stats) { Margin = new Thickness(0, Ui.PanelSpacing, 0, 0) });
         if (!restoreOffset && sections is Panel parts)
@@ -738,7 +738,7 @@ internal static class StatsUi
 internal static class StatsSections
 {
     public static FrameworkElement Page(List<(StatDef Def, StatResult Result)> results, StatsCharts.Data charts, SessionStatsService service, StatQuery q, Action changed,
-        FrameworkElement? sessions = null, FrameworkElement? lastRace = null)
+        FrameworkElement? sessions = null, FrameworkElement? lastRace = null, FrameworkElement? goals = null)
     {
         var byId = results.ToDictionary(r => r.Def.Id, r => r);
         (StatDef Def, StatResult Result)? Get(string id) => byId.TryGetValue(id, out var r) ? r : null;
@@ -769,8 +769,10 @@ internal static class StatsSections
         Group("More", results.Where(r => !known.Contains(r.Def.Id)));
         Add(Hero(charts, q, StatsUi.RangeName(service.Range), Many("pace.laps", "time.total", "pace.distance", "pace.top").ToList(), groups, lastRace));
         Add(sessions);
+        Add(goals);
 
-        var performance = Section("Performance", "I.Stats", null, PickPair(charts, service, changed),
+        var performance = Section("Performance", "I.Stats", null, PickPair(charts, service, changed), Stack(
+            charts.Report is { } report ? StatsReport.Card(report, service, changed) : null,
             StatsLayout.Pair(
                 Chart("Personal best progression", "Your best clean lap in this car and track, session by session", charts.Timeline.Count switch
                 {
@@ -779,7 +781,7 @@ internal static class StatsSections
                     _ => StatsCharts.Progression(charts.Timeline),
                 }),
                 Chart("Lap consistency", "Clean laps per session: the box holds the middle half, the line runs from the fastest lap to the 90th percentile, the tick is the median",
-                    charts.Consistency.Count == 0 ? Empty("No session with 3 or more clean laps in this pair yet.") : StatsCharts.Consistency(charts.Consistency)), 1050, gap: 26)!);
+                    charts.Consistency.Count == 0 ? Empty("No session with 3 or more clean laps in this pair yet.") : StatsCharts.Consistency(charts.Consistency)), 1050, gap: 26)!));
 
         var types = charts.SessionTypes;
         var activity = Section("Driving activity", "I.Clock", $"{SimRacing.Race.RaceFormat.Count(charts.Sessions, "session")}", null, Stack(
@@ -855,7 +857,7 @@ internal static class StatsSections
         return stack;
     }
 
-    private static FrameworkElement? Metrics(IEnumerable<(StatDef Def, StatResult Result)> stats, double size = 18)
+    internal static FrameworkElement? Metrics(IEnumerable<(StatDef Def, StatResult Result)> stats, double size = 18)
     {
         var grid = new StatGrid { MinTileWidth = 122, Gap = 0, RowGap = 13 };
         foreach (var (def, result) in stats)
@@ -900,9 +902,9 @@ internal static class StatsSections
         FrameworkElement shown = value;
         if (!result.NoData && !name)
         {
-            var rolling = new Odometer(size * 1.25, tone?.Deep ?? hue ?? "Heading", italic: true) { CountUpOnLoad = true, RollMs = 900, HorizontalAlignment = HorizontalAlignment.Left };
-            rolling.Set(result.Value);
-            shown = rolling;
+            var figure = RaceParts.LiveFigure(result.Value, size * 1.25, tone?.Deep ?? hue ?? "Heading");
+            figure.HorizontalAlignment = HorizontalAlignment.Left;
+            shown = figure;
         }
         var stack = new StackPanel { Children = { bar, shown, label } };
         if (result.Detail is { Length: > 0 } detail && !result.NoData)
@@ -934,7 +936,7 @@ internal static class StatsSections
             };
             block.Children.Add(carZone);
             block.Children.Add(outline);
-            var lap = RaceParts.Big(StatFormat.LapTime(pb.Best), 58, "Place4Text", italic: true);
+            var lap = RaceParts.BigFigure(StatFormat.LapTime(pb.Best), 58, "Place4Text");
             lap.HorizontalAlignment = HorizontalAlignment.Left;
             lap.Margin = new Thickness(0, 2, 0, 0);
             best.Children.Add(lap);
@@ -1251,7 +1253,8 @@ internal static class StatsCharts
 
     internal sealed record Data(int Sessions, double[,] Heatmap, int[,] HeatmapDays, List<Ranking> Cars, List<Ranking> Tracks, List<Ranking> Classes,
         List<(string Type, double Seconds)> SessionTypes, TrendData Trend,
-        List<PersonalBest> Bests, (DateTime When, double Lap)? HeroFirst, string? TimelineKey, List<(DateTime When, double Lap)> Timeline, List<SessionSpread> Consistency);
+        List<PersonalBest> Bests, (DateTime When, double Lap)? HeroFirst, string? TimelineKey, List<(DateTime When, double Lap)> Timeline, List<SessionSpread> Consistency,
+        ComboReport? Report = null);
 
     public static Data Read(StatsStore store, StatQuery q, StatRange range, string? timelineKey, long? pickedAt)
     {
@@ -1320,7 +1323,9 @@ internal static class StatsCharts
             }
             if (spreads.Count > 24) spreads = spreads.Skip(spreads.Count - 24).ToList();
         }
-        return new Data(starts.Count, heat, DaysPerCell(hoursDriven), Top("car"), Top("track"), Top("car_class"), types, TrendOf(starts, q, range), bests, heroFirst, picked?.Key, timeline, spreads);
+        var report = picked is null ? null : ComboReport.Read(store, picked.Car, picked.Track, picked.Config, picked.TrackId, picked.TrackName);
+        return new Data(starts.Count, heat, DaysPerCell(hoursDriven), Top("car"), Top("track"), Top("car_class"), types, TrendOf(starts, q, range), bests, heroFirst, picked?.Key, timeline, spreads,
+            report);
     }
 
     internal static void SpreadOverHours(double[,] heat, DateTime start, DateTime end, double seconds, ISet<DateTime>? hoursDriven = null)

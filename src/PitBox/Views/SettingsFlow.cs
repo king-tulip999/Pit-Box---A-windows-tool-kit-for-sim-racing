@@ -81,7 +81,7 @@ internal sealed class SettingsFlow : StackPanel
                     height = Math.Max(height, child.DesiredSize.Height);
                 }
                 for (int c = 0; c < line.Count; c++)
-                    _places.Add((line[c], new Rect(c * (cell + ColumnGap), y + (height - line[c].DesiredSize.Height) / 2, cell, line[c].DesiredSize.Height)));
+                    _places.Add((line[c], new Rect(c * (cell + ColumnGap), y, cell, line[c].DesiredSize.Height)));
                 y += height;
                 for (int c = 0; c < line.Count; c++)
                     bottoms[c] = y;

@@ -297,7 +297,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         return new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, 10), Child = stack };
     }
 
-    private static Tile BrowserSources(AppServices app, RaceHudSettings S, Func<HudHost?> host, Action changed, Action rebuild)
+    private static Tile BrowserSources(RaceHudSettings S, Func<HudHost?> host, Action changed, Action rebuild)
     {
         void Apply()
         {
@@ -709,7 +709,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
                 Ui.Switch(!S.Interactive, on => { S.Interactive = !on; changed(); })),
             Ui.SettingRow("Units", null, Ui.Segmented(new[] { "Metric", "Imperial" }, (int)S.Units, i => { S.Units = (HudUnits)i; changed(); }, "hudunits"),
                 D(() => S.Units == HudUnits.Metric, () => S.Units = HudUnits.Metric, "Metric"))));
-        root.Children.Add(BrowserSources(app, S, Host, changed, rebuild));
+        root.Children.Add(BrowserSources(S, Host, changed, rebuild));
         var keys = new KeybindTree(app, e => e.Id.StartsWith("hud.", StringComparison.Ordinal), skip: 2, label: ShortKeybindLabel, flat: true) { Style = null, Padding = new Thickness(0), Margin = new Thickness(-5, 5, 0, 0) };
         root.Children.Add(new Tile
         {
@@ -1284,7 +1284,7 @@ internal sealed class PreviewSource
 
     public PreviewSource(Func<RaceHudSettings> settings)
     {
-        Simulated = new RaceState(settings);
+        Simulated = new RaceState(settings) { MapLoader = SimRacing.TrackMaps.TrackMapLibrary.ForRace };
         DemoTelemetry.WarmUp(Simulated, _frame, ref _seq);
         Advance(null);
     }

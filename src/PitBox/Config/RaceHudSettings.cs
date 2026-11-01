@@ -63,6 +63,13 @@ public sealed class RaceHudSettings
 
     public List<string> EditorSectionsToggled { get; set; } = new();
 
+    public List<TrackNote> Notes { get; set; } = new();
+
+    public const int MaxNotes = 500, NoteLength = 160;
+
+    public IEnumerable<TrackNote> NotesFor(string track, string config, string car) =>
+        Notes.Where(n => n.Matches(track, config, car));
+
     public List<string> KnownClasses { get; set; } = new();
     public List<string> KnownCars { get; set; } = new();
     public List<string> KnownTracks { get; set; } = new();
@@ -84,7 +91,7 @@ public sealed class RaceHudSettings
 
     public static string SessionKind(string session) => string.Equals(session, "Warmup", StringComparison.OrdinalIgnoreCase) ? "Practice" : session;
 
-    public static readonly string[] RemovedKinds = { "radar", "blindspot", "spotter", "h2h", "pit", "inputs", "flags", "dash", "trackmap", "radio", "spotterbox" };
+    public static readonly string[] RemovedKinds = { "blindspot", "spotter", "h2h", "pit", "flags", "dash", "trackmap", "radio", "spotterbox" };
 
     public string? ToggleHotkey { get; set; }
     public string? EditHotkey { get; set; }
@@ -197,6 +204,7 @@ public sealed class RaceHudSettings
                 w.Kind ??= "";
                 if (string.IsNullOrWhiteSpace(w.Id) || !ids.Add(w.Id)) { w.Id = HudWidgetConfig.NewId(w.Kind); ids.Add(w.Id); }
                 SideBannerToTop(w);
+                OldInputStyles(w);
                 if (before2) ShowClassesInsteadOfHiding(w);
                 w.Clamp();
             }
@@ -225,10 +233,36 @@ public sealed class RaceHudSettings
         KnownClasses = Clean(KnownClasses);
         KnownCars = Clean(KnownCars);
         KnownTracks = Clean(KnownTracks);
+        var noteIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        Notes = (Notes ?? new()).Where(n => n is not null && !string.IsNullOrWhiteSpace(n.Track) && !string.IsNullOrWhiteSpace(n.Text)).Take(MaxNotes).ToList();
+        foreach (var n in Notes)
+        {
+            n.Clean();
+            if (string.IsNullOrWhiteSpace(n.Id) || !noteIds.Add(n.Id)) { n.Id = Guid.NewGuid().ToString("N"); noteIds.Add(n.Id); }
+        }
     }
 
     internal void ShowClassesInsteadOfHiding(HudWidgetConfig w) =>
         SimRacing.Hud.Editors.HudClassFilter.Migrate(w, (KnownClasses ?? new()).Concat(SimRacing.Race.SessionNames.Classes));
+
+    internal static void OldInputStyles(HudWidgetConfig w)
+    {
+        if (!string.Equals(w.Kind, "inputs", StringComparison.OrdinalIgnoreCase) || w.Options is null || !w.Options.TryGetValue("style", out var style)) return;
+        if (style == "tach")
+        {
+            w.Options.Remove("style");
+            double factor = w.W / 188;
+            w.W = Math.Max(1, Math.Round(420 * factor));
+            w.H = Math.Max(1, Math.Round(110 * factor));
+        }
+        else if (style == "strip")
+        {
+            w.Options["style"] = "lights";
+            double factor = w.H / 50;
+            w.W = Math.Max(1, Math.Round(470 * factor));
+            w.H = Math.Max(1, Math.Round(66 * factor));
+        }
+    }
 
     internal static void SideBannerToTop(HudWidgetConfig w)
     {
@@ -325,6 +359,32 @@ public sealed class HudWidgetConfig
     }
 
     public bool ShowsIn(string session) => Sessions.Count == 0 || Sessions.Any(s => string.Equals(s, session, StringComparison.OrdinalIgnoreCase));
+}
+
+public sealed class TrackNote
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string Track { get; set; } = "";
+    public string Config { get; set; } = "";
+    public string? Car { get; set; }
+    public double? Pct { get; set; }
+    public string? Turn { get; set; }
+    public string Text { get; set; } = "";
+
+    public bool Matches(string track, string config, string car) =>
+        string.Equals(Track, track.Trim(), StringComparison.OrdinalIgnoreCase) && string.Equals(Config, config.Trim(), StringComparison.OrdinalIgnoreCase)
+        && (Car is null || string.Equals(Car, car.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    public void Clean()
+    {
+        Track = (Track ?? "").Trim();
+        Config = (Config ?? "").Trim();
+        Car = string.IsNullOrWhiteSpace(Car) ? null : Car.Trim();
+        Text = (Text ?? "").Trim();
+        if (Text.Length > RaceHudSettings.NoteLength) Text = Text[..RaceHudSettings.NoteLength].TrimEnd();
+        Pct = Pct is { } p && double.IsFinite(p) ? p - Math.Floor(p) : null;
+        Turn = Pct is null || string.IsNullOrWhiteSpace(Turn) ? null : Turn.Trim();
+    }
 }
 
 public sealed class HudLayoutRule

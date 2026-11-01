@@ -813,29 +813,29 @@ internal sealed class HudPainter : IDisposable
                 G.FillRectangle(Brush(c), r.X + col * cell, r.Y + row * cell, Math.Min(cell, r.Right - r.X - col * cell), Math.Min(cell, r.Bottom - r.Y - row * cell));
     }
 
-    private readonly Dictionary<(string, float), (GraphicsPath Path, RectangleF Box)> _display = new();
+    private readonly Dictionary<(string, float, bool), (GraphicsPath Path, RectangleF Box)> _display = new();
 
-    private (GraphicsPath Path, RectangleF Box) DisplayPath(string text, float px)
+    private (GraphicsPath Path, RectangleF Box) DisplayPath(string text, float px, bool lean)
     {
         px = MathF.Round(px * _textScale * 2) / 2;
-        var key = (text, px);
+        var key = (text, px, lean);
         if (_display.TryGetValue(key, out var known)) return known;
         if (_display.Count >= MaxCached) { foreach (var x in _display.Values) x.Path.Dispose(); _display.Clear(); }
         var (family, style) = OverlayFonts.Display;
         var path = new GraphicsPath();
         path.AddString(text, family, (int)style, px, PointF.Empty, StringFormat.GenericTypographic);
-        path.Transform(Lean);
+        if (lean) path.Transform(Lean);
         var box = path.GetBounds();
         if (box.Width <= 0 || box.Height <= 0) box = new RectangleF(0, 0, Math.Max(1, text.Length * px * 0.5f), px * 0.7f);
         return _display[key] = (path, box);
     }
 
-    public SizeF DisplaySize(string text, float px) => text.Length == 0 ? SizeF.Empty : DisplayPath(text, px).Box.Size;
+    public SizeF DisplaySize(string text, float px, bool lean = true) => text.Length == 0 ? SizeF.Empty : DisplayPath(text, px, lean).Box.Size;
 
-    public void Display(string text, float px, Color c, RectangleF box, HAlign h = HAlign.Left, VAlign v = VAlign.Top)
+    public void Display(string text, float px, Color c, RectangleF box, HAlign h = HAlign.Left, VAlign v = VAlign.Top, bool lean = true)
     {
         if (text.Length == 0) return;
-        var (path, bounds) = DisplayPath(text, px);
+        var (path, bounds) = DisplayPath(text, px, lean);
         float x = h switch { HAlign.Center => box.X + (box.Width - bounds.Width) / 2, HAlign.Right => box.Right - bounds.Width, _ => box.X } - bounds.X;
         float y = v switch { VAlign.Center => box.Y + (box.Height - bounds.Height) / 2, VAlign.Bottom => box.Bottom - bounds.Height, _ => box.Y } - bounds.Y;
         G.TranslateTransform(x, y);

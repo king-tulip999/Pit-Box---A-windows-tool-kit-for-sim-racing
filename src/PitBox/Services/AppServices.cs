@@ -161,6 +161,7 @@ internal sealed class AppServices : IDisposable
 
     public void SaveNow()
     {
+        SaveWatch.Saved(Config);
         try
         {
             ConfigStore.Save(Config);
@@ -173,6 +174,7 @@ internal sealed class AppServices : IDisposable
 
     private async void SaveInBackground()
     {
+        SaveWatch.Saved(Config);
         try
         {
             if (ConfigStore.SaveInBackground(Config) is { } write) await write;

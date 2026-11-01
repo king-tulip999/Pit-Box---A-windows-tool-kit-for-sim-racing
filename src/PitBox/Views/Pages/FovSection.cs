@@ -946,7 +946,7 @@ internal sealed class FovSection : StackPanel
         return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(15, 11, 15, 11), Child = stack };
     }
 
-    private sealed record Figure(Tile Tile, Odometer Value, Border Note);
+    private sealed record Figure(Tile Tile, TextBlock Value, Border Note);
 
     private readonly Dictionary<string, Figure> _figures = new();
 
@@ -963,18 +963,17 @@ internal sealed class FovSection : StackPanel
             });
             head.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
             stack.Children.Add(head);
-            var rolling = new Odometer { RollMs = 420, Margin = new Thickness(0, 3, 0, 0), HorizontalAlignment = HorizontalAlignment.Left };
-            System.Windows.Documents.TextElement.SetFontSize(rolling, 22.5);
-            System.Windows.Documents.TextElement.SetFontWeight(rolling, FontWeights.SemiBold);
-            stack.Children.Add(rolling);
+            var number = new TextBlock { FontSize = 22.5, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 3, 0, 0), HorizontalAlignment = HorizontalAlignment.Left };
+            System.Windows.Documents.Typography.SetNumeralAlignment(number, FontNumeralAlignment.Tabular);
+            stack.Children.Add(number);
             var noteHost = new Border();
             stack.Children.Add(noteHost);
-            figure = new Figure(new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(13, 10, 13, 10), Margin = new Thickness(5, 0, 5, 10), Child = stack }, rolling, noteHost);
+            figure = new Figure(new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(13, 10, 13, 10), Margin = new Thickness(5, 0, 5, 10), Child = stack }, number, noteHost);
             _figures[title + icon] = figure;
         }
         (figure.Tile.Parent as Panel)?.Children.Remove(figure.Tile);
-        figure.Value.SetBrush(warn ? "WarnDeep" : "Text");
-        figure.Value.Set(value);
+        figure.Value.SetResourceReference(TextBlock.ForegroundProperty, warn ? "WarnDeep" : "Text");
+        TextCase.Set(figure.Value, value);
         var noteText = new TextBlock { Text = note, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap };
         figure.Note.Child = warn ? Ui.IconText("I.Alert", noteText, "WarnDeep") : noteText;
         figure.Tile.ToolTip = tip;

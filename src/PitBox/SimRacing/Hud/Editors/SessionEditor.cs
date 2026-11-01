@@ -13,8 +13,9 @@ internal static class SessionEditor
             new("fields", "Shows", HudTab.Content, true, new PickerSetting("fields", new HudCategory[]
             {
                 new("Time", "remain", "lapsleft", "elapsed", "clock", "finish"),
-                new("Race", "lap", "pos", "cpos", "phase", "inc"),
-                new("Track", "track", "temps"),
+                new("Race", "lap", "pos", "cpos", "phase", "inc", "irchange"),
+                new("Driving", "offtracks", "consistency"),
+                new("Track", "track", "temps", "trend"),
             })),
         },
         Regions = new Dictionary<string, string> { ["progress"] = "progress" },
@@ -22,7 +23,7 @@ internal static class SessionEditor
         {
             new(HudPreset.Minimal, V(("fields", "remain,pos"), ("progress", false))),
             new(HudPreset.Standard, V()),
-            new(HudPreset.Everything, V(("fields", "remain,lapsleft,elapsed,lap,pos,cpos,phase,track,temps,inc,clock,finish"))),
+            new(HudPreset.Everything, V(("fields", "remain,lapsleft,elapsed,lap,pos,cpos,phase,track,temps,trend,inc,irchange,offtracks,consistency,clock,finish"))),
         },
     };
 }

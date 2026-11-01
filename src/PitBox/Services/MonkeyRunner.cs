@@ -69,6 +69,7 @@ internal static class MonkeyRunner
             await Settle();
             int baseline = TickHandlers(app);
             Log($"tick handlers on the first page: {baseline}");
+            SaveWatch.Start(app);
             var end = DateTime.UtcNow.AddMinutes(minutes);
             while (DateTime.UtcNow < end)
             {
@@ -347,6 +348,7 @@ internal static class MonkeyRunner
         string twice = JsonSerializer.Serialize(ConfigStore.Normalize(copy), ConfigStore.JsonOptions);
         if (once != twice) Problem("config: Normalize twice differs from once");
         foreach (var d in ConfigReferences.Dangling(app.Config)) Problem("config: dangling " + d);
+        if (SaveWatch.Unsaved(app) is { } unsaved) Problem("a setting changed without being saved (lost on restart): " + unsaved);
 
         if (Orphans().Count > 0)
         {

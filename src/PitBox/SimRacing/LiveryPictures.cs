@@ -200,7 +200,7 @@ internal sealed class LiveryPictures
         return files;
     }
 
-    private static SessionInfo? Session(string path)
+    internal static SessionInfo? Session(string path)
     {
         try
         {

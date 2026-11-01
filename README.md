@@ -24,9 +24,14 @@ What started this journey. I got sick of doing everything by hand every time I w
 
 [![Watch the iRacing Overlay showcase](screenshots/hud-showcase.jpg)](https://www.youtube.com/watch?v=PLWhXW9Hh0A)
 
-- **Widgets:** Relative, Standings, Fuel and strategy, Lap timing and delta, Lap history, Tires, Weather and track, Wind, Session, Race events, Multiclass traffic, Alerts, Track map, Inputs, a Result card after the race and a Data block for any single value.
-- **Inputs:** throttle, brake, clutch and steering with gear, speed and RPM, as a scrolling trace, a round tach or a low strip.
+- **Widgets:** Relative, Standings, Fuel and strategy, Lap timing and delta, Lap history, Tires, Weather and track, Wind, Session, Race events, Multiclass traffic, Alerts, Car radar, Track map, Inputs, Practice goals, Notes, a Race result after the race and a Data block for any single value.
+- **Inputs:** throttle, brake, clutch and steering with gear, speed and shift lights, as a scrolling trace or a low shift-light bar.
 - **Pit exit:** the Fuel widget shows where a stop right now would put you: your class position, the cars ahead and behind, traffic, and a ghost on a track strip. It learns the pit lane, fill rate and tire time per track and car.
+- **Strategy:** fuel saving (what each lap may use to finish with one stop fewer) and undercut / overcut (what you'd need per lap to jump the car ahead, or to cover the one behind).
+- **Practice goals:** clean or consistent laps in a row, laps close to your best or under a time, as a lap list or big counters.
+- **Notes:** your notes per track and car, with the next corner's note lighting up as you get close.
+- **Race result:** a card, a banner, a stamp or a lap chart once you take the flag.
+- **Track limits:** off-tracks counted and placed by corner, with an alert from a threshold you pick.
 - **Your layout:** every widget can be set up however you like, with layouts that switch by car / class / track.
 - **In-game editor:** `Ctrl+Alt+E`, so you never have to leave the car.
 - **Browser sources:** every widget is also a web page on your PC only (`127.0.0.1`), for a wheel screen, a tablet browser or OBS. Off by default (iRacing Overlay → Settings → Browser sources).
@@ -49,6 +54,12 @@ What started this journey. I got sick of doing everything by hand every time I w
 
 - Single and triple screens, compare rigs, and write the result straight into iRacing.
 - Tells you when iRacing's FOV doesn't match your rig, or your side screens aren't at the best angle.
+
+#### Bass shakers
+
+- Engine, gear shifts, ABS, kerbs and bumps, and the rev limiter from iRacing's telemetry, played through any sound output your shaker's amplifier is on.
+- Other games (or iRacing, if you prefer) can use the low rumble from the game's own sound instead.
+- Each effect has its own strength and a test button. Off by default (Settings → Tools).
 
 #### Companion apps
 
@@ -89,7 +100,9 @@ Your iRacing history, kept on your PC.
 
 - **History:** laps, time, results, ratings, incidents and personal bests by week / month / season, with a picture of each car. Panels can be dragged into your own order.
 - **Result cards:** every race gets one with your finish, positions gained, rating changes, pace, consistency and awards (Win, Podium, Clean race, Personal best, Charger and more).
-- **Lap analysis:** open any session for its laps and sectors, then compare laps on telemetry traces or a top-down replay. Export a lap to share and import other people's.
+- **Goals and achievements:** set goals for iRating, safety rating, races, wins, podiums, clean races or hours (per car / track or this season), earn achievement tiers and follow your streaks.
+- **Per car and track:** a report card, where your off-tracks happen on the map, and your notes.
+- **Lap analysis:** open any session for its laps and sectors, then compare laps on telemetry traces (including brake bias, ABS and traction control) or a top-down replay, and see which corners cost the most time. Export a lap to share and import other people's.
 - **Tire wear** is tracked per run from the pit-stall readings.
 - **Old telemetry:** reads your old iRacing telemetry files so your history doesn't start from zero, can switch on iRacing's telemetry recording, and can clear out files it has already read.
 
@@ -117,7 +130,7 @@ Your iRacing history, kept on your PC.
 
 ## Limitations
 
-- The sim racing tools only support iRacing.
+- The sim racing tools only support iRacing (bass shakers can also use other games' sound).
 - Overlays show over borderless and windowed games, not exclusive fullscreen.
 - If Pit-Box gets force-killed (Task Manager → End task), fans stay at their last speed until it restarts or the PC reboots.
 - Windows text scaling (100%, 125%…) has no supported API, so the Displays page just links to Windows settings for it.
@@ -125,6 +138,7 @@ Your iRacing history, kept on your PC.
 ## Updates and removal
 
 - **Updates:** Settings → About and updates checks on start, daily, weekly or only when you click **Check now**. When there's an update, **Install and restart** downloads it, checks the checksum and swaps the exe. Your settings are kept.
+- **Storage:** Settings → Data and configuration → Storage shows how much space replays, paints, telemetry and Pit-Box itself use, and moves old replays and other drivers' paints to the Recycle Bin.
 - **Reset:** Settings → Data and configuration → **Reset Pit-Box**. Your old settings are saved as `config.before-reset-<date>.json`, and **Export / Import** lets you back them up or move them to another PC.
 - **Uninstall:**
   1. Turn off **Start with Windows**.

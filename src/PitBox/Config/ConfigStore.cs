@@ -118,6 +118,7 @@ public static class ConfigStore
         config.SimRacing.AssignCompareColors();
         (config.SimRacing.Setups ??= new()).Normalize();
         config.SimRacing.MigratePanelLayout();
+        (config.SimRacing.Shakers ??= new()).Normalize();
         (config.SessionStats ??= new()).Normalize();
         (config.SimRacing.Hud ??= new()).Normalize(SimRacing.Hud.HudPresets.DefaultLayouts, SimRacing.Hud.HudPresets.DefaultRules);
         if (config.Ui.StartPage is null || config.Ui.StartPage.Equals("home", StringComparison.OrdinalIgnoreCase) || config.Ui.StartPage.Equals("plugins", StringComparison.OrdinalIgnoreCase))

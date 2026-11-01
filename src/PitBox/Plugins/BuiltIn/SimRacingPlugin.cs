@@ -17,7 +17,7 @@ internal sealed class SimRacingPlugin : Plugin
     public override string Reads =>
         "With the iRacing Overlay on: iRacing's live telemetry (its shared memory, read only) while iRacing runs, and whether iRacing is running. With a keybind set to a wheel or button box button: that controller's button presses. iRacing's settings files and setups folder, and recent setups in Downloads, while its page is open. With “Car pictures in your paint” on: your paint files in iRacing's paint folder and the driver details in your newest telemetry files. With “Launch when iRacing starts” on: whether iRacing is running.";
     public override string BackgroundWork =>
-        "With the iRacing Overlay switched on: waits for iRacing to start (process events), then reads its telemetry about 60 times a second and draws the widgets at their own rates; while iRacing is closed it only waits. Turning a tool off in Settings → Tools also stops its background work and keybinds. Only with “Launch when iRacing starts” on for Trading Paints or Garage 61: watches for iRacing starting (process events, no polling). With “Car pictures in your paint” on: after iRacing opens or a session ends, asks iRacing to draw your car in each paint that changed (its own local service) and keeps the pictures in the Pit-Box folder. While the Setup Manager is open on screen: file events for the setups folder and Downloads. Otherwise never.";
+        "With the iRacing Overlay switched on: waits for iRacing to start (process events), then reads its telemetry about 60 times a second and draws the widgets at their own rates; while iRacing is closed it only waits. Turning a tool off in Settings → Tools also stops its background work and keybinds. Only with “Launch when iRacing starts” on for Trading Paints or Garage 61: watches for iRacing starting (process events, no polling). With “Car pictures in your paint” on: after iRacing opens or a session ends, asks iRacing to draw your car in each paint that changed (its own local service) and keeps the pictures in the Pit-Box folder. With Bass shakers switched on: reads the same telemetry and, only while iRacing is connected or a test plays, writes a sound to the output you picked. While the Setup Manager is open on screen: file events for the setups folder and Downloads. Otherwise never.";
     public override string Changes =>
         "The iRacing Overlay draws its own windows on top of the game; nothing is injected into iRacing or written to it. Only when you ask: iRacing's settings files when you save in iRacing Controller or write the FOV (backed up first), setup files and folders you import, rename, move, delete (to the Recycle Bin) or export in the Setup Manager, and starting or closing Trading Paints / Garage 61.";
 
@@ -29,6 +29,7 @@ internal sealed class SimRacingPlugin : Plugin
         if (app.Plugins.Find(PluginIds.SimRacing) is SimRacingPlugin { } plugin)
         {
             plugin.Hud?.SetActive(FeatureOn(app, "hud"));
+            plugin.Shakers?.SetActive(FeatureOn(app, "shakers"));
             plugin.TradingPaints?.SetActive(FeatureOn(app, "tradingpaints"));
             plugin.Garage61?.SetActive(FeatureOn(app, "garage61"));
             plugin.Liveries?.SetActive(LiveryPictures.On(app));
@@ -82,6 +83,8 @@ internal sealed class SimRacingPlugin : Plugin
             _ => "iRacing Overlay on · waiting for iRacing",
         };
 
+    public SimRacing.Shakers.ShakerHost? Shakers { get; private set; }
+
     public CompanionApp? TradingPaints { get; private set; }
 
     public CompanionApp? Garage61 { get; private set; }
@@ -94,6 +97,8 @@ internal sealed class SimRacingPlugin : Plugin
         Liveries.SetActive(LiveryPictures.On(app));
         Hud = new HudHost(app);
         Hud.SetActive(FeatureOn(app, "hud"));
+        Shakers = new SimRacing.Shakers.ShakerHost(app);
+        Shakers.SetActive(FeatureOn(app, "shakers"));
         TradingPaints = new CompanionApp(app, CompanionApp.TradingPaints, () => app.Config.SimRacing.TradingPaints);
         Garage61 = new CompanionApp(app, CompanionApp.Garage61, () => app.Config.SimRacing.Garage61);
         if (FeatureOn(app, "tradingpaints")) TradingPaints.Start(); else TradingPaints.SetActive(false);
@@ -104,6 +109,8 @@ internal sealed class SimRacingPlugin : Plugin
     {
         Hud?.Dispose();
         Hud = null;
+        Shakers?.Dispose();
+        Shakers = null;
         Liveries?.SetActive(false);
         Liveries = null;
         TradingPaints?.Stop();

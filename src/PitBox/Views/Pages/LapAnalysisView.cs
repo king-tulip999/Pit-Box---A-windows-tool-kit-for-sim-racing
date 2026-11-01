@@ -88,7 +88,10 @@ internal static class LapAnalysisView
     private static readonly Dictionary<string, string> LaneNames = new()
     {
         ["delta"] = "Time delta", ["speed"] = "Speed", ["pedals"] = "Throttle / brake", ["steering"] = "Steering angle", ["gear"] = "Gear", ["rpm"] = "RPM", ["latg"] = "Lateral g",
+        ["bias"] = "Brake bias", ["abs"] = "ABS setting", ["tc"] = "Traction control setting",
     };
+
+    public static readonly HashSet<string> SettingLanes = new() { "bias", "abs", "tc" };
 
     public static FrameworkElement Build(AnalysisData data, Config.SessionStatsSettings settings, string reference, AnalysisActions actions, ReplayMemory memory,
         out AnalysisState state)
@@ -210,6 +213,11 @@ internal static class LapAnalysisView
         chartCard.SizeChanged += (_, _) => MatchHeights();
         var telemetry = StatsLayout.Pair(mapCard, chartCard, 1100, 2, 3, Ui.PanelSpacing)!;
         page.Children.Add(telemetry);
+        if (LossCard(data, s) is { } loss)
+        {
+            loss.Margin = new Thickness(0, Ui.PanelSpacing, 0, 0);
+            page.Children.Add(loss);
+        }
         page.Children.Add(new DividerLine { Height = 2 * Ui.PanelSpacing });
         page.Children.Add(new LapReplayView(data, s, settings, memory, actions.Save));
         s.ResetZoom();
@@ -244,7 +252,7 @@ internal static class LapAnalysisView
             var mark = new Border { Width = 24, Height = 4, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(3, 0, 0, 6), RenderTransform = new SkewTransform(-30, 0) };
             mark.SetResourceReference(Border.BackgroundProperty, line?.BrushKey ?? place);
             plate.Children.Add(mark);
-            var time = RaceParts.Big(StatFormat.LapTime(lap.Time), 34, lap.Time == fastest ? place + "Text" : "Heading", italic: true);
+            var time = RaceParts.BigFigure(StatFormat.LapTime(lap.Time), 34, lap.Time == fastest ? place + "Text" : "Heading");
             time.HorizontalAlignment = HorizontalAlignment.Left;
             plate.Children.Add(time);
             string gap = lap.Time == fastest || data.Laps.Count == 1 ? "" : " · " + StatFormat.Value(StatKind.LapDelta, lap.Time - fastest, false);
@@ -277,6 +285,51 @@ internal static class LapAnalysisView
     {
         Style = Ui.Res<Style>("Card"), Padding = new Thickness(16, 13, 16, 16), Child = content, Margin = new Thickness(0, 0, 0, Ui.PanelSpacing),
     };
+
+    private static Tile? LossCard(AnalysisData data, AnalysisState s)
+    {
+        if (s.Single || s.Lines.FirstOrDefault(l => !l.Reference) is not { } lap) return null;
+        var worst = CornerLoss.Worst(lap.Trace, s.Reference.Trace);
+        var names = data.Map is { } map ? SimRacing.TrackMaps.TurnNames.From(map, data.Session.TrackKm) : null;
+        string Where(double d) => names?.HasTurns == true ? names.Where(d / s.Reference.Trace.LengthM) : DistanceText(d, s.Imperial);
+        var rows = new StackPanel { Margin = new Thickness(0, 10, 0, 0) };
+        if (worst.Count == 0)
+            rows.Children.Add(new TextBlock { Text = $"No corner costs more than {CornerLoss.LeastLoss.ToString("0.00", CultureInfo.CurrentCulture)} {Units.S}.", Style = Ui.Res<Style>("Muted") });
+        foreach (var c in worst)
+        {
+            var corner = c;
+            var parts = new List<string>();
+            if (c.BrakeEarlier is { } b && Math.Abs(b) >= 3) parts.Add($"braked {Metres(Math.Abs(b), s.Imperial)} {(b > 0 ? "earlier" : "later")}");
+            if (c.ApexSpeed is { } v && Math.Abs(v) >= 0.55) parts.Add($"{SpeedText(Math.Abs(v), s.Imperial)} {(v < 0 ? "slower" : "faster")} at the slowest point");
+            if (c.ThrottleLater is { } t && Math.Abs(t) >= 5) parts.Add($"full throttle {Metres(Math.Abs(t), s.Imperial)} {(t > 0 ? "later" : "earlier")}");
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(74) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(86) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition());
+            var name = new TextBlock { Text = Where(c.Apex), Style = Ui.Res<Style>("H3"), VerticalAlignment = VerticalAlignment.Center };
+            var lost = new TextBlock { Text = "+" + c.Lost.ToString("0.000", CultureInfo.CurrentCulture) + " " + Units.S, Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+            lost.SetResourceReference(TextBlock.ForegroundProperty, "DangerDeep");
+            System.Windows.Documents.Typography.SetNumeralAlignment(lost, FontNumeralAlignment.Tabular);
+            string said = parts.Count > 0 ? string.Join(", ", parts) : "lost through the corner";
+            var detail = new TextBlock { Text = char.ToUpper(said[0], CultureInfo.CurrentCulture) + said[1..] + ".", Style = Ui.Res<Style>("Muted"), TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
+            Grid.SetColumn(lost, 1);
+            Grid.SetColumn(detail, 2);
+            grid.Children.Add(name);
+            grid.Children.Add(lost);
+            grid.Children.Add(detail);
+            var row = new Button { Style = Ui.Res<Style>("GhostButton"), Content = grid, HorizontalContentAlignment = HorizontalAlignment.Stretch, Height = double.NaN, MinHeight = 34,
+                Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(0, 0, 0, 4), ToolTip = "Zoom the charts and map to this corner" };
+            row.Click += (_, _) => s.Zoom(corner.From, corner.To);
+            rows.Children.Add(row);
+        }
+        return Card(StatsSections.Chart("Where the time goes", $"{lap.Short} against {s.Reference.Short}: the corners costing the most time, from the braking zone to the next corner", rows));
+    }
+
+    private static string Metres(double m, bool imperial) =>
+        imperial ? (m * 3.28084).ToString("0", CultureInfo.CurrentCulture) + " " + Units.Ft : m.ToString("0", CultureInfo.CurrentCulture) + " " + Units.M;
+
+    private static string SpeedText(double ms, bool imperial) =>
+        imperial ? (ms * 2.236936).ToString("0", CultureInfo.CurrentCulture) + " " + Units.Mph : (ms * 3.6).ToString("0", CultureInfo.CurrentCulture) + " " + Units.Kmh;
 
     private static FrameworkElement LaneTag(string id, Action? remove)
     {
@@ -392,6 +445,9 @@ internal static class LapAnalysisView
             line.Lanes["gear"] = (t[TraceChannel.Gear], null);
             line.Lanes["rpm"] = (t[TraceChannel.Rpm], null);
             line.Lanes["latg"] = (Scaled(t[TraceChannel.LatAccel], 1 / 9.80665), null);
+            line.Lanes["bias"] = (t[TraceChannel.BrakeBias], null);
+            line.Lanes["abs"] = (t[TraceChannel.Abs], null);
+            line.Lanes["tc"] = (t[TraceChannel.Tc], null);
             line.PushToPass.AddRange(BoostSpans(t));
             line.Wind = t.WindOfLap();
         }
@@ -430,6 +486,9 @@ internal static class LapAnalysisView
         "steering" => StatsUi.Hue("Plum").Deep,
         "gear" => StatsUi.Hue("Gold").Deep,
         "rpm" => StatsUi.Hue("Coral").Deep,
+        "bias" => "Danger",
+        "abs" => StatsUi.Hue("Orange").Deep,
+        "tc" => StatsUi.Hue("Plum").Deep,
         _ => StatsUi.Hue("Slate").Deep,
     };
 
@@ -437,6 +496,7 @@ internal static class LapAnalysisView
     {
         "delta" => PitBox.SimRacing.Race.RaceFormat.Signed(v, "0.000", CultureInfo.CurrentCulture),
         "latg" => v.ToString("0.00", CultureInfo.CurrentCulture),
+        "bias" => v.ToString("0.0", CultureInfo.CurrentCulture),
         "gear" => v < 0 ? "R" : v == 0 ? "N" : v.ToString("0", CultureInfo.CurrentCulture),
         _ => v.ToString("0", CultureInfo.CurrentCulture),
     };
@@ -720,7 +780,7 @@ internal sealed class TraceChart : FrameworkElement
 
     public const double BoostStrip = 3;
 
-    public static double LaneHeight(string lane) => lane switch { "gear" => 58, "delta" => 96, "speed" => 112, "pedals" => 91, _ => 81 };
+    public static double LaneHeight(string lane) => lane switch { "gear" or "bias" or "abs" or "tc" => 58, "delta" => 96, "speed" => 112, "pedals" => 91, _ => 81 };
 
     public double PlotWidth => Math.Max(1, ActualWidth - Left - Right);
 
@@ -813,10 +873,15 @@ internal sealed class TraceChart : FrameworkElement
                     double a = X(from), b = X(to);
                     if (b >= Left && a <= ActualWidth - Right) dc.DrawRectangle(boost[k].Item1, null, new Rect(a, plotTop + plotH - BoostStrip * (k + 1), Math.Max(1, b - a), BoostStrip - 1));
                 }
+            if (!_s.Lines.Any(l => l.Lanes.TryGetValue(lane, out var has) && has.A is not null))
+            {
+                var none = LapAnalysisView.Text(this, "Not recorded on these laps", muted, 10);
+                dc.DrawText(none, new Point(Left + 8, plotTop + (plotH - none.Height) / 2));
+            }
             foreach (var line in _s.Lines)
             {
                 if (!line.Lanes.TryGetValue(lane, out var series)) continue;
-                if (series.A is { } a) dc.DrawGeometry(null, PenFor(line, false, lane, _s.Single), Decimated(a, line.Trace.StepM, Y, lane == "gear"));
+                if (series.A is { } a) dc.DrawGeometry(null, PenFor(line, false, lane, _s.Single), Decimated(a, line.Trace.StepM, Y, lane == "gear" || LapAnalysisView.SettingLanes.Contains(lane)));
                 if (series.B is { } b) dc.DrawGeometry(null, PenFor(line, true, lane, _s.Single), Decimated(b, line.Trace.StepM, Y, false));
             }
             dc.Pop();
@@ -866,6 +931,8 @@ internal sealed class TraceChart : FrameworkElement
             return (-m, m);
         }
         if (lane == "gear") return (Math.Min(0, lo), Math.Max(lo + 1, hi));
+        if (lane is "abs" or "tc") return (Math.Floor(lo) - 1, Math.Ceiling(hi) + 1);
+        if (lane == "bias") return (lo - Math.Max(0.5, (hi - lo) * 0.2), hi + Math.Max(0.5, (hi - lo) * 0.2));
         double pad = Math.Max(1e-6, (hi - lo) * 0.06);
         return (lo - pad, hi + pad);
     }

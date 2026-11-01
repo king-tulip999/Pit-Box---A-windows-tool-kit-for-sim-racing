@@ -45,7 +45,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
     {
         public required FanSpinner Spinner;
         public required TextBlock Rpm;
-        public required Odometer Output;
+        public required TextBlock Output;
         public required SegmentMeter Bar;
         public CurvePreview? Curve;
         public bool Fresh = true;
@@ -421,7 +421,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
     private void ShowLive(FanInfo fan, FanCardParts parts)
     {
         TextCase.Set(parts.Rpm, (fan.Rpm is { } r ? $"{r:N0} RPM" : "– RPM") + (fan.Percent is not null && !fan.Controlled ? " · auto" : ""));
-        parts.Output.Set(fan.Percent is { } p ? $"{p:0}" : "–");
+        TextCase.Set(parts.Output, fan.Percent is { } p ? $"{p:0}" : "–");
         var cal = Fans.HardwareFor(fan.ControlId).Calibration;
         parts.Spinner.SetSpeed(fan.Percent, fan.Rpm, cal?.MaxRpm ?? 0, Motion.Enabled && !parts.Fresh);
         double level = fan.Percent is { } pp ? pp / 100 : cal?.MaxRpm > 0 && fan.Rpm is { } rr ? rr / cal.MaxRpm : 0;
@@ -495,8 +495,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         Grid.SetColumn(names, 1);
         left.Children.Add(names);
         var bar = new SegmentMeter(hw.IsPump ? "Slate" : "Sage") { Height = 10, Tiered = true, Smooth = true, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(57, 0, 16, 0) };
-        var output = new Odometer(46, "Heading", italic: true) { RollMs = 380 };
-        output.Set("–");
+        var output = RaceParts.LiveFigure("–", 46, "Heading");
         var percent = RaceParts.Big("%", 22, hw.IsPump ? "SlateDeep" : "AccentText", italic: true);
         percent.HorizontalAlignment = HorizontalAlignment.Left;
         var rpm = RaceParts.Big("–", 13, "TextMuted", italic: true, heavy: false);

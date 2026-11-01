@@ -9,7 +9,7 @@ namespace PitBox.Views.Pages;
 
 internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICancelEdit, IRevealAnchor, ISectionedPage, IPageHistory
 {
-    internal static readonly string[] DefaultPanelOrder = { "setups", "hud", "iracing", "fov", "companions" };
+    internal static readonly string[] DefaultPanelOrder = { "setups", "hud", "shakers", "iracing", "fov", "companions" };
 
     private static readonly string[] CompanionIds = { "tradingpaints", "garage61" };
 
@@ -24,6 +24,7 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
     private readonly System.Windows.Controls.Primitives.UniformGrid _companions = new() { Columns = 1, VerticalAlignment = VerticalAlignment.Top };
     private SetupManagerSection? _setups;
     private RaceHudSection? _hud;
+    private ShakersSection? _shakers;
     private readonly ScrollViewer _scroll;
     private readonly SectionView _view;
     private bool _shown;
@@ -57,6 +58,9 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
         _view.Add(Def("hud", "",
             () => _hud = new RaceHudSection(_app, _window), "simracing.hud.panel",
             () => _hud?.OnShown(), () => _hud?.OnHidden()));
+        _view.Add(Def("shakers", "Tactile transducers under your seat or pedals, driven by iRacing's telemetry or game audio through a sound output.",
+            () => _shakers = new ShakersSection(_app), "simracing.shakers",
+            () => _shakers?.OnShown(), () => _shakers?.OnHidden()));
         _view.Add(Def("companions", "",
             BuildCompanions, "simracing.companions",
             ShowCompanions, HideCompanions));
@@ -122,6 +126,7 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
     {
         new("setups", "iRacing Setup Manager", "I.Folder"),
         new("hud", "iRacing Overlay", "I.RaceOverlay"),
+        new("shakers", "Bass shakers", "I.Speaker"),
         new("fov", "FOV calculator", "I.Compass"),
         new("iracing", "iRacing Controller", "I.Keyboard"),
         new("companions", "Companion apps", "I.Rocket"),
@@ -364,6 +369,7 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
             if (_hud?.ScreenshotStates().FirstOrDefault(s => s.Name == "hud-standings") is { Enter: { } open }) await open();
         });
         yield return ("hud-wide", () => { _body.ClearValue(MaxWidthProperty); _body.ClearValue(HorizontalAlignmentProperty); return Task.CompletedTask; });
+        yield return ("shakers", () => { Only("shakers"); return Task.CompletedTask; });
         yield return ("companions", () => { Only("companions"); return Task.CompletedTask; });
         yield return ("companions-one-off", () =>
         {

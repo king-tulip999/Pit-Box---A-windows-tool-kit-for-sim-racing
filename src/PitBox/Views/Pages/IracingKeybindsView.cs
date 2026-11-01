@@ -67,7 +67,15 @@ internal sealed class KeybindsBoard : StackPanel
     private readonly Border _pane = new();
     private readonly TextBox _search = new() { Tag = "Search keybinds", Width = 300, VerticalAlignment = VerticalAlignment.Center };
     private readonly HotkeyBox _findBox = new() { Placeholder = "Find a key", ForSearch = true, NumpadByPosition = true, Width = 150, VerticalAlignment = VerticalAlignment.Center };
-    private readonly Odometer _setNumber = new(38, "Heading") { RollMs = 420, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom };
+    private readonly TextBlock _setNumber = SetNumber();
+
+    private static TextBlock SetNumber()
+    {
+        var number = RaceParts.LiveFigure("", 38, "Heading", italic: false);
+        number.HorizontalAlignment = HorizontalAlignment.Left;
+        number.VerticalAlignment = VerticalAlignment.Bottom;
+        return number;
+    }
     private List<HotkeyEntry> _entries = new();
     private Filter _filter;
     private string _query = "";
@@ -275,7 +283,7 @@ internal sealed class KeybindsBoard : StackPanel
         {
             Style = Ui.Res<Style>("QuietButton"), Content = grid, HorizontalAlignment = HorizontalAlignment.Left, HorizontalContentAlignment = HorizontalAlignment.Stretch,
             Padding = new Thickness(6, 6, 12, 6), MinWidth = 300, BorderThickness = Hairline.Edges(), IsHitTestVisible = canPick,
-            ToolTip = _keys.FilePath is { } path ? TextCase.VerbatimTip(path) : null,
+            ToolTip = _keys.FilePath is { } path ? TextCase.PathTip(path) : null,
         };
         button.SetResourceReference(Control.BorderBrushProperty, "AccentEdge");
         button.SetResourceReference(Control.BackgroundProperty, "Surface");
@@ -298,7 +306,7 @@ internal sealed class KeybindsBoard : StackPanel
     private void RenderSummary()
     {
         int total = _entries.Count, set = _entries.Count(IsSet), wheel = _entries.Count(OnWheel), keyboard = set - wheel, none = total - set, changed = _entries.Count(Changed);
-        _setNumber.Set(set.ToString(CultureInfo.CurrentCulture));
+        TextCase.Set(_setNumber, set.ToString(CultureInfo.CurrentCulture));
 
         var top = new DockPanel();
         if (changed > 0)

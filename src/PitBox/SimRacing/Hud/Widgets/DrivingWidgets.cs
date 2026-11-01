@@ -15,7 +15,8 @@ internal sealed class TimingWidget : HudWidget
         HudOption.Number("range", "Bar range", 1.0, 0.2, 5, 0.1, Units.S),
         HudOption.Columns("fields", "Times", "last,current,best,predicted",
             new HudChoice("current", "Current lap"), new HudChoice("last", "Last lap"), new HudChoice("best", "My best"), new HudChoice("predicted", "Predicted lap"),
-            new HudChoice("sessionBest", "Session best (all)"), new HudChoice("classBest", "Best in my class"), new HudChoice("theoretical", "Optimal lap (best sectors)")),
+            new HudChoice("sessionBest", "Session best (all)"), new HudChoice("classBest", "Best in my class"), new HudChoice("theoretical", "Optimal lap (best sectors)"),
+            new HudChoice("consistency", "Consistency", "Half the spread of your last 5 clean laps")),
         HudOption.Bool("sectors", "Sectors", true),
         HudOption.Choice("split", "Sector split", "track", new HudChoice("track", "The track's sectors"), new HudChoice("6", "6 equal sectors"),
             new HudChoice("8", "8 equal sectors"), new HudChoice("10", "10 equal sectors"), new HudChoice("12", "12 equal sectors"))
@@ -82,6 +83,7 @@ internal sealed class TimingWidget : HudWidget
                 "sessionBest" => ("SESSION", RaceFormat.LapTime(FieldOrder.FastestLap(f)?.Time), p.P.Fastest),
                 "classBest" => ((f.Session.Player?.ClassName ?? "CLASS").ToUpperInvariant(), RaceFormat.LapTime(FieldOrder.FastestLap(f, f.Session.Player?.ClassId)?.Time), p.P.Fastest),
                 "theoretical" => ("OPTIMAL", RaceFormat.LapTime(LapMath.Theoretical(LapMath.BestSectors(v.Race.Laps.Laps, v.Race.Laps.SectorCount))), (Color?)null),
+                "consistency" => ("CONSISTENCY", RaceFormat.Spread(LapMath.Stats(v.Race.Laps.Laps, 5) is { Count: >= 3 } cs ? cs.Spread : null), (Color?)null),
                 _ => ("", "", null),
             };
             if (name.Length > 0) p.BoxedStat(box, name, value, valueColor);
@@ -172,6 +174,8 @@ internal sealed class FuelWidget : HudWidget
         new("figures", "Big figures", "Large numbers (Big figures shows)"),
         new("table", "Last / average / most table", "Columns of rates, rows of per lap, laps and refuel (Table columns / rows)"),
         new("pitexit", "Pit exit", "Where a stop now would put you: class position, the cars ahead and behind, traffic, and a ghost on a track strip. Learns the pit lane, fill rate and tire time per track and car"),
+        new("undercut", "Undercut / overcut", "Races: what you'd have to gain per lap, over 1 to 3 laps, to jump the car ahead in class by stopping first, and what the car behind needs to jump you. Green = less than your tires have dropped off this stint"),
+        new("save", "Fuel saving", "What each lap may use to make the flag with one stop fewer, how much that saves per lap, and what this lap is on course for. Green target = you've already done a lap that frugal. With no stop needed: the spare per lap"),
     };
 
     public static IReadOnlyList<HudOption> Options { get; } = new[]
@@ -259,6 +263,8 @@ internal sealed class FuelWidget : HudWidget
                 case "figures": Figures_(p, v, box, level, plan, lowLaps); break;
                 case "table": TablePart(p, v, box, level, plan); break;
                 case "pitexit": PitExitPart(p, v, box); break;
+                case "undercut": UndercutPart(p, v, box); break;
+                case "save": SavePart(p, v, box, level, plan); break;
             }
             area = new RectangleF(area.X, area.Y + gap, area.Width, Math.Max(0, area.Height - gap));
         }
@@ -288,11 +294,77 @@ internal sealed class FuelWidget : HudWidget
             : p.LineHeight(p.Label) + 4 + Math.Min(2, v.Options.Columns("gridRows").Count) * (p.LineHeight(p.Body) + 4 * p.Density),
         "plan" => p.LineHeight(p.Bold) + 8 * p.Density,
         "pitexit" => p.LineHeight(p.Label) + p.LineHeight(p.Bold) + p.LineHeight(p.Small) + 14 * p.Density,
+        "save" => p.LineHeight(p.Label) + p.LineHeight(p.Bold) + 6 * p.Density,
+        "undercut" => 2 * (p.LineHeight(p.Label) + p.LineHeight(p.Bold) + 4 * p.Density) + 4 * p.Density,
         "figures" => v.Options.Columns("top").Count > 0 ? p.ValueStatHeight() : 0,
         "table" => v.Options.Columns("cols").Count == 0 || v.Options.Columns("rows").Count == 0 ? 0
             : p.LineHeight(p.Label) + 4 + (p.LineHeight(p.Bold) + 5 * p.Density + 2),
         _ => 0,
     };
+
+    private static void SavePart(HudPainter p, HudView v, RectangleF box, double level, FuelPlan? plan)
+    {
+        var u = v.Units;
+        var target = FuelSave.Target(plan, level, v.Race.Tank, RowRate("min", v, plan).Rate);
+        if (target is not { } t)
+        {
+            p.Text("Shows once the plan has laps to go and a tank size", p.Small, p.P.Faint, box, HAlign.Center, VAlign.Center);
+            return;
+        }
+        var head = box.Top(p.LineHeight(p.Label) + 2, out var cells);
+        string title = t.Spare ? "No stop needed" : t.StopsNow == 1 ? "Save to finish without a stop" : $"Save to finish with {RaceFormat.Count(t.StopsNow - 1, "stop")}";
+        p.Text(p.LabelText(title), p.Label, p.LabelColor, head, HAlign.Left, VAlign.Center);
+        double? now = RowRate("curr", v, plan).Rate;
+        float cw = cells.Width / 3;
+        var targetColor = t.Spare || t.Proven ? p.P.GoodText : p.P.WarnText;
+        Cell(0, "TARGET", RaceFormat.Fuel(t.Target, u), targetColor);
+        Cell(1, t.Spare ? "SPARE" : "SAVE", RaceFormat.Fuel(Math.Abs(t.Save), u) + string.Create(System.Globalization.CultureInfo.InvariantCulture, $" {Math.Abs(t.Share) * 100:0}%"), p.P.Heading);
+        Cell(2, "THIS LAP", now is { } n ? RaceFormat.Fuel(n, u) : RaceFormat.Missing, now is { } m ? m <= t.Target ? p.P.GoodText : p.P.DangerText : p.P.Faint);
+
+        void Cell(int i, string label, string value, Color color)
+        {
+            var c = new RectangleF(cells.X + i * cw, cells.Y, cw, cells.Height);
+            var align = i == 0 ? HAlign.Left : i == 2 ? HAlign.Right : HAlign.Center;
+            var lb = c.Top(p.LineHeight(p.Label), out var vb);
+            p.Text(label, p.Label, p.LabelColor, lb, align, VAlign.Center, false);
+            p.Number(value, p.Bold, color, vb, align, VAlign.Center);
+        }
+    }
+
+    private static void UndercutPart(HudPainter p, HudView v, RectangleF box)
+    {
+        var f = v.Frame;
+        var r = v.Race;
+        if (f.SessionKind != SessionKind.Race)
+        {
+            p.Text("Undercut shows in races", p.Small, p.P.Faint, box, HAlign.Center, VAlign.Center);
+            return;
+        }
+        var (ahead, behind) = Undercut.Rivals(r.Standings, f.PlayerCarIdx, car => FieldOrder.ClassOf(f, car));
+        double? tyres = Undercut.TyreGain(r.Laps.Laps, r.StintStartLap);
+        float rowH = (box.Height - 4 * p.Density) / 2;
+        Row(new RectangleF(box.X, box.Y, box.Width, rowH), ahead, true);
+        Row(new RectangleF(box.X, box.Y + rowH + 4 * p.Density, box.Width, rowH), behind, false);
+
+        void Row(RectangleF row, UndercutRival? rival, bool isAhead)
+        {
+            var head = row.Top(p.LineHeight(p.Label) + 2, out var cells);
+            string who = rival is { } rv ? $"P{rv.ClassPosition} {RaceFormat.Name(RaceState.Name(f, rv.CarIdx), "last")} {RaceFormat.Gap(rv.Gap)}" : RaceFormat.Missing;
+            p.Text(p.LabelText((isAhead ? "Undercut " : "Cover ") + who), p.Label, p.LabelColor, head, HAlign.Left, VAlign.Center);
+            if (isAhead)
+                p.Text(p.LabelText(tyres is { } t ? $"Tires {t:0.0}/lap" : "Tires –"), p.Label, p.P.Muted, head, HAlign.Right, VAlign.Center);
+            if (rival is not { } x) return;
+            float cw = cells.Width / Undercut.Laps;
+            for (int k = 1; k <= Undercut.Laps; k++)
+            {
+                double need = Undercut.Needed(x.Gap, k);
+                bool on = tyres is { } gain && need <= gain;
+                var color = !on ? p.P.Muted : isAhead ? p.P.GoodText : p.P.WarnText;
+                var cell = new RectangleF(cells.X + (k - 1) * cw, cells.Y, cw - 4 * p.Density, cells.Height);
+                p.Text($"{k}L {need:0.00}", p.Bold, color, cell, HAlign.Left, VAlign.Center);
+            }
+        }
+    }
 
     private static void HeaderLine(HudPainter p, HudView v, RectangleF box, double level, FuelPlan? plan)
     {

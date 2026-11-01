@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -44,6 +45,17 @@ internal static class GrrParts
         var t = TextFit.TipWhenTrimmed(new TextBlock { Text = text, Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, top, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis });
         if (brush is not null) t.Foreground = Ui.Res<Brush>(brush);
         return t;
+    }
+
+    public static double BaselineBottom(double bigSize, double smallSize, bool figureLines = false)
+    {
+        double Drop(FontFamily family, double size, double? lineHeight = null)
+        {
+            var t = new FormattedText("0", CultureInfo.InvariantCulture, FlowDirection.LeftToRight, new Typeface(family, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal), size, Brushes.Black, 1);
+            if (lineHeight is { } line) t.LineHeight = line;
+            return t.Height - t.Baseline;
+        }
+        return Math.Max(0, Drop(Ui.Res<FontFamily>("RaceFont"), bigSize, figureLines ? RaceParts.FigureLineHeight(bigSize) : null) - Drop(Ui.Res<FontFamily>("UiFont"), smallSize));
     }
 
     public static TextBlock Caption(string text, double top = 0) =>
@@ -224,10 +236,15 @@ internal static class GrrParts
     public static FrameworkElement Position(int p, bool mine, double size = 11, bool prefix = false, string? plain = null)
     {
         var text = RaceParts.Big(prefix ? $"P{p}" : p.ToString(), size * 1.15, p is >= 1 and <= 3 ? $"Podium{p}Fg" : plain ?? (mine ? "AccentText" : "TextFaint"));
-        if (p is < 1 or > 3) return text;
+        double k = size / 13;
+        if (p is < 1 or > 3)
+        {
+            if (prefix) return text;
+            text.HorizontalAlignment = HorizontalAlignment.Center;
+            return new Border { MinWidth = 21 * k, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, Child = text };
+        }
         text.HorizontalAlignment = HorizontalAlignment.Center;
         string tip = p switch { 1 => "1st: gold", 2 => "2nd: silver", _ => "3rd: bronze" };
-        double k = size / 13;
         var pill = new Tile
         {
             MinWidth = 21 * k, Padding = new Thickness(5 * k, 1 * k, 5 * k, 2 * k), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center,

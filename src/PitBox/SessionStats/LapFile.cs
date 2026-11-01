@@ -42,7 +42,7 @@ internal static class LapFile
         using (var s = zip.CreateEntry("lap.json", CompressionLevel.Optimal).Open())
             JsonSerializer.Serialize(s, header, new JsonSerializerOptions { WriteIndented = true });
         using (var s = zip.CreateEntry("trace.bin", CompressionLevel.NoCompression).Open())
-            s.Write(lap.Trace.Encode());
+            s.Write(lap.Trace.Without(LapTrace.NotShared).Encode());
     }
 
     public static SharedLap Read(Stream input)

@@ -44,6 +44,77 @@ internal sealed class RaceState
         _pitExit = new PitExitFeed(pitLoss ?? new PitLossStore(null));
         Alerts = new AlertEngine(def => ChoiceFor(settings(), def));
         Laps.LapCompleted += OnLap;
+        TrackLimits.Left += OnOffTrack;
+    }
+
+    public TrackLimits TrackLimits { get; } = new();
+
+    public WeatherTrend Weather { get; } = new();
+
+    public TrackMaps.TurnNames Turns { get; private set; } = TrackMaps.TurnNames.None;
+
+    public Func<SessionInfo, bool, Task<TrackMaps.TrackMap?>>? MapLoader { get; init; }
+
+    private Task<TrackMaps.TrackMap?>? _turnsLoading;
+    private (int? Id, string Name, bool Sample)? _turnsFor;
+
+    private void SyncTurns(TelemetryFrame f)
+    {
+        var key = (f.Session.TrackId, f.Session.TrackName, f.Simulated);
+        if (key != _turnsFor)
+        {
+            _turnsFor = key;
+            Turns = new TrackMaps.TurnNames(Array.Empty<(double, string)>(), f.Session.TrackLengthKm);
+            _turnsLoading = MapLoader?.Invoke(f.Session, f.Simulated);
+        }
+        if (_turnsLoading is { IsCompleted: true } done)
+        {
+            _turnsLoading = null;
+            if (done.IsCompletedSuccessfully && done.Result is { } map) Turns = TrackMaps.TurnNames.From(map, f.Session.TrackLengthKm);
+        }
+    }
+
+    private void OnOffTrack(OffTrack o)
+    {
+        var f = Frame;
+        string where = o.Pct >= 0 ? Turns.Where(o.Pct) : "";
+        int n = TrackLimits.Count;
+        AddEvent(f, where.Length > 0 ? $"Off track · {where} ({n})" : $"Off track ({n})", AlertLevel.Warning);
+        if (n >= Alerts.Threshold("track.limits"))
+            Alerts.Fire("track.limits", Now, RaceFormat.Count(n, "off-track"), where.Length > 0 ? "Last at " + where : null);
+    }
+
+    internal static (int Clean, int Consistent, double ConsistentWithin, int Near, double NearWithin, bool Races)? GoalTargets(RaceHudSettings s)
+    {
+        foreach (var layout in s.Layouts)
+            foreach (var w in layout.Widgets)
+                if (w.Enabled && string.Equals(w.Kind, "goals", StringComparison.OrdinalIgnoreCase) && Hud.HudCatalog.Find("goals") is { } def)
+                {
+                    var o = new Hud.HudOptions(def, w);
+                    var on = o.Columns("goals");
+                    return (on.Contains("clean") ? o.Int("cleanLaps") : 0, on.Contains("consistent") ? o.Int("consistentLaps") : 0, o.Number("consistentWithin"),
+                        on.Contains("near") ? o.Int("nearLaps") : 0, o.Number("nearWithin"), o.Bool("races"));
+                }
+        return null;
+    }
+
+    private readonly HashSet<GoalKind> _goalsDone = new();
+
+    private void CheckGoals()
+    {
+        if (GoalTargets(_settings()) is not { } g || Frame.SessionKind == SessionKind.Race && !g.Races) return;
+        var laps = Laps.Laps;
+        Check(g.Clean > 0 ? PracticeGoals.CleanStreak(laps, g.Clean) : null, $"{RaceFormat.Count(g.Clean, "clean lap")} in a row");
+        Check(g.Consistent > 0 ? PracticeGoals.Consistent(laps, g.Consistent, g.ConsistentWithin) : null,
+            $"{RaceFormat.Count(g.Consistent, "lap")} within {g.ConsistentWithin:0.0#} {Units.S}");
+        Check(g.Near > 0 ? PracticeGoals.NearBest(laps, g.Near, g.NearWithin) : null, $"{RaceFormat.Count(g.Near, "lap")} within {g.NearWithin:0.0#} {Units.S} of your best");
+
+        void Check(GoalProgress? p, string what)
+        {
+            if (p is not { Done: true } done || !_goalsDone.Add(done.Kind)) return;
+            Alerts.Fire("goal.done", Now, "Goal reached", what, "goal.done:" + done.Kind);
+            AddEvent(Frame, "Goal reached · " + what, AlertLevel.Good);
+        }
     }
 
     public TelemetryFrame Frame { get; private set; } = new();
@@ -51,6 +122,7 @@ internal sealed class RaceState
     public double Now { get; private set; }
 
     public GapHistory Gaps { get; } = new();
+    public RadarModel Radar { get; } = new();
     public FuelModel FuelData { get; } = new();
     public LapTracker Laps { get; } = new();
     public AlertEngine Alerts { get; }
@@ -284,7 +356,16 @@ internal sealed class RaceState
             FuelData.Update(f, _fuelIdentity, s.Fuel.Window);
             if (f.LapCompleted != _fuelLap || f.OnPitRoad) { _fuelLap = f.LapCompleted; _lapStartFuel = f.Fuel; FuelThisLapFrom = f.LapDistPct is { } at && at < 0.95 ? at : 0; }
         }
-        if (!f.IsReplayPlaying) Gaps.Sample(f, Now);
+        if (!f.IsReplayPlaying)
+        {
+            Gaps.Sample(f, Now);
+            SyncTurns(f);
+            if (f.SessionTime is { } st)
+            {
+                TrackLimits.Update(st, f.PlayerSurface, f.Driving, f.OnPitRoad, f.LapCompleted ?? 0, f.LapDistPct);
+                Weather.Update(st, f.TrackTemp, f.Precipitation);
+            }
+        }
 
         if (f.SessionKind == SessionKind.Race && _startPositions.Count == 0 && f.Phase >= SessionPhase.Racing)
         {
@@ -300,6 +381,7 @@ internal sealed class RaceState
             TrackFlags(f);
             TrackPositions(f);
         }
+        if (!f.IsReplayPlaying) Radar.Learn(f, f.Session.Player?.CarPath ?? "");
         var call = _spotter.Next(f.Sides);
         if (call != SpotterCall.None) Alerts.Fire("side.car", Now, Spotter.Text(call));
         if (Now - _lastChecks >= 0.25)
@@ -323,6 +405,9 @@ internal sealed class RaceState
     {
         Laps.Clear();
         Gaps.Clear();
+        TrackLimits.Clear();
+        Weather.Clear();
+        _goalsDone.Clear();
         _pitExit.Reset();
         _spotter.Reset();
         _startPositions.Clear();
@@ -434,6 +519,7 @@ internal sealed class RaceState
             double pct = (lap.Time / stats.Average - 1) * 100;
             if (pct > Alerts.Threshold("pace.drop")) Alerts.Fire("pace.drop", Now, "Pace dropping", $"{RaceFormat.LapTime(lap.Time)} · +{pct:0.0}% on your average");
         }
+        CheckGoals();
     }
 
     private void UpdateFuel(TelemetryFrame f, RaceHudSettings s)
@@ -518,6 +604,12 @@ internal sealed class RaceState
             if (_lastWetness >= 0 && wet != _lastWetness)
                 Alerts.Fire("weather.wet", now, wet > _lastWetness ? "Track getting wetter" : "Track drying", "Now " + RaceFormat.Wetness(wet).ToLowerInvariant());
             _lastWetness = wet;
+        }
+        if (Weather.TrackPerWindow is { } trend && f.TrackTemp is { } trackNow)
+        {
+            bool moving = Math.Abs(trend) >= Alerts.Threshold("weather.trend");
+            Alerts.Set("weather.trend", moving && f.Driving, now, trend > 0 ? "Track warming up" : "Track cooling down",
+                moving ? $"{(trend > 0 ? "+" : "−")}{RaceFormat.TempDelta(Math.Abs(trend), s.Units)} in 10 min · now {RaceFormat.Temp(trackNow, s.Units)}" : null);
         }
         var penalty = RaceControl.Active(f.Flags).FirstOrDefault(k => k is FlagKind.Black or FlagKind.Meatball or FlagKind.Disqualified);
         Alerts.Set("flag.penalty", penalty != FlagKind.None, now, RaceControl.Label(penalty), RaceControl.Meaning(penalty));

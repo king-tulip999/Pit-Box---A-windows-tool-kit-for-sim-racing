@@ -376,10 +376,10 @@ internal static class FieldColumns
                 return new Column(id, "iR ±", "+000", HAlign.Right, car => r.IRatingChangeOf(car) is not { } c ? None
                     : Math.Round(c) == 0 ? new Cell("0", pal.Muted) : new Cell((c > 0 ? "+" : "−") + Math.Abs(Math.Round(c)), c > 0 ? pal.GoodText : pal.DangerText));
             case "last":
-                return new Column(id, "LAST", Time(83.456), HAlign.Right, car =>
+                return new Column(id, "LAST", Time(538.888), HAlign.Right, car =>
                     new Cell(Time(f.CarLastLap[car] > 0 ? f.CarLastLap[car] : null), Text(car)));
             case "best":
-                return new Column(id, "BEST", Time(83.456), HAlign.Right, car =>
+                return new Column(id, "BEST", Time(538.888), HAlign.Right, car =>
                 {
                     double t = f.CarBestLap[car];
                     bool fastest = t > 0 && FieldOrder.FastestLap(f, D(car)?.ClassId) is { } fl && fl.Car == car;

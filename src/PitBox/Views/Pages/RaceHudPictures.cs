@@ -10,7 +10,7 @@ namespace PitBox.Views.Pages;
 internal sealed partial class RaceHudWidgets
 {
     private const double SideBySideMin = 860, SettingsShare = 1.05, GroupMinWidth = 440;
-    private const double PictureMaxW = 80, PictureMaxH = 34, PicturePadX = 3, PicturePadY = 5, PictureMinScale = 0.45;
+    private const double PictureMaxW = 80, PictureMaxH = 34, PicturePadX = 3, PicturePadY = 5, PictureMinScale = 0.45, PictureFade = 18;
     private const int PictureCache = 64;
 
     private readonly Dictionary<string, UIElement> _presetDots = new(StringComparer.OrdinalIgnoreCase);
@@ -68,6 +68,7 @@ internal sealed partial class RaceHudWidgets
             found.Inflate((float)PicturePadX, (float)PicturePadY);
             found.Intersect(new System.Drawing.RectangleF(0, 0, (float)w.W, (float)w.H));
             double fit = Math.Clamp(PictureMaxH / found.Height, PictureMinScale, 1);
+            bool trimmed = found.Width > PictureMaxW / fit;
             found.Width = (float)Math.Min(found.Width, PictureMaxW / fit);
             found.Height = (float)Math.Min(found.Height, PictureMaxH / fit);
             double k = _previewPixels;
@@ -85,7 +86,7 @@ internal sealed partial class RaceHudWidgets
                     PictureMemo[signature] = null;
                     return null;
                 }
-                images.Add(Crop(bitmap, crop, k));
+                images.Add(Crop(bitmap, crop, k, trimmed ? PictureFade * k : 0));
             }
             PictureMemo[signature] = images;
             return images;
@@ -98,12 +99,28 @@ internal sealed partial class RaceHudWidgets
         }
     }
 
-    private static BitmapSource Crop(System.Drawing.Bitmap bitmap, System.Drawing.Rectangle crop, double k)
+    private static BitmapSource Crop(System.Drawing.Bitmap bitmap, System.Drawing.Rectangle crop, double k, double fade)
     {
         var target = new WriteableBitmap(crop.Width, crop.Height, 96 * k, 96 * k, PixelFormats.Pbgra32, null);
         var data = bitmap.LockBits(crop, System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
-        try { target.WritePixels(new Int32Rect(0, 0, crop.Width, crop.Height), data.Scan0, data.Stride * crop.Height, data.Stride); }
+        var pixels = new byte[crop.Width * 4 * crop.Height];
+        try
+        {
+            for (int y = 0; y < crop.Height; y++)
+                System.Runtime.InteropServices.Marshal.Copy(data.Scan0 + y * data.Stride, pixels, y * crop.Width * 4, crop.Width * 4);
+        }
         finally { bitmap.UnlockBits(data); }
+        int span = Math.Min(crop.Width, (int)Math.Round(fade));
+        for (int x = crop.Width - span; x < crop.Width; x++)
+        {
+            double keep = (crop.Width - x) / (double)(span + 1);
+            for (int y = 0; y < crop.Height; y++)
+            {
+                int at = (y * crop.Width + x) * 4;
+                for (int b = 0; b < 4; b++) pixels[at + b] = (byte)(pixels[at + b] * keep);
+            }
+        }
+        target.WritePixels(new Int32Rect(0, 0, crop.Width, crop.Height), pixels, crop.Width * 4, 0);
         target.Freeze();
         return target;
     }

@@ -31,7 +31,7 @@ internal static class HudSheet
     private static void Render(string folder)
     {
         var settings = new RaceHudSettings();
-        var race = new RaceState(() => settings);
+        var race = new RaceState(() => settings) { MapLoader = SimRacing.TrackMaps.TrackMapLibrary.ForRace };
         var demo = new DemoTelemetry();
         var frame = new TelemetryFrame();
         long seq = 0;
@@ -70,7 +70,7 @@ internal static class HudSheet
             race.Frame.Flags = flags;
 
             var inputs = HudCatalog.Find("inputs")!;
-            foreach (var (file, style, show) in new[] { ("inputs-tach", "tach", ""), ("inputs-strip", "strip", ""), ("inputs-trimmed", "trace", "throttle,brake,speed"), ("inputs-strip-trimmed", "strip", "throttle,brake,rpm,trace") })
+            foreach (var (file, style, show) in new[] { ("inputs-lights", "lights", ""), ("inputs-trimmed", "trace", "throttle,brake,speed"), ("inputs-lights-trimmed", "lights", "throttle,brake,rpm") })
             {
                 var config = new HudWidgetConfig { Options = { ["style"] = style } };
                 if (show.Length > 0) config.Options["show"] = show;
@@ -78,8 +78,26 @@ internal static class HudSheet
                 Save(inputs, size.Width, size.Height, Path.Combine(dir, file + ".png"), 1, config.Options.Select(kv => (kv.Key, kv.Value)).ToArray());
             }
 
+            foreach (var (kind, file, options) in new[]
+            {
+                ("goals", "goals-counters", new[] { ("look", "counters") }),
+                ("goals", "goals-six", new[] { ("goals", "clean,consistent,near,under,total,minutes") }),
+                ("goals", "goals-counters-six", new[] { ("look", "counters"), ("goals", "clean,consistent,near,under,total,minutes") }),
+                ("result", "result-banner", new[] { ("look", "banner") }),
+                ("result", "result-stamp", new[] { ("look", "stamp") }),
+                ("result", "result-story", new[] { ("look", "story") }),
+            })
+            {
+                var def = HudCatalog.Find(kind)!;
+                var config = new HudWidgetConfig();
+                foreach (var (key, value) in options) config.Options[key] = value;
+                var size = def.Natural!(new HudOptions(def, config));
+                Save(def, size.Width, size.Height, Path.Combine(dir, file + ".png"), 1, options);
+            }
+
             var fuel = HudCatalog.Find("fuel")!;
             Save(fuel, fuel.W, 150, Path.Combine(dir, "fuel-pitexit.png"), 1, ("parts", "header,pitexit"));
+            Save(fuel, fuel.W, 150, Path.Combine(dir, "fuel-save.png"), 1, ("parts", "header,save,undercut"));
 
             foreach (var kind in new[] { "relative", "standings", "fuel" })
                 Save(HudCatalog.Find(kind)!, HudCatalog.Find(kind)!.W, HudCatalog.Find(kind)!.H, Path.Combine(dir, kind + "@150.png"), 1.5f);

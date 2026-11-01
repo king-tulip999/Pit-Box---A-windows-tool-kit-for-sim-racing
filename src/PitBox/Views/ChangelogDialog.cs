@@ -60,15 +60,27 @@ internal static class ChangelogDialog
             body.Children.Add(new TextBlock { Text = "No release notes were found.", Style = Ui.Res<Style>("Muted") });
             return;
         }
-        for (int i = 0; i < picked.Count; i++) body.Children.Add(Release(picked[i], i == 0));
+        int shownLines = 0;
+        for (int i = 0; i < picked.Count; i++)
+        {
+            var lines = PlainText(picked[i].Notes);
+            if (shownLines >= FirstScreenLines)
+            {
+                await body.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.Background);
+                if (!body.IsLoaded) return;
+            }
+            body.Children.Add(Release(picked[i], lines, i == 0));
+            shownLines += lines.Count + 1;
+        }
     }
 
-    private static StackPanel Release(ReleaseInfo release, bool first)
+    private const int FirstScreenLines = 40;
+
+    private static StackPanel Release(ReleaseInfo release, List<ReleaseLine> lines, bool first)
     {
         var stack = new StackPanel { Margin = new Thickness(0, first ? 0 : 18, 0, 0) };
         string when = release.Published is { } at ? " · " + Dates.Date(at.ToLocalTime()) : "";
         stack.Children.Add(new TextBlock { Text = UpdateService.Tag(release.Version) + when, Style = Ui.Res<Style>("H3") });
-        var lines = PlainText(release.Notes);
         if (lines.Count == 0)
             stack.Children.Add(new TextBlock { Text = "No notes for this release.", Style = Ui.Res<Style>("Muted"), Margin = new Thickness(0, 5, 0, 0) });
         foreach (var line in lines) stack.Children.Add(Line(line));

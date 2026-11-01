@@ -100,7 +100,7 @@ internal sealed class HudWebRenderer : IDisposable
         if (_sampleFeed is null || _sampleRace is null)
         {
             _sampleFeed = new DemoTelemetry();
-            _sampleRace = new RaceState(() => _sampleSettings!);
+            _sampleRace = new RaceState(() => _sampleSettings!) { MapLoader = TrackMaps.TrackMapLibrary.ForRace };
             DemoTelemetry.WarmUp(_sampleRace, _sampleFrame, ref _sampleSequence);
         }
         _sampleFeed.Fill(_sampleFrame);
@@ -164,7 +164,7 @@ internal sealed class HudWebRenderer : IDisposable
         var lines = new[]
         {
             ("app-bg", App("Bg")), ("app-panel", App("Panel")), ("app-surface", App("Surface")), ("app-line", App("Line")), ("app-line-strong", App("LineStrong")),
-            ("app-heading", App("Heading")), ("app-text", App("Text")), ("app-muted", App("TextMuted")), ("app-accent", App("Accent")),
+            ("app-heading", App("Heading")), ("app-text", App("Text")), ("app-muted", App("TextMuted")), ("app-accent", App("Accent")), ("app-accent-soft", App("AccentSoft")), ("app-danger", App("Danger")),
             ("hud-bg", Hex(hud.Bg)), ("hud-surface", Hex(hud.Surface)), ("hud-text", Hex(hud.Text)), ("hud-heading", Hex(hud.Heading)), ("hud-muted", Hex(hud.Muted)),
             ("hud-line", Hex(hud.LineStrong)), ("hud-accent", Hex(hud.Accent)), ("hud-good", Hex(hud.Good)), ("hud-warn", Hex(hud.Warn)), ("hud-danger", Hex(hud.Danger)),
         };

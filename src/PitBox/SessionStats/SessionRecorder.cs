@@ -339,7 +339,8 @@ internal sealed class SessionRecorder
             if (_lapStart is not null)
                 _trace.Add(new TraceBuilder.Sample(f.LapDist ?? pct * (row.TrackKm ?? 0) * 1000, pct, t, f.Speed ?? 0, f.Throttle ?? 0, f.Brake ?? 0, f.Clutch,
                     f.Steering ?? 0, f.Gear ?? 0, f.Rpm ?? 0, f.LatAccel ?? 0, f.LongAccel ?? 0, f.RawValue("Lat") ?? 0, f.RawValue("Lon") ?? 0, _x, _y,
-                    f.PushToPassActive, f.WindSpeed, f.WindDir, f.YawNorth is { } north ? Math.PI / 2 - north : null));
+                    f.PushToPassActive, f.WindSpeed, f.WindDir, f.YawNorth is { } north ? Math.PI / 2 - north : null,
+                    f.BrakeBias, f.Abs, f.TractionControl, f.PlayerSurface is null ? null : f.PlayerSurface == TrackSurface.OffTrack));
         }
         _prevPct = pct;
         _prevTime = t;

@@ -48,7 +48,7 @@ internal sealed partial class HudMontage : IDisposable
 
     public HudMontage()
     {
-        _race = new RaceState(() => _settings);
+        _race = new RaceState(() => _settings) { MapLoader = SimRacing.TrackMaps.TrackMapLibrary.ForRace };
         _timer.Tick += (_, _) => Tick();
     }
 

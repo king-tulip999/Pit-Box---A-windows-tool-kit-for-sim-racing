@@ -18,7 +18,7 @@ internal static class ColorField
             Width = 28, Height = 24, MinHeight = 0, Padding = new Thickness(0), Margin = new Thickness(0, 0, 6, 0), ToolTip = "Pick a color", Style = Ui.Res<Style>("Btn"),
             Content = chip,
         };
-        var box = new TextBox { Text = get(), Width = boxWidth, MaxLength = 7, FontFamily = Ui.Res<FontFamily>("MonoFont"), VerticalAlignment = VerticalAlignment.Center, ToolTip = help };
+        var box = new TextBox { Text = get(), MinWidth = boxWidth, MaxLength = 7, FontFamily = Ui.Res<FontFamily>("MonoFont"), VerticalAlignment = VerticalAlignment.Center, ToolTip = help };
         void Show() => chip.Background = CustomPalette.Parse(get()) is { } c ? new SolidColorBrush(c) : Brushes.Transparent;
         void Commit(string text)
         {

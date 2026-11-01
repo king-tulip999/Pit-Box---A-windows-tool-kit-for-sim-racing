@@ -66,7 +66,7 @@ internal sealed class HudHost : IDisposable
     public HudHost(AppServices app)
     {
         _app = app;
-        Race = new RaceState(() => Settings, app.PitLoss);
+        Race = new RaceState(() => Settings, app.PitLoss) { MapLoader = TrackMaps.TrackMapLibrary.ForRace };
         _timer.Tick += (_, _) => SafeTick();
         app.Telemetry.StatusChanged += OnStatusChanged;
         app.Telemetry.SimStarted += OnSimStarted;

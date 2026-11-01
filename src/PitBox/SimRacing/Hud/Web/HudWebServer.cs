@@ -156,15 +156,16 @@ internal sealed class HudWebServer : IDisposable
             {
                 tcp.NoDelay = true;
                 var stream = tcp.GetStream();
-                (string Path, string Query, Dictionary<string, string> Headers)? request;
+                (string Method, string Path, string Query, Dictionary<string, string> Headers)? request;
                 using (var reading = CancellationTokenSource.CreateLinkedTokenSource(token))
                 {
                     reading.CancelAfter(RequestTimeout);
                     request = await ReadRequest(stream, reading.Token).ConfigureAwait(false);
                 }
                 if (request is null) return;
-                var (path, query, headers) = request.Value;
-                if (!headers.TryGetValue("host", out var host) || !LocalHost(host, Port))
+                var (method, path, query, headers) = request.Value;
+                bool remote = tcp.Client.RemoteEndPoint is not IPEndPoint { Address: var from } || !IPAddress.IsLoopback(from);
+                if (remote || method != "GET" || !headers.TryGetValue("host", out var host) || !LocalHost(host, Port))
                 {
                     await Respond(stream, "403 Forbidden", "text/plain", "Forbidden"u8.ToArray(), token).ConfigureAwait(false);
                     return;
@@ -198,7 +199,7 @@ internal sealed class HudWebServer : IDisposable
     internal static bool LocalOrigin(string? origin, int port) =>
         string.IsNullOrEmpty(origin) || origin.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && LocalHost(origin[7..], port);
 
-    private static async Task<(string Path, string Query, Dictionary<string, string> Headers)?> ReadRequest(NetworkStream stream, CancellationToken token)
+    private static async Task<(string Method, string Path, string Query, Dictionary<string, string> Headers)?> ReadRequest(NetworkStream stream, CancellationToken token)
     {
         var buffer = new byte[MaxRequest];
         int length = 0;
@@ -220,7 +221,7 @@ internal sealed class HudWebServer : IDisposable
         }
         string path = first[1];
         int query = path.IndexOf('?');
-        return (query >= 0 ? path[..query] : path, query >= 0 ? path[(query + 1)..] : "", headers);
+        return (first[0], query >= 0 ? path[..query] : path, query >= 0 ? path[(query + 1)..] : "", headers);
     }
 
     private static async Task Respond(NetworkStream stream, string status, string type, byte[] body, CancellationToken token)

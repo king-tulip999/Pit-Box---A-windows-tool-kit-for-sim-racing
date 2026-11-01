@@ -228,13 +228,6 @@ internal static class RaceParts
 
     public static bool Raced(SessionSummary s) => s.Type == "Race" && s.Finished && s.FinishPos is > 0;
 
-    public static string Ordinal(int n)
-    {
-        int tens = n % 100;
-        if (tens is >= 11 and <= 13) return "TH";
-        return (n % 10) switch { 1 => "ST", 2 => "ND", 3 => "RD", _ => "TH" };
-    }
-
     public static TextBlock Big(string text, double size, string brush, bool italic = false, bool heavy = true)
     {
         var t = new TextBlock
@@ -247,6 +240,29 @@ internal static class RaceParts
         TextCase.Verbatim(t);
         return t;
     }
+
+    public static TextBlock BigFigure(string text, double size, string brush, bool italic = true)
+    {
+        var t = Big(text, size, brush, italic);
+        FigureLines(t, size);
+        return t;
+    }
+
+    public static TextBlock LiveFigure(string text, double size, string brush, bool italic = true, bool heavy = true)
+    {
+        var t = Big(text, size, brush, italic, heavy);
+        FigureLines(t, size);
+        System.Windows.Documents.Typography.SetNumeralAlignment(t, FontNumeralAlignment.Tabular);
+        return t;
+    }
+
+    public static void FigureLines(DependencyObject target, double size)
+    {
+        TextBlock.SetLineStackingStrategy(target, LineStackingStrategy.BlockLineHeight);
+        TextBlock.SetLineHeight(target, FigureLineHeight(size));
+    }
+
+    public static double FigureLineHeight(double size) => Math.Round(size * 1.08);
 
     public static TextBlock Value(string text, double size = 15, string brush = "Heading")
     {
@@ -406,8 +422,8 @@ internal static class RaceParts
         var mark = new Border { Width = 22, Height = 3, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(3, 0, 0, 7), RenderTransform = new SkewTransform(-30, 0) };
         mark.SetResourceReference(Border.BackgroundProperty, bar);
         stack.Children.Add(mark);
-        var number = new Odometer(size, valueBrush, italic: true) { CountUpOnLoad = true, RollMs = 900, HorizontalAlignment = HorizontalAlignment.Left };
-        number.Set(value);
+        var number = LiveFigure(value, size, valueBrush);
+        number.HorizontalAlignment = HorizontalAlignment.Left;
         stack.Children.Add(number);
         stack.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) });
         var cell = Hairline.Frame(new Border { Child = stack, ToolTip = tip }, Sides.Left);
@@ -463,16 +479,13 @@ internal static class RaceParts
     public static FrameworkElement Position(int finish, string place, double size, string label)
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Top };
-        var number = Big(finish.ToString(CultureInfo.CurrentCulture), size, place + "Text", italic: true);
+        var number = Big("P" + finish.ToString(CultureInfo.CurrentCulture), size, place + "Text", italic: true);
         number.VerticalAlignment = VerticalAlignment.Top;
         number.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
         number.LineHeight = size * 0.86;
         row.Children.Add(number);
         var side = new StackPanel { Margin = new Thickness(size * 0.06, size * 0.05, 0, 0) };
         side.Children.Add(Big(label, Math.Max(11.5, size * 0.1), "TextMuted", italic: false, heavy: false).Also(t => t.Margin = new Thickness(size * 0.12, 0, 0, 0)));
-        var suffix = Big(Ordinal(finish), size * 0.3, place + "Text", italic: true);
-        suffix.Margin = new Thickness(0, -2, 0, 0);
-        side.Children.Add(suffix);
         row.Children.Add(side);
         return row;
     }

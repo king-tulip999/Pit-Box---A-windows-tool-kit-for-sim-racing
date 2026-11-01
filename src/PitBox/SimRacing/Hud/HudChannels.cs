@@ -73,6 +73,10 @@ internal static class HudChannels
         new("stintLaps", "Stint laps", ChannelKind.History, ChannelUnit.Count, v => v.Frame.LapCompleted is { } l ? l - v.Race.StintStartLap : null, 0),
         new("avgLap", "Average lap (last 5 clean)", ChannelKind.History, ChannelUnit.LapTime, v => LapMath.Stats(v.Race.Laps.Laps, 5)?.Average),
         new("consistency", "Lap spread (std. dev.)", ChannelKind.History, ChannelUnit.Seconds, v => LapMath.Stats(v.Race.Laps.Laps, 10)?.StdDev, 3),
+        new("spread5", "Consistency (± last 5 clean laps)", ChannelKind.History, ChannelUnit.Seconds, v => LapMath.Stats(v.Race.Laps.Laps, 5) is { Count: >= 3 } s ? s.Spread / 2 : null, 2),
+        new("offTracks", "Off-tracks", ChannelKind.History, ChannelUnit.Count, v => v.Frame.Status == SimStatus.Connected ? v.Race.TrackLimits.Count : null, 0),
+        new("irChange", "iRating gain / loss (est.)", ChannelKind.Calculated, ChannelUnit.None, v => v.Race.IRatingChangeOf(v.Frame.PlayerCarIdx) is { } c ? Math.Round(c) : null, 0),
+        new("trackTrend", "Track temperature change (10 min)", ChannelKind.Calculated, ChannelUnit.None, v => v.Race.Weather.TrackPerWindow is { } t ? (v.Units == HudUnits.Imperial ? t * 9 / 5 : t) : null, 1),
     };
 
     public static HudChannel? Find(string id) => All.FirstOrDefault(c => c.Id == id);

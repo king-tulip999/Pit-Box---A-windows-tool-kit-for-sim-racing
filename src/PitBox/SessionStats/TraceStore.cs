@@ -162,6 +162,39 @@ internal sealed class TraceStore : IDisposable
         _db.Query("SELECT session_id, lap, lap_time FROM traces WHERE car = ?1 AND track = ?2 AND track_config = ?3 AND clean = 1 ORDER BY lap_time LIMIT 1", car, track, config)
             is { Count: > 0 } r ? ((long)r[0][0]!, Convert.ToInt32(r[0][1]), Convert.ToDouble(r[0][2])) : null;
 
+    public (List<double> Pcts, int Laps) OffTracksAt(string car, string track, string config, int most)
+    {
+        var found = new List<double>();
+        int laps = 0;
+        foreach (var r in _db.Query("SELECT data FROM traces WHERE car = ?1 AND track = ?2 AND track_config = ?3 ORDER BY start_utc DESC, lap DESC LIMIT ?4", car, track, config, most))
+        {
+            if (r[0] is not byte[] data) continue;
+            LapTrace t;
+            try { t = LapTrace.Decode(data); }
+            catch (Exception ex) when (ex is InvalidDataException or EndOfStreamException) { continue; }
+            laps++;
+            found.AddRange(OffTrackStarts(t).Select(d => d / t.LengthM));
+        }
+        return (found, laps);
+    }
+
+    internal static List<double> OffTrackStarts(LapTrace t)
+    {
+        var starts = new List<double>();
+        if (t[TraceChannel.OffTrack] is not { } off) return starts;
+        var time = t.Time;
+        double backOn = double.NegativeInfinity;
+        bool was = false;
+        for (int i = 0; i < off.Length; i++)
+        {
+            bool now = off[i] > 0.5;
+            if (now && !was && time[i] - backOn >= SimRacing.Race.TrackLimits.SameExcursionSeconds) starts.Add(t.Distance(i));
+            if (!now && was) backOn = time[i];
+            was = now;
+        }
+        return starts;
+    }
+
     public List<TraceInfo> All() =>
         _db.Query("SELECT session_id, lap, lap_time, car, track, track_config, start_utc, clean FROM traces")
             .Select(r => new TraceInfo((long)r[0]!, Convert.ToInt32(r[1]), Convert.ToDouble(r[2]), (string)r[3]!, (string)r[4]!, (string)r[5]!, (long)r[6]!, Convert.ToInt64(r[7]) != 0)).ToList();

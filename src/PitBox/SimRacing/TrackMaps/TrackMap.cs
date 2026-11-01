@@ -60,6 +60,24 @@ internal sealed class TrackMap
         return new PointF((float)(a.X + (b.X - a.X) * t), (float)(a.Y + (b.Y - a.Y) * t));
     }
 
+    public double PctOf(PointF p)
+    {
+        var c = Centerline;
+        if (c.Length < 2) return 0;
+        var l = Lengths();
+        double best = double.MaxValue, at = 0;
+        for (int i = 0; i < c.Length; i++)
+        {
+            var a = c[i];
+            var b = c[(i + 1) % c.Length];
+            double dx = b.X - a.X, dy = b.Y - a.Y, len = dx * dx + dy * dy;
+            double t = len <= 0 ? 0 : Math.Clamp(((p.X - a.X) * dx + (p.Y - a.Y) * dy) / len, 0, 1);
+            double x = a.X + t * dx - p.X, y = a.Y + t * dy - p.Y, d = x * x + y * y;
+            if (d < best) { best = d; at = l[i] + t * (l[i + 1] - l[i]); }
+        }
+        return l[^1] > 0 ? at / l[^1] % 1 : 0;
+    }
+
     public PointF Heading(double pct)
     {
         double step = 2.0 / Math.Max(1, Length);

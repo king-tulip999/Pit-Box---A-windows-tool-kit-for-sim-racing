@@ -96,6 +96,8 @@ public sealed class SimRacingSettings
 
     public RaceHudSettings Hud { get; set; } = new();
 
+    public ShakerSettings Shakers { get; set; } = new();
+
     public List<PanelSlot> PanelLayout { get; set; } = new();
 
     public int PanelLayoutVersion { get; set; }
@@ -121,7 +123,12 @@ public sealed class SimRacingSettings
             if (at >= 0 && !PanelLayout.Any(s => Is(s, "companions")))
                 PanelLayout.Insert(Math.Min(at, PanelLayout.Count), new PanelSlot { Id = "companions" });
         }
-        PanelLayoutVersion = 3;
+        if (PanelLayoutVersion < 4)
+        {
+            HiddenPanels ??= new();
+            if (!IsPanelHidden("shakers")) HiddenPanels.Add("shakers");
+        }
+        PanelLayoutVersion = 4;
     }
 
     public List<string> HiddenPanels { get; set; } = new();

@@ -284,7 +284,7 @@ internal static class StatsSessionView
         {
             var lead = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             lead.Children.Add(new TextBlock { Text = "Fastest clean lap", Style = Ui.Res<Style>("Caption") });
-            lead.Children.Add(RaceParts.Big(s.Best is { } fastest ? StatFormat.LapTime(fastest) : SimRacing.Race.RaceFormat.Missing, 58, place + "Text", italic: true).Also(t => t.HorizontalAlignment = HorizontalAlignment.Left));
+            lead.Children.Add(RaceParts.BigFigure(s.Best is { } fastest ? StatFormat.LapTime(fastest) : SimRacing.Race.RaceFormat.Missing, 58, place + "Text").Also(t => t.HorizontalAlignment = HorizontalAlignment.Left));
             row.Children.Add(lead);
         }
         var meta = new StackPanel { Margin = new Thickness(raced ? 22 : 30, 10, 0, 0), VerticalAlignment = VerticalAlignment.Center, MaxWidth = 520 };

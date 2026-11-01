@@ -50,6 +50,8 @@ internal sealed class SessionStatsService : IDisposable
 
     public Config.SessionStatsSettings Settings => _app.Config.SessionStats;
 
+    public Config.RaceHudSettings Hud => _app.Config.SimRacing.Hud;
+
     public IReadOnlyCollection<int>? Leagues => Plugins.BuiltIn.SessionStatsPlugin.LeagueIds(_app);
 
     public IEnumerable<StatDef> Available => StatRegistry.All.Where(d => !d.League || Leagues is not null);
@@ -99,7 +101,7 @@ internal sealed class SessionStatsService : IDisposable
             return;
         }
         if (_app.Demo) return;
-        _app.Telemetry.FrameObserver = _observer;
+        _app.Telemetry.AddObserver(_observer);
         _app.Telemetry.Acquire(Consumer);
         _app.Watcher.Stopped += OnProcessStopped;
         ImportNewFiles();
@@ -111,7 +113,7 @@ internal sealed class SessionStatsService : IDisposable
         _started = false;
         _app.Watcher.Stopped -= OnProcessStopped;
         _scanAfterExit?.Stop();
-        if (ReferenceEquals(_app.Telemetry.FrameObserver, _observer)) _app.Telemetry.FrameObserver = null;
+        _app.Telemetry.RemoveObserver(_observer);
         RaceHistory.Use(null);
         if (!_app.Demo) _app.Telemetry.Release(Consumer);
         lock (_feedGate)
@@ -332,7 +334,7 @@ internal sealed class SessionStatsService : IDisposable
         }
     }
 
-    private const string RereadKey = "recorder_reread", RereadVersion = "official-lap-times-differs-grid-class-finish";
+    private const string RereadKey = "recorder_reread", RereadVersion = "official-lap-times-differs-grid-class-finish-car-settings-off-track";
 
     private void Reread(StatsStore store, string folder, bool traces, TraceRetention retention, CancellationToken cancel)
     {

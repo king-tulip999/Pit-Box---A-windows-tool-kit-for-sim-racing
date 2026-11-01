@@ -258,6 +258,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
     {
         ["setups"] = "Your car setups by car: find, rename, move, import and share.",
         ["hud"] = "In-game widgets from iRacing's live telemetry; off stops reading it.",
+        ["shakers"] = "Engine, shifts, ABS, kerbs and the limiter through a sound output; off by default.",
         ["fov"] = "The correct field of view for your seat and screens.",
         ["iracing"] = "Every iRacing setting explained, a health check and backups.",
         ["tradingpaints"] = "Starts the Trading Paints Downloader by hand or with iRacing.",
@@ -692,10 +693,13 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         section.Children.Add(Ui.Divider());
 
         var folder = Ui.LabeledButton("I.Folder", "Open folder", () => OpenFolder(ConfigStore.Folder));
-        folder.ToolTip = TextCase.VerbatimTip(ConfigStore.Folder);
+        folder.ToolTip = TextCase.PathTip(ConfigStore.Folder);
         var fileRow = Ui.SettingRow("Settings file", "Your settings, the error log, backups made by Reset and Import, and iRacing backups, all in one folder.", folder);
         Ui.Anchor(fileRow, "settings.folder");
         section.Children.Add(fileRow);
+        section.Children.Add(Ui.Divider());
+        section.Children.Add(new TextBlock { Text = "Storage", Style = Ui.Res<Style>("H3"), Margin = new Thickness(0, 4, 0, 6) });
+        section.Children.Add(new StorageView(_app, _window));
         section.Children.Add(Ui.Divider());
         section.Children.Add(ResetRow());
         section.Children.Add(Ui.Divider());
@@ -850,7 +854,8 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         about.ColumnDefinitions.Add(new ColumnDefinition());
         about.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var text = new StackPanel { Margin = new Thickness(0, 0, 10, 0) };
-        text.Children.Add(new TextBlock { Text = $"Pit-Box {UpdateService.Tag(_app.Updates.Installed)}" + (_app.Demo ? " · demo data" : ""), Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold });
+        text.Children.Add(new TextBlock { Text = $"Pit-Box {UpdateService.Tag(_app.Updates.Installed)}", Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold });
+        if (_app.Demo) text.Children.Add(Ui.Text("Demo data", "Caption"));
         about.Children.Add(text);
         var project = Ui.LabeledButton("I.External", "Project page", () => Ui.OpenUrl(UpdateService.ProjectPage), "GhostButton");
         var changelog = Ui.LabeledButton("I.FileText", "Changelog", () => ChangelogDialog.Show(_window, _app.Updates, null, justUpdated: false), "GhostButton");

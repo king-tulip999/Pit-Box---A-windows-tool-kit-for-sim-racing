@@ -13,7 +13,7 @@ internal static class TimingEditor
             new("sectors", "Sectors", HudTab.Layout, true, O("sectors"), O("split")),
             new("times", "Times", HudTab.Content, true, new PickerSetting("fields", new HudCategory[]
             {
-                new("Your laps", "current", "last", "best", "predicted", "theoretical"),
+                new("Your laps", "current", "last", "best", "predicted", "theoretical", "consistency"),
                 new("Field", "sessionBest", "classBest"),
             })),
         },
@@ -23,7 +23,7 @@ internal static class TimingEditor
         {
             new(HudPreset.Minimal, V(("fields", "current,best"), ("sectors", false))),
             new(HudPreset.Standard, V()),
-            new(HudPreset.Everything, V(("fields", "current,last,best,predicted,theoretical,sessionBest,classBest"))),
+            new(HudPreset.Everything, V(("fields", "current,last,best,predicted,theoretical,consistency,sessionBest,classBest"))),
         },
     };
 }

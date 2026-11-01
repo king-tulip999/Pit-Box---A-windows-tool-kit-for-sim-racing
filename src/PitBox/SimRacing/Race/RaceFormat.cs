@@ -120,6 +120,12 @@ internal static class RaceFormat
         return u == HudUnits.Imperial ? $"{c * 9 / 5 + 32:0}°F" : $"{c:0}°C";
     }
 
+    public static string TempDelta(double celsius, HudUnits u) =>
+        u == HudUnits.Imperial ? (celsius * 9 / 5).ToString("0.0", Inv) + "°F" : celsius.ToString("0.0", Inv) + "°C";
+
+    public static string Spread(double? seconds) =>
+        seconds is { } s && double.IsFinite(s) && s >= 0 ? "±" + (s / 2).ToString(s / 2 < 10 ? "0.00" : "0.0", Inv) : Missing;
+
     public static string Pressure(double? kpa, HudUnits u)
     {
         if (kpa is not { } p || !double.IsFinite(p) || p <= 0) return Missing;

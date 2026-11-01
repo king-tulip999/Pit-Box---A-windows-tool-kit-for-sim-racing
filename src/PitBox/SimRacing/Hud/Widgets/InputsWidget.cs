@@ -8,20 +8,21 @@ namespace PitBox.SimRacing.Hud.Widgets;
 
 internal sealed class InputsWidget : HudWidget
 {
-    public const string Trace = "trace", Tach = "tach", Strip = "strip";
-    private const double TraceSeconds = 6, StripSeconds = 4, LimiterHz = 10, AbsHz = 4;
+    public const string Trace = "trace", Lights = "lights";
+    private const double TraceSeconds = 6, LimiterHz = 10, AbsHz = 4;
+    private const int TraceLights = 20, BarLights = 15;
+    private const float TraceH = 84, RightW = 90, BarW = 470, BarH = 66, SpeedW = 80;
     private const int Capacity = 640;
 
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
         HudOption.Choice("style", "Style", Trace,
-            new HudChoice(Trace, "Trace", "A pedal and steering trace beside the pedal bars, gear, speed and RPM"),
-            new HudChoice(Tach, "Tach", "A round RPM dial inside a steering ring, pedal bars under it"),
-            new HudChoice(Strip, "Strip", "One low row to sit under the mirror")),
+            new HudChoice(Trace, "Trace", "A pedal and steering trace beside the pedal bars, gear, speed and RPM, shift lights across the top"),
+            new HudChoice(Lights, "Shift-light bar", "One low row: gear, a wide row of shift lights, pedal bars and speed")),
         HudOption.Set("show", "Shows", "throttle,brake,clutch,steering,speed,rpm,trace,abs", null,
             new HudChoice("throttle", "Throttle"), new HudChoice("brake", "Brake"), new HudChoice("clutch", "Clutch", "Pedal travel: pressed shows full"),
-            new HudChoice("steering", "Steering"), new HudChoice("speed", "Speed"), new HudChoice("rpm", "RPM readout"),
-            new HudChoice("trace", "Input trace", "Trace and Strip only"),
+            new HudChoice("steering", "Steering"), new HudChoice("speed", "Speed"), new HudChoice("rpm", "RPM", "Shift lights and the RPM number in Trace"),
+            new HudChoice("trace", "Input trace", "Trace only"),
             new HudChoice("abs", "ABS flash", "While ABS works the gear flashes amber and the brake turns amber")),
     };
 
@@ -30,9 +31,10 @@ internal sealed class InputsWidget : HudWidget
         public bool AnyPedal => Throttle || Brake || Clutch;
         public int Pedals => (Clutch ? 1 : 0) + (Brake ? 1 : 0) + (Throttle ? 1 : 0);
         public bool TraceGraph => Trace && (AnyPedal || Steering);
-        public bool StripGraph => Trace && AnyPedal;
-        public bool StripMiddle => Rpm || Steering;
-        public float StripFixed => 50 + 12 + (Speed ? 44 + 12 : 0) + (StripGraph ? 90 + 12 : 0) + (AnyPedal ? Pedals * 12 - 4 + 12 : 0);
+        public bool SteerBar => Steering && !TraceGraph;
+        public float PedalsW => Math.Max(AnyPedal ? Pedals * 17 - 5 : 0, SteerBar ? 46 : 0);
+        public float TraceW => 8 + (TraceGraph ? 250 + 10 : 0) + (PedalsW > 0 ? PedalsW + 8 : 0) + RightW + 8;
+        public float TraceHeight => (Rpm ? 18 : 8) + TraceH + 8;
     }
 
     internal static Shows Parse(HudOptions o)
@@ -57,12 +59,7 @@ internal sealed class InputsWidget : HudWidget
     public static SizeF Natural(HudOptions o)
     {
         var on = Parse(o);
-        return o.Choice("style") switch
-        {
-            Tach => new SizeF(188, 176 + (on.AnyPedal ? 30 : 0)),
-            Strip => new SizeF(on.StripFixed + (on.StripMiddle ? 254 + 12 : 0), 50),
-            _ => new SizeF(10 + (on.TraceGraph ? 250 : 0) + (on.AnyPedal || on.Steering ? 90 : 0) + 90 + 10, (on.Rpm ? 4 : 0) + 100),
-        };
+        return o.Choice("style") == Lights ? new SizeF(BarW - (on.Speed ? 0 : SpeedW - 12), BarH) : new SizeF(on.TraceW, on.TraceHeight);
     }
 
     private struct Sample
@@ -81,7 +78,7 @@ internal sealed class InputsWidget : HudWidget
     private readonly GraphicsPath _path = new(), _absPath = new();
     private float _k = 1;
 
-    private readonly record struct RpmScale(double Min, double Max, double Shift, double Blink, double ZoneFrom)
+    private readonly record struct RpmScale(double Min, double Max, double First, double Shift, double Blink, double ZoneFrom)
     {
         public double Frac(double rpm) => Max > Min ? Math.Clamp((rpm - Min) / (Max - Min), 0, 1) : 0;
     }
@@ -96,12 +93,8 @@ internal sealed class InputsWidget : HudWidget
         var live = Read(v);
         Record(v, live);
         p.Panel();
-        switch (v.Options.Choice("style"))
-        {
-            case Tach: DrawTach(p, v, live); break;
-            case Strip: DrawStrip(p, v, live); break;
-            default: DrawTrace(p, v, live); break;
-        }
+        if (v.Options.Choice("style") == Lights) DrawLights(p, v, live);
+        else DrawTrace(p, v, live);
     }
 
     private void ReadShows(HudOptions o)
@@ -152,7 +145,8 @@ internal sealed class InputsWidget : HudWidget
         double b = blink > 0 ? blink : redline > 0 ? redline : max;
         double sh = shift > 0 ? Math.Min(shift, max) : b;
         double zone = redline > 0 ? Math.Min(b, redline) : b;
-        return new RpmScale(min, max, sh, Math.Min(b, max), Math.Min(zone, max));
+        double first = s.ShiftLightFirstRpm is { } fl && fl < sh ? fl : min;
+        return new RpmScale(min, max, first, sh, Math.Min(b, max), Math.Min(zone, max));
     }
 
     private void Record(HudView v, in Live live)
@@ -199,51 +193,47 @@ internal sealed class InputsWidget : HudWidget
 
     private Color BrakeColor(HudPainter p, in Live live) => live.Abs ? p.P.AbsInput : p.P.BrakeInput;
 
-    private void DrawTrace(HudPainter p, HudView v, in Live live)
-    {
-        var b = p.Bounds;
-        bool graph = _on.TraceGraph, pedals = AnyPedal || _steering;
-        float lineH = _rpm ? 4 : 0;
-        float designH = lineH + 100, minW = 10 + (graph ? 250 : 0) + (pedals ? 90 : 0) + 70 + 10;
-        _k = Math.Max(0.1f, Math.Min(b.Height / designH, b.Width / minW));
-        float top = (b.Height - designH * _k) / 2;
-        if (_rpm) RpmLine(p, live, new RectangleF(b.X, b.Y, b.Width, S(4)), p.P.Surface, false);
-        float y = top + S(lineH + 10), h = S(80), x = S(10);
-        if (graph)
-        {
-            Graph(p, new RectangleF(x, y, S(240), h), live.Now, TraceSeconds, true);
-            x += S(250);
-        }
-        if (pedals)
-        {
-            PedalBlock(p, new RectangleF(x, y, S(80), h), live);
-            x += S(90);
-        }
-        GearBlock(p, v, new RectangleF(x, y, Math.Max(S(40), b.Right - S(10) - x), h), live, 44, 15, 10);
-    }
-
-    private void RpmLine(HudPainter p, in Live live, RectangleF r, Color notchColor, bool tallNotch)
-    {
-        var sc = live.Scale;
-        p.Fill(r, p.P.InputTrack);
-        float zone = r.X + (float)sc.Frac(sc.ZoneFrom) * r.Width;
-        if (zone < r.Right) p.Fill(RectangleF.FromLTRB(zone, r.Top, r.Right, r.Bottom), p.P.RedZone);
-        if (live.Rpm is { } rpm && (!live.Limiter || FlashOn(p, live.Now, LimiterHz)))
-            p.Fill(new RectangleF(r.X, r.Y, (float)sc.Frac(rpm) * r.Width, r.Height), live.Limiter ? p.P.Danger : p.P.Accent);
-        float sx = r.X + (float)sc.Frac(sc.Shift) * r.Width;
-        float over = tallNotch ? S(2) : 0;
-        p.Fill(new RectangleF(sx - S(1), r.Y - over, S(2), r.Height + over * 2), notchColor);
-    }
-
     private void Graph(HudPainter p, RectangleF r, double now, double window, bool steering)
     {
         p.Fill(r, p.P.TraceBack);
         if (steering) p.Fill(new RectangleF(r.X, r.Y + r.Height / 2 - 0.5f, r.Width, 1), p.P.InputTicks);
         float thick = steering ? 2 : 1.5f;
-        if (steering && _steering) Lines(p, r, now, window, 3, p.P.SteerInput, null, S(1.5f));
+        if (_throttle) Area(p, r, now, window, 0, HudPalette.Alpha(p.P.ThrottleInput, 70));
+        if (_brake) Area(p, r, now, window, 1, HudPalette.Alpha(p.P.BrakeInput, 95));
+        if (steering && _steering) Lines(p, r, now, window, 3, HudPalette.Alpha(p.P.SteerInput, 180), null, S(1.2f));
         if (_clutch) Lines(p, r, now, window, 2, p.P.ClutchInput, null, S(1.5f));
         if (_brake) Lines(p, r, now, window, 1, p.P.BrakeInput, _abs ? p.P.AbsInput : null, S(thick));
         if (_throttle) Lines(p, r, now, window, 0, p.P.ThrottleInput, null, S(thick));
+    }
+
+    private void Area(HudPainter p, RectangleF r, double now, double window, int channel, Color color)
+    {
+        _path.Reset();
+        float from = r.Bottom, span = r.Height - 1;
+        int start = (_head - _count + Capacity) % Capacity;
+        bool open = false;
+        PointF last = default;
+        for (int n = 0; n < _count; n++)
+        {
+            ref readonly var s = ref _ring[(start + n) % Capacity];
+            double age = now - s.At;
+            if (age > window || age < -0.5)
+            {
+                if (open) { _path.AddLine(last, new PointF(last.X, from)); _path.CloseFigure(); open = false; }
+                continue;
+            }
+            var pt = new PointF(r.Right - (float)(age / window) * r.Width, from - Value(s, channel) * span);
+            if (!open)
+            {
+                _path.StartFigure();
+                _path.AddLine(new PointF(pt.X, from), pt);
+                open = true;
+            }
+            else _path.AddLine(last, pt);
+            last = pt;
+        }
+        if (open) { _path.AddLine(last, new PointF(last.X, from)); _path.CloseFigure(); }
+        if (_path.PointCount > 2) p.G.FillPath(p.Brush(color), _path);
     }
 
     private static float Value(in Sample s, int channel) => channel switch { 0 => s.Throttle, 1 => s.Brake, 2 => s.Clutch, _ => s.Steer };
@@ -308,55 +298,6 @@ internal sealed class InputsWidget : HudWidget
         p.Fill(new RectangleF(cx - S(1), r.Y - S(2), S(2), r.Height + S(4)), p.P.Accent);
     }
 
-    private static string Percent(double? v) => v is { } x ? string.Create(CultureInfo.InvariantCulture, $"{x * 100:0}%") : RaceFormat.Missing;
-
-    private void PedalBlock(HudPainter p, RectangleF r, in Live live)
-    {
-        int n = PedalCount;
-        var small = p.Font(S(10), false);
-        float textH = p.LineHeight(small), steerH = _steering ? S(5) + S(3) + textH : 0;
-        if (n > 0)
-        {
-            float barH = r.Height - steerH - S(3) - textH - (_steering ? S(4) : 0);
-            if (!_steering) barH = Math.Min(barH, r.Height - S(3) - textH);
-            float slot = r.Width / n;
-            int i = 0;
-            if (_clutch) One(i++, live.Clutch, p.P.ClutchInput);
-            if (_brake) One(i++, live.Brake, BrakeColor(p, live));
-            if (_throttle) One(i, live.Throttle, p.P.ThrottleInput);
-
-            void One(int at, double? value, Color color)
-            {
-                float cx = r.X + slot * at + slot / 2;
-                VerticalBar(p, new RectangleF(cx - S(5), r.Y, S(10), barH), value, color);
-                p.Text(Percent(value), small, p.P.Muted, new RectangleF(cx - slot / 2, r.Y + barH + S(3), slot, textH), HAlign.Center, VAlign.Top, false);
-            }
-        }
-        if (_steering)
-        {
-            float sy = n > 0 ? r.Bottom - steerH : r.Y + (r.Height - steerH) / 2;
-            SteerBar(p, new RectangleF(r.X, sy, r.Width, S(5)), live);
-            p.Text(Angle(live.SteerDeg), small, p.P.Muted, new RectangleF(r.X, sy + S(5) + S(3), r.Width, textH), HAlign.Center, VAlign.Top, false);
-        }
-    }
-
-    private void GearBlock(HudPainter p, HudView v, RectangleF r, in Live live, float gearPx, float speedPx, float rpmPx)
-    {
-        var gearFont = p.Font(S(gearPx), true);
-        var speedFont = p.Font(S(speedPx), true);
-        var small = p.Font(S(rpmPx), false);
-        float gearH = p.LineHeight(gearFont) * 0.92f, speedH = _speed ? p.LineHeight(speedFont) : 0, rpmH = _rpm ? p.LineHeight(small) : 0;
-        float y = r.Y + (r.Height - gearH - speedH - rpmH) / 2;
-        p.Text(GearText(v.Frame.Gear), gearFont, GearColor(p, live), new RectangleF(r.X, y, r.Width, gearH), HAlign.Center, VAlign.Center, false);
-        y += gearH;
-        if (_speed)
-        {
-            SpeedLine(p, v, new RectangleF(r.X, y, r.Width, speedH), speedFont, small);
-            y += speedH;
-        }
-        if (_rpm) p.Text(RpmText(live.Rpm), small, p.P.Muted, new RectangleF(r.X, y, r.Width, rpmH), HAlign.Center, VAlign.Center, false);
-    }
-
     private static string RpmText(double? rpm) => rpm is { } x ? string.Create(CultureInfo.InvariantCulture, $"{x:0} RPM") : RaceFormat.Missing + " RPM";
 
     private static readonly string[] SpeedSamples = { "888" };
@@ -372,165 +313,116 @@ internal sealed class InputsWidget : HudWidget
         p.Text(unit, unitFont, p.P.Muted, new RectangleF(x + nw + gap, r.Y + drop, uw + 2, r.Height), HAlign.Left, VAlign.Center, false);
     }
 
-    private void DrawTach(HudPainter p, HudView v, in Live live)
+    internal static int LitLights(double? rpm, double first, double shift, int count)
     {
-        var b = p.Bounds;
-        bool pedals = AnyPedal;
-        float designH = 10 + 156 + (pedals ? 30 : 0) + 10;
-        _k = Math.Max(0.1f, Math.Min(b.Width / 188, b.Height / designH));
-        float ox = (b.Width - S(188)) / 2, oy = (b.Height - S(designH)) / 2;
-        var dial = new RectangleF(ox + S(10), oy + S(10), S(168), S(156));
-        float cx = dial.X + dial.Width / 2, cy = dial.Y + dial.Height / 2;
-        if (_steering) SteerRing(p, cx, cy, S(73), live);
-        RpmArc(p, cx, cy, S(62), live);
-        var gearFont = p.Font(S(58), true);
-        var speedFont = p.Font(S(16), true);
-        var small = p.Font(S(10), false);
-        float gearH = p.LineHeight(gearFont), speedH = p.LineHeight(speedFont), rpmH = p.LineHeight(small);
-        float lift = (_speed ? S(8) : 0) + (_rpm ? S(6) : 0);
-        float left = cx - S(55), width = S(110);
-        p.Text(GearText(v.Frame.Gear), gearFont, GearColor(p, live), new RectangleF(left, cy - lift - gearH / 2, width, gearH), HAlign.Center, VAlign.Center, false);
-        float below = cy - lift + S(30);
-        if (_speed)
-        {
-            SpeedLine(p, v, new RectangleF(left, below - speedH / 2, width, speedH), speedFont, small);
-            below += S(15);
-        }
-        if (_rpm) p.Text(RpmText(live.Rpm), small, p.P.Muted, new RectangleF(left, below - rpmH / 2, width, rpmH), HAlign.Center, VAlign.Center, false);
-        if (_steering)
-        {
-            var angleFont = p.Font(S(11), true);
-            float ah = p.LineHeight(angleFont);
-            p.Text(Angle(live.SteerDeg), angleFont, p.P.SteerInput, new RectangleF(cx - S(40), cy + S(57) - ah / 2, S(80), ah), HAlign.Center, VAlign.Center, false);
-        }
-        if (pedals) PedalRow(p, new RectangleF(dial.X, dial.Bottom + S(8), dial.Width, S(22)), live);
+        if (rpm is not { } r || count <= 0) return 0;
+        if (r >= shift) return count;
+        if (shift <= first) return 0;
+        return Math.Clamp((int)Math.Floor((r - first) * count / (shift - first)), 0, count);
     }
 
-    private void SteerRing(HudPainter p, float cx, float cy, float radius, in Live live)
-    {
-        var box = new RectangleF(cx - radius, cy - radius, radius * 2, radius * 2);
-        p.G.DrawEllipse(p.FlatPen(p.P.InputTrack, S(3)), box);
-        p.Fill(new RectangleF(cx - S(1), cy - radius - S(4), S(2), S(8)), p.P.InputTicks);
-        if (live.SteerDeg is not { } deg) return;
-        float sweep = (float)Math.Clamp(deg, -359.5, 359.5);
-        if (Math.Abs(sweep) >= 0.5f) p.G.DrawArc(p.FlatPen(p.P.SteerInput, S(3)), box, 270, sweep);
-        double a = (270 + sweep) * Math.PI / 180;
-        float ex = cx + radius * (float)Math.Cos(a), ey = cy + radius * (float)Math.Sin(a);
-        p.Fill(new RectangleF(ex - S(4), ey - S(4), S(8), S(8)), p.P.Accent);
-    }
-
-    private void RpmArc(HudPainter p, float cx, float cy, float radius, in Live live)
+    private void ShiftLights(HudPainter p, in Live live, RectangleF r, int count, float gap)
     {
         var sc = live.Scale;
-        var box = new RectangleF(cx - radius, cy - radius, radius * 2, radius * 2);
-        float stroke = S(10);
-        p.G.DrawArc(p.FlatPen(p.P.InputTrack, stroke), box, 135, 270);
-        float zone = (float)sc.Frac(sc.ZoneFrom) * 270;
-        if (zone < 270) p.G.DrawArc(p.FlatPen(p.P.RedZone, stroke), box, 135 + zone, 270 - zone);
-        if (live.Rpm is { } rpm && (!live.Limiter || FlashOn(p, live.Now, LimiterHz)) && sc.Frac(rpm) * 270 is var fill and > 0.3)
-            p.G.DrawArc(p.FlatPen(live.Limiter ? p.P.Danger : p.P.Accent, stroke), box, 135, (float)fill);
-        float inner = radius - stroke / 2;
-        double step = sc.Max - sc.Min > 12000 ? 2000 : 1000;
-        var tick = p.FlatPen(p.P.InputTicks, S(1.5f));
-        for (double at = Math.Ceiling(sc.Min / step) * step; at <= sc.Max + 0.5; at += step)
-            Spoke(p, tick, cx, cy, 135 + sc.Frac(at) * 270, inner - S(2), inner - S(6));
-        Spoke(p, p.FlatPen(p.P.Accent, S(2.5f)), cx, cy, 135 + sc.Frac(sc.Shift) * 270, inner - S(1), inner - S(9));
+        int lit = LitLights(live.Rpm, sc.First, sc.Shift, count);
+        bool shifting = live.Rpm is { } rpm && rpm >= sc.Shift;
+        bool dark = live.Limiter && !FlashOn(p, live.Now, LimiterHz);
+        var on = shifting ? p.P.Danger : p.P.Text;
+        var off = HudPalette.Alpha(p.P.Muted, 31);
+        float w = (r.Width - gap * (count - 1)) / count;
+        for (int i = 0; i < count; i++)
+            p.Fill(new RectangleF(r.X + i * (w + gap), r.Y, w, r.Height), i < lit && !dark ? on : off);
     }
 
-    private static void Spoke(HudPainter p, Pen pen, float cx, float cy, double degrees, float from, float to)
-    {
-        double a = degrees * Math.PI / 180;
-        float c = (float)Math.Cos(a), s = (float)Math.Sin(a);
-        p.G.DrawLine(pen, cx + c * from, cy + s * from, cx + c * to, cy + s * to);
-    }
-
-    private void PedalRow(HudPainter p, RectangleF r, in Live live)
-    {
-        int n = PedalCount;
-        float gap = S(8), w = (r.Width - gap * (n - 1)) / n;
-        var small = p.Font(S(10), false);
-        float x = r.X;
-        if (_clutch) One("CLU", live.Clutch, p.P.ClutchInput);
-        if (_brake) One("BRK", live.Brake, BrakeColor(p, live));
-        if (_throttle) One("THR", live.Throttle, p.P.ThrottleInput);
-
-        void One(string label, double? value, Color color)
-        {
-            HorizontalBar(p, new RectangleF(x, r.Y, w, S(8)), value, color);
-            var text = new RectangleF(x, r.Y + S(10), w, r.Height - S(10));
-            p.Text(label, small, p.P.Muted, text, HAlign.Left, VAlign.Top, false);
-            p.Text(Percent(value), small, p.P.Muted, text, HAlign.Right, VAlign.Top, false);
-            x += w + gap;
-        }
-    }
-
-    private void DrawStrip(HudPainter p, HudView v, in Live live)
+    private void DrawTrace(HudPainter p, HudView v, in Live live)
     {
         var b = p.Bounds;
-        bool middle = _on.StripMiddle, graph = _on.StripGraph, pedals = AnyPedal;
-        float fixedW = _on.StripFixed;
-        float minW = fixedW + (middle ? 120 + 12 : 0);
-        _k = Math.Max(0.1f, Math.Min(b.Height / 50, b.Width / minW));
-        float oy = (b.Height - S(50)) / 2;
-        float spare = b.Width / _k - fixedW - (middle ? 12 : 0);
-        float middleW = middle ? Math.Max(120, spare) : 0, graphW = graph ? 90 + (middle ? 0 : Math.Max(0, spare)) : 0;
-        var tile = new RectangleF(0, oy, S(50), S(50));
-        var tileColor = live.Limiter ? FlashOn(p, live.Now, LimiterHz) ? p.P.Danger : p.P.InputTrack
-            : live.Rpm is { } rpm && rpm >= live.Scale.Shift ? p.P.Accent : p.P.InputTrack;
-        p.Fill(tile, tileColor);
-        p.Text(GearText(v.Frame.Gear), p.Font(S(36), true), live.Abs ? GearColor(p, live) : p.P.Heading, tile, HAlign.Center, VAlign.Center, false);
-        float x = tile.Right + S(12);
-        float cy = oy + S(25);
-        if (_speed)
-        {
-            var number = p.Font(S(20), true);
-            var unitFont = p.Font(S(9), false);
-            float nh = p.LineHeight(number), uh = p.LineHeight(unitFont), top = cy - (nh + uh) / 2;
-            var box = new RectangleF(x, top, S(44), nh);
-            string value = v.Frame.Speed is { } ms ? RaceFormat.SpeedValue(ms, v.Units).ToString("0", CultureInfo.InvariantCulture) : RaceFormat.Missing;
-            p.Text(value, number, p.P.Text, box, HAlign.Right, VAlign.Center, false);
-            p.Text(RaceFormat.SpeedUnit(v.Units), unitFont, p.P.Muted, new RectangleF(x, top + nh, S(44), uh), HAlign.Right, VAlign.Top, false);
-            x += S(44 + 12);
-        }
-        if (middle)
-        {
-            Middle(p, new RectangleF(x, oy, S(middleW), S(50)), live);
-            x += S(middleW + 12);
-        }
+        bool graph = _on.TraceGraph;
+        float pedalsW = _on.PedalsW;
+        _k = Math.Max(0.1f, Math.Min(b.Height / _on.TraceHeight, b.Width / _on.TraceW));
+        float top = (b.Height - S(_on.TraceHeight)) / 2;
+        float pad = S(8), x = pad;
+        if (_rpm) ShiftLights(p, live, new RectangleF(pad, top + pad, b.Width - pad * 2, S(4)), TraceLights, S(2));
+        float y = top + S(_rpm ? 18 : 8), h = S(TraceH);
         if (graph)
         {
-            Graph(p, new RectangleF(x, cy - S(16), S(graphW), S(32)), live.Now, StripSeconds, false);
-            x += S(graphW + 12);
+            Graph(p, new RectangleF(x, y, S(250), h), live.Now, TraceSeconds, true);
+            x += S(260);
         }
-        if (pedals)
+        if (pedalsW > 0)
         {
-            int i = 0;
-            if (_clutch) Bar(live.Clutch, p.P.ClutchInput);
-            if (_brake) Bar(live.Brake, BrakeColor(p, live));
-            if (_throttle) Bar(live.Throttle, p.P.ThrottleInput);
+            PedalBars(p, new RectangleF(x, y, S(pedalsW), h), live);
+            x += S(pedalsW + 8);
+        }
+        GearBlock(p, v, new RectangleF(x, y, Math.Max(S(40), b.Right - pad - x), h), live);
+    }
 
-            void Bar(double? value, Color color) => VerticalBar(p, new RectangleF(x + S(12) * i++, cy - S(16), S(8), S(32)), value, color);
+    private void PedalBars(HudPainter p, RectangleF r, in Live live)
+    {
+        float steerH = _on.SteerBar ? S(11) : 0;
+        float barH = r.Height - steerH;
+        float x = r.X;
+        if (_clutch) One(live.Clutch, p.P.ClutchInput);
+        if (_brake) One(live.Brake, BrakeColor(p, live));
+        if (_throttle) One(live.Throttle, p.P.ThrottleInput);
+        if (_on.SteerBar) SteerBar(p, new RectangleF(r.X, r.Bottom - S(5), r.Width, S(5)), live);
+
+        void One(double? value, Color color)
+        {
+            VerticalBar(p, new RectangleF(x, r.Y, S(12), barH), value, color);
+            x += S(17);
         }
     }
 
-    private void Middle(HudPainter p, RectangleF r, in Live live)
+    private void GearBlock(HudPainter p, HudView v, RectangleF r, in Live live)
     {
-        var small = p.Font(S(9), false);
-        float textH = p.LineHeight(small);
-        float total = (_rpm ? S(10) + S(5) : 0) + (_steering ? S(5) + S(5) : 0) + textH;
-        float y = r.Y + (r.Height - total) / 2;
+        float gearPx = S(52);
+        float gearH = p.DisplaySize("8", gearPx, false).Height;
+        p.Display(GearText(v.Frame.Gear), gearPx, GearColor(p, live), new RectangleF(r.X, r.Y + S(26) - gearH / 2, r.Width, gearH), HAlign.Center, VAlign.Center, false);
+        if (_speed) SpeedLine(p, v, new RectangleF(r.X, r.Y + S(50), r.Width, S(24)), p.Font(S(18), true), p.Font(S(10.5f), true));
         if (_rpm)
         {
-            RpmLine(p, live, new RectangleF(r.X, y, r.Width, S(10)), p.P.Muted, true);
-            y += S(15);
+            var small = p.Font(S(10.5f), true);
+            p.Text(RpmText(live.Rpm), small, p.P.Faint, new RectangleF(r.X, r.Bottom - p.LineHeight(small), r.Width, p.LineHeight(small)), HAlign.Center, VAlign.Bottom, false);
         }
-        if (_steering)
+    }
+
+    private void DrawLights(HudPainter p, HudView v, in Live live)
+    {
+        var b = p.Bounds;
+        float naturalW = BarW - (_speed ? 0 : SpeedW - 12);
+        _k = Math.Max(0.1f, Math.Min(b.Height / BarH, b.Width / naturalW));
+        float oy = (b.Height - S(BarH)) / 2, right = b.Width - S(12);
+        var sc = live.Scale;
+        bool shifting = live.Rpm is { } rpm && rpm >= sc.Shift;
+        var tile = new RectangleF(0, oy, S(56), S(BarH));
+        var tileColor = live.Limiter ? FlashOn(p, live.Now, LimiterHz) ? p.P.Danger : p.P.SurfaceAlt : shifting ? p.P.Danger : p.P.SurfaceAlt;
+        p.Fill(tile, tileColor);
+        p.Display(GearText(v.Frame.Gear), S(48), live.Abs ? GearColor(p, live) : p.P.Heading, tile, HAlign.Center, VAlign.Center, false);
+        float x = tile.Right + S(10);
+        float speedLeft = _speed ? right - S(SpeedW - 12) : right + S(12);
+        if (_speed)
         {
-            SteerBar(p, new RectangleF(r.X, y, r.Width, S(5)), live);
-            y += S(10);
+            string value = v.Frame.Speed is { } ms ? RaceFormat.SpeedValue(ms, v.Units).ToString("0", CultureInfo.InvariantCulture) : RaceFormat.Missing;
+            float numberH = p.DisplaySize("888", S(30), false).Height;
+            p.Display(value, S(30), p.P.Heading, new RectangleF(speedLeft, oy + S(36) - numberH, right - speedLeft, numberH), HAlign.Right, VAlign.Bottom, false);
+            var unit = p.Font(S(10.5f), true);
+            p.Text(RaceFormat.SpeedUnit(v.Units), unit, p.P.Muted, new RectangleF(speedLeft, oy + S(56) - p.Ascent(unit), right - speedLeft, p.LineHeight(unit)), HAlign.Right, VAlign.Top, false);
         }
-        var row = new RectangleF(r.X, y, r.Width, textH);
-        if (_rpm) p.Text(RpmText(live.Rpm), small, p.P.Muted, row, HAlign.Left, VAlign.Center, false);
-        if (_steering) p.Text(Angle(live.SteerDeg), small, p.P.Muted, row, HAlign.Right, VAlign.Center, false);
+        float width = speedLeft - S(10) - x;
+        ShiftLights(p, live, new RectangleF(x, oy + S(10), width, S(22)), BarLights, S(4));
+        int bars = PedalCount;
+        if (bars == 0) return;
+        float barTop = oy + S(40), room = S(BarH - 8 - 40), gap = S(4);
+        float barH = Math.Min(S(6), (room - gap * (bars - 1)) / bars);
+        if (_throttle) Bar(live.Throttle, p.P.ThrottleInput);
+        if (_brake) Bar(live.Brake, BrakeColor(p, live));
+        if (_clutch) Bar(live.Clutch, p.P.ClutchInput);
+
+        void Bar(double? value, Color color)
+        {
+            HorizontalBar(p, new RectangleF(x, barTop, width, barH), value, color);
+            barTop += barH + gap;
+        }
     }
 }
