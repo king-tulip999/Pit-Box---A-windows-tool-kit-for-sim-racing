@@ -945,7 +945,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         HudAlertSetting Mine() => S.Alerts.TryGetValue(def.Id, out var x) ? x : S.Alerts[def.Id] = new HudAlertSetting();
         var grid = new Grid { Margin = new Thickness(24, 6, 0, 6) };
         grid.ColumnDefinitions.Add(new ColumnDefinition());
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(ThresholdColumn) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, MinWidth = ThresholdColumn });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(SwitchColumn) });
         var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 13, 0) };
         var title = new TextBlock { Text = def.Title, Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };

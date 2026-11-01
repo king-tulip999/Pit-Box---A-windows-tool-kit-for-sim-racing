@@ -18,9 +18,14 @@ internal sealed class HudWebClient
     private string? _message;
     private readonly SemaphoreSlim _wake = new(0, 1);
 
-    public HudWebClient(string kind) => Kind = kind;
+    public HudWebClient(string kind, bool sample)
+    {
+        Kind = kind;
+        Sample = sample;
+    }
 
     public string Kind { get; }
+    public bool Sample { get; }
     public volatile int Width, Height;
 
     public void Offer(byte[] frame)
@@ -151,14 +156,14 @@ internal sealed class HudWebServer : IDisposable
             {
                 tcp.NoDelay = true;
                 var stream = tcp.GetStream();
-                (string Path, Dictionary<string, string> Headers)? request;
+                (string Path, string Query, Dictionary<string, string> Headers)? request;
                 using (var reading = CancellationTokenSource.CreateLinkedTokenSource(token))
                 {
                     reading.CancelAfter(RequestTimeout);
                     request = await ReadRequest(stream, reading.Token).ConfigureAwait(false);
                 }
                 if (request is null) return;
-                var (path, headers) = request.Value;
+                var (path, query, headers) = request.Value;
                 if (!headers.TryGetValue("host", out var host) || !LocalHost(host, Port))
                 {
                     await Respond(stream, "403 Forbidden", "text/plain", "Forbidden"u8.ToArray(), token).ConfigureAwait(false);
@@ -177,7 +182,7 @@ internal sealed class HudWebServer : IDisposable
                         await Respond(stream, "503 Service Unavailable", "text/plain", "Too many overlays open"u8.ToArray(), token).ConfigureAwait(false);
                         return;
                     }
-                    await Socket(stream, _overlays.First(o => o.Kind.Equals(path[4..], StringComparison.OrdinalIgnoreCase)).Kind, key, token).ConfigureAwait(false);
+                    await Socket(stream, _overlays.First(o => o.Kind.Equals(path[4..], StringComparison.OrdinalIgnoreCase)).Kind, query == "sample", key, token).ConfigureAwait(false);
                     return;
                 }
                 var (status, type, body) = Page(path);
@@ -193,7 +198,7 @@ internal sealed class HudWebServer : IDisposable
     internal static bool LocalOrigin(string? origin, int port) =>
         string.IsNullOrEmpty(origin) || origin.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && LocalHost(origin[7..], port);
 
-    private static async Task<(string Path, Dictionary<string, string> Headers)?> ReadRequest(NetworkStream stream, CancellationToken token)
+    private static async Task<(string Path, string Query, Dictionary<string, string> Headers)?> ReadRequest(NetworkStream stream, CancellationToken token)
     {
         var buffer = new byte[MaxRequest];
         int length = 0;
@@ -215,7 +220,7 @@ internal sealed class HudWebServer : IDisposable
         }
         string path = first[1];
         int query = path.IndexOf('?');
-        return (query >= 0 ? path[..query] : path, headers);
+        return (query >= 0 ? path[..query] : path, query >= 0 ? path[(query + 1)..] : "", headers);
     }
 
     private static async Task Respond(NetworkStream stream, string status, string type, byte[] body, CancellationToken token)
@@ -258,12 +263,12 @@ internal sealed class HudWebServer : IDisposable
         }
     }
 
-    private async Task Socket(NetworkStream stream, string kind, string key, CancellationToken token)
+    private async Task Socket(NetworkStream stream, string kind, bool sample, string key, CancellationToken token)
     {
         string accept = Convert.ToBase64String(SHA1.HashData(Encoding.ASCII.GetBytes(key + SocketGuid)));
         await stream.WriteAsync(Encoding.ASCII.GetBytes($"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {accept}\r\n\r\n"), token).ConfigureAwait(false);
         using var socket = WebSocket.CreateFromStream(stream, new WebSocketCreationOptions { IsServer = true, KeepAliveInterval = TimeSpan.FromSeconds(20) });
-        var client = new HudWebClient(kind);
+        var client = new HudWebClient(kind, sample);
         using var done = CancellationTokenSource.CreateLinkedTokenSource(token);
         Add(client);
         try

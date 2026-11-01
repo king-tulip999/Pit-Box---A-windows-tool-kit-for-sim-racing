@@ -37,6 +37,11 @@ internal sealed class HudWebRenderer : IDisposable
     private readonly Dictionary<HudWebClient, Target> _targets = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<string, HudWidgetConfig> _fallbacks = new(StringComparer.OrdinalIgnoreCase);
     private readonly MemoryStream _png = new();
+    private readonly TelemetryFrame _sampleFrame = new();
+    private DemoTelemetry? _sampleFeed;
+    private RaceState? _sampleRace;
+    private RaceHudSettings? _sampleSettings;
+    private long _sampleSequence;
 
     public static IReadOnlyList<HudWebOverlay> Overlays { get; } = HudCatalog.All.Select(d => new HudWebOverlay(d.Kind, d.Name, d.W, d.H)).ToList();
 
@@ -49,8 +54,11 @@ internal sealed class HudWebRenderer : IDisposable
             _targets.Remove(stale);
         }
         long now = Stopwatch.GetTimestamp();
+        bool live = frame.Status == SimStatus.Connected;
+        bool sampled = !live && AdvanceSample(clients, settings);
         foreach (var client in clients)
         {
+            var (shown, shownRace) = sampled && client.Sample ? (_sampleFrame, _sampleRace!) : (frame, race);
             if (HudCatalog.Find(client.Kind) is not { } def) continue;
             if (!_targets.TryGetValue(client, out var t)) _targets[client] = t = new Target { Def = def };
             var config = ConfigFor(def, layout);
@@ -66,21 +74,39 @@ internal sealed class HudWebRenderer : IDisposable
             fastest = Math.Max(fastest, hz);
             var size = (client.Width, client.Height);
             bool due = Stopwatch.GetElapsedTime(t.LastDraw, now).TotalMilliseconds >= 1000.0 / hz - 4;
-            if (!dirty && size == t.Size && !(due && t.LastSeq != frame.Sequence)) continue;
+            if (!dirty && size == t.Size && !(due && t.LastSeq != shown.Sequence)) continue;
             t.Size = size;
-            t.LastSeq = frame.Sequence;
+            t.LastSeq = shown.Sequence;
             t.LastDraw = now;
             if (Math.Abs(config.Opacity - t.Opacity) > 0.01)
             {
                 t.Opacity = config.Opacity;
                 client.Say(string.Create(CultureInfo.InvariantCulture, $"{{\"type\":\"look\",\"opacity\":{Math.Clamp(config.Opacity / 100, 0, 1):0.###}}}"));
             }
-            var bytes = Draw(t, frame, race, settings, palette, size);
+            var bytes = Draw(t, shown, shownRace, settings, palette, size);
             if (t.Last is not null && bytes.AsSpan().SequenceEqual(t.Last)) continue;
             t.Last = bytes;
             client.Offer(bytes);
         }
         return fastest;
+    }
+
+    private bool AdvanceSample(IReadOnlyList<HudWebClient> clients, RaceHudSettings settings)
+    {
+        bool wanted = false;
+        foreach (var c in clients) wanted |= c.Sample;
+        if (!wanted) return false;
+        _sampleSettings = settings;
+        if (_sampleFeed is null || _sampleRace is null)
+        {
+            _sampleFeed = new DemoTelemetry();
+            _sampleRace = new RaceState(() => _sampleSettings!);
+            DemoTelemetry.WarmUp(_sampleRace, _sampleFrame, ref _sampleSequence);
+        }
+        _sampleFeed.Fill(_sampleFrame);
+        _sampleFrame.Sequence = ++_sampleSequence;
+        _sampleRace.Update(_sampleFrame);
+        return true;
     }
 
     private HudWidgetConfig ConfigFor(HudWidgetDef def, HudLayout? layout)

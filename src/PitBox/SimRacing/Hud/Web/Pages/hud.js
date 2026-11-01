@@ -60,7 +60,7 @@
   }
 
   function connect() {
-    socket = new WebSocket("ws://" + location.host + "/ws/" + kind);
+    socket = new WebSocket("ws://" + location.host + "/ws/" + kind + location.search);
     socket.binaryType = "blob";
     socket.onopen = function () { retry = 1000; sendSize(); };
     socket.onmessage = function (e) {

@@ -12,7 +12,26 @@ internal static class TextFit
         new(text, CultureInfo.CurrentUICulture, tb.FlowDirection, new Typeface(tb.FontFamily, tb.FontStyle, tb.FontWeight, tb.FontStretch),
             tb.FontSize, Brushes.Black, VisualTreeHelper.GetDpi(tb).PixelsPerDip);
 
-    public static double Width(TextBlock tb, string text) => Format(tb, text).WidthIncludingTrailingWhitespace;
+    public static double Width(TextBlock tb, string text)
+    {
+        var key = new WidthKey(text, new Typeface(tb.FontFamily, tb.FontStyle, tb.FontWeight, tb.FontStretch), tb.FontSize, tb.FlowDirection,
+            VisualTreeHelper.GetDpi(tb).PixelsPerDip, CultureInfo.CurrentUICulture);
+        lock (Widths)
+            if (Widths.TryGetValue(key, out double known)) return known;
+        double width = Format(tb, text).WidthIncludingTrailingWhitespace;
+        lock (Widths)
+        {
+            if (Widths.Count >= MemoSize) Widths.Clear();
+            Widths[key] = width;
+        }
+        return width;
+    }
+
+    private const int MemoSize = 4096;
+
+    private readonly record struct WidthKey(string Text, Typeface Typeface, double Size, FlowDirection Flow, double Dip, CultureInfo Culture);
+
+    private static readonly Dictionary<WidthKey, double> Widths = new();
 
     public static bool IsTrimmed(TextBlock tb)
     {

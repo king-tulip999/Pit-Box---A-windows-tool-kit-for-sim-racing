@@ -63,6 +63,7 @@ public partial class App : Application
             return;
         }
         PerfProbe.Mark("onstartup");
+        Plugins.PluginManager.DiscoverEarly();
         System.Windows.Media.Animation.Timeline.DesiredFrameRateProperty.OverrideMetadata(typeof(System.Windows.Media.Animation.Timeline), new FrameworkPropertyMetadata { DefaultValue = PcClass.FrameRate });
         System.Windows.Controls.ToolTipService.ShowOnDisabledProperty.OverrideMetadata(typeof(System.Windows.Controls.Control), new FrameworkPropertyMetadata(true));
         Controls.ClickGuard.Install();

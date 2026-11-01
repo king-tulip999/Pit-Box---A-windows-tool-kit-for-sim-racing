@@ -1,8 +1,9 @@
 html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }
+html.index { overflow: auto; }
 body.overlay { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
 body.overlay canvas { display: block; image-rendering: auto; }
 
-body.index { overflow: auto; background: var(--app-bg, #000); color: var(--app-text, #ddd); font: 14px Bahnschrift, "Segoe UI", sans-serif; padding: 24px; }
+body.index { overflow: visible; background: var(--app-bg, #000); color: var(--app-text, #ddd); font: 14px Bahnschrift, "Segoe UI", sans-serif; padding: 24px; }
 body.index h1 { font-size: 22px; font-weight: 600; color: var(--app-heading, #fff); margin: 0 0 4px; }
 body.index p.note { color: var(--app-muted, #999); margin: 0 0 24px; }
 body.index .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 24px; }

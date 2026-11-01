@@ -16,11 +16,18 @@ internal sealed class PluginManager
     {
         _app = app;
         _config = config;
-        All = typeof(Plugin).Assembly.GetTypes()
-            .Where(t => t.IsSubclassOf(typeof(Plugin)) && !t.IsAbstract && t.GetConstructor(Type.EmptyTypes) is not null)
+        All = (_discovery ?? Task.Run(PluginTypes)).GetAwaiter().GetResult()
             .Select(t => (Plugin)Activator.CreateInstance(t)!)
             .OrderBy(p => p.Order).ThenBy(p => p.Name).ToList();
     }
+
+    private static Task<List<Type>>? _discovery;
+
+    public static void DiscoverEarly() => _discovery ??= Task.Run(PluginTypes);
+
+    private static List<Type> PluginTypes() => typeof(Plugin).Assembly.GetTypes()
+        .Where(t => t.IsSubclassOf(typeof(Plugin)) && !t.IsAbstract && t.GetConstructor(Type.EmptyTypes) is not null)
+        .ToList();
 
     public IEnumerable<Plugin> Active => All.Where(p => p.IsActive);
 

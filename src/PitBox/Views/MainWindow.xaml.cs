@@ -502,7 +502,6 @@ public partial class MainWindow : Window
 
     internal void TrimWhileHidden()
     {
-        DropPages(keepCurrent: true);
         Dispatcher.BeginInvoke(new Action(CompactMemory), DispatcherPriority.ContextIdle);
     }
 
