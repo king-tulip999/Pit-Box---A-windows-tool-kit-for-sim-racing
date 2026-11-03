@@ -813,20 +813,15 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     }
 
     private const double SetWidth = 132, SetSwatch = 14;
-    private const int LockedShown = 6;
-
     private static StackPanel ColorSets(AppServices app, RaceHudSettings S, Action changed, Action rebuild)
     {
-        int reached = app.Config.SessionStats.Reached.Count;
         var panel = new StackPanel { Margin = new Thickness(0, 2, 0, 6) };
         panel.Children.Add(new TextBlock { Text = "Color sets", Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 5, 0, 2) });
-        panel.Children.Add(new TextBlock { Text = $"Unlocked by reaching goals on the Session Stats page ({RaceFormat.Count(reached, "goal")} so far). Picking one replaces the colors below.",
-            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) });
+        panel.Children.Add(new TextBlock { Text = "Picking one replaces the colors below.", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) });
         var wrap = new WrapPanel();
-        var shown = HudColorSets.All.Where(set => HudColorSets.Unlocked(set, reached)).Concat(HudColorSets.All.Where(set => !HudColorSets.Unlocked(set, reached)).Take(LockedShown)).ToList();
-        foreach (var set in shown)
+        foreach (var set in HudColorSets.All)
         {
-            bool open = HudColorSets.Unlocked(set, reached), on = open && HudColorSets.Matches(set, S.Appearance.Custom);
+            bool on = HudColorSets.Matches(set, S.Appearance.Custom);
             var swatches = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 5) };
             foreach (var hex in new[] { set.Colors.Background, set.Colors.Surface, set.Colors.Accent, set.Colors.Text })
             {
@@ -836,15 +831,13 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             }
             var name = new TextBlock { Text = set.Name, FontWeight = FontWeights.SemiBold };
             name.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
-            var state = new TextBlock { Text = on ? "In use" : open ? "Unlocked" : $"At {RaceFormat.Count(set.Goals, "goal")}", Style = Ui.Res<Style>("Caption") };
+            var content = new StackPanel { Children = { swatches, name } };
+            if (on) content.Children.Add(new TextBlock { Text = "In use", Style = Ui.Res<Style>("Caption") });
             var button = new Button
             {
                 Style = Ui.Res<Style>("GhostButton"), Width = SetWidth, Height = double.NaN, HorizontalContentAlignment = HorizontalAlignment.Left,
-                Padding = new Thickness(9, 7, 9, 7), Margin = new Thickness(0, 0, 6, 6), IsEnabled = open,
-                Content = new StackPanel { Children = { swatches, name, state } },
-                ToolTip = open ? "Use these colors" : $"Reach {RaceFormat.Count(set.Goals, "goal")} on the Session Stats page to unlock",
+                Padding = new Thickness(9, 7, 9, 7), Margin = new Thickness(0, 0, 6, 6), Content = content, ToolTip = "Use these colors",
             };
-            ToolTipService.SetShowOnDisabled(button, true);
             Ui.SetToggled(button, on);
             button.Click += (_, _) =>
             {
@@ -863,9 +856,6 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             wrap.Children.Add(button);
         }
         panel.Children.Add(wrap);
-        int hidden = HudColorSets.All.Length - shown.Count;
-        if (hidden > 0)
-            panel.Children.Add(new TextBlock { Text = $"{hidden} more to unlock, up to {RaceFormat.Count(HudColorSets.All[^1].Goals, "goal")}.", Style = Ui.Res<Style>("Caption") });
         return panel;
     }
 

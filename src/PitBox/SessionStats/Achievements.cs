@@ -1,12 +1,11 @@
 using System.Globalization;
-using PitBox.Config;
 
 namespace PitBox.SessionStats;
 
 internal sealed record AchievementTotals(int Races, int Wins, int Podiums, int CleanRaces, int Poles, int BestGain, double Laps, double Hours,
     int Tracks, int Cars, double? PeakIRating, double? PeakSafety, RaceStreaks Streaks);
 
-internal sealed record AchievementFamily(string Id, string Name, string Noun, double[] Tiers, Func<AchievementTotals, double?> Value, GoalMetric? Goal = null);
+internal sealed record AchievementFamily(string Id, string Name, string Noun, double[] Tiers, Func<AchievementTotals, double?> Value);
 
 internal sealed record AchievementState(AchievementFamily Family, double? Value)
 {
@@ -17,25 +16,23 @@ internal sealed record AchievementState(AchievementFamily Family, double? Value)
 
 internal static class Achievements
 {
-    public const int MaxSuggestions = 3;
-
     public static readonly AchievementFamily[] All =
     {
-        new("races", "Races", "race", new double[] { 1, 10, 25, 50, 100, 250, 500 }, t => t.Races, GoalMetric.Races),
-        new("wins", "Wins", "win", new double[] { 1, 5, 10, 25, 50 }, t => t.Wins, GoalMetric.Wins),
-        new("podiums", "Podiums", "podium", new double[] { 1, 10, 25, 50, 100 }, t => t.Podiums, GoalMetric.Podiums),
-        new("clean", "Clean races", "clean race", new double[] { 1, 10, 25, 50, 100 }, t => t.CleanRaces, GoalMetric.CleanRaces),
+        new("races", "Races", "race", new double[] { 1, 10, 25, 50, 100, 250, 500 }, t => t.Races),
+        new("wins", "Wins", "win", new double[] { 1, 5, 10, 25, 50 }, t => t.Wins),
+        new("podiums", "Podiums", "podium", new double[] { 1, 10, 25, 50, 100 }, t => t.Podiums),
+        new("clean", "Clean races", "clean race", new double[] { 1, 10, 25, 50, 100 }, t => t.CleanRaces),
         new("poles", "Pole starts", "pole start", new double[] { 1, 5, 10, 25 }, t => t.Poles),
         new("gain", "Places gained in one race", "place", new double[] { 5, 10, 15 }, t => t.BestGain),
         new("cleanrun", "Clean races in a row", "race", new double[] { 3, 5, 10, 20 }, t => t.Streaks.Clean.Best),
         new("finishrun", "Finishes in a row", "race", new double[] { 10, 25, 50, 100 }, t => t.Streaks.Finished.Best),
         new("top5run", "Top fives in a row", "race", new double[] { 3, 5, 10 }, t => t.Streaks.TopFive.Best),
-        new("laps", "Laps", "lap", new double[] { 100, 1000, 5000, 10000, 25000 }, t => t.Laps, GoalMetric.Laps),
-        new("hours", "Hours driven", "h", new double[] { 10, 50, 100, 250, 500 }, t => t.Hours, GoalMetric.DrivingHours),
+        new("laps", "Laps", "lap", new double[] { 100, 1000, 5000, 10000, 25000 }, t => t.Laps),
+        new("hours", "Hours driven", "h", new double[] { 10, 50, 100, 250, 500 }, t => t.Hours),
         new("tracks", "Tracks driven", "track", new double[] { 5, 10, 25, 50 }, t => t.Tracks),
         new("cars", "Cars driven", "car", new double[] { 3, 10, 25 }, t => t.Cars),
-        new("irating", "Best iRating", "", new double[] { 1500, 2000, 2500, 3000, 4000, 5000 }, t => t.PeakIRating, GoalMetric.IRating),
-        new("sr", "Best safety rating", "", new double[] { 2, 3, 4, 4.99 }, t => t.PeakSafety, GoalMetric.SafetyRating),
+        new("irating", "Best iRating", "", new double[] { 1500, 2000, 2500, 3000, 4000, 5000 }, t => t.PeakIRating),
+        new("sr", "Best safety rating", "", new double[] { 2, 3, 4, 4.99 }, t => t.PeakSafety),
     };
 
     public static List<AchievementState> Evaluate(AchievementTotals totals) => All.Select(f => new AchievementState(f, f.Value(totals))).ToList();
@@ -54,21 +51,6 @@ internal static class Achievements
         "" or "h" => Format(family, v),
         var noun => SimRacing.Race.RaceFormat.Count((int)v, noun),
     };
-
-    public static List<StatGoal> Suggest(IEnumerable<AchievementState> states, IEnumerable<StatGoal> goals, int room)
-    {
-        var taken = goals.Where(g => g.Car is null && g.Track is null && !g.ThisSeason).Select(g => g.Kind).ToHashSet();
-        var picks = new List<StatGoal>();
-        foreach (var s in states.Where(s => s.Family.Goal is { } k && !taken.Contains(k) && s.Value is not null && s.Next is not null)
-                     .OrderByDescending(s => s.Fraction).ThenBy(s => Array.IndexOf(All, s.Family)))
-        {
-            if (picks.Count >= Math.Min(room, MaxSuggestions)) break;
-            var goal = new StatGoal { Kind = s.Family.Goal!.Value, Target = s.Next!.Value };
-            goal.Clean();
-            picks.Add(goal);
-        }
-        return picks;
-    }
 
     public static AchievementTotals Read(StatsStore store, RaceStreaks streaks)
     {

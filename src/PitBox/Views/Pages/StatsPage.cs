@@ -439,10 +439,10 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         var charts = await Task.Run(() => StatsCharts.Read(store, q, range, stats.Settings.TimelineCombo, stats.Settings.TimelinePickedUtc));
         var traces = stats.Traces;
         string driver = name ?? "";
-        var (sessions, traced, races, goals) = await Task.Run(() =>
+        var (sessions, traced, races, achievements) = await Task.Run(() =>
         {
             var list = store.Sessions(q.From, q.To);
-            return (list, traces?.SessionsWithTraces(list.Select(s => s.Id)) ?? new HashSet<long>(), RaceInfo.Read(store, driver), GoalsData.Read(store, stats.Settings, q.NowUtc));
+            return (list, traces?.SessionsWithTraces(list.Select(s => s.Id)) ?? new HashSet<long>(), RaceInfo.Read(store, driver), AchievementsData.Read(store));
         });
         await Motion.PageSettled(Dispatcher);
         if (version != _version || !_shown || _sessionId is not null) return;
@@ -459,9 +459,8 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         }
         var sessionsCard = StatsSessions.Card(sessions, traced, _filter, stats.Settings, Refresh, s => Open(s.Id), TraceSettings.Button(_app, stats, _window), races);
         _performance = new ContentControl { Focusable = false, IsTabStop = false, Content = StatsSections.Performance(charts, stats, Changed, PairPicked) };
-        _goals = new ContentControl { Focusable = false, IsTabStop = false, Content = StatsGoals.Card(goals, stats, GoalsChanged, _app.Save) };
         var lastRace = sessions.FirstOrDefault(RaceParts.Raced);
-        var sections = StatsSections.Page(results, charts, stats, q, Changed, sessionsCard, races.Card(lastRace, StatsGoals.ReachedIn(stats.Settings, lastRace?.Id)), _goals, _performance);
+        var sections = StatsSections.Page(results, charts, stats, q, Changed, sessionsCard, races.Card(lastRace), StatsAchievements.Card(achievements), _performance);
         page.Children.Add(sections);
         page.Children.Add(_telemetry = new TelemetryFilesCard(_app, _window, stats) { Margin = new Thickness(0, Ui.PanelSpacing, 0, 0) });
         if (!restoreOffset && sections is Panel parts)
@@ -479,28 +478,7 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
 
     private void Refresh() => Refresh(false);
 
-    private ContentControl? _performance, _goals;
-
-    private async void GoalsChanged()
-    {
-        _app.Save();
-        if (!_shown || Stats is not { Store: { } store } stats || _goals is not { } host) return;
-        int version = _version;
-        try
-        {
-            var now = stats.Query().NowUtc;
-            var data = await Task.Run(() => GoalsData.Read(store, stats.Settings, now));
-            if (version != _version || !_shown || host != _goals) return;
-            host.Content = StatsGoals.Card(data, stats, GoalsChanged, _app.Save);
-            _built = Inputs(stats);
-            stats.CheckGoals();
-        }
-        catch (Exception ex)
-        {
-            App.LogError(ex);
-            Refresh();
-        }
-    }
+    private ContentControl? _performance;
 
     private async void PairPicked()
     {
@@ -708,27 +686,10 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
                 await Task.Delay(300);
             });
         }
-        yield return ("goals", async () =>
+        yield return ("achievements", async () =>
         {
-            if (_app.Demo && Stats is { Settings.Goals.Count: 0 } stats)
-            {
-                stats.Settings.Goals.AddRange(new Config.StatGoal[]
-                {
-                    new() { Kind = Config.GoalMetric.IRating, Target = 2500 },
-                    new() { Kind = Config.GoalMetric.Laps, Target = 2000 },
-                    new() { Kind = Config.GoalMetric.Wins, Target = 5, ThisSeason = true },
-                    new() { Kind = Config.GoalMetric.Podiums, Target = 5 },
-                });
-                var day = DateTime.UtcNow.Date;
-                stats.Settings.Reached.AddRange(new Config.StatGoal[]
-                {
-                    new() { Kind = Config.GoalMetric.Races, Target = 10, CreatedUtc = day.AddDays(-30), ReachedUtc = day.AddDays(-12) },
-                    new() { Kind = Config.GoalMetric.DrivingHours, Target = 50, CreatedUtc = day.AddDays(-20), ReachedUtc = day.AddDays(-1), Open = true },
-                });
-                Refresh();
-            }
             await Task.Delay(700);
-            Ui.FindAnchor(this, "stats.goals")?.BringIntoView(new Rect(0, 0, 1, 600));
+            Ui.FindAnchor(this, "stats.achievements")?.BringIntoView(new Rect(0, 0, 1, 600));
             await Task.Delay(300);
         });
         yield return ("imperial", () =>
@@ -808,7 +769,7 @@ internal static class StatsUi
 internal static class StatsSections
 {
     public static FrameworkElement Page(List<(StatDef Def, StatResult Result)> results, StatsCharts.Data charts, SessionStatsService service, StatQuery q, Action changed,
-        FrameworkElement? sessions = null, FrameworkElement? lastRace = null, FrameworkElement? goals = null, FrameworkElement? performance = null)
+        FrameworkElement? sessions = null, FrameworkElement? lastRace = null, FrameworkElement? achievements = null, FrameworkElement? performance = null)
     {
         var byId = results.ToDictionary(r => r.Def.Id, r => r);
         (StatDef Def, StatResult Result)? Get(string id) => byId.TryGetValue(id, out var r) ? r : null;
@@ -859,7 +820,7 @@ internal static class StatsSections
         Ui.Anchor(cars, "stats.cars");
         Add(cars);
         Add(performance);
-        Add(goals);
+        Add(achievements);
         return page;
     }
 

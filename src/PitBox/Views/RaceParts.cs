@@ -220,10 +220,7 @@ internal sealed class Stripe : Grid
     }
 }
 
-internal sealed record RaceCardData(SessionSummary Session, IReadOnlyList<(double Time, bool Clean)> Laps, double? Consistency, IReadOnlyList<Award> Awards, string Driver)
-{
-    public IReadOnlyList<string> Goals { get; init; } = Array.Empty<string>();
-}
+internal sealed record RaceCardData(SessionSummary Session, IReadOnlyList<(double Time, bool Clean)> Laps, double? Consistency, IReadOnlyList<Award> Awards, string Driver);
 
 internal static class RaceParts
 {
@@ -343,15 +340,6 @@ internal static class RaceParts
         row.Children.Add(new TextBlock { Text = RaceResult.Name(award), Style = Ui.Res<Style>("Caption"), Margin = new Thickness(5, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center }
             .Also(t => t.SetResourceReference(TextBlock.ForegroundProperty, "Heading")));
         return Chip(row, place + "Soft", place + "Edge", RaceResult.Why(award));
-    }
-
-    public static Border GoalChip(string goal, string place)
-    {
-        var row = new StackPanel { Orientation = Orientation.Horizontal };
-        row.Children.Add(Glyph("I.Trophy", 12, place + "Text"));
-        row.Children.Add(new TextBlock { Text = "Goal: " + goal, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(5, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center }
-            .Also(t => t.SetResourceReference(TextBlock.ForegroundProperty, "Heading")));
-        return Chip(row, place + "Soft", place + "Edge", "A goal you set on the Session Stats page, reached in this session");
     }
 
     public static Border AwardSquare(Award award, string place)
@@ -561,7 +549,6 @@ internal static class RaceParts
         foreach (var chip in Ratings(s)) chips.Children.Add(chip);
         if (s.Incidents is { } inc) chips.Children.Add(Labeled("Inc", inc + "x", "Incidents"));
         foreach (var award in d.Awards) chips.Children.Add(AwardChip(award, place));
-        foreach (var goal in d.Goals) chips.Children.Add(GoalChip(goal, place));
         stack.Children.Add(chips);
 
         var rows = new StackPanel { Margin = new Thickness(16, 6, 16, 0) };

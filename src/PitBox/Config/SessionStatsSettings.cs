@@ -38,12 +38,6 @@ public sealed class SessionStatsSettings
 
     public bool AnalysisWind { get; set; } = true;
 
-    public List<StatGoal> Goals { get; set; } = new();
-
-    public List<StatGoal> Reached { get; set; } = new();
-
-    public const int MaxGoals = 6, KeptGoals = 12, KeptReached = 200;
-
     public static readonly int[] KeepDayChoices = { 30, 90, 182, 365, 730, 0 };
     public static readonly int[] LapChoices = { 0, 10, 3, 1 };
     public static readonly string[] Lanes = { "delta", "speed", "pedals", "steering", "gear", "rpm", "latg", "bias", "abs", "tc" };
@@ -59,56 +53,5 @@ public sealed class SessionStatsSettings
         if (ReplaySync is not ("distance" or "time")) ReplaySync = "distance";
         if (!SessionStats.LapReplay.Speeds.Contains(ReplaySpeed)) ReplaySpeed = 1;
         ReplayZoom = double.IsFinite(ReplayZoom) ? Math.Clamp(ReplayZoom, 0, 1) : 0.5;
-        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        Goals = (Goals ?? new()).Where(g => g is not null && Enum.IsDefined(g.Kind)).Take(KeptGoals).ToList();
-        Reached = (Reached ?? new()).Where(g => g is not null && Enum.IsDefined(g.Kind) && g.ReachedUtc is not null).TakeLast(KeptReached).ToList();
-        foreach (var g in Reached) g.Clean();
-        foreach (var g in Goals)
-        {
-            g.Clean();
-            if (string.IsNullOrWhiteSpace(g.Id) || !ids.Add(g.Id)) { g.Id = Guid.NewGuid().ToString("N"); ids.Add(g.Id); }
-        }
-    }
-}
-
-public enum GoalMetric { IRating, SafetyRating, DrivingHours, Laps, Races, Wins, Podiums, CleanRaces }
-
-public sealed class StatGoal
-{
-    public string Id { get; set; } = Guid.NewGuid().ToString("N");
-    public GoalMetric Kind { get; set; }
-    public double Target { get; set; }
-    public string? Car { get; set; }
-    public string? Track { get; set; }
-    public bool ThisSeason { get; set; }
-    public string? Category { get; set; }
-    public double? From { get; set; }
-    public DateTime? CreatedUtc { get; set; }
-    public DateTime? ReachedUtc { get; set; }
-    public long? ReachedSession { get; set; }
-    public bool Open { get; set; }
-    public bool Seen { get; set; }
-
-    public static bool IsRating(GoalMetric kind) => kind is GoalMetric.IRating or GoalMetric.SafetyRating;
-
-    public static (double Min, double Max, double Step) Limits(GoalMetric kind) => kind switch
-    {
-        GoalMetric.IRating => (100, 15000, 50),
-        GoalMetric.SafetyRating => (0.01, 4.99, 0.01),
-        GoalMetric.DrivingHours => (1, 2000, 1),
-        GoalMetric.Laps => (10, 100000, 10),
-        _ => (1, 1000, 1),
-    };
-
-    public void Clean()
-    {
-        var (min, max, step) = Limits(Kind);
-        Target = double.IsFinite(Target) ? Math.Clamp(Math.Round(Target / step) * step, min, max) : min;
-        Car = string.IsNullOrWhiteSpace(Car) ? null : Car.Trim();
-        Track = string.IsNullOrWhiteSpace(Track) ? null : Track.Trim();
-        Category = string.IsNullOrWhiteSpace(Category) ? null : Category.Trim();
-        if (From is { } from && !double.IsFinite(from)) From = null;
-        if (IsRating(Kind)) { Car = Track = null; ThisSeason = false; }
-        else { Category = null; From = null; }
     }
 }

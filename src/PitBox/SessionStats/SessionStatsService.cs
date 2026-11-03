@@ -100,7 +100,6 @@ internal sealed class SessionStatsService : IDisposable
             App.LogError(ex);
             return;
         }
-        CheckGoals();
         if (_app.Demo) return;
         _app.Telemetry.AddObserver(_observer);
         _app.Telemetry.Acquire(Consumer);
@@ -184,50 +183,7 @@ internal sealed class SessionStatsService : IDisposable
             lock (_queueGate) _changedPosted = false;
             Generation++;
             Changed?.Invoke();
-            CheckGoals();
         }, null);
-    }
-
-    private bool _checkingGoals, _checkGoalsAgain;
-
-    public async void CheckGoals()
-    {
-        if (Store is not { } store || Settings.Goals.Count == 0) return;
-        if (_checkingGoals) { _checkGoalsAgain = true; return; }
-        _checkingGoals = true;
-        try
-        {
-            var goals = Settings.Goals.ToList();
-            var now = DateTime.UtcNow;
-            var (states, latest) = await Task.Run(() => (goals.Select(g => StatGoals.Read(store, g, now)).ToList(), LatestSession(store)));
-            if (Store != store) return;
-            bool live = !_app.Demo && GoalRewards.Live(latest?.End, now);
-            var reached = GoalRewards.Reach(Settings, states, now, live ? latest?.Id : null);
-            if (reached.Count == 0) return;
-            _app.Save();
-            if (live) Celebrate(reached);
-            Generation++;
-            Changed?.Invoke();
-        }
-        catch (Exception ex) { App.LogError(ex); }
-        finally
-        {
-            _checkingGoals = false;
-            if (_checkGoalsAgain) { _checkGoalsAgain = false; CheckGoals(); }
-        }
-    }
-
-    private static (long Id, DateTime End)? LatestSession(StatsStore store) =>
-        store.Db.Query("SELECT id, end_utc FROM sessions ORDER BY end_utc DESC LIMIT 1") is [var row] && row[0] is not null && row[1] is not null
-            ? (Convert.ToInt64(row[0]), StatsStore.FromUnix(Convert.ToInt64(row[1])))
-            : null;
-
-    private void Celebrate(List<Config.StatGoal> reached)
-    {
-        string what = string.Join(", ", reached.Select(StatGoals.Label));
-        _app.Notify(reached.Count == 1 ? "Goal reached" : "Goals reached", what, NoticeKind.Success, important: true);
-        if (_app.Plugins.Find(Plugins.PluginIds.SimRacing) is Plugins.BuiltIn.SimRacingPlugin { Hud: { } hud })
-            foreach (var g in reached) hud.Announce("stats.goal", "Goal reached", StatGoals.Label(g));
     }
 
     public static string? TelemetryFolder() =>

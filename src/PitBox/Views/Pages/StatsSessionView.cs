@@ -26,7 +26,7 @@ internal static class StatsSessionView
         var cleanLaps = laps.Where(l => l.Clean).ToList();
         int sectors = laps.Max(l => (int?)(l.Sectors?.Count ?? 0)) ?? 0;
         var bestSector = Enumerable.Range(0, sectors).Select(k => laps.Where(l => l.Clean && l.Sectors?.Count == sectors).Select(l => (double?)l.Sectors![k]).Min()).ToArray();
-        page.Children.Add(Banner(d, cleanLaps, sectors, bestSector, imperial, StatsGoals.ReachedIn(settings, d.Session.Id)));
+        page.Children.Add(Banner(d, cleanLaps, sectors, bestSector, imperial));
 
         if (laps.Count == 0)
         {
@@ -248,7 +248,7 @@ internal static class StatsSessionView
     private const double CarRoom = 300;
     private const double MapWidth = 170, MapHeight = 120;
 
-    private static FrameworkElement Banner(SessionDetail d, List<LapRow> cleanLaps, int sectors, double?[] bestSector, bool imperial, IReadOnlyList<string> goals)
+    private static FrameworkElement Banner(SessionDetail d, List<LapRow> cleanLaps, int sectors, double?[] bestSector, bool imperial)
     {
         var s = d.Session;
         var laps = d.Laps;
@@ -295,7 +295,6 @@ internal static class StatsSessionView
         if (s.CarClass.Length > 0) chips.Children.Add(RaceParts.Labeled("Class", s.CarClass));
         if (s.Type == "Race") foreach (var chip in RaceParts.Ratings(s)) chips.Children.Add(chip);
         foreach (var award in awards.Skip(1)) chips.Children.Add(RaceParts.AwardChip(award, place));
-        foreach (var goal in goals) chips.Children.Add(RaceParts.GoalChip(goal, place));
         meta.Children.Add(chips);
         row.Children.Add(meta);
         top.Children.Add(row);

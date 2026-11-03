@@ -37,6 +37,5 @@ internal sealed class RaceInfo
 
     public RaceCardData Data(SessionSummary s) => new(s, LapsOf(s.Id), ConsistencyOf(s.Id), AwardsOf(s.Id), Driver);
 
-    public FrameworkElement? Card(SessionSummary? s, IReadOnlyList<string>? goals = null) =>
-        s is null ? null : RaceParts.Card(Data(s) with { Goals = goals ?? Array.Empty<string>() }, "Last race");
+    public FrameworkElement? Card(SessionSummary? s) => s is null ? null : RaceParts.Card(Data(s), "Last race");
 }

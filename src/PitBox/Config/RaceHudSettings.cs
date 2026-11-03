@@ -548,7 +548,7 @@ public sealed class HudCustomColors
     }
 }
 
-public sealed record HudColorSet(string Name, int Goals, HudCustomColors Colors);
+public sealed record HudColorSet(string Name, HudCustomColors Colors);
 
 public static class HudColorSets
 {
@@ -562,39 +562,33 @@ public static class HudColorSets
 
     public static readonly HudColorSet[] All =
     {
-        new("Pit lane", 1, Set("#070D0A", "#111D17", "#E4F1EB", "#82B099", "#23392E", "#2DD27A", "#25AD64", "#FFFFFF", "#516159", "#879B91", "#36453D", "#D4DDD9")),
-        new("Night race", 2, Set("#06080F", "#0E1220", "#E2E6F3", "#828DB0", "#1D253E", "#42C6FA", "#0BB5F9", "#FFFFFF", "#4D5365", "#8389A0", "#323748", "#D2D5E0")),
-        new("Podium gold", 3, Set("#0E0B07", "#1E1910", "#F2EDE3", "#B0A182", "#3B3221", "#F2B231", "#E09A0E", "#0A0A0A", "#635C50", "#9D9586", "#464035", "#DEDBD3")),
-        new("Carbon", 5, Set("#0A0A0A", "#171717", "#EBEBEB", "#999999", "#2E2E2E", "#FF512E", "#F72900", "#FFFFFF", "#595959", "#919191", "#3D3D3D", "#D9D9D9")),
-        new("Sunset strip", 7, Set("#0E0807", "#1E1310", "#F2E7E3", "#B08E82", "#3B2721", "#FA792E", "#EC5B06", "#FFFFFF", "#635550", "#9D8C86", "#463935", "#DED6D3")),
-        new("Glacier", 9, Set("#070B0D", "#11191D", "#E4EDF1", "#82A1B0", "#233239", "#79D9EC", "#41C9E4", "#0A0A0A", "#515C61", "#87959B", "#364045", "#D4DADD")),
-        new("Rally dust", 12, Set("#0D0A08", "#1C1712", "#F0EBE6", "#B09982", "#372E25", "#DD873C", "#C46E23", "#FFFFFF", "#605953", "#9A9189", "#433D37", "#DDD9D5")),
-        new("Electric violet", 15, Set("#0A060E", "#160F1F", "#E9E2F3", "#9582B0", "#2B1F3D", "#B264F7", "#9529F4", "#FFFFFF", "#574F64", "#8F849F", "#3C3347", "#D8D3DF")),
-        new("Racing green", 18, Set("#060E09", "#0F1F14", "#E2F3E8", "#82B091", "#1F3D29", "#EEBD2B", "#D5A411", "#0A0A0A", "#4F6456", "#849F8D", "#33473A", "#D3DFD7")),
-        new("Endurance blue", 21, Set("#05090F", "#0D1521", "#E2E9F3", "#8295B0", "#1C2B40", "#1F8CF9", "#0673E0", "#FFFFFF", "#4C5767", "#818FA2", "#313B49", "#D1D7E0")),
-        new("Neon nights", 25, Set("#0D060F", "#1D0E20", "#F0E2F3", "#A882B0", "#391D3E", "#FF33BB", "#FB00A7", "#FFFFFF", "#614D65", "#9B83A0", "#453248", "#DDD2E0")),
-        new("Ice white", 30, Set("#F1F2F4", "#FEFEFE", "#22262A", "#656B72", "#D5D9DD", "#259DF4", "#259DF4", "#FFFFFF", "#A5ADB6", "#67737E", "#C1C7CD", "#22262A", heading: "#0E0F11", good: "#1F9E5A", warn: "#C98A0B", danger: "#D1343A", fastest: "#8A3FE0", lapping: "#D9534F", lapped: "#2F7DE1")),
-        new("Tangerine", 35, Set("#0D0A07", "#1D1611", "#F1EAE4", "#B09582", "#392C23", "#FF851A", "#E66B00", "#FFFFFF", "#615851", "#9B9087", "#453C36", "#DDD8D4")),
-        new("Deep sea", 40, Set("#050E10", "#0C1F22", "#E2F0F3", "#82A8B0", "#1A3B42", "#12E2D1", "#0FBAAB", "#FFFFFF", "#4B6368", "#7F9DA3", "#30464B", "#D0DEE1")),
-        new("Rosso", 45, Set("#0E0607", "#1F0F10", "#F3E2E4", "#B08286", "#3D1F22", "#EC1325", "#C1101E", "#FFFFFF", "#644F50", "#9F8486", "#473335", "#DFD3D4")),
-        new("Grey day", 50, Set("#090A0B", "#151719", "#E9EAEC", "#9298A0", "#2B2D31", "#B8BEC7", "#919BA9", "#0A0A0A", "#57595B", "#8F9194", "#3B3D3F", "#D8D9DA")),
-        new("Lime flag", 60, Set("#0B0D07", "#181D11", "#ECF1E4", "#9DB082", "#303923", "#AFF425", "#96DB0C", "#0A0A0A", "#5B6151", "#939B87", "#3E4536", "#DADDD4")),
-        new("Midnight teal", 70, Set("#060F0F", "#0E2020", "#E2F3F3", "#82B0B0", "#1D3E3E", "#13ECC8", "#10C1A4", "#0A0A0A", "#4D6565", "#83A0A0", "#324848", "#D2E0E0")),
-        new("Desert night", 80, Set("#0D0B07", "#1D1811", "#F1ECE4", "#B09D82", "#393023", "#E85E30", "#CF4517", "#FFFFFF", "#615B51", "#9B9387", "#453E36", "#DDDAD4")),
-        new("Aurora", 90, Set("#060E0C", "#0F1F1A", "#E2F3ED", "#82B0A1", "#1F3D33", "#BE5EED", "#A829E7", "#FFFFFF", "#4F645D", "#849F96", "#334740", "#D3DFDB")),
-        new("Paddock white", 100, Set("#F1F2F4", "#FEFEFE", "#22252B", "#636973", "#D4D7DD", "#D81878", "#D81878", "#FFFFFF", "#A4AAB7", "#656E81", "#C0C5CE", "#22252B", heading: "#0D0F11", good: "#1F9E5A", warn: "#C98A0B", danger: "#D1343A", fastest: "#8A3FE0", lapping: "#D9534F", lapped: "#2F7DE1")),
-        new("Crimson carbon", 115, Set("#0B090A", "#191516", "#EDE9E9", "#A29093", "#322A2B", "#E90C31", "#BF0A28", "#FFFFFF", "#5C5757", "#958E8F", "#403B3C", "#DAD7D8")),
-        new("Sapphire", 130, Set("#050710", "#0C1122", "#E2E7F3", "#828EB0", "#1A2442", "#5A74F6", "#2144F3", "#FFFFFF", "#4B5268", "#7F88A3", "#30364B", "#D0D5E1")),
-        new("Champagne", 150, Set("#F5F4F0", "#FEFEFE", "#2E2A1F", "#78725E", "#E0DDD1", "#DFCB90", "#DFCB90", "#FFFFFF", "#BEB69D", "#8A7E5C", "#D2CDBC", "#2E2A1F", heading: "#12110C", good: "#1F9E5A", warn: "#C98A0B", danger: "#D1343A", fastest: "#8A3FE0", lapping: "#D9534F", lapped: "#2F7DE1")),
-        new("Black gold", 175, Set("#0B0B09", "#191815", "#ECEBE9", "#A09D92", "#312F2B", "#EEBD2B", "#D5A411", "#0A0A0A", "#5B5A57", "#94938F", "#3F3E3B", "#DAD9D8")),
-        new("Hall of fame", 200, Set("#0B080C", "#18131B", "#ECE7EF", "#9F87AB", "#302735", "#FAC938", "#F5B906", "#0A0A0A", "#5B545F", "#948B98", "#3F3842", "#DAD6DC")),
+        new("Pit lane", Set("#070D0A", "#111D17", "#E4F1EB", "#82B099", "#23392E", "#2DD27A", "#25AD64", "#FFFFFF", "#516159", "#879B91", "#36453D", "#D4DDD9")),
+        new("Night race", Set("#06080F", "#0E1220", "#E2E6F3", "#828DB0", "#1D253E", "#42C6FA", "#0BB5F9", "#FFFFFF", "#4D5365", "#8389A0", "#323748", "#D2D5E0")),
+        new("Podium gold", Set("#0E0B07", "#1E1910", "#F2EDE3", "#B0A182", "#3B3221", "#F2B231", "#E09A0E", "#0A0A0A", "#635C50", "#9D9586", "#464035", "#DEDBD3")),
+        new("Carbon", Set("#0A0A0A", "#171717", "#EBEBEB", "#999999", "#2E2E2E", "#FF512E", "#F72900", "#FFFFFF", "#595959", "#919191", "#3D3D3D", "#D9D9D9")),
+        new("Sunset strip", Set("#0E0807", "#1E1310", "#F2E7E3", "#B08E82", "#3B2721", "#FA792E", "#EC5B06", "#FFFFFF", "#635550", "#9D8C86", "#463935", "#DED6D3")),
+        new("Glacier", Set("#070B0D", "#11191D", "#E4EDF1", "#82A1B0", "#233239", "#79D9EC", "#41C9E4", "#0A0A0A", "#515C61", "#87959B", "#364045", "#D4DADD")),
+        new("Rally dust", Set("#0D0A08", "#1C1712", "#F0EBE6", "#B09982", "#372E25", "#DD873C", "#C46E23", "#FFFFFF", "#605953", "#9A9189", "#433D37", "#DDD9D5")),
+        new("Electric violet", Set("#0A060E", "#160F1F", "#E9E2F3", "#9582B0", "#2B1F3D", "#B264F7", "#9529F4", "#FFFFFF", "#574F64", "#8F849F", "#3C3347", "#D8D3DF")),
+        new("Racing green", Set("#060E09", "#0F1F14", "#E2F3E8", "#82B091", "#1F3D29", "#EEBD2B", "#D5A411", "#0A0A0A", "#4F6456", "#849F8D", "#33473A", "#D3DFD7")),
+        new("Endurance blue", Set("#05090F", "#0D1521", "#E2E9F3", "#8295B0", "#1C2B40", "#1F8CF9", "#0673E0", "#FFFFFF", "#4C5767", "#818FA2", "#313B49", "#D1D7E0")),
+        new("Neon nights", Set("#0D060F", "#1D0E20", "#F0E2F3", "#A882B0", "#391D3E", "#FF33BB", "#FB00A7", "#FFFFFF", "#614D65", "#9B83A0", "#453248", "#DDD2E0")),
+        new("Ice white", Set("#F1F2F4", "#FEFEFE", "#22262A", "#656B72", "#D5D9DD", "#259DF4", "#259DF4", "#FFFFFF", "#A5ADB6", "#67737E", "#C1C7CD", "#22262A", heading: "#0E0F11", good: "#1F9E5A", warn: "#C98A0B", danger: "#D1343A", fastest: "#8A3FE0", lapping: "#D9534F", lapped: "#2F7DE1")),
+        new("Tangerine", Set("#0D0A07", "#1D1611", "#F1EAE4", "#B09582", "#392C23", "#FF851A", "#E66B00", "#FFFFFF", "#615851", "#9B9087", "#453C36", "#DDD8D4")),
+        new("Deep sea", Set("#050E10", "#0C1F22", "#E2F0F3", "#82A8B0", "#1A3B42", "#12E2D1", "#0FBAAB", "#FFFFFF", "#4B6368", "#7F9DA3", "#30464B", "#D0DEE1")),
+        new("Rosso", Set("#0E0607", "#1F0F10", "#F3E2E4", "#B08286", "#3D1F22", "#EC1325", "#C1101E", "#FFFFFF", "#644F50", "#9F8486", "#473335", "#DFD3D4")),
+        new("Grey day", Set("#090A0B", "#151719", "#E9EAEC", "#9298A0", "#2B2D31", "#B8BEC7", "#919BA9", "#0A0A0A", "#57595B", "#8F9194", "#3B3D3F", "#D8D9DA")),
+        new("Lime flag", Set("#0B0D07", "#181D11", "#ECF1E4", "#9DB082", "#303923", "#AFF425", "#96DB0C", "#0A0A0A", "#5B6151", "#939B87", "#3E4536", "#DADDD4")),
+        new("Midnight teal", Set("#060F0F", "#0E2020", "#E2F3F3", "#82B0B0", "#1D3E3E", "#13ECC8", "#10C1A4", "#0A0A0A", "#4D6565", "#83A0A0", "#324848", "#D2E0E0")),
+        new("Desert night", Set("#0D0B07", "#1D1811", "#F1ECE4", "#B09D82", "#393023", "#E85E30", "#CF4517", "#FFFFFF", "#615B51", "#9B9387", "#453E36", "#DDDAD4")),
+        new("Aurora", Set("#060E0C", "#0F1F1A", "#E2F3ED", "#82B0A1", "#1F3D33", "#BE5EED", "#A829E7", "#FFFFFF", "#4F645D", "#849F96", "#334740", "#D3DFDB")),
+        new("Paddock white", Set("#F1F2F4", "#FEFEFE", "#22252B", "#636973", "#D4D7DD", "#D81878", "#D81878", "#FFFFFF", "#A4AAB7", "#656E81", "#C0C5CE", "#22252B", heading: "#0D0F11", good: "#1F9E5A", warn: "#C98A0B", danger: "#D1343A", fastest: "#8A3FE0", lapping: "#D9534F", lapped: "#2F7DE1")),
+        new("Crimson carbon", Set("#0B090A", "#191516", "#EDE9E9", "#A29093", "#322A2B", "#E90C31", "#BF0A28", "#FFFFFF", "#5C5757", "#958E8F", "#403B3C", "#DAD7D8")),
+        new("Sapphire", Set("#050710", "#0C1122", "#E2E7F3", "#828EB0", "#1A2442", "#5A74F6", "#2144F3", "#FFFFFF", "#4B5268", "#7F88A3", "#30364B", "#D0D5E1")),
+        new("Champagne", Set("#F5F4F0", "#FEFEFE", "#2E2A1F", "#78725E", "#E0DDD1", "#DFCB90", "#DFCB90", "#FFFFFF", "#BEB69D", "#8A7E5C", "#D2CDBC", "#2E2A1F", heading: "#12110C", good: "#1F9E5A", warn: "#C98A0B", danger: "#D1343A", fastest: "#8A3FE0", lapping: "#D9534F", lapped: "#2F7DE1")),
+        new("Black gold", Set("#0B0B09", "#191815", "#ECEBE9", "#A09D92", "#312F2B", "#EEBD2B", "#D5A411", "#0A0A0A", "#5B5A57", "#94938F", "#3F3E3B", "#DAD9D8")),
+        new("Hall of fame", Set("#0B080C", "#18131B", "#ECE7EF", "#9F87AB", "#302735", "#FAC938", "#F5B906", "#0A0A0A", "#5B545F", "#948B98", "#3F3842", "#DAD6DC")),
     };
-
-    public static bool Unlocked(HudColorSet set, int reached) => reached >= set.Goals;
-
-    public static int UnlockedCount(int reached) => All.Count(s => Unlocked(s, reached));
-
-    public static HudColorSet? Next(int reached) => All.FirstOrDefault(s => !Unlocked(s, reached));
 
     public static void Apply(HudColorSet set, HudCustomColors into)
     {
