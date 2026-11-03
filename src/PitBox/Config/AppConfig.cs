@@ -109,6 +109,7 @@ public readonly struct AppTheme : IEquatable<AppTheme>
 
     public static readonly AppTheme Dark = new("Dark");
     public static readonly AppTheme Custom = new("CustomTheme");
+    public static readonly AppTheme Teams = new("Teams");
 
     internal static readonly AppTheme[] Numbered = { Dark, Dark, Dark, Dark, Custom };
 
@@ -206,6 +207,8 @@ public sealed class UiSettings
     public AppTheme Theme { get; set; }
 
     public CustomThemeSettings OledCustom { get; set; } = new();
+
+    public string? Team { get; set; }
 
     public string? PastelPreset { get; set; }
 

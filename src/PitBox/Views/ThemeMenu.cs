@@ -20,7 +20,7 @@ internal static class ThemeMenu
         : pick.Custom ? customLabel
         : pick.Theme == AppTheme.Custom && !string.IsNullOrEmpty(pick.Set)
             ? $"{Themes.For(AppTheme.Custom).Name} · {(pick.Set == Themes.OledDefaultSet ? "Default" : pick.Set)}"
-            : Themes.For(pick.Theme).Name;
+            : Themes.ForSet(pick.Theme, pick.Set).Label;
 
     public static Button OverlayButton(Func<Pick> current, Action<Pick> picked, bool followApp, string? customLabel, double minWidth = 162)
     {
@@ -60,6 +60,14 @@ internal static class ThemeMenu
             foreach (var theme in Themes.All)
             {
                 bool chosen = !pick.FollowApp && !pick.Custom && pick.Theme == theme.Id;
+                if (ThemeSets.For(theme.Id) is { } set)
+                {
+                    var sets = new MenuItem { Header = Header(theme.Name, theme), IsChecked = chosen };
+                    sets.Items.Add(Item($"As in the app ({theme.Label})", theme, chosen && string.IsNullOrEmpty(pick.Set), new Pick(false, false, theme.Id, null)));
+                    AddPicks(sets, set, name => chosen && string.Equals(pick.Set, name, StringComparison.OrdinalIgnoreCase), name => { picked(new Pick(false, false, set.Id, name)); Show(); });
+                    menu.Items.Add(sets);
+                    continue;
+                }
                 if (theme.Id != AppTheme.Custom)
                 {
                     menu.Items.Add(Item(theme.Name, theme, chosen, new Pick(false, false, theme.Id, null)));
@@ -75,6 +83,62 @@ internal static class ThemeMenu
             {
                 menu.Items.Add(new Separator());
                 menu.Items.Add(Item(customLabel, null, pick.Custom, new Pick(false, true, pick.Theme, null)));
+            }
+            menu.IsOpen = true;
+        };
+        return button;
+    }
+
+    public static Button PaletteButton(Func<string?> current, Action<string, ThemeSpec> picked, string otherLabel, double minWidth = 220)
+    {
+        var text = TextFit.TipWhenTrimmed(new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
+        var chevron = new Icon { Data = Ui.Res<Geometry>("I.ChevronDown"), Width = 10, Height = 10, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        DockPanel.SetDock(chevron, Dock.Right);
+        var row = new DockPanel { LastChildFill = true, Children = { chevron, text } };
+        var button = new Button { Style = Ui.Res<Style>("Btn"), Content = row, MinWidth = minWidth, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(8, 2, 8, 2) };
+        void Show() => text.Text = current() ?? otherLabel;
+        Show();
+        button.Click += (_, _) =>
+        {
+            string? now = current();
+            var menu = new ContextMenu { PlacementTarget = button, Placement = PlacementMode.Bottom, MinWidth = Math.Max(220, button.ActualWidth) };
+            Ui.DropBelow(menu);
+            MenuItem Leaf(string name, ThemeSpec spec)
+            {
+                var item = new MenuItem { Header = Header(name, spec), IsChecked = name == now };
+                item.Click += (_, _) => { picked(name, spec); Show(); };
+                return item;
+            }
+            MenuItem Group(string header, IEnumerable<MenuItem> items)
+            {
+                var group = new MenuItem { Header = header };
+                foreach (var item in items)
+                {
+                    group.IsChecked |= item.IsChecked;
+                    group.Items.Add(item);
+                }
+                return group;
+            }
+            menu.Items.Add(Leaf(Themes.Dark.Name, Themes.Dark));
+            var custom = Group(Themes.DefaultCustomName, new[] { Leaf(Themes.DefaultCustomName, Themes.Custom) });
+            custom.Items.Add(new Separator());
+            foreach (var family in CustomPalette.Families)
+            {
+                var group = Group(family, CustomPalette.Presets.Where(p => p.Family == family).Select(p => Leaf(p.Name, Themes.ForSet(AppTheme.Custom, p.Name))));
+                custom.IsChecked |= group.IsChecked;
+                custom.Items.Add(group);
+            }
+            menu.Items.Add(custom);
+            foreach (var set in ThemeSets.All)
+            {
+                var top = new MenuItem { Header = set.Name };
+                foreach (var family in set.Families)
+                {
+                    var group = Group(family, set.Presets.Where(p => p.Family == family).Select(p => Leaf(p.Name, Themes.ForSet(set.Id, p.Name))));
+                    top.IsChecked |= group.IsChecked;
+                    top.Items.Add(group);
+                }
+                menu.Items.Add(top);
             }
             menu.IsOpen = true;
         };
@@ -98,6 +162,39 @@ internal static class ThemeMenu
             menu.Items.Add(family);
         }
         menu.IsOpen = true;
+    }
+
+    public static void OpenSetMenu(FrameworkElement anchor, ThemeSet set, Action<string?> use)
+    {
+        var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom, MinWidth = Math.Max(220, anchor.ActualWidth) };
+        Ui.DropBelow(menu);
+        bool on = ThemeManager.Current.Id == set.Id;
+        string? current = Services.AppServices.Current is { } app ? set.Current(app.Config.Ui) : null;
+        var item = new MenuItem();
+        AddPicks(item, set, name => on && string.Equals(current, name, StringComparison.OrdinalIgnoreCase), name => use(name));
+        foreach (var family in item.Items.Cast<object>().ToList())
+        {
+            item.Items.Remove(family);
+            menu.Items.Add(family);
+        }
+        menu.IsOpen = true;
+    }
+
+    private static void AddPicks(MenuItem into, ThemeSet set, Func<string, bool> isChecked, Action<string> pick)
+    {
+        if (into.Items.Count > 0) into.Items.Add(new Separator());
+        foreach (var family in set.Families)
+        {
+            var group = new MenuItem { Header = family };
+            foreach (var (name, _, _) in set.Presets.Where(p => p.Family == family))
+            {
+                var item = new MenuItem { Header = Header(name, Themes.ForSet(set.Id, name)), IsChecked = isChecked(name) };
+                item.Click += (_, _) => pick(name);
+                group.IsChecked |= item.IsChecked;
+                group.Items.Add(item);
+            }
+            into.Items.Add(group);
+        }
     }
 
     private static void AddSets(MenuItem into, Func<string, bool> isChecked, Action<string> pick)

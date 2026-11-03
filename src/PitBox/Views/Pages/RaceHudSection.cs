@@ -695,6 +695,22 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             changed();
         }, "hudcolors");
         FillCustomColours(app, custom, S, changed, rebuild);
+        var palette = ThemeMenu.PaletteButton(
+            () => a.Colors == HudColors.Default ? "Default" : HudThemeColors.NameOf(a.Custom),
+            (name, spec) =>
+            {
+                var (beforeColors, beforeCustom) = (a.Colors, a.Custom);
+                a.Custom = HudThemeColors.From(spec);
+                a.Colors = HudColors.Custom;
+                changed();
+                rebuild();
+                app.Notify("Colors applied", $"“{name}”", NoticeKind.Success, action: new NoticeAction("Undo", () =>
+                {
+                    (a.Colors, a.Custom) = (beforeColors, beforeCustom);
+                    changed();
+                    rebuild();
+                }));
+            }, "Your own colors");
         var when = Ui.Combo(new[]
         {
             new Choice(nameof(HudShowWhen.Driving), "In the car"),
@@ -718,6 +734,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         });
         root.Children.Add(Group("Look", "The overlay keeps its own colors whatever the app's theme; flags keep their real colors.",
             Ui.SettingRow("Colors", null, colors),
+            Ui.SettingRow("Theme colors", "Fills the custom colors from an app theme; edit them after.", palette),
             custom,
             Ui.SettingRow("Background", null, Ui.SliderWithValue(0, 100, a.Background, "{0:0}%", v => { a.Background = (int)v; changed(); }),
                 D(() => a.Background == stdLook.Background, () => a.Background = stdLook.Background, stdLook.Background + "%")),
@@ -776,7 +793,6 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
                 ("Lapped", "Cars a lap or more behind", nameof(HudCustomColors.Lapped)),
             }),
         };
-        into.Children.Add(ColorSets(app, S, changed, rebuild));
         var entries = c.All().ToDictionary(e => e.Id, e => e);
         var grid = new StackPanel { Margin = new Thickness(0, 2, 0, 6) };
         foreach (var (title, rows) in groups)
@@ -810,53 +826,6 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         reset.HorizontalAlignment = HorizontalAlignment.Left;
         reset.Margin = new Thickness(0, 0, 0, 6);
         into.Children.Add(reset);
-    }
-
-    private const double SetWidth = 132, SetSwatch = 14;
-    private static StackPanel ColorSets(AppServices app, RaceHudSettings S, Action changed, Action rebuild)
-    {
-        var panel = new StackPanel { Margin = new Thickness(0, 2, 0, 6) };
-        panel.Children.Add(new TextBlock { Text = "Color sets", Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 5, 0, 2) });
-        panel.Children.Add(new TextBlock { Text = "Picking one replaces the colors below.", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) });
-        var wrap = new WrapPanel();
-        foreach (var set in HudColorSets.All)
-        {
-            bool on = HudColorSets.Matches(set, S.Appearance.Custom);
-            var swatches = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 5) };
-            foreach (var hex in new[] { set.Colors.Background, set.Colors.Surface, set.Colors.Accent, set.Colors.Text })
-            {
-                var swatch = Hairline.Frame(new Border { Width = SetSwatch, Height = SetSwatch, Background = new SolidColorBrush(Palettes.Hex(hex)), Margin = new Thickness(0, 0, 3, 0) });
-                swatch.SetResourceReference(Border.BorderBrushProperty, "Line");
-                swatches.Children.Add(swatch);
-            }
-            var name = new TextBlock { Text = set.Name, FontWeight = FontWeights.SemiBold };
-            name.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
-            var content = new StackPanel { Children = { swatches, name } };
-            if (on) content.Children.Add(new TextBlock { Text = "In use", Style = Ui.Res<Style>("Caption") });
-            var button = new Button
-            {
-                Style = Ui.Res<Style>("GhostButton"), Width = SetWidth, Height = double.NaN, HorizontalContentAlignment = HorizontalAlignment.Left,
-                Padding = new Thickness(9, 7, 9, 7), Margin = new Thickness(0, 0, 6, 6), Content = content, ToolTip = "Use these colors",
-            };
-            Ui.SetToggled(button, on);
-            button.Click += (_, _) =>
-            {
-                var before = S.Appearance.Custom;
-                S.Appearance.Custom = new HudCustomColors();
-                HudColorSets.Apply(set, S.Appearance.Custom);
-                changed();
-                rebuild();
-                app.Notify("Color set applied", $"“{set.Name}”", NoticeKind.Success, action: new NoticeAction("Undo", () =>
-                {
-                    S.Appearance.Custom = before;
-                    changed();
-                    rebuild();
-                }));
-            };
-            wrap.Children.Add(button);
-        }
-        panel.Children.Add(wrap);
-        return panel;
     }
 
     private Grid? _alertGroups;

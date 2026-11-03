@@ -97,7 +97,7 @@ internal static class StatsSessions
                 Cell(table, row, 0, Caption(Dates.Time(local)));
                 Cell(table, row, 1, raced ? Finish(s, place) : TypeMark(s.Type));
                 var names = new DockPanel();
-                var outline = new TrackSketch(s.Track, s.Config, "TextMuted", 1.6) { Width = 56, Height = 36, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+                var outline = new TrackSketch(s.Track, s.Config, "TextMuted", 1.6) { Width = 56, Height = 36, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, TrackId = s.TrackId, TrackName = s.TrackName };
                 DockPanel.SetDock(outline, Dock.Right);
                 names.Children.Add(outline);
                 names.Children.Add(new StackPanel { Children = { Body(s.Car), Body(s.Place, "TextMuted", 9.5) } });

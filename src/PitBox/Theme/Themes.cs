@@ -7,6 +7,8 @@ internal sealed record ThemeSpec
 {
     public required AppTheme Id { get; init; }
     public required string Name { get; init; }
+    public string? Variant { get; init; }
+    public string Label => Variant is null ? Name : $"{Name} · {Variant}";
     public required bool Dark { get; init; }
     public required IReadOnlyDictionary<string, System.Windows.Media.Color> Colors { get; init; }
 
@@ -71,7 +73,9 @@ internal static class Themes
         Glow = true, GlowStrength = 0.45, StepsClimb = false,
     };
 
-    public static readonly ThemeSpec[] BuiltIn = { Dark, Custom };
+    public static readonly ThemeSpec Teams = SetSpec(ThemeSets.Teams, null);
+
+    public static readonly ThemeSpec[] BuiltIn = { Dark, Custom, Teams };
 
     private static ThemeSpec[] _all = BuiltIn;
 
@@ -104,10 +108,29 @@ internal static class Themes
         OverlayPresets.ClearCache();
     }
 
+    public static void SetPick(ThemeSet set, string? name)
+    {
+        var spec = SetSpec(set, name);
+        _all = _all.Select(t => t.Id == set.Id ? spec : t).ToArray();
+        OverlayPresets.ClearCache();
+    }
+
+    private static ThemeSpec SetSpec(ThemeSet set, string? name)
+    {
+        string pick = set.Known(name) ?? set.First;
+        var colors = set.Preset(pick)!;
+        return new ThemeSpec
+        {
+            Id = set.Id, Name = set.Name, Variant = pick, Dark = CustomPalette.IsDark(colors), Colors = CustomPalette.BuildBrand(colors),
+            CardEdge = Hairline, LogoEdge = new(0), StepsClimb = false,
+        };
+    }
+
     public const string OledDefaultSet = "#default";
 
     public static ThemeSpec ForSet(AppTheme id, string? set)
     {
+        if (ThemeSets.For(id) is { } themeSet && themeSet.Known(set) is { } pick) return SetSpec(themeSet, pick);
         if (id != AppTheme.Custom || string.IsNullOrEmpty(set)) return For(id);
         if (set == OledDefaultSet) return Custom;
         if (CustomPalette.Preset(set) is not { } colors) return For(id);

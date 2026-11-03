@@ -92,7 +92,9 @@ public static class ConfigStore
         }
         UiSettings.DropPastelTheme(config.Ui);
         config.Ui.OledCustom.Normalize();
-        foreach (var layout in config.Overlay.Layouts.Where(l => l.ColorSet is { } set && set != Theme.Themes.OledDefaultSet && Theme.CustomPalette.Preset(set) is null))
+        foreach (var themeSet in Theme.ThemeSets.All)
+            themeSet.Set(config.Ui, themeSet.Known(themeSet.Get(config.Ui)));
+        foreach (var layout in config.Overlay.Layouts.Where(l => l.ColorSet is { } set && set != Theme.Themes.OledDefaultSet && Theme.CustomPalette.Preset(set) is null && !Theme.ThemeSets.Knows(set)))
             layout.ColorSet = null;
         if (config.Overlay.ColorsVersion < 1)
         {

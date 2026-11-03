@@ -3,7 +3,6 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Automation;
 using PitBox.Config;
 using PitBox.Controls;
 using PitBox.Hardware;
@@ -175,7 +174,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
 
     private void BuildApplication()
     {
-        var app = Section("Application settings", "I.Power", "settings.app");
+        var app = Section("Application settings", "settings.app");
         var startup = Group(app, "Startup", "settings.startup");
         BuildStartup(startup);
         var window = Group(app, "Window", "settings.window");
@@ -186,12 +185,18 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         var row = Ui.SettingRow("Tools", $"{plugins.Count(_app.Plugins.IsEnabled)} of {plugins.Count} on.", jump);
         Ui.Anchor(row, "settings.plugins");
         window.Children.Add(row);
+        window.Children.Add(Ui.Divider());
+        var setup = Ui.SettingRow("Setup", "Sets which tools are on from what you use Pit-Box for.",
+            Ui.LabeledButton("I.Wand", "Run setup", () => _window.ShowSetup(firstRun: false), "GhostButton"));
+        Ui.Anchor(setup, "settings.setup");
+        window.Children.Add(setup);
     }
 
     private async Task ShowTools()
     {
-        var host = new ContentControl { Focusable = false, Content = BuildTools() };
-        void Refill() => Dispatcher.BeginInvoke(new Action(() => host.Content = BuildTools()));
+        var host = new ContentControl { Focusable = false, HorizontalContentAlignment = HorizontalAlignment.Stretch };
+        void Refill() => Dispatcher.BeginInvoke(new Action(() => host.Content = ToolChooser.Build(_app, () => { })));
+        Refill();
         var close = new StackPanel();
         var ok = new Button { Content = "Done", Style = Ui.Res<Style>("PrimaryButton"), IsDefault = true };
         ok.Click += (_, _) => _window.CloseModal(true);
@@ -201,60 +206,14 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         {
             await _window.ShowModal(Ui.Dialog(_window, "Tools",
                 "A tool that's off has no page, keybind, tray item or background work; its settings are kept. Drag tools in the sidebar to reorder them.",
-                host, close, null, ToolsDialogWidth));
+                host, close, null, ToolsDialogWidth, ToolChooser.BulkButtons(_app, () => { })));
         }
         finally { _app.Plugins.Changed -= Refill; }
     }
 
-    private FrameworkElement BuildTools()
-    {
-        var plugins = PluginManager.InNavOrder(_app.Plugins.All, U.NavOrder).ToList();
-        var group = new StackPanel();
-        var columns = new MasonryPanel { MinColumnWidth = PluginColumnWidth, Gap = 13, MaxColumns = 2 };
-        group.Children.Add(columns);
-        foreach (var plugin in plugins)
-        {
-            var p = plugin;
-            var block = new StackPanel();
-            columns.Children.Add(block);
-            var head = new StackPanel { Orientation = Orientation.Horizontal };
-            var (soft, deep) = p.Colors;
-            head.Children.Add(Ui.Badge(p.Pages.Count > 0 ? p.Pages[0].Icon : p.Icon, soft, deep, 22.5, 6.5, 12));
-            var titles = new StackPanel { Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-            titles.Children.Add(new TextBlock { Text = p.Name, FontWeight = FontWeights.SemiBold });
-            head.Children.Add(titles);
-            head.Children.Add(HudSettings.HelpTip.For($"Reads: {p.Reads}\n\nRuns in the background: {p.BackgroundWork}\n\nChanges on your PC: {p.Changes}", $"What {p.Name} reads and changes"));
-            var sw = Ui.Switch(_app.Plugins.IsEnabled(p), on =>
-            {
-                _app.Plugins.SetEnabled(p, on);
-                _app.Notify(on ? $"{p.Name} on" : $"{p.Name} off", on ? "It's in the sidebar." : "Its background work has stopped. Settings are kept.", NoticeKind.Success);
-            });
-            AutomationProperties.SetName(sw, p.Name);
-            var row = new Grid { Margin = new Thickness(0, 0, 0, 3) };
-            row.ColumnDefinitions.Add(new ColumnDefinition());
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var text = new StackPanel();
-            text.Children.Add(head);
-            if (p.Id != PluginIds.SimRacing)
-                text.Children.Add(new TextBlock { Text = p.Description, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(31, 2, 13, 0) });
-            row.Children.Add(text);
-            sw.VerticalAlignment = VerticalAlignment.Center;
-            Grid.SetColumn(sw, 1);
-            row.Children.Add(sw);
-            block.Children.Add(row);
-            bool parentOn = _app.Plugins.IsEnabled(p);
-            if (p.Id == PluginIds.SimRacing)
-                foreach (var tool in SimRacingPage.ToolsInOrder(_app))
-                    block.Children.Add(SubRow(tool.Title, PartNotes.GetValueOrDefault(tool.Id, ""), SimRacingPage.IsToolOn(_app, tool.Id), parentOn,
-                        on => SimRacingPage.SetToolOn(_app, tool.Id, on)));
-        }
+    private const double ToolsDialogWidth = 790;
 
-        return group;
-    }
-
-    private const double PluginColumnWidth = 340, ToolsDialogWidth = 790;
-
-    private static readonly Dictionary<string, string> PartNotes = new()
+    internal static readonly Dictionary<string, string> PartNotes = new()
     {
         ["setups"] = "Your car setups by car: find, rename, move, import and share.",
         ["hud"] = "In-game widgets from iRacing's live telemetry; off stops reading it.",
@@ -264,29 +223,6 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         ["tradingpaints"] = "Starts the Trading Paints Downloader by hand or with iRacing.",
         ["garage61"] = "Starts the Garage 61 Telemetry Agent by hand or with iRacing.",
     };
-
-    private static Grid SubRow(string title, string note, bool on, bool enabled, Action<bool> set, bool beta = false)
-    {
-        var sw = Ui.Switch(on, set);
-        sw.IsEnabled = enabled;
-        AutomationProperties.SetName(sw, title);
-        var row = new Grid { Margin = new Thickness(31, 2, 0, 3), Opacity = enabled ? 1 : 0.55 };
-        row.ColumnDefinitions.Add(new ColumnDefinition());
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var text = new Border { BorderThickness = new Thickness(2, 0, 0, 0), Padding = new Thickness(10, 2, 13, 2) };
-        text.SetResourceReference(Border.BorderBrushProperty, "Line");
-        var stack = new StackPanel();
-        var name = new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
-        stack.Children.Add(beta ? new TrimRow { Children = { name, Ui.BetaChip() } } : name);
-        if (note.Length > 0)
-            stack.Children.Add(new TextBlock { Text = note, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) });
-        text.Child = stack;
-        row.Children.Add(text);
-        sw.VerticalAlignment = VerticalAlignment.Center;
-        Grid.SetColumn(sw, 1);
-        row.Children.Add(sw);
-        return row;
-    }
 
     private static StackPanel Group(StackPanel section, string title, string anchor)
     {
@@ -455,10 +391,10 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
 
     private void BuildAppearance()
     {
-        var look = Section("Appearance", "I.Palette", "settings.look");
+        var look = Section("Appearance", "settings.look");
         look.Children.Add(new TextBlock { Text = "Theme", Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 8, 0, 0) });
         look.Children.Add(new Border { Height = 8 });
-        look.Children.Add(new ThemePicker(U.Theme, _app.SetTheme, columns: 2, height: 52, oled: _app.UseOledColors) { Margin = new Thickness(0, 0, -8, 3) });
+        look.Children.Add(new ThemePicker(U.Theme, _app.SetTheme, columns: 3, height: 52, oled: _app.UseOledColors, usePick: _app.UsePick) { Margin = new Thickness(0, 0, -8, 3) });
         look.Children.Add(Ui.Divider());
         var custom = new CustomThemeSection(_app);
         Ui.Anchor(custom, "settings.customcolors");
@@ -478,7 +414,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
 
     private void BuildPerformance()
     {
-        var section = Section("Performance", "I.Gauge", "settings.performance");
+        var section = Section("Performance", "settings.performance");
         var p = _app.Config.Performance;
         var options = PerformanceSettings.Presets.Append(SensorRate.Custom).ToArray();
         var rate = Ui.Segmented(options.Select(PerformanceSettings.Name).ToArray(), Array.IndexOf(options, p.Rate), i =>
@@ -676,7 +612,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
 
     private void BuildData()
     {
-        var section = Section("Data and configuration", "I.Folder", "settings.data");
+        var section = Section("Data and configuration", "settings.data");
         var transfer = new StackPanel { Orientation = Orientation.Horizontal };
         var export = Ui.LabeledButton("I.Save", "Export…", () => ExportSettings());
         export.ToolTip = "Saves every setting (theme, window profiles, fan curves and presets, overlay, keybinds, plugins, layouts…) to a file";
@@ -783,7 +719,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
 
     private void BuildHardware()
     {
-        var access = Section("Hardware access", "I.Cpu", "settings.access");
+        var access = Section("Hardware access", "settings.access");
         access.Children.Add(StatusRow("Administrator", _app.IsAdmin || _app.Demo,
             _app.Demo ? "Demo mode: nothing on this PC is changed, so administrator rights aren't needed." : _app.IsAdmin ? "Running as administrator: FPS counting, sensors and fan control are available." : "Not running as administrator, so FPS, CPU temperature and fan control are limited."));
         access.Children.Add(Ui.Divider());
@@ -848,7 +784,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
 
     private void BuildAboutAndUpdates()
     {
-        var section = Section("About and updates", "I.Info", "settings.updates");
+        var section = Section("About and updates", "settings.updates");
         Ui.Anchor(section, "settings.about");
         var about = new Grid { Margin = new Thickness(0, 2, 0, 6) };
         about.ColumnDefinitions.Add(new ColumnDefinition());
@@ -1004,6 +940,18 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
             _window.Navigate(_window.FirstPage);
             return Task.CompletedTask;
         });
+        yield return ("teams-on", () =>
+        {
+            _app.UsePick(ThemeSets.Teams, "Ferrari");
+            _window.GoTo("settings", "settings.customcolors", flash: false);
+            return Task.CompletedTask;
+        });
+        yield return ("conditions-on", () =>
+        {
+            _app.UseOledColors("Night race");
+            _window.GoTo("settings", "settings.customcolors", flash: false);
+            return Task.CompletedTask;
+        });
         yield return ("custom-colors-back", () =>
         {
             U.OledCustom.Use(null);
@@ -1066,15 +1014,11 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         return grid;
     }
 
-    private StackPanel Section(string title, string icon, string? anchor = null)
+    private StackPanel Section(string title, string? anchor = null)
     {
         var stack = new StackPanel { Margin = new Thickness(15, 10, 15, 15) };
         var head = new StackPanel { Orientation = Orientation.Horizontal };
-        head.Children.Add(new Tile { Style = Ui.Res<Style>("IconBadge"), Width = 24, Height = 24, CornerRadius = ThemeManager.Round(9),
-            Child = new Icon { Data = Ui.Res<Geometry>(icon), Width = 13, Height = 13 } });
-        var name = RaceParts.Big(title, 20, "Heading", italic: false, heavy: false);
-        name.Margin = new Thickness(8, 0, 0, 0);
-        head.Children.Add(name);
+        head.Children.Add(RaceParts.Big(title, 20, "Heading", italic: false, heavy: false));
         var band = new Grid();
         band.Children.Add(new Slant("Place4Wash", 0, 0, 0.78, 0, 0.7, 1, 0, 1));
         band.Children.Add(new Slant("Place4Band", 0.78, 0, 0.8, 0, 0.72, 1, 0.7, 1));

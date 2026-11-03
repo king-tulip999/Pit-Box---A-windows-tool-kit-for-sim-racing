@@ -568,7 +568,7 @@ internal sealed class StatsStore : IDisposable
     private const string SummarySql = """
         SELECT s.id, s.start_utc, s.session_type, s.car, s.car_class, s.track, s.track_config, s.laps,
         (SELECT MIN(time) FROM laps WHERE session_id = s.id AND clean = 1), s.incidents, s.start_pos, s.finish_pos, s.finished,
-        s.weather, s.track_km, s.ir_delta, s.sr_delta, s.drive_s, s.official, s.league_id, s.source, s.ir_start, s.sr_start, s.pit_stops
+        s.weather, s.track_km, s.ir_delta, s.sr_delta, s.drive_s, s.official, s.league_id, s.source, s.ir_start, s.sr_start, s.pit_stops, s.track_id, s.track_name
         FROM sessions s
         """;
 
@@ -576,7 +576,7 @@ internal sealed class StatsStore : IDisposable
         (long)r[0]!, FromUnix((long)r[1]!), (string)r[2]!, (string)r[3]!, (string)r[4]!, (string)r[5]!, (string)r[6]!, Convert.ToInt32(r[7]), D(r[8]),
         I(r[9]), I(r[10]), I(r[11]), Convert.ToInt64(r[12]) != 0, (string)r[13]!, D(r[14]), I(r[15]), D(r[16]), Convert.ToDouble(r[17]), Convert.ToInt64(r[18]) != 0,
         Convert.ToInt32(r[19]), (string)r[20]!, I(r[21]) is { } ir && RaceResult.KnownRating(ir) ? ir : null,
-        RaceResult.KnownRating(I(r[21])) ? D(r[22]) : null, Convert.ToInt32(r[23]));
+        RaceResult.KnownRating(I(r[21])) ? D(r[22]) : null, Convert.ToInt32(r[23]), I(r[24]), r[25] as string ?? "");
 
     public void Dispose() => _db.Dispose();
 }
@@ -586,7 +586,7 @@ internal sealed record SessionConditions(double? AirTemp, double? TrackTempMin, 
 
 internal sealed record SessionSummary(long Id, DateTime StartUtc, string Type, string Car, string CarClass, string Track, string Config, int Laps, double? Best,
     int? Incidents, int? StartPos, int? FinishPos, bool Finished, string Weather, double? TrackKm, int? IrDelta, double? SrDelta, double DriveS, bool Official,
-    int LeagueId, string Source, int? IrStart = null, double? SrStart = null, int PitStops = 0)
+    int LeagueId, string Source, int? IrStart = null, double? SrStart = null, int PitStops = 0, int? TrackId = null, string TrackName = "")
 {
     public string Place => Config.Length > 0 ? $"{Track} · {Config}" : Track;
 }

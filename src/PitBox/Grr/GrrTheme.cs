@@ -103,7 +103,7 @@ internal static class GrrTheme
 
     public static IReadOnlyDictionary<string, Color> Podium(AppTheme theme, IReadOnlyDictionary<string, Color> colors)
     {
-        if (PodiumByTheme.TryGetValue(theme.Id, out var known)) return known;
+        if (PodiumByTheme.TryGetValue((ThemeSets.For(theme) is null ? theme : AppTheme.Custom).Id, out var known)) return known;
         var made = new Dictionary<string, Color>();
         foreach (var (place, family) in new[] { (1, "Gold"), (2, "Slate"), (3, "Apricot") })
         {

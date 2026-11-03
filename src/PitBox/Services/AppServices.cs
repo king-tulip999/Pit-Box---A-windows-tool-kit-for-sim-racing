@@ -235,6 +235,16 @@ internal sealed class AppServices : IDisposable
         Overlay.InvalidateColors();
     }
 
+    public void UsePick(Theme.ThemeSet set, string? name)
+    {
+        set.Set(Config.Ui, set.Known(name) ?? set.First);
+        Theme.Themes.SetPick(set, set.Get(Config.Ui));
+        if (Config.Ui.Theme != set.Id) { SetTheme(set.Id); return; }
+        Save();
+        Theme.ThemeManager.Apply(Config.Ui.Theme);
+        Overlay.InvalidateColors();
+    }
+
     public void SetOverlayVisible(bool visible)
     {
         Overlay.SetVisible(visible);

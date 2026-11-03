@@ -132,6 +132,8 @@ internal static class ScreenshotRunner
             }
             if (window.SetupOpen)
                 await CaptureSetupAsync(window, folder);
+            if (Environment.GetCommandLineArgs().Contains("--setup-only", StringComparer.OrdinalIgnoreCase))
+                return;
 
             var only = Arg("--pages")?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             IReadOnlyList<string> pages = only is null ? window.NavKeys : window.NavKeys.Where(k => only.Contains(k, StringComparer.OrdinalIgnoreCase)).ToList();

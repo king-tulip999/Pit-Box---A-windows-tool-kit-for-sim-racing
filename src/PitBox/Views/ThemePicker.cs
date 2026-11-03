@@ -11,12 +11,15 @@ namespace PitBox.Views;
 
 internal sealed class ThemePicker : UniformGrid
 {
-    public ThemePicker(AppTheme selected, Action<AppTheme> pick, int columns = 3, double height = 52, Action<string?>? oled = null)
+    public ThemePicker(AppTheme selected, Action<AppTheme> pick, int columns = 3, double height = 52, Action<string?>? oled = null, Action<ThemeSet, string?>? usePick = null)
     {
         Columns = columns;
         foreach (var theme in Themes.All)
         {
-            Action<FrameworkElement>? menu = theme.Id == AppTheme.Custom && oled is not null ? anchor => ThemeMenu.OpenOledMenu(anchor, oled) : null;
+            Action<FrameworkElement>? menu =
+                theme.Id == AppTheme.Custom && oled is not null ? anchor => ThemeMenu.OpenOledMenu(anchor, oled)
+                : ThemeSets.For(theme.Id) is { } set && usePick is not null ? anchor => ThemeMenu.OpenSetMenu(anchor, set, name => usePick(set, name))
+                : null;
             Children.Add(Swatch(theme, theme.Id == selected, pick, height, menu));
         }
     }
@@ -30,12 +33,14 @@ internal sealed class ThemePicker : UniformGrid
         foreach (var key in new[] { "Accent", "ActiveModeBg", "Sage" })
             dots.Children.Add(new Rectangle { Width = 8, Height = 8, RadiusX = theme.ChipRadius > 6 ? 5 : 2, RadiusY = theme.ChipRadius > 6 ? 5 : 2, Fill = Of(key), Margin = new Thickness(3, 0, 0, 0) });
 
-        var name = TextFit.TipWhenTrimmed(new TextBlock
+        var name = new TextBlock
         {
-            Text = theme.Caps ? theme.Name.ToUpperInvariant() : theme.Name,
+            Text = theme.Caps ? theme.Label.ToUpperInvariant() : theme.Label,
             FontFamily = ThemeManager.Family(theme.DisplayFont), FontWeight = theme.HeadingWeight, FontStyle = theme.HeadingStyle, FontSize = 11.5,
-            Foreground = Of("Heading"), VerticalAlignment = VerticalAlignment.Bottom, TextTrimming = TextTrimming.CharacterEllipsis,
-        });
+            Foreground = Of("Heading"), VerticalAlignment = VerticalAlignment.Bottom, TextWrapping = TextWrapping.Wrap,
+            LineHeight = 12.5, LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
+            Margin = new Thickness(0, 9, menu is not null ? 13 : selected ? 9 : 0, 0),
+        };
         FrameworkElement label = theme.Link is { } link && Logo(link.Logo) is { } logo
             ? new Image
             {
@@ -72,12 +77,12 @@ internal sealed class ThemePicker : UniformGrid
             Style = Ui.Res<Style>("Btn"), Height = height, Margin = new Thickness(0, 0, 8, 8), Padding = new Thickness(4),
             HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch,
             Background = Of("Bg"), BorderBrush = selected ? Ui.Res<Brush>("Accent") : Ui.Res<Brush>("LineStrong"),
-            BorderThickness = new Thickness(selected ? 2 : 1), Content = face, ToolTip = theme.Name,
+            BorderThickness = new Thickness(selected ? 2 : 1), Content = face, ToolTip = theme.Label,
         };
         button.MouseEnter += (_, _) => button.BorderBrush = Ui.Res<Brush>("Accent");
         button.MouseLeave += (_, _) => button.BorderBrush = selected ? Ui.Res<Brush>("Accent") : Ui.Res<Brush>("LineStrong");
-        AutomationProperties(button, theme.Link?.Name ?? theme.Name, selected);
-        if (menu is not null) button.ToolTip = theme.Name + ": pick its colors";
+        AutomationProperties(button, theme.Link?.Name ?? theme.Label, selected);
+        if (menu is not null) button.ToolTip = theme.Name + ": " + (ThemeSets.For(theme.Id)?.PickTip ?? "pick its colors");
         button.Click += (_, _) =>
         {
             if (menu is not null) menu(button);

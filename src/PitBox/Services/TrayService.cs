@@ -154,6 +154,26 @@ internal sealed class TrayService : IDisposable
         foreach (var theme in Themes.All)
         {
             var id = theme.Id;
+            if (ThemeSets.For(id) is { } set)
+            {
+                bool setOn = ThemeManager.Current.Id == id;
+                string current = set.Current(_app.Config.Ui);
+                var sets = new ToolStripMenuItem(theme.Name) { Checked = setOn };
+                foreach (var family in set.Families)
+                {
+                    var group = new ToolStripMenuItem(family);
+                    foreach (var preset in set.Presets.Where(p => p.Family == family))
+                    {
+                        string name = preset.Name;
+                        bool picked = setOn && current == name;
+                        group.Checked |= picked;
+                        group.DropDownItems.Add(new ToolStripMenuItem(name, null, (_, _) => _app.UsePick(set, name)) { Checked = picked });
+                    }
+                    sets.DropDownItems.Add(group);
+                }
+                themes.DropDownItems.Add(sets);
+                continue;
+            }
             if (id != Config.AppTheme.Custom)
             {
                 themes.DropDownItems.Add(new ToolStripMenuItem(theme.Name, null, (_, _) => _app.SetTheme(id)) { Checked = ThemeManager.Current.Id == id });

@@ -30,7 +30,7 @@ internal static class ConfigReferences
         var presets = config.Fans.Presets.Select(p => p.Name).ToList();
         var curves = config.Fans.Curves.Select(c => c.Name).ToList();
         var layouts = config.Overlay.Layouts.Select(l => l.Name).ToList();
-        var colorSets = Theme.CustomPalette.Presets.Select(p => p.Name).Append(Theme.Themes.OledDefaultSet).ToList();
+        var colorSets = Theme.CustomPalette.Presets.Select(p => p.Name).Concat(Theme.ThemeSets.All.SelectMany(s => s.Presets).Select(p => p.Name)).Append(Theme.Themes.OledDefaultSet).ToList();
         if (presets.Count > 0) Check("active fan preset", config.Fans.ActivePreset, presets);
         var groups = config.WindowProfiles.Groups.Select(g => g.Id).ToList();
         foreach (var w in config.WindowProfiles.Profiles)

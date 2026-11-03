@@ -5,7 +5,7 @@ namespace PitBox.Theme;
 
 internal static class CustomPalette
 {
-    public static readonly string[] Families = { "Pastel", "Neon", "Glow", "Night", "Nature", "Warm", "Racing", "Mono" };
+    public static readonly string[] Families = { "Pastel", "Neon", "Glow", "Night", "Nature", "Warm", "Racing", "Mono", "Conditions", "Accessible" };
 
     public static readonly (string Name, string Family, ThemeColors Colors)[] Presets =
     {
@@ -66,6 +66,16 @@ internal static class CustomPalette
         ("Slate", "Mono", Make("#05070A", "#56606E", "#E9EDF2", "#7C93B0", "#C2CCD8", "#6FCF97", "#E8C468", "#E87070")),
         ("Steel", "Mono", Make("#040506", "#5F6B73", "#EEF2F4", "#8FB3C7", "#D0DCE3", "#72D6A0", "#F2C46B", "#F27A7A")),
         ("Sepia", "Mono", Make("#060504", "#6B6155", "#F5EEDF", "#D49A6A", "#E6D3B3", "#8FC98F", "#F2DA6B", "#E85F6F")),
+
+        ("Night race", "Conditions", Make("#03040C", "#474E78", "#EEF0FF", "#FF9E1B", "#5CB8FF", "#4ADE80", "#F2F24A", "#FF4D6A")),
+        ("Wet race", "Conditions", Make("#04070A", "#4F6678", "#EAF2F8", "#6FB7E6", "#B8C7D4", "#4ADE80", "#FFC93C", "#FF6B6B")),
+        ("Dawn stint", "Conditions", Make("#07040A", "#6A5A78", "#FFF0F4", "#FF8FA3", "#FFD27A", "#4ADE80", "#FFD23F", "#FF5A1F")),
+        ("Desert heat", "Conditions", Make("#070402", "#7A5E48", "#FFF2E4", "#E8762E", "#F2D49B", "#5CE0A0", "#FFD23F", "#FF4D8A")),
+        ("Fog", "Conditions", Make("#05060A", "#5C6470", "#EEF1F4", "#A9B8C8", "#E0E6EC", "#6FD6A0", "#E8C468", "#E86A6A")),
+        ("Floodlights", "Conditions", Make("#02040A", "#4E5878", "#F4F7FF", "#E8F0FF", "#7DF9FF", "#4ADE80", "#FFC93C", "#FF5C5C")),
+
+        ("High contrast", "Accessible", Make("#000000", "#B0B0B0", "#FFFFFF", "#FFE000", "#00E5FF", "#3DFF6A", "#FF8000", "#FF4D4D")),
+        ("Colorblind safe", "Accessible", Make("#000000", "#6A6A6A", "#F2F2F2", "#56B4E9", "#CC79A7", "#009E73", "#F0E442", "#D55E00")),
     };
 
     public static ThemeColors? Preset(string? name) =>
@@ -93,6 +103,54 @@ internal static class CustomPalette
     public static readonly IReadOnlyDictionary<string, Color> Default = Derive(ThemeColors.Default);
 
     public static IReadOnlyDictionary<string, Color> Build(ThemeColors seeds) => seeds.IsDefault ? Default : Derive(seeds);
+
+    public static IReadOnlyDictionary<string, Color> BuildBrand(ThemeColors seeds)
+    {
+        var p = new Dictionary<string, Color>(Derive(seeds));
+        Color bg = p["Bg"], surface = p["Surface"], accent = p["Accent"];
+        var tint = ThemeManager.Mix(surface, accent, p["PrimaryBg"].A / 255.0);
+        var bright = KeepHue(accent, c => new[] { bg, surface, tint }.All(under => ThemeManager.Contrast(c, under) >= 4.5)) ?? p["AccentText"];
+        p["AccentText"] = p["PrimaryFg"] = p["MetricText"] = p["Graph"] = p["GraphText"] = bright;
+        p["GraphSoft"] = ThemeManager.Mix(bg, accent, 0.2);
+        return p;
+    }
+
+    private static Color? KeepHue(Color c, Func<Color, bool> readable)
+    {
+        var (h, s, l) = ToHsl(c);
+        for (int step = 0; step <= 60; step++)
+        {
+            var x = FromHsl(h, s, Math.Min(1, l + step * 0.01));
+            if (readable(x)) return x;
+        }
+        return null;
+    }
+
+    private static (double H, double S, double L) ToHsl(Color c)
+    {
+        double r = c.R / 255.0, g = c.G / 255.0, b = c.B / 255.0;
+        double max = Math.Max(r, Math.Max(g, b)), min = Math.Min(r, Math.Min(g, b)), d = max - min, l = (max + min) / 2;
+        if (d == 0) return (0, 0, l);
+        double s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        double h = max == r ? (g - b) / d % 6 : max == g ? (b - r) / d + 2 : (r - g) / d + 4;
+        return ((h * 60 + 360) % 360, s, l);
+    }
+
+    private static Color FromHsl(double h, double s, double l)
+    {
+        double c = (1 - Math.Abs(2 * l - 1)) * s, x = c * (1 - Math.Abs(h / 60 % 2 - 1)), m = l - c / 2;
+        var (r, g, b) = h switch
+        {
+            < 60 => (c, x, 0.0),
+            < 120 => (x, c, 0.0),
+            < 180 => (0.0, c, x),
+            < 240 => (0.0, x, c),
+            < 300 => (x, 0.0, c),
+            _ => (c, 0.0, x),
+        };
+        static byte B(double v) => (byte)Math.Round(Math.Clamp(v, 0, 1) * 255);
+        return Color.FromRgb(B(r + m), B(g + m), B(b + m));
+    }
 
     private static IReadOnlyDictionary<string, Color> Derive(ThemeColors seeds)
     {
