@@ -28,7 +28,7 @@ internal static class ShowcaseRunner
         return new Overlay.FrameStats(Math.Round(fps), 141, 118, 1000 / fps);
     }
 
-    private const int Stagger = 120, RequiredDpi = 144;
+    private const int Stagger = 120;
     private const string Tagline = "A Windows toolkit for sim rigs";
 
     private static MainWindow W = null!;
@@ -55,9 +55,7 @@ internal static class ShowcaseRunner
             if (ffmpeg is null || !File.Exists(ffmpeg)) throw new InvalidOperationException("ffmpeg not found (--ffmpeg <path to ffmpeg.exe>)");
             var screen = System.Windows.Forms.Screen.PrimaryScreen!.Bounds;
             uint dpi = MonitorDpi(screen);
-            if (dpi != RequiredDpi)
-                throw new InvalidOperationException($"the main monitor's scale is {dpi * 100 / 96} %, the recording needs 150 %: Settings → System → Display → Scale, then run it again");
-            Log.Add($"monitor {screen.Width}×{screen.Height} at 150 %");
+            Log.Add($"monitor {screen.Width}×{screen.Height} at {dpi * 100 / 96} %");
             double scale = dpi / 96.0;
             Pointer.Scale = scale;
             window.WindowStartupLocation = WindowStartupLocation.Manual;

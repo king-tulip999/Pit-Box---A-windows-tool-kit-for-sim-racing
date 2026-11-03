@@ -32,6 +32,11 @@ public partial class App : Application
             HudSheet.Run(this, sheetFolder);
             return;
         }
+        if (ArgValue(e.Args, HudSheet.FramesArg) is { } framesFolder)
+        {
+            HudSheet.Run(this, framesFolder, frames: true);
+            return;
+        }
         if (ArgValue(e.Args, FuelReplay.Arg) is { } replayFolder)
         {
             int at = Array.FindIndex(e.Args, a => string.Equals(a, FuelReplay.Arg, StringComparison.OrdinalIgnoreCase));

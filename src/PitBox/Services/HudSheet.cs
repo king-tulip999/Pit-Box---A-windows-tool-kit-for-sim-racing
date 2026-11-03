@@ -10,16 +10,18 @@ namespace PitBox.Services;
 internal static class HudSheet
 {
     public const string Arg = "--hud-sheet";
+    public const string FramesArg = "--hud-frames";
 
     public static bool Running { get; private set; }
 
-    public static void Run(App app, string folder)
+    public static void Run(App app, string folder, bool frames = false)
     {
         Running = true;
         try
         {
             Directory.CreateDirectory(folder);
-            Render(folder);
+            if (frames) RenderFrames(folder);
+            else Render(folder);
         }
         catch (Exception ex)
         {
@@ -102,6 +104,9 @@ internal static class HudSheet
             foreach (var kind in new[] { "relative", "standings", "fuel" })
                 Save(HudCatalog.Find(kind)!, HudCatalog.Find(kind)!.W, HudCatalog.Find(kind)!.H, Path.Combine(dir, kind + "@150.png"), 1.5f);
 
+            foreach (var kind in new[] { "radar", "goals" })
+                Save(HudCatalog.Find(kind)!, HudCatalog.Find(kind)!.W, HudCatalog.Find(kind)!.H, Path.Combine(dir, kind + "@250.png"), 2.5f);
+
             void Save(HudWidgetDef def, double w, double h, string path, float scale = 1, params (string Key, string Value)[] options)
             {
                 var config = new HudWidgetConfig { Id = "sheet-" + def.Kind, Kind = def.Kind, W = w, H = h };
@@ -121,5 +126,95 @@ internal static class HudSheet
                 surface.Bitmap!.Save(path);
             }
         }
+    }
+
+    private const int FrameRate = 60;
+    private const double ClipSeconds = 12, FrameScale = 2.5;
+    private const double EventAt = 2.5;
+    private static readonly HashSet<string> EveryFrame = new(StringComparer.OrdinalIgnoreCase) { "inputs", "radar", "map", "timing", "wind" };
+    private static readonly HashSet<string> AroundLapLine = new(StringComparer.OrdinalIgnoreCase) { "timing", "laps", "fuel", "goals", "block" };
+    private static readonly Dictionary<string, double> Speeds = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["relative"] = 4, ["standings"] = 12, ["timing"] = 2, ["laps"] = 20, ["fuel"] = 20, ["session"] = 10, ["alerts"] = 12,
+        ["traffic"] = 6, ["map"] = 4, ["weather"] = 30, ["wind"] = 6, ["goals"] = 20, ["notes"] = 4, ["events"] = 20, ["block"] = 20,
+    };
+
+    private static void RenderFrames(string folder)
+    {
+        double lapLine = FirstLapLine();
+        foreach (var def in HudCatalog.All)
+        {
+            double speed = Speeds.GetValueOrDefault(def.Kind, 1);
+            double start = def.Kind == "radar" ? FirstOverlap() - EventAt
+                : AroundLapLine.Contains(def.Kind) ? lapLine - EventAt * speed
+                : 0.25;
+            var settings = new RaceHudSettings();
+            var race = new RaceState(() => settings) { MapLoader = SimRacing.TrackMaps.TrackMapLibrary.ForRace };
+            var demo = new DemoTelemetry();
+            var frame = new TelemetryFrame();
+            long seq = 0;
+            for (double t = start - 1500; t < start; t += 0.25) Step(t);
+            var palette = HudPalette.Of(settings.Appearance);
+            var config = new HudWidgetConfig { Id = "frames-" + def.Kind, Kind = def.Kind, W = def.W, H = def.H };
+            var options = new HudOptions(def, config);
+            var widget = def.Create();
+            using var painter = new HudPainter();
+            using var surface = new PitBox.Overlay.DibSurface();
+            var size = new Size((int)Math.Round(def.W * FrameScale), (int)Math.Round(def.H * FrameScale));
+            string dir = Path.Combine(folder, def.Kind);
+            Directory.CreateDirectory(dir);
+            int every = EveryFrame.Contains(def.Kind) ? 1 : speed > 1 ? 2 : FrameRate / 15;
+            int substeps = (int)Math.Ceiling(speed / FrameRate / 0.25);
+            var saved = new List<string>();
+            for (int i = 0; i <= ClipSeconds * FrameRate; i++)
+            {
+                for (int s = substeps; s >= 1; s--) Step(start + (i - (s - 1) / (double)substeps) * speed / FrameRate);
+                var g = surface.Ensure(size);
+                painter.Simulated = true;
+                painter.MarkSimulated = false;
+                painter.Begin(g, (float)FrameScale, new SizeF((float)def.W, (float)def.H), palette, settings.Appearance);
+                widget.Draw(painter, new HudView { Frame = race.Frame, Race = race, Settings = settings, Config = config, Options = options, Def = def });
+                painter.FinishPanels();
+                painter.End(surface.Dc, surface.Size);
+                if (i % every != 0) continue;
+                string file = $"{saved.Count:0000}.png";
+                surface.Bitmap!.Save(Path.Combine(dir, file));
+                saved.Add(string.Format(System.Globalization.CultureInfo.InvariantCulture, "{{\"t\":{0:0.000},\"f\":\"{1}\"}}", i / (double)FrameRate, file));
+            }
+            File.WriteAllText(Path.Combine(dir, "frames.json"), $"{{\"kind\":\"{def.Kind}\",\"scale\":{FrameScale.ToString(System.Globalization.CultureInfo.InvariantCulture)},\"speed\":{speed.ToString(System.Globalization.CultureInfo.InvariantCulture)},\"frames\":[{string.Join(",", saved)}]}}");
+
+            void Step(double t)
+            {
+                demo.Fill(frame, t);
+                frame.Sequence = ++seq;
+                race.Update(frame);
+            }
+        }
+    }
+
+    private static double FirstLapLine()
+    {
+        var demo = new DemoTelemetry();
+        var frame = new TelemetryFrame();
+        demo.Fill(frame, 120);
+        int? lap = frame.LapCompleted;
+        for (double t = 120; t < 3600; t += 1.0 / FrameRate)
+        {
+            demo.Fill(frame, t);
+            if (frame.LapCompleted != lap && !frame.OnPitRoad) return t;
+        }
+        return 120;
+    }
+
+    private static double FirstOverlap()
+    {
+        var demo = new DemoTelemetry();
+        var frame = new TelemetryFrame();
+        for (double t = 10; t < 3600; t += 1.0 / FrameRate)
+        {
+            demo.Fill(frame, t);
+            if (frame.Sides != CarSides.Clear) return t;
+        }
+        return 10;
     }
 }
