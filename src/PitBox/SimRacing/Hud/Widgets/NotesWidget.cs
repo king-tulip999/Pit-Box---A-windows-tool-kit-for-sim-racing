@@ -8,6 +8,7 @@ internal sealed class NotesWidget : HudWidget
 {
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
+        TitleRow,
         HudOption.Int("ahead", "Corner notes from", 300, 50, 2000, Services.CapsUnits.M, "How far before the corner its note lights up"),
         HudOption.Bool("general", "Notes for the whole track", true),
         HudOption.Bool("onlyNext", "Only the next corner's note", false),

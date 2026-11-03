@@ -111,7 +111,7 @@ internal static class RaceFormat
     {
         if (litres is not { } l || !double.IsFinite(l)) return Missing;
         double v = FuelValue(l, u);
-        return (u == HudUnits.Imperial ? v.ToString("0.00", Inv) : v.ToString(Math.Abs(v) < 10 ? "0.00" : "0.0", Inv)) + " " + FuelUnit(u);
+        return v.ToString("0.00", Inv) + " " + FuelUnit(u);
     }
 
     public static string Temp(double? celsius, HudUnits u)

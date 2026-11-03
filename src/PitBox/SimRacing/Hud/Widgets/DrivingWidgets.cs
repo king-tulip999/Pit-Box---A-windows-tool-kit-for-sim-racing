@@ -444,7 +444,7 @@ internal sealed class FuelWidget : HudWidget
         float lh = p.LineHeight(p.SmallBold);
         var line = new RectangleF(box.X, box.Y, box.Width, lh);
         p.Text("TANK", p.Label, p.LabelColor, line, HAlign.Left, VAlign.Center, false);
-        string middle = RaceFormat.Fuel(level, u) + (plan is not null ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $" · {plan.LapsOfFuel:0.0} LAPS") : "");
+        string middle = RaceFormat.Fuel(level, u) + (plan is not null ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $" · {plan.LapsOfFuel:0.00} LAPS") : "");
         p.Text(middle, p.SmallBold, p.P.Heading, line, HAlign.Center, VAlign.Center);
         if (r.Tank is { } cap) p.Text($"{RaceFormat.Fuel(cap, u)} CAP", p.Label, p.LabelColor, line, HAlign.Right, VAlign.Center, false);
         var track = new RectangleF(box.X, line.Bottom + 2, box.Width, 6 * p.Density);
@@ -528,7 +528,7 @@ internal sealed class FuelWidget : HudWidget
                     switch (cols[c])
                     {
                         case "use": text = FuelNumber(x, u); break;
-                        case "laps": text = (level / x).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture); break;
+                        case "laps": text = (level / x).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture); break;
                         case "refuel":
                             if (togo is { } t)
                             {
@@ -640,7 +640,7 @@ internal sealed class FuelWidget : HudWidget
                         case "perlap": text = FuelNumber(x, u); break;
                         case "laps":
                             double laps = level / x;
-                            text = laps.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+                            text = laps.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
                             break;
                         case "refuel":
                             if (togo is { } t)
@@ -738,7 +738,7 @@ internal sealed class FuelWidget : HudWidget
     private static string FuelNumber(double litres, Config.HudUnits u)
     {
         double x = RaceFormat.FuelValue(litres, u);
-        return x.ToString(u == Config.HudUnits.Imperial || Math.Abs(x) < 10 ? "0.00" : "0.0", System.Globalization.CultureInfo.InvariantCulture);
+        return x.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private static (Color Fill, string Label, string Value) State(HudPainter p, HudView v, FuelPlan? plan, int measured)
@@ -755,7 +755,7 @@ internal sealed class FuelWidget : HudWidget
         string many = stops > 1 ? $" · {stops} STOPS" : "";
         return plan.WindowOpensIn is <= 0
             ? (p.P.Good, "WINDOW OPEN" + many, add)
-            : (p.P.Warn, (plan.WindowOpensIn is { } o ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"WINDOW IN {o:0.0} LAPS") : "PIT NEEDED") + many, add);
+            : (p.P.Warn, (plan.WindowOpensIn is { } o ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"WINDOW IN {o:0.00} LAPS") : "PIT NEEDED") + many, add);
     }
 
     internal static string Confidence(EstimateReliability r) => r switch
@@ -780,11 +780,11 @@ internal sealed class FuelWidget : HudWidget
             case "atflag":
                 return (id, "AT THE FLAG", plan?.AtFlag is { } at ? (at < 0 ? "−" : "") + RaceFormat.Fuel(Math.Abs(at), u) : RaceFormat.Missing,
                     plan?.AtFlag is < 0 ? p.P.DangerText : null);
-            case "laps": return (id, "LAPS LEFT", plan is null ? RaceFormat.Missing : plan.LapsOfFuel.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture), null);
+            case "laps": return (id, "LAPS LEFT", plan is null ? RaceFormat.Missing : plan.LapsOfFuel.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture), null);
             case "time":
                 double? pace = r.Laps.Laps.Count > 0 ? LapMath.Stats(r.Laps.Laps, 5)?.Average : f.LapBest;
                 return (id, "TIME LEFT", plan is not null && pace is { } pc ? RaceFormat.Clock(plan.LapsOfFuel * pc) : RaceFormat.Missing, null);
-            case "togo": return (id, "LAPS TO GO", plan?.LapsToGo is { } tg ? tg.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) : RaceFormat.Missing, null);
+            case "togo": return (id, "LAPS TO GO", plan?.LapsToGo is { } tg ? tg.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) : RaceFormat.Missing, null);
             case "tofinish": return (id, "TO FINISH", plan?.ToFinish is { } tf ? RaceFormat.Fuel(tf, u) : RaceFormat.Missing, null);
             case "surplus":
                 return (id, plan?.Surplus is < 0 ? "SHORT" : "SPARE", plan?.Surplus is { } s ? RaceFormat.Fuel(Math.Abs(s), u) : RaceFormat.Missing,
@@ -796,7 +796,7 @@ internal sealed class FuelWidget : HudWidget
                 string win = plan?.Stops switch
                 {
                     0 => "Not needed",
-                    > 0 when plan.WindowOpensIn is { } o => o <= 0 ? "Open" : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"In {o:0.0} LAPS"),
+                    > 0 when plan.WindowOpensIn is { } o => o <= 0 ? "Open" : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"In {o:0.00} LAPS"),
                     _ => RaceFormat.Missing,
                 };
                 return (id, "PIT WINDOW", win, plan?.WindowOpensIn is <= 0 && plan.Stops > 0 ? p.P.GoodText : null);

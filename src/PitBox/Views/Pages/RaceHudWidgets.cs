@@ -36,7 +36,7 @@ internal sealed partial class RaceHudWidgets
     private bool _dragging;
     private readonly Dictionary<string, string> _fitSignatures = new(StringComparer.OrdinalIgnoreCase);
     private readonly HudPainter _trialPainter = new() { Items = new(), Overflow = new() };
-    private System.Drawing.Bitmap? _trialBitmap;
+    private const double NavScrollGutter = 14;
     private int _trialRun;
     private Border? _previewWell;
     private TextBlock? _previewNote;
@@ -72,7 +72,11 @@ internal sealed partial class RaceHudWidgets
         }
         else
         {
-            var nav = Hairline.Frame(new Border { Padding = new Thickness(8, 10, 8, 10), Margin = new Thickness(11, 11, 0, 11), Child = new ScrollViewer { Style = Ui.Res<Style>("PageScroll"), Content = NavWithLayer(_nav), Focusable = false } });
+            var navContent = NavWithLayer(_nav);
+            var navScroll = new ScrollViewer { Style = Ui.Res<Style>("PageScroll"), Content = navContent, Focusable = false };
+            navScroll.ScrollChanged += (_, _) =>
+                navContent.Margin = new Thickness(0, 0, navScroll.ComputedVerticalScrollBarVisibility == Visibility.Visible ? NavScrollGutter : 0, 0);
+            var nav = Hairline.Frame(new Border { Padding = new Thickness(8, 10, 8, 10), Margin = new Thickness(11, 11, 0, 11), Child = navScroll });
             nav.SetResourceReference(Border.BackgroundProperty, "Panel");
             nav.SetResourceReference(Border.BorderBrushProperty, "Line");
             grid.Children.Add(nav);
@@ -93,8 +97,6 @@ internal sealed partial class RaceHudWidgets
         _picturePainter.ReleaseText();
         _previewBitmap?.Dispose();
         _previewBitmap = null;
-        _trialBitmap?.Dispose();
-        _trialBitmap = null;
         _pictureBitmap?.Dispose();
         _pictureBitmap = null;
     }
@@ -684,6 +686,7 @@ internal sealed partial class RaceHudWidgets
     private void SetValues(HudWidgetConfig w, HudWidgetDef def, IReadOnlyDictionary<string, string?> values)
     {
         var naturalBefore = def.Natural?.Invoke(new HudOptions(def, w));
+        var overflowBefore = Host is { } host ? Overflows(host, w) : null;
         foreach (var (key, value) in values)
         {
             if (def.Option(key) is not { } o) continue;
@@ -702,10 +705,33 @@ internal sealed partial class RaceHudWidgets
             w.W = Math.Clamp(Math.Round(after.Width * factor), Math.Max(def.MinW, HudWidgetConfig.MinSize), HudWidgetConfig.MaxSize);
             w.H = Math.Clamp(Math.Round(after.Height * factor), Math.Max(def.MinH, HudWidgetConfig.MinSize), HudWidgetConfig.MaxSize);
         }
+        if (overflowBefore is not null) GrowToFit(w, overflowBefore);
         Changed();
         if (_preview is not null) DrawPreview(w);
         RefreshVisibility();
         ShowPresetState(w, def);
+    }
+
+    private HashSet<(string Key, string Id)> Overflows(HudHost host, HudWidgetConfig w)
+    {
+        host.MeasurePreview(w, _section.Preview.Race, _trialPainter);
+        return _trialPainter.Overflow!.ToHashSet();
+    }
+
+    private void GrowToFit(HudWidgetConfig w, HashSet<(string Key, string Id)> before)
+    {
+        if (Host is not { } host) return;
+        bool FitsAt(double width, double height)
+        {
+            var (oldW, oldH) = (w.W, w.H);
+            (w.W, w.H) = (width, height);
+            try { return Overflows(host, w).IsSubsetOf(before); }
+            finally { (w.W, w.H) = (oldW, oldH); }
+        }
+        if (FitsAt(w.W, w.H)) return;
+        double tall = FitSearch.Limit(w.H), wide = FitSearch.Limit(w.W);
+        if (FitsAt(w.W, tall)) w.H = FitSearch.Smallest(w.H, tall, h => FitsAt(w.W, h));
+        else if (FitsAt(wide, w.H)) w.W = FitSearch.Smallest(w.W, wide, x => FitsAt(x, w.H));
     }
 
     private void Reveal(HudWidgetDef def, string settingId)
@@ -848,10 +874,10 @@ internal sealed partial class RaceHudWidgets
             picker.Mark(key, hidden, new HashSet<string>());
             trials.AddRange(candidates.Select(id => (key, id)));
         }
-        if (trials.Count > 0) TryCandidates(w, scale, trials);
+        if (trials.Count > 0) TryCandidates(w, trials);
     }
 
-    private void TryCandidates(HudWidgetConfig w, float scale, List<(string Key, string Id)> trials)
+    private void TryCandidates(HudWidgetConfig w, List<(string Key, string Id)> trials)
     {
         int run = ++_trialRun;
         var blocked = trials.Select(t => t.Key).Distinct().ToDictionary(k => k, _ => new HashSet<string>());
@@ -870,10 +896,15 @@ internal sealed partial class RaceHudWidgets
             var copy = w.Copy();
             copy.Id = "fit-" + w.Id;
             copy.Options[k] = string.Join(",", new HudOptions(def, w).Columns(k).Append(id));
+            bool Overflows(double width, double height)
+            {
+                (copy.W, copy.H) = (width, height);
+                host.MeasurePreview(copy, _section.Preview.Race, _trialPainter);
+                return _trialPainter.Overflow!.Any(x => x.Key == k);
+            }
             try
             {
-                host.RenderPreview(copy, _section.Preview.Race, _trialPainter, scale, ref _trialBitmap);
-                if (_trialPainter.Overflow!.Any(x => x.Key == k)) blocked[k].Add(id);
+                if (Overflows(w.W, FitSearch.Limit(w.H)) && Overflows(FitSearch.Limit(w.W), w.H)) blocked[k].Add(id);
             }
             catch (Exception ex) { App.LogError(ex); }
             _list.Dispatcher.BeginInvoke(Step, System.Windows.Threading.DispatcherPriority.Background);
@@ -1193,7 +1224,7 @@ internal sealed partial class RaceHudWidgets
     {
         var layout = Layout;
         if (layout is null) return;
-        var w = new HudWidgetConfig { Id = HudWidgetConfig.NewId(def.Kind), Kind = def.Kind, W = def.W, H = def.H, Anchor = HudAnchor.Center };
+        var w = new HudWidgetConfig { Id = HudWidgetConfig.NewId(def.Kind), Kind = def.Kind, W = def.W, H = def.H, Anchor = HudAnchor.Center, Background = def.Background };
         var monitors = HudHost.ReadMonitors();
         var monitor = HudGeometry.MonitorFor("primary", monitors);
         var others = layout.Widgets.Where(x => x.Enabled && HudGeometry.MonitorFor(x.Monitor, monitors) == monitor).Select(x => HudGeometry.Place(x, monitor)).ToList();

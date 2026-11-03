@@ -6,7 +6,7 @@ internal static class HudPresets
 {
     private static HudWidgetConfig W(string kind, HudAnchor anchor, double x, double y, double w, double h, bool enabled = true, (string Key, string Value)[]? options = null)
     {
-        var config = new HudWidgetConfig { Id = HudWidgetConfig.NewId(kind), Kind = kind, Enabled = enabled, Anchor = anchor, X = x, Y = y, W = w, H = h };
+        var config = new HudWidgetConfig { Id = HudWidgetConfig.NewId(kind), Kind = kind, Enabled = enabled, Anchor = anchor, X = x, Y = y, W = w, H = h, Background = HudCatalog.Find(kind)?.Background };
         foreach (var (k, v) in options ?? Array.Empty<(string, string)>()) config.Options[k] = v;
         return config;
     }

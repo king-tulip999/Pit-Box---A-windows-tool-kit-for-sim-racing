@@ -61,6 +61,7 @@ internal sealed record HudWidgetDef(string Kind, string Name, string Description
     public bool? HideWhenEmpty { get; init; }
     public Editors.HudEditorDef? Editor { get; init; }
     public Func<HudOptions, SizeF>? Natural { get; init; }
+    public int? Background { get; init; }
 
     private Editors.HudEditorDef? _plain;
     public Editors.HudEditorDef EditorDef => Editor ?? (_plain ??= Editors.HudEditorDef.Plain(this));
@@ -194,7 +195,15 @@ internal sealed class HudView
 
 internal abstract class HudWidget
 {
+    public static readonly HudOption TitleRow = HudOption.Bool("titleRow", "Title row", true);
+
     public abstract void Draw(HudPainter p, HudView v);
+
+    public void Paint(HudPainter p, HudView v)
+    {
+        p.TitleRowShown = v.Def.Option(TitleRow.Key) is null || v.Options.Bool(TitleRow.Key);
+        Draw(p, v);
+    }
 
     public virtual bool HasContent(HudView v) => true;
 

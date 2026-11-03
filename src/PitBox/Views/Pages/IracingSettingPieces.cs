@@ -421,8 +421,6 @@ internal sealed partial class IracingControllerSection
     private sealed class AreaBand : Tile
     {
         private readonly TextBlock _total = Number("Heading"), _changed = Number("AccentText"), _unsaved = Number("AccentText");
-        private readonly StackPanel _stairs = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Bottom, Height = 34 };
-        private readonly FrameworkElement _stairsCell;
 
         private static TextBlock Number(string brush)
         {
@@ -440,8 +438,6 @@ internal sealed partial class IracingControllerSection
             row.Children.Add(Cell(_total, "settings here"));
             row.Children.Add(Cell(_changed, "changed from default"));
             row.Children.Add(Cell(_unsaved, "not written yet"));
-            _stairsCell = Cell(_stairs, "detail levels");
-            row.Children.Add(_stairsCell);
             Child = row;
         }
 
@@ -459,17 +455,6 @@ internal sealed partial class IracingControllerSection
             TextCase.Set(_total, listed.Count.ToString(c));
             TextCase.Set(_changed, listed.Count(s => s.IsModified).ToString(c));
             TextCase.Set(_unsaved, listed.Count(s => s.IsChanged).ToString(c));
-            _stairs.Children.Clear();
-            foreach (var s in listed.Where(s => SettingShapes.Of(s.Def) == SettingShape.Level))
-            {
-                int option = OptionOf(s, s.Draft);
-                int level = Array.FindIndex(SettingShapes.LevelMap(s.Def), m => m == option);
-                if (level < 0) continue;
-                var bar = new Border { Width = 9, Height = 6 + level * 9, Margin = new Thickness(0, 0, 3, 0), VerticalAlignment = VerticalAlignment.Bottom, ToolTip = s.Def.Label + ": " + SettingShapes.Levels[level] };
-                bar.SetResourceReference(Border.BackgroundProperty, "Accent");
-                _stairs.Children.Add(bar);
-            }
-            _stairsCell.Visibility = _stairs.Children.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
     }
 

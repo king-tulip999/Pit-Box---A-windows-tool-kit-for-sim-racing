@@ -733,6 +733,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         }, step: RaceHudSettings.GridStep);
         root.Children.Add(Group("Arranging on screen", null,
             Ui.SettingRow("Snap while arranging", "Edges line up with other widgets and the screen, else a grid. Hold Alt to place freely.", Ui.Switch(S.Snap, on => { if (Host() is { } host) host.SetSnap(on); else S.Snap = on; changed(); })),
+            Ui.SettingRow("Show the grid while arranging", "Snapping works with the grid hidden.", Ui.Switch(S.GridShown, on => { if (Host() is { } host) host.SetGridShown(on); else S.GridShown = on; changed(); })),
             Ui.SettingRow("Grid", app.Demo ? "The grid is shown over your screens while you adjust it (not with demo data)." : "Shown over your screens while you adjust it.", grid)));
 
         return root;
@@ -775,6 +776,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
                 ("Lapped", "Cars a lap or more behind", nameof(HudCustomColors.Lapped)),
             }),
         };
+        into.Children.Add(ColorSets(app, S, changed, rebuild));
         var entries = c.All().ToDictionary(e => e.Id, e => e);
         var grid = new StackPanel { Margin = new Thickness(0, 2, 0, 6) };
         foreach (var (title, rows) in groups)
@@ -808,6 +810,63 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         reset.HorizontalAlignment = HorizontalAlignment.Left;
         reset.Margin = new Thickness(0, 0, 0, 6);
         into.Children.Add(reset);
+    }
+
+    private const double SetWidth = 132, SetSwatch = 14;
+    private const int LockedShown = 6;
+
+    private static StackPanel ColorSets(AppServices app, RaceHudSettings S, Action changed, Action rebuild)
+    {
+        int reached = app.Config.SessionStats.Reached.Count;
+        var panel = new StackPanel { Margin = new Thickness(0, 2, 0, 6) };
+        panel.Children.Add(new TextBlock { Text = "Color sets", Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 5, 0, 2) });
+        panel.Children.Add(new TextBlock { Text = $"Unlocked by reaching goals on the Session Stats page ({RaceFormat.Count(reached, "goal")} so far). Picking one replaces the colors below.",
+            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) });
+        var wrap = new WrapPanel();
+        var shown = HudColorSets.All.Where(set => HudColorSets.Unlocked(set, reached)).Concat(HudColorSets.All.Where(set => !HudColorSets.Unlocked(set, reached)).Take(LockedShown)).ToList();
+        foreach (var set in shown)
+        {
+            bool open = HudColorSets.Unlocked(set, reached), on = open && HudColorSets.Matches(set, S.Appearance.Custom);
+            var swatches = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 5) };
+            foreach (var hex in new[] { set.Colors.Background, set.Colors.Surface, set.Colors.Accent, set.Colors.Text })
+            {
+                var swatch = Hairline.Frame(new Border { Width = SetSwatch, Height = SetSwatch, Background = new SolidColorBrush(Palettes.Hex(hex)), Margin = new Thickness(0, 0, 3, 0) });
+                swatch.SetResourceReference(Border.BorderBrushProperty, "Line");
+                swatches.Children.Add(swatch);
+            }
+            var name = new TextBlock { Text = set.Name, FontWeight = FontWeights.SemiBold };
+            name.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
+            var state = new TextBlock { Text = on ? "In use" : open ? "Unlocked" : $"At {RaceFormat.Count(set.Goals, "goal")}", Style = Ui.Res<Style>("Caption") };
+            var button = new Button
+            {
+                Style = Ui.Res<Style>("GhostButton"), Width = SetWidth, Height = double.NaN, HorizontalContentAlignment = HorizontalAlignment.Left,
+                Padding = new Thickness(9, 7, 9, 7), Margin = new Thickness(0, 0, 6, 6), IsEnabled = open,
+                Content = new StackPanel { Children = { swatches, name, state } },
+                ToolTip = open ? "Use these colors" : $"Reach {RaceFormat.Count(set.Goals, "goal")} on the Session Stats page to unlock",
+            };
+            ToolTipService.SetShowOnDisabled(button, true);
+            Ui.SetToggled(button, on);
+            button.Click += (_, _) =>
+            {
+                var before = S.Appearance.Custom;
+                S.Appearance.Custom = new HudCustomColors();
+                HudColorSets.Apply(set, S.Appearance.Custom);
+                changed();
+                rebuild();
+                app.Notify("Color set applied", $"“{set.Name}”", NoticeKind.Success, action: new NoticeAction("Undo", () =>
+                {
+                    S.Appearance.Custom = before;
+                    changed();
+                    rebuild();
+                }));
+            };
+            wrap.Children.Add(button);
+        }
+        panel.Children.Add(wrap);
+        int hidden = HudColorSets.All.Length - shown.Count;
+        if (hidden > 0)
+            panel.Children.Add(new TextBlock { Text = $"{hidden} more to unlock, up to {RaceFormat.Count(HudColorSets.All[^1].Goals, "goal")}.", Style = Ui.Res<Style>("Caption") });
+        return panel;
     }
 
     private Grid? _alertGroups;

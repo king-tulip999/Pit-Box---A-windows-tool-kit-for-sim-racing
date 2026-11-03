@@ -44,6 +44,7 @@ internal static class AlertCatalog
         new("position.change", "Place gained / lost", "Your position in your class changed during the race.", AlertLevel.Info, false, DefaultCooldown: 3),
         new("track.limits", "Track limits", "Counts every time all four wheels leave the track (going off again within 2 s counts once) and warns from the threshold on.", AlertLevel.Warning, true, 3, "off-tracks", 0),
         new("goal.done", "Practice goal reached", "A goal on the Practice goals widget is done.", AlertLevel.Good, true, DefaultCooldown: 5),
+        new("stats.goal", "Session Stats goal reached", "One of your goals on the Session Stats page is reached.", AlertLevel.Good, true, DefaultCooldown: 0),
         new("weather.rain", "Rain", "Rain heavier than the threshold.", AlertLevel.Warning, true, 5, "%", 300),
         new("weather.wet", "Track wetness changed", "The track got wetter or dried out (iRacing's wetness level).", AlertLevel.Info, true, DefaultCooldown: 120),
         new("weather.trend", "Track temperature changing", "The track temperature moved faster than the threshold over the last 10 minutes (needs 5 minutes of readings).", AlertLevel.Info, true, 3, "°C / 10 min", 600),
@@ -62,7 +63,7 @@ internal static class AlertCatalog
         ("pit", "Pit and stint", "I.Clock", new[] { "pit.window", "pit.speed", "pit.limiter", "stint.limit" }),
         ("traffic", "Traffic and spotter", "I.Target", new[] { "traffic.faster", "traffic.slower", "side.car" }),
         ("flags", "Flags and penalties", "I.Flag", new[] { "flag.yellow", "flag.blue", "flag.white", "flag.penalty", "incidents.limit", "incident.new" }),
-        ("laps", "Laps and position", "I.Trophy", new[] { "lap.pb", "lap.unclean", "pace.drop", "position.change", "track.limits", "goal.done" }),
+        ("laps", "Laps and position", "I.Trophy", new[] { "lap.pb", "lap.unclean", "pace.drop", "position.change", "track.limits", "goal.done", "stats.goal" }),
         ("weather", "Weather", "I.Sun", new[] { "weather.rain", "weather.wet", "weather.trend" }),
         ("car", "Car and telemetry", "I.Alert", new[] { "engine.warning", "telemetry.lost" }),
     };

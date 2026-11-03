@@ -458,7 +458,10 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
             return;
         }
         var sessionsCard = StatsSessions.Card(sessions, traced, _filter, stats.Settings, Refresh, s => Open(s.Id), TraceSettings.Button(_app, stats, _window), races);
-        var sections = StatsSections.Page(results, charts, stats, q, Changed, sessionsCard, races.Card(sessions.FirstOrDefault(RaceParts.Raced)), StatsGoals.Card(goals, stats, Changed));
+        _performance = new ContentControl { Focusable = false, IsTabStop = false, Content = StatsSections.Performance(charts, stats, Changed, PairPicked) };
+        _goals = new ContentControl { Focusable = false, IsTabStop = false, Content = StatsGoals.Card(goals, stats, GoalsChanged, _app.Save) };
+        var lastRace = sessions.FirstOrDefault(RaceParts.Raced);
+        var sections = StatsSections.Page(results, charts, stats, q, Changed, sessionsCard, races.Card(lastRace, StatsGoals.ReachedIn(stats.Settings, lastRace?.Id)), _goals, _performance);
         page.Children.Add(sections);
         page.Children.Add(_telemetry = new TelemetryFilesCard(_app, _window, stats) { Margin = new Thickness(0, Ui.PanelSpacing, 0, 0) });
         if (!restoreOffset && sections is Panel parts)
@@ -475,6 +478,50 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
     }
 
     private void Refresh() => Refresh(false);
+
+    private ContentControl? _performance, _goals;
+
+    private async void GoalsChanged()
+    {
+        _app.Save();
+        if (!_shown || Stats is not { Store: { } store } stats || _goals is not { } host) return;
+        int version = _version;
+        try
+        {
+            var now = stats.Query().NowUtc;
+            var data = await Task.Run(() => GoalsData.Read(store, stats.Settings, now));
+            if (version != _version || !_shown || host != _goals) return;
+            host.Content = StatsGoals.Card(data, stats, GoalsChanged, _app.Save);
+            _built = Inputs(stats);
+            stats.CheckGoals();
+        }
+        catch (Exception ex)
+        {
+            App.LogError(ex);
+            Refresh();
+        }
+    }
+
+    private async void PairPicked()
+    {
+        _app.Save();
+        if (!_shown || Stats is not { Store: { } store } stats || _performance is not { } host) return;
+        int version = _version;
+        try
+        {
+            var q = stats.Query();
+            var range = stats.Range;
+            var charts = await Task.Run(() => StatsCharts.Read(store, q, range, stats.Settings.TimelineCombo, stats.Settings.TimelinePickedUtc));
+            if (version != _version || !_shown || host != _performance) return;
+            host.Content = StatsSections.Performance(charts, stats, Changed, PairPicked);
+            _built = Inputs(stats);
+        }
+        catch (Exception ex)
+        {
+            App.LogError(ex);
+            Refresh();
+        }
+    }
 
     private IEnumerable<(string Name, Func<Task> Enter)> LapStates()
     {
@@ -661,6 +708,29 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
                 await Task.Delay(300);
             });
         }
+        yield return ("goals", async () =>
+        {
+            if (_app.Demo && Stats is { Settings.Goals.Count: 0 } stats)
+            {
+                stats.Settings.Goals.AddRange(new Config.StatGoal[]
+                {
+                    new() { Kind = Config.GoalMetric.IRating, Target = 2500 },
+                    new() { Kind = Config.GoalMetric.Laps, Target = 2000 },
+                    new() { Kind = Config.GoalMetric.Wins, Target = 5, ThisSeason = true },
+                    new() { Kind = Config.GoalMetric.Podiums, Target = 5 },
+                });
+                var day = DateTime.UtcNow.Date;
+                stats.Settings.Reached.AddRange(new Config.StatGoal[]
+                {
+                    new() { Kind = Config.GoalMetric.Races, Target = 10, CreatedUtc = day.AddDays(-30), ReachedUtc = day.AddDays(-12) },
+                    new() { Kind = Config.GoalMetric.DrivingHours, Target = 50, CreatedUtc = day.AddDays(-20), ReachedUtc = day.AddDays(-1), Open = true },
+                });
+                Refresh();
+            }
+            await Task.Delay(700);
+            Ui.FindAnchor(this, "stats.goals")?.BringIntoView(new Rect(0, 0, 1, 600));
+            await Task.Delay(300);
+        });
         yield return ("imperial", () =>
         {
             if (Stats is { } stats) { stats.Settings.Range = "season"; stats.Settings.Imperial = true; Refresh(); }
@@ -738,7 +808,7 @@ internal static class StatsUi
 internal static class StatsSections
 {
     public static FrameworkElement Page(List<(StatDef Def, StatResult Result)> results, StatsCharts.Data charts, SessionStatsService service, StatQuery q, Action changed,
-        FrameworkElement? sessions = null, FrameworkElement? lastRace = null, FrameworkElement? goals = null)
+        FrameworkElement? sessions = null, FrameworkElement? lastRace = null, FrameworkElement? goals = null, FrameworkElement? performance = null)
     {
         var byId = results.ToDictionary(r => r.Def.Id, r => r);
         (StatDef Def, StatResult Result)? Get(string id) => byId.TryGetValue(id, out var r) ? r : null;
@@ -769,19 +839,6 @@ internal static class StatsSections
         Group("More", results.Where(r => !known.Contains(r.Def.Id)));
         Add(Hero(charts, q, StatsUi.RangeName(service.Range), Many("pace.laps", "time.total", "pace.distance", "pace.top").ToList(), groups, lastRace));
         Add(sessions);
-        Add(goals);
-
-        var performance = Section("Performance", "I.Stats", null, PickPair(charts, service, changed), Stack(
-            charts.Report is { } report ? StatsReport.Card(report, service, changed) : null,
-            StatsLayout.Pair(
-                Chart("Personal best progression", "Your best clean lap in this car and track, session by session", charts.Timeline.Count switch
-                {
-                    0 => Empty("No clean laps for this pair yet."),
-                    1 => Empty($"One best so far: {StatFormat.LapTime(charts.Timeline[0].Lap)} on {Dates.Day(charts.Timeline[0].When.ToLocalTime())}. The line starts once you beat it."),
-                    _ => StatsCharts.Progression(charts.Timeline),
-                }),
-                Chart("Lap consistency", "Clean laps per session: the box holds the middle half, the line runs from the fastest lap to the 90th percentile, the tick is the median",
-                    charts.Consistency.Count == 0 ? Empty("No session with 3 or more clean laps in this pair yet.") : StatsCharts.Consistency(charts.Consistency)), 1050, gap: 26)!));
 
         var types = charts.SessionTypes;
         var activity = Section("Driving activity", "I.Clock", $"{SimRacing.Race.RaceFormat.Count(charts.Sessions, "session")}", null, Stack(
@@ -802,8 +859,22 @@ internal static class StatsSections
         Ui.Anchor(cars, "stats.cars");
         Add(cars);
         Add(performance);
+        Add(goals);
         return page;
     }
+
+    internal static Tile Performance(StatsCharts.Data charts, SessionStatsService service, Action changed, Action pairPicked) =>
+        Section("Performance", "I.Stats", null, PickPair(charts, service, pairPicked), Stack(
+            charts.Report is { } report ? StatsReport.Card(report, service, changed) : null,
+            StatsLayout.Pair(
+                Chart("Personal best progression", "Your best clean lap in this car and track, session by session", charts.Timeline.Count switch
+                {
+                    0 => Empty("No clean laps for this pair yet."),
+                    1 => Empty($"One best so far: {StatFormat.LapTime(charts.Timeline[0].Lap)} on {Dates.Day(charts.Timeline[0].When.ToLocalTime())}. The line starts once you beat it."),
+                    _ => StatsCharts.Progression(charts.Timeline),
+                }),
+                Chart("Lap consistency", "Clean laps per session: the box holds the middle half, the line runs from the fastest lap to the 90th percentile, the tick is the median",
+                    charts.Consistency.Count == 0 ? Empty("No session with 3 or more clean laps in this pair yet.") : StatsCharts.Consistency(charts.Consistency)), 1050, gap: 26)!));
 
     private static string? Count((StatDef Def, StatResult Result)? stat, string noun) =>
         stat is { Result: { NoData: false } r } ? $"{r.Value} {noun}{(r.Value == "1" ? "" : "s")}" : null;
@@ -918,7 +989,7 @@ internal static class StatsSections
         return cell;
     }
 
-    private static Tile Hero(StatsCharts.Data charts, StatQuery q, string range, List<(StatDef Def, StatResult Result)> headline, StatGrid racecraft, FrameworkElement? lastRace)
+    private static FrameworkElement Hero(StatsCharts.Data charts, StatQuery q, string range, List<(StatDef Def, StatResult Result)> headline, StatGrid racecraft, FrameworkElement? lastRace)
     {
         var block = new Grid { MinHeight = 172, ClipToBounds = true };
         block.Children.Add(new Slant("Place4Wash", 0, 0, 0.58, 0, 0.44, 1, 0, 1));
@@ -984,22 +1055,20 @@ internal static class StatsSections
             right.Children.Add(rule);
             right.Children.Add(new Border { Padding = new Thickness(23, 18, 23, 21), Child = racecraft });
         }
-        FrameworkElement body = right;
-        if (lastRace is Border card)
-        {
-            card.VerticalAlignment = VerticalAlignment.Stretch;
-            var grid = new Grid();
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(CardWidth) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition());
-            grid.Children.Add(card);
-            Grid.SetColumn(right, 1);
-            grid.Children.Add(right);
-            body = grid;
-        }
-        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Child = body, ClipToBounds = true };
+        var hero = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Child = right, ClipToBounds = true };
+        if (lastRace is not Border card) return hero;
+        card.VerticalAlignment = VerticalAlignment.Stretch;
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(CardWidth) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(CardGap) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        grid.Children.Add(card);
+        Grid.SetColumn(hero, 2);
+        grid.Children.Add(hero);
+        return grid;
     }
 
-    internal const double CardWidth = 300;
+    internal const double CardWidth = 300, CardGap = 16;
     private const double CarRoom = 300;
     private const double CarArea = 380;
     private const double OutlineWidth = 200, OutlineHeight = 120;

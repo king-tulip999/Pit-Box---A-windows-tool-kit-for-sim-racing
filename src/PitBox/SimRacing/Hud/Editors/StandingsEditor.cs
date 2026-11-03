@@ -26,7 +26,7 @@ internal static class StandingsEditor
         Groups = new HudGroup[]
         {
             new("layout", "Table", HudTab.Layout, true, TitleRow, O("showHeader"), O("stripes"), Grouping, O("divider")),
-            new("rows", "Rows", HudTab.Layout, true, MyRow, O("top"), O("otherRows") with { ShowIf = Grouped, InlineHelp = true }, O("nameFormat"), O("noDigits"),
+            new("rows", "Rows", HudTab.Layout, true, MyRow, O("top"), O("otherTop") with { ShowIf = Grouped, InlineHelp = true }, O("otherRows") with { ShowIf = Grouped, InlineHelp = true }, O("nameFormat"), O("noDigits"),
                 O("badgeFormat") with { ShowIf = Has("columns", "badge") }),
             new("timing", "Timing", HudTab.Layout, false, O("gapTo"), O("timeFormat"), O("decimals"), O("avgLaps") with { ShowIf = Has("columns", "avglap") }),
             new("pit", "Pit", HudTab.Layout, false, O("pitShow") with { ShowIf = Has("columns", "pit") }, O("pitTime") with { ShowIf = Has("columns", "pit") }),

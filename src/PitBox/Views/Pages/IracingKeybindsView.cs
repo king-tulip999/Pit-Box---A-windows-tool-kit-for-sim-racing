@@ -55,7 +55,7 @@ internal sealed class KeybindsBoard : StackPanel
 {
     private enum Filter { All, Set, NotSet, Changed, Wheel }
 
-    private const double RailWidth = 320, RowHeight = 36, SlotWidth = 26, GearWidth = 86;
+    private const double RailWidth = 340, RowHeight = 36, SlotWidth = 26, GearWidth = 86;
     private static string? _lastGroup;
 
     private readonly AppServices _app;
@@ -170,12 +170,6 @@ internal sealed class KeybindsBoard : StackPanel
         && (_query.Length == 0 || KeybindTree.Matches(e, _query))
         && (_find is null || (!OnWheel(e) && KeybindTree.Same(e, e.Get(), _find)));
 
-    private static (string Soft, string Deep) HueOf(string group) =>
-        KeybindTree.IracingLooks.TryGetValue(group, out var look) ? Hues.Named(look.Hue) : Hues.Accent;
-
-    private static string IconOf(string group) =>
-        KeybindTree.IracingLooks.TryGetValue(group, out var look) ? look.Icon : "I.Keyboard";
-
     private void Render()
     {
         _entries = Load();
@@ -207,7 +201,7 @@ internal sealed class KeybindsBoard : StackPanel
     {
         var stack = new StackPanel { Margin = new Thickness(20, 14, 22, 13) };
         var eyebrow = new TextBlock { Text = "Editing control profile", Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 7) };
-        eyebrow.SetResourceReference(TextBlock.ForegroundProperty, "AccentText");
+        eyebrow.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
         Ui.AddInfo(eyebrow, IracingKeybindsView.ProfileExplained + " iRacing saves its own copy of the keys when it exits, so changes here only work while it's closed. Wheel and button-box bindings are shown but set in iRacing. To bind a number-pad key, turn Num Lock off first.");
         stack.Children.Add(eyebrow);
         stack.Children.Add(ProfilePicker());
@@ -215,7 +209,7 @@ internal sealed class KeybindsBoard : StackPanel
         var chips = new WrapPanel { Margin = new Thickness(0, 9, 0, 0) };
         var state = _ws.SimRunning
             ? Ui.Chip("iRacing is running: close it to change keybinds", "ApricotSoft", "ApricotDeep")
-            : Ui.Chip("Saved as you change them", "SageSoft", "SageDeep");
+            : Ui.Chip("Saved as you change them");
         if (!_ws.SimRunning) state.ToolTip = "A backup is made before the first change";
         state.Margin = new Thickness(0, 0, 6, 0);
         chips.Children.Add(state);
@@ -234,7 +228,6 @@ internal sealed class KeybindsBoard : StackPanel
         }
 
         var block = new Grid { MinWidth = 420 };
-        block.SetResourceReference(Panel.BackgroundProperty, "AccentSoft");
         var bar = new Border { Width = 3, HorizontalAlignment = HorizontalAlignment.Left };
         bar.SetResourceReference(Border.BackgroundProperty, "Accent");
         block.Children.Add(bar);
@@ -253,8 +246,8 @@ internal sealed class KeybindsBoard : StackPanel
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var badge = new Tile { Width = 44, Height = 44, CornerRadius = ThemeManager.Round(0), Child = RaceParts.Glyph("I.Keyboard", 22, "AccentText") };
-        badge.SetResourceReference(Border.BackgroundProperty, "AccentSoft");
+        var badge = new Tile { Width = 44, Height = 44, CornerRadius = ThemeManager.Round(0), Child = RaceParts.Glyph("I.Keyboard", 22, "TextMuted") };
+        badge.SetResourceReference(Border.BackgroundProperty, "SurfaceAlt");
         grid.Children.Add(badge);
         var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 16, 0) };
         var title = RaceParts.Big(name, 28, "Heading", italic: false, heavy: false);
@@ -274,7 +267,7 @@ internal sealed class KeybindsBoard : StackPanel
         bool canPick = _keys.Profiles.Count > 0;
         if (canPick)
         {
-            var caret = RaceParts.Glyph("I.ChevronDown", 16, "AccentText");
+            var caret = RaceParts.Glyph("I.ChevronDown", 16, "TextMuted");
             Grid.SetColumn(caret, 2);
             grid.Children.Add(caret);
         }
@@ -285,7 +278,7 @@ internal sealed class KeybindsBoard : StackPanel
             Padding = new Thickness(6, 6, 12, 6), MinWidth = 300, BorderThickness = Hairline.Edges(), IsHitTestVisible = canPick,
             ToolTip = _keys.FilePath is { } path ? TextCase.PathTip(path) : null,
         };
-        button.SetResourceReference(Control.BorderBrushProperty, "AccentEdge");
+        button.SetResourceReference(Control.BorderBrushProperty, "LineStrong");
         button.SetResourceReference(Control.BackgroundProperty, "Surface");
         AutomationProperties.SetName(button, "Control profile " + name);
         button.Click += (_, _) =>
@@ -337,7 +330,7 @@ internal sealed class KeybindsBoard : StackPanel
             bar.Children.Add(piece);
         }
         Part(keyboard, "Accent");
-        Part(wheel, "Slate");
+        Part(wheel, "TextFaint");
         Part(none, "LineStrong");
 
         var legend = new WrapPanel();
@@ -351,7 +344,7 @@ internal sealed class KeybindsBoard : StackPanel
             legend.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 2), Children = { swatch, text, number } });
         }
         Item("Keyboard", keyboard, "Accent");
-        Item("Wheel or controller", wheel, "Slate");
+        Item("Wheel or controller", wheel, "TextFaint");
         Item("Not set", none, "LineStrong");
 
         _summary.Child = new StackPanel { Margin = new Thickness(22, 12, 22, 12), VerticalAlignment = VerticalAlignment.Center, MaxWidth = 760, HorizontalAlignment = HorizontalAlignment.Stretch, Children = { top, bar, legend } };
@@ -404,27 +397,22 @@ internal sealed class KeybindsBoard : StackPanel
             string group = groups[i];
             var inside = _entries.Where(e => GroupOf(e) == group).ToList();
             int set = inside.Count(IsSet), found = inside.Count(Shown);
-            var hue = HueOf(group);
+            bool on = !filtering && group == current;
 
             var grid = new Grid();
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
             grid.ColumnDefinitions.Add(new ColumnDefinition());
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            grid.Children.Add(Badge(group, 30));
-            var middle = new StackPanel { Margin = new Thickness(10, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
-            middle.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = group, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis }));
-            middle.Children.Add(new SegmentMeter(hue.Deep) { Height = 5, CellWidth = 6, Margin = new Thickness(0, 6, 0, 0), Value = inside.Count == 0 ? 0 : (double)set / inside.Count });
-            Grid.SetColumn(middle, 1);
-            grid.Children.Add(middle);
-            var count = new TextBlock { Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center };
+            var name = TextFit.TipWhenTrimmed(new TextBlock { Text = group, FontSize = RailText, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 8, 0) });
+            if (on) name.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
+            grid.Children.Add(name);
+            var count = new TextBlock { Style = Ui.Res<Style>("Caption"), FontSize = RailCount, VerticalAlignment = VerticalAlignment.Center };
             count.Inlines.Add(new System.Windows.Documents.Run((filtering ? found : set).ToString(CultureInfo.CurrentCulture)) { FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>("Text") });
             count.Inlines.Add(new System.Windows.Documents.Run(filtering ? " found" : $" / {inside.Count}"));
-            Grid.SetColumn(count, 2);
+            Grid.SetColumn(count, 1);
             grid.Children.Add(count);
 
-            bool on = !filtering && group == current;
             var holder = new Grid();
-            holder.Children.Add(new Border { Padding = new Thickness(12, 10, 12, 10), Child = grid });
+            holder.Children.Add(new Border { Padding = new Thickness(12, 13, 12, 13), Child = grid });
             if (on)
             {
                 holder.SetResourceReference(Panel.BackgroundProperty, "AccentSoft");
@@ -453,13 +441,7 @@ internal sealed class KeybindsBoard : StackPanel
 
     private static string Current(List<string> groups) => _lastGroup is { } g && groups.Contains(g) ? g : groups.FirstOrDefault() ?? "";
 
-    private static FrameworkElement Badge(string group, double size)
-    {
-        var hue = HueOf(group);
-        var badge = new Tile { Width = size, Height = size, CornerRadius = ThemeManager.Round(0), VerticalAlignment = VerticalAlignment.Center, Child = RaceParts.Glyph(IconOf(group), Math.Round(size * 0.55), hue.Deep) };
-        badge.SetResourceReference(Border.BackgroundProperty, hue.Soft);
-        return badge;
-    }
+    private const double RailText = 15, RailCount = 13;
 
     private void RenderPane()
     {
@@ -470,8 +452,7 @@ internal sealed class KeybindsBoard : StackPanel
             var inside = _entries.Where(e => GroupOf(e) == group).ToList();
             var head = Head(stack);
             var title = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-            title.Children.Add(Badge(group, 30));
-            title.Children.Add(new TextBlock { Text = group, Style = Ui.Res<Style>("H3"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 10, 0) });
+            title.Children.Add(new TextBlock { Text = group, Style = Ui.Res<Style>("H3"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) });
             title.Children.Add(new TextBlock { Text = $"{inside.Count(IsSet)} of {inside.Count} set", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center });
             var changed = inside.Where(Changed).ToList();
             if (changed.Count > 0)
@@ -482,7 +463,7 @@ internal sealed class KeybindsBoard : StackPanel
                 head.Children.Add(reset);
             }
             head.Children.Add(title);
-            stack.Children.Add(Sections(inside, HueOf(group), new Thickness(18, 4, 18, 18)));
+            stack.Children.Add(Sections(inside, new Thickness(18, 4, 18, 18)));
             _pane.Child = stack;
             return;
         }
@@ -523,10 +504,9 @@ internal sealed class KeybindsBoard : StackPanel
             var inside = shown.Where(e => GroupOf(e) == group).ToList();
             if (inside.Count == 0) continue;
             var title = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(18, 16, 18, 0) };
-            title.Children.Add(Badge(group, 26));
-            title.Children.Add(new TextBlock { Text = group, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) });
+            title.Children.Add(new TextBlock { Text = group, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
             stack.Children.Add(title);
-            stack.Children.Add(Sections(inside, HueOf(group), new Thickness(18, 0, 18, 6)));
+            stack.Children.Add(Sections(inside, new Thickness(18, 0, 18, 6)));
         }
         _pane.Child = stack;
     }
@@ -540,7 +520,7 @@ internal sealed class KeybindsBoard : StackPanel
         return head;
     }
 
-    private UIElement Sections(List<HotkeyEntry> entries, (string Soft, string Deep) hue, Thickness margin)
+    private UIElement Sections(List<HotkeyEntry> entries, Thickness margin)
     {
         var stack = new StackPanel { Margin = margin };
         var blocks = new List<(string? Title, List<HotkeyEntry> Items)>();
@@ -559,7 +539,7 @@ internal sealed class KeybindsBoard : StackPanel
             foreach (var (title, items) in blocks)
             {
                 var block = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
-                if (title is not null) block.Children.Add(SectionHead(title, hue));
+                if (title is not null) block.Children.Add(SectionHead(title));
                 foreach (var e in items) block.Children.Add(Row(e));
                 columns.Children.Add(block);
             }
@@ -568,7 +548,7 @@ internal sealed class KeybindsBoard : StackPanel
         if (gears is not null)
         {
             var block = new StackPanel { Margin = new Thickness(0, 14, 0, 0) };
-            block.Children.Add(SectionHead("Gears", hue));
+            block.Children.Add(SectionHead("Gears"));
             var tiles = new WrapPanel { Margin = new Thickness(0, 2, 0, 0) };
             foreach (var e in gears) tiles.Children.Add(Gear(e));
             block.Children.Add(tiles);
@@ -578,12 +558,8 @@ internal sealed class KeybindsBoard : StackPanel
         return stack;
     }
 
-    private static TextBlock SectionHead(string title, (string Soft, string Deep) hue)
-    {
-        var head = new TextBlock { Text = title, Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 4) };
-        head.SetResourceReference(TextBlock.ForegroundProperty, hue.Deep);
-        return head;
-    }
+    private static TextBlock SectionHead(string title) =>
+        new() { Text = title, Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 4) };
 
     private static readonly Dictionary<string, string> Titles = new(StringComparer.Ordinal)
     {
@@ -688,7 +664,7 @@ internal sealed class KeybindsBoard : StackPanel
             Text = locked ? "Wheel" : set ? PitBox.Hotkeys.Hotkey.Display(entry.Get()) : "Not set", Style = Ui.Res<Style>("Caption"),
             HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(4, 3, 4, 0),
         });
-        keyText.SetResourceReference(TextBlock.ForegroundProperty, locked ? "SlateDeep" : set ? "AccentText" : "TextFaint");
+        keyText.SetResourceReference(TextBlock.ForegroundProperty, locked ? "TextMuted" : set ? "AccentText" : "TextFaint");
         if (set) keyText.FontWeight = FontWeights.SemiBold;
         stack.Children.Add(keyText);
         var keys = new Border { Child = stack, VerticalAlignment = VerticalAlignment.Center };
@@ -848,12 +824,12 @@ internal sealed class KeybindsBoard : StackPanel
     private static FrameworkElement Wheel(string tip)
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        row.Children.Add(RaceParts.Glyph("I.Gamepad", 13, "SlateDeep"));
+        row.Children.Add(RaceParts.Glyph("I.Gamepad", 13, "TextMuted"));
         var text = new TextBlock { Text = "Wheel", FontWeight = FontWeights.SemiBold, FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
-        text.SetResourceReference(TextBlock.ForegroundProperty, "SlateDeep");
+        text.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
         row.Children.Add(text);
         var chip = new Border { Height = 24, Padding = new Thickness(8, 0, 8, 0), Child = row, ToolTip = tip };
-        chip.SetResourceReference(Border.BackgroundProperty, "SlateSoft");
+        chip.SetResourceReference(Border.BackgroundProperty, "SurfaceAlt");
         return chip;
     }
 

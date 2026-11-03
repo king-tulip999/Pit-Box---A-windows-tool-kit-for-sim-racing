@@ -37,7 +37,7 @@ internal static class HudCatalog
             { MinW = 70, MinH = 70, DefaultHz = 5, Options = WindWidget.Options, Editor = Editors.WindEditor.Def,
               Limits = "iRacing gives the wind at the start / finish line, the same all round the track." },
         new("map", "Track map", "The track from iRacing's own maps, upright or turning with your car, whole or zoomed in on you, with the pit lane, start / finish and turn numbers, and every car as a dot in its class color; you stand out.", 300, 260, () => new MapWidget())
-            { MinW = 140, MinH = 120, DefaultHz = 15, MovingHz = 60, Moves = MapWidget.Moves, Options = MapWidget.Options, Editor = Editors.MapEditor.Def,
+            { MinW = 140, MinH = 120, DefaultHz = 15, MovingHz = 60, Moves = MapWidget.Moves, Background = 0, Options = MapWidget.Options, Editor = Editors.MapEditor.Def,
               Limits = "Cars are placed along the track's center line from their distance round the lap; tracks without a bundled map show none." },
         new("laps", "Lap history", "Your laps with deltas, what happened on them, fuel used, and consistency.", 320, 260, () => new LapsWidget())
             { MinW = 200, MinH = 110, DefaultHz = 2, Options = LapsWidget.Options, Editor = Editors.LapsEditor.Def },

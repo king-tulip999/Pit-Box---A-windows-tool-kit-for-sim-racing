@@ -617,7 +617,8 @@ internal sealed class StandingsWidget : HudWidget
         HudOption.Choice("gapTo", "Gap to", "leader", new HudChoice("leader", "Leader (class leader when grouped)"), new HudChoice("interval", "Car ahead"), new HudChoice("player", "You")),
         Editors.HudClassFilter.Scope,
         Editors.HudClassFilter.List,
-        HudOption.Int("top", "Leaders kept", 5, 1, 20, help: "When the list doesn't fit: this many from the top of each class, then the cars around you."),
+        HudOption.Int("top", "Leaders kept", 5, 1, 20, help: "When the list doesn't fit: this many from the top of your class, then the cars around you."),
+        HudOption.Int("otherTop", "Leaders per other class", 3, 1, 20, help: "Multiclass: always kept from the top of every other class, before your class takes the rest."),
         HudOption.Int("otherRows", "Cars per other class", 0, 0, 30, help: "Multiclass: at most this many cars of each class but yours (0 = as many as fit)."),
         FieldColumns.MarksOption,
         HudOption.Bool("retired", "Show cars that left", true, "Cars no longer in the session stay in the list, dimmed."),
@@ -747,11 +748,11 @@ internal sealed class StandingsWidget : HudWidget
             : blocks;
         float breaks = o.Choice("divider") == "none" ? 0 : BreakRoom(p) * blocks.Count;
         int fit = Math.Max(1, (int)((area.Bottom - y - perBlock * blocks.Count - (group ? headH : 0) - breaks) / rowH));
-        var shown = Pick(pickFrom, fit, o.Int("top"), me);
+        var shown = Pick(pickFrom, fit, o.Int("top"), o.Int("otherTop"), me);
         if (group)
         {
             int empty = shown.Count(s => s.Count == 0);
-            if (empty > 0) shown = Pick(pickFrom, Math.Max(1, (int)((area.Bottom - y - perBlock * (blocks.Count - empty) - (group ? headH : 0) - breaks) / rowH)), o.Int("top"), me);
+            if (empty > 0) shown = Pick(pickFrom, Math.Max(1, (int)((area.Bottom - y - perBlock * (blocks.Count - empty) - (group ? headH : 0) - breaks) / rowH)), o.Int("top"), o.Int("otherTop"), me);
         }
         bool highlight = o.Bool("highlightMe"), stripes = o.Bool("stripes");
         int drawn = 0;
@@ -864,7 +865,7 @@ internal sealed class StandingsWidget : HudWidget
 
     private static float BreakRoom(HudPainter p) => 7 * p.Density;
 
-    public static List<List<(StandingRow Row, int Index)>> Pick(List<List<StandingRow>> blocks, int fit, int top, int player)
+    public static List<List<(StandingRow Row, int Index)>> Pick(List<List<StandingRow>> blocks, int fit, int top, int otherTop, int player)
     {
         var result = blocks.Select(_ => new List<(StandingRow, int)>()).ToList();
         int total = blocks.Sum(b => b.Count);
@@ -875,7 +876,15 @@ internal sealed class StandingsWidget : HudWidget
         }
         int playerBlock = blocks.FindIndex(b => b.Any(r => r.CarIdx == player));
         var shares = new int[blocks.Count];
-        int left = fit;
+        for (int b = 0; b < blocks.Count; b++)
+            if (b != playerBlock) shares[b] = Math.Min(otherTop, blocks[b].Count);
+        int room = fit - (playerBlock >= 0 ? 1 : 0);
+        while (shares.Sum() > room)
+        {
+            int widest = Array.IndexOf(shares, shares.Max());
+            shares[widest]--;
+        }
+        int left = fit - shares.Sum();
         if (playerBlock >= 0)
         {
             int count = blocks[playerBlock].Count;
@@ -883,20 +892,22 @@ internal sealed class StandingsWidget : HudWidget
             left -= shares[playerBlock];
         }
         int others = blocks.Where((_, b) => b != playerBlock).Sum(b => b.Count);
-        int rest = fit - (playerBlock >= 0 ? shares[playerBlock] : 0);
+        int rest = left;
         for (int b = 0; b < blocks.Count && left > 0; b++)
         {
             if (b == playerBlock) continue;
-            int want = others == 0 ? 0 : Math.Max(Math.Min(top, blocks[b].Count), (int)Math.Floor((double)rest * blocks[b].Count / others));
-            shares[b] = Math.Min(left, Math.Min(blocks[b].Count, want));
-            left -= shares[b];
+            int more = others == 0 ? 0 : (int)Math.Floor((double)rest * blocks[b].Count / others);
+            int add = Math.Min(left, Math.Min(blocks[b].Count - shares[b], more));
+            shares[b] += add;
+            left -= add;
         }
         for (int b = 0; b < blocks.Count; b++)
         {
             var block = blocks[b];
             int share = shares[b];
             var take = new SortedSet<int>();
-            for (int i = 0; i < Math.Min(top, block.Count) && take.Count < share; i++) take.Add(i);
+            int keep = b == playerBlock ? top : otherTop;
+            for (int i = 0; i < Math.Min(keep, block.Count) && take.Count < share; i++) take.Add(i);
             if (b == playerBlock)
             {
                 int at = block.FindIndex(r => r.CarIdx == player);

@@ -10,6 +10,7 @@ internal sealed class SessionWidget : HudWidget
 {
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
+        TitleRow,
         HudOption.Columns("fields", "Shows", "remain,lapsleft,lap,cpos",
             new HudChoice("remain", "Time left"), new HudChoice("lapsleft", "Laps left", "Timed races: estimated from the pace"), new HudChoice("elapsed", "Time elapsed"),
             new HudChoice("lap", "Lap"), new HudChoice("pos", "Position"), new HudChoice("cpos", "Position in class"), new HudChoice("phase", "Phase"), new HudChoice("track", "Track"),
@@ -202,6 +203,7 @@ internal sealed class TyresWidget : HudWidget
 
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
+        TitleRow,
         HudOption.Bool("pressure", "Pressures", true),
         HudOption.Bool("temps", "Temperatures", true),
         HudOption.Bool("wear", "Wear", true),
@@ -255,6 +257,7 @@ internal sealed class TyresWidget : HudWidget
             var head = inner.Top(headH, out inner);
             p.Text(names[i], p.SmallBold, p.P.AccentText, head, HAlign.Left);
             if (pressure) p.Text(RaceFormat.Pressure(f.TyreColdPressure[i], v.Units), p.Small, p.P.Text, head, HAlign.Right);
+            if (hasWear && !showWear) p.Number(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{wear!.Value * 100:0}%"), p.SmallBold, WearColor(p, wear.Value), head, HAlign.Center, VAlign.Center);
             if (showTemps)
             {
                 double?[] t = i % 2 == 0 ? new[] { f.TyreTempOuter[i], f.TyreTempMiddle[i], f.TyreTempInner[i] } : new[] { f.TyreTempInner[i], f.TyreTempMiddle[i], f.TyreTempOuter[i] };
@@ -270,15 +273,20 @@ internal sealed class TyresWidget : HudWidget
             }
             if (showWear)
             {
-                double wv = wear!.Value;
+                double?[] tread = i % 2 == 0 ? new[] { f.TyreWearOuter[i], f.TyreWearMiddle[i], f.TyreWearInner[i] } : new[] { f.TyreWearInner[i], f.TyreWearMiddle[i], f.TyreWearOuter[i] };
                 var line = new RectangleF(inner.X, inner.Y + between, inner.Width, wearH);
-                string pct = $"{wv * 100:0}%";
-                float pw = p.Measure("100%", p.Label) + 6 * p.Density;
-                p.Bar(new RectangleF(line.X, line.Y + line.Height / 2 - 2.5f, line.Width - pw, 5), wv, wv < 0.5 ? p.P.Danger : wv < 0.75 ? p.P.Warn : p.P.Good);
-                p.Text(pct, p.Label, p.LabelColor, new RectangleF(line.Right - pw, line.Y, pw, line.Height), HAlign.Right, VAlign.Center, false);
+                float gap = 3 * p.Density, cw = (line.Width + gap) / 3;
+                for (int k = 0; k < 3; k++)
+                {
+                    var cell = new RectangleF(line.X + k * cw, line.Y, cw - gap, line.Height);
+                    if (tread[k] is not { } left || !double.IsFinite(left)) { p.Text(RaceFormat.Missing, p.Label, p.P.Faint, cell, HAlign.Center, VAlign.Center); continue; }
+                    p.Number(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{left * 100:0}%"), p.Label, WearColor(p, left), cell, HAlign.Center, VAlign.Center);
+                }
             }
         }
     }
+
+    private static Color WearColor(HudPainter p, double left) => left < 0.5 ? p.P.DangerText : left < 0.75 ? p.P.WarnText : p.P.GoodText;
 }
 
 internal sealed class WeatherWidget : HudWidget
@@ -340,10 +348,9 @@ internal sealed class WeatherWidget : HudWidget
         {
             float x = area.X + cw * i;
             if (i > 0) p.Line(x, top - 2 * d, x, top + lh + vh + 2 * d, HudPalette.Alpha(p.P.Muted, 110), 1);
-            float inset = i > 0 ? cellPad : 0;
-            var cell = new RectangleF(x + inset, top, cw - inset - cellPad / 2, lh + vh);
-            p.Text(_cells[i].Label, p.Label, p.LabelColor, new RectangleF(cell.X, cell.Y, cell.Width, lh), HAlign.Left, VAlign.Top, false);
-            p.Number(_cells[i].Value, font, p.P.Heading, new RectangleF(cell.X, cell.Y + lh, cell.Width, vh), HAlign.Left, VAlign.Center);
+            var cell = new RectangleF(x + cellPad / 2, top, cw - cellPad, lh + vh);
+            p.Text(_cells[i].Label, p.Label, p.LabelColor, new RectangleF(cell.X, cell.Y, cell.Width, lh), HAlign.Center, VAlign.Top, false);
+            p.Number(_cells[i].Value, font, p.P.Heading, new RectangleF(cell.X, cell.Y + lh, cell.Width, vh), HAlign.Center, VAlign.Center);
         }
     }
 
@@ -522,6 +529,7 @@ internal sealed class LapsWidget : HudWidget
 {
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
+        TitleRow,
         HudOption.Int("count", "Laps listed", 10, 3, 30),
         HudOption.Int("window", "Laps in the statistics", 10, 3, 50),
         HudOption.Bool("fuel", "Fuel used", true),
@@ -617,7 +625,7 @@ internal sealed class LapsWidget : HudWidget
 
 internal sealed class EventsWidget : HudWidget
 {
-    public static IReadOnlyList<HudOption> Options { get; } = new[] { HudOption.Int("count", "Events listed", 8, 3, 30) };
+    public static IReadOnlyList<HudOption> Options { get; } = new[] { TitleRow, HudOption.Int("count", "Events listed", 8, 3, 30) };
 
     public override void Draw(HudPainter p, HudView v)
     {

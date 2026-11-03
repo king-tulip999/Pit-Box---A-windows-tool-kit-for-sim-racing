@@ -713,10 +713,13 @@ internal sealed class HudPainter : IDisposable
         if (right is not null) Text(right, Small, rightColor ?? P.Muted, new RectangleF(x + titleW + 6, inner.Y, Math.Max(0, inner.Right - x - titleW - 6), inner.Height), HAlign.Right, VAlign.Center);
     }
 
+    public bool TitleRowShown { get; set; } = true;
+
     public RectangleF Header(string title, string? right = null, Color? rightColor = null)
     {
         float pillH = PillHeight, padH = 8 * Density;
         Panel(Bounds);
+        if (!TitleRowShown) return Bounds.Inflated(-padH, -6 * Density);
         TitleRow(new RectangleF(0, 0, Bounds.Width, pillH), title, right, rightColor);
         Line(1, pillH, Bounds.Width - 1, pillH, HudPalette.Alpha(P.LineStrong, 160), 1);
         var body = new RectangleF(0, pillH + 1, Bounds.Width, Bounds.Height - pillH - 1);

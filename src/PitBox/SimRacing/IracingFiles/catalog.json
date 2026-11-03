@@ -514,7 +514,7 @@
     },
     {
      "value": 1,
-     "label": "More self-shadowing objects when shadow mapping"
+     "label": "On"
     }
    ],
    "source": "research",
@@ -618,7 +618,7 @@
     },
     {
      "value": 1,
-     "label": "Track walls cast shadows"
+     "label": "On"
     }
    ],
    "source": "research",
@@ -639,7 +639,7 @@
     },
     {
      "value": 1,
-     "label": "Track objects cast shadows"
+     "label": "On"
     }
    ],
    "source": "research",
@@ -656,11 +656,11 @@
    "options": [
     {
      "value": 0,
-     "label": "Per-AA-sample shadows"
+     "label": "Per AA sample"
     },
     {
      "value": 1,
-     "label": "Per-pixel shadow"
+     "label": "Per pixel"
     }
    ],
    "source": "research",
@@ -763,7 +763,7 @@
     },
     {
      "value": 1,
-     "label": "Render trees with higher quality in two passes"
+     "label": "On"
     }
    ],
    "source": "research",
@@ -971,7 +971,7 @@
     },
     {
      "value": 1,
-     "label": "Dynamic shadow maps trim some objects by size"
+     "label": "On"
     }
    ],
    "source": "reason",
@@ -992,7 +992,7 @@
     },
     {
      "value": 1,
-     "label": "Dynamic shadow maps for cars"
+     "label": "On"
     }
    ],
    "source": "research",
@@ -1009,11 +1009,11 @@
    "options": [
     {
      "value": 0,
-     "label": "Fewer shadows"
+     "label": "Fewer"
     },
     {
      "value": 1,
-     "label": "Maximum shadows"
+     "label": "Maximum"
     }
    ],
    "source": "reason",
@@ -1043,11 +1043,11 @@
    "options": [
     {
      "value": 0,
-     "label": "Low detail"
+     "label": "Low"
     },
     {
      "value": 1,
-     "label": "High detail in mirrors"
+     "label": "High"
     }
    ],
    "caution": "Large FPS cost, multiplied by each mirror.",
@@ -1721,11 +1721,11 @@
    "options": [
     {
      "value": 0,
-     "label": "Normal trees"
+     "label": "Still"
     },
     {
      "value": 1,
-     "label": "Trees sway with wind"
+     "label": "Sway"
     }
    ],
    "source": "reason",
@@ -1742,11 +1742,11 @@
    "options": [
     {
      "value": 0,
-     "label": "Render without displacement"
+     "label": "Off"
     },
     {
      "value": 1,
-     "label": "Render using track displacement shaders"
+     "label": "On"
     }
    ],
    "source": "reason",
@@ -1914,11 +1914,11 @@
    "options": [
     {
      "value": 0,
-     "label": "Disabled"
+     "label": "Off"
     },
     {
      "value": 1,
-     "label": "Multithreaded scene sort"
+     "label": "On"
     }
    ],
    "source": "reason",
@@ -1935,11 +1935,11 @@
    "options": [
     {
      "value": 0,
-     "label": "Color headlights"
+     "label": "Color"
     },
     {
      "value": 1,
-     "label": "All white (less blotches/banding"
+     "label": "All white"
     }
    ],
    "source": "reason",
@@ -1960,7 +1960,7 @@
     },
     {
      "value": 1,
-     "label": "Headlights illuminate track surface in mirrors"
+     "label": "On"
     }
    ],
    "source": "research",
@@ -2004,7 +2004,7 @@
     },
     {
      "value": 1,
-     "label": "Block compress (recommended"
+     "label": "Compressed"
     }
    ],
    "source": "reason",
@@ -2025,7 +2025,7 @@
     },
     {
      "value": 1,
-     "label": "Block compress (recommended"
+     "label": "Compressed"
     }
    ],
    "source": "reason",
@@ -2060,7 +2060,7 @@
     },
     {
      "value": 1,
-     "label": "Use compressed vertices"
+     "label": "On"
     }
    ],
    "std": 1,
@@ -6295,7 +6295,7 @@
    "options": [
     {
      "value": 0,
-     "label": "Slew rate limiter",
+     "label": "Slew rate",
      "tip": "Caps how fast force can change. Softens kerb and wall hits. Default."
     },
     {

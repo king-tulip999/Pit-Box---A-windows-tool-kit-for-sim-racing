@@ -6,7 +6,7 @@ internal static class EventsEditor
 {
     public static readonly HudEditorDef Def = new()
     {
-        Groups = new HudGroup[] { new("main", null, HudTab.Layout, true, O("count")) },
+        Groups = new HudGroup[] { new("main", null, HudTab.Layout, true, O("titleRow"), O("count")) },
         Presets = new HudPreset[]
         {
             new(HudPreset.Minimal, V(("count", 5))),

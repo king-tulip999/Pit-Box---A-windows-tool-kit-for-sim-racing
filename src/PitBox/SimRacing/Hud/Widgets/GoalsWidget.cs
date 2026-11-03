@@ -13,6 +13,7 @@ internal sealed class GoalsWidget : HudWidget
 
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
+        TitleRow,
         HudOption.Choice("look", "Look", Ledger,
             new HudChoice(Ledger, "Lap list", "The goals as tiles over your last laps, each lap marked with the goals it counted toward"),
             new HudChoice(Counters, "Counters", "One big number per goal")),

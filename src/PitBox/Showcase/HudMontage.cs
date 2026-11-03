@@ -177,7 +177,7 @@ internal sealed partial class HudMontage : IDisposable
             item.Painter.MarkSimulated = false;
             item.Painter.Begin(g, item.Box.Width / (float)item.Config.W, new SizeF((float)item.Config.W, (float)item.Config.H), _palette, _settings.Appearance);
             var view = new HudView { Frame = _race.Frame, Race = _race, Settings = _settings, Config = item.Config, Options = item.Options, Def = item.Def };
-            item.Widget.Draw(item.Painter, view);
+            item.Widget.Paint(item.Painter, view);
             item.Painter.FinishPanels();
             item.Painter.End(_surface.Dc, _surface.Size);
             using var copy = Graphics.FromImage(item.Content);

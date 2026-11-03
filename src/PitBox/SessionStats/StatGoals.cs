@@ -8,7 +8,10 @@ internal sealed record RaceStreaks(Streak Clean, Streak Finished, Streak TopFive
 
 internal sealed record GoalState(StatGoal Goal, double? Current, string? Category)
 {
-    public double Fraction => Current is { } c && Goal.Target > 0 ? Math.Clamp(c / Goal.Target, 0, 1) : 0;
+    public double Fraction => Current is not { } c ? 0
+        : Done ? 1
+        : Goal.From is { } from && from < Goal.Target ? Math.Clamp((c - from) / (Goal.Target - from), 0, 1)
+        : Goal.Target > 0 ? Math.Clamp(c / Goal.Target, 0, 1) : 0;
     public bool Done => Current is { } c && c >= Goal.Target;
 }
 
@@ -40,12 +43,10 @@ internal static class StatGoals
     public static GoalState Read(StatsStore store, StatGoal goal, DateTime nowUtc)
     {
         var db = store.Db;
-        if (goal.Kind is GoalMetric.IRating or GoalMetric.SafetyRating)
+        if (StatGoal.IsRating(goal.Kind))
         {
-            string column = goal.Kind == GoalMetric.IRating ? "ir" : "sr";
-            string known = goal.Kind == GoalMetric.IRating ? $"ir_start > {RaceResult.PlaceholderIRating}" : "sr_start IS NOT NULL";
-            var rows = db.Query($"SELECT {column}_start + COALESCE({column}_delta, 0), category FROM sessions WHERE {known} ORDER BY start_utc DESC LIMIT 1");
-            return rows.Count == 0 || rows[0][0] is null ? new GoalState(goal, null, null) : new GoalState(goal, Convert.ToDouble(rows[0][0]), rows[0][1] as string);
+            var (rating, category) = LatestRating(store, goal.Kind, goal.Category);
+            return new GoalState(goal, rating, category);
         }
         var where = new List<string>();
         var args = new List<object?>();
@@ -73,6 +74,28 @@ internal static class StatGoals
         var value = db.Scalar(sql, args.ToArray());
         return new GoalState(goal, value is null ? 0 : Convert.ToDouble(value), null);
     }
+
+    public static (double? Value, string? Category) LatestRating(StatsStore store, GoalMetric kind, string? category)
+    {
+        string column = kind == GoalMetric.IRating ? "ir" : "sr";
+        string sql = $"SELECT {column}_start + COALESCE({column}_delta, 0), category FROM sessions WHERE ir_start > {RaceResult.PlaceholderIRating} AND {column}_start IS NOT NULL";
+        var rows = category is null
+            ? store.Db.Query(sql + " ORDER BY start_utc DESC LIMIT 1")
+            : store.Db.Query(sql + " AND category = ?1 ORDER BY start_utc DESC LIMIT 1", category);
+        return rows.Count == 0 || rows[0][0] is null ? (null, category) : (Convert.ToDouble(rows[0][0]), rows[0][1] as string ?? category);
+    }
+
+    public static List<string> RatedCategories(StatsStore store) =>
+        store.Db.Query($"SELECT category, MAX(start_utc) latest FROM sessions WHERE ir_start > {RaceResult.PlaceholderIRating} AND category IS NOT NULL AND category <> '' GROUP BY category ORDER BY latest DESC")
+            .Select(r => (string)r[0]!).ToList();
+
+    public static string CategoryName(string category)
+    {
+        var words = System.Text.RegularExpressions.Regex.Replace(category.Trim(), "(?<=[a-z])(?=[A-Z])", " ");
+        return words.Length == 0 ? words : char.ToUpperInvariant(words[0]) + words[1..].ToLowerInvariant();
+    }
+
+    public static string Label(StatGoal g) => $"{Name(g.Kind)} {Format(g.Kind, g.Target)}";
 
     public static string Name(GoalMetric kind) => kind switch
     {

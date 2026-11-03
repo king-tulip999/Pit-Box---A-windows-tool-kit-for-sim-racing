@@ -123,7 +123,7 @@ internal sealed class HudWebRenderer : IDisposable
             if (any is not null) return any;
         }
         if (!_fallbacks.TryGetValue(def.Kind, out var fallback))
-            _fallbacks[def.Kind] = fallback = new HudWidgetConfig { Id = "web-" + def.Kind, Kind = def.Kind, W = def.W, H = def.H };
+            _fallbacks[def.Kind] = fallback = new HudWidgetConfig { Id = "web-" + def.Kind, Kind = def.Kind, W = def.W, H = def.H, Background = def.Background };
         return fallback;
     }
 
@@ -141,7 +141,7 @@ internal sealed class HudWebRenderer : IDisposable
         p.MarkSimulated = false;
         p.Begin(g, scale, new SizeF((float)config.W, (float)config.H), palette, settings.Appearance);
         p.Background = config.Background;
-        t.Widget!.Draw(p, view);
+        t.Widget!.Paint(p, view);
         p.FinishPanels();
         p.End(t.Surface.Dc, size);
         _png.SetLength(0);

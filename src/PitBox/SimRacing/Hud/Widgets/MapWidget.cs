@@ -10,6 +10,7 @@ internal sealed class MapWidget : HudWidget
 {
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
+        TitleRow,
         HudOption.Number("zoom", "Zoom", 1, 1, 8, 0.5, null, "1 shows the whole track; above that the map closes in on your car"),
         HudOption.Bool("rotate", "Turn with my car", false, "Your direction of travel points up"),
         HudOption.Bool("turns", "Turn numbers", true, "Numbers that would overlap are left out"),

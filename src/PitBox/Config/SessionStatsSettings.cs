@@ -40,7 +40,9 @@ public sealed class SessionStatsSettings
 
     public List<StatGoal> Goals { get; set; } = new();
 
-    public const int MaxGoals = 12;
+    public List<StatGoal> Reached { get; set; } = new();
+
+    public const int MaxGoals = 6, KeptGoals = 12, KeptReached = 200;
 
     public static readonly int[] KeepDayChoices = { 30, 90, 182, 365, 730, 0 };
     public static readonly int[] LapChoices = { 0, 10, 3, 1 };
@@ -58,7 +60,9 @@ public sealed class SessionStatsSettings
         if (!SessionStats.LapReplay.Speeds.Contains(ReplaySpeed)) ReplaySpeed = 1;
         ReplayZoom = double.IsFinite(ReplayZoom) ? Math.Clamp(ReplayZoom, 0, 1) : 0.5;
         var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        Goals = (Goals ?? new()).Where(g => g is not null && Enum.IsDefined(g.Kind)).Take(MaxGoals).ToList();
+        Goals = (Goals ?? new()).Where(g => g is not null && Enum.IsDefined(g.Kind)).Take(KeptGoals).ToList();
+        Reached = (Reached ?? new()).Where(g => g is not null && Enum.IsDefined(g.Kind) && g.ReachedUtc is not null).TakeLast(KeptReached).ToList();
+        foreach (var g in Reached) g.Clean();
         foreach (var g in Goals)
         {
             g.Clean();
@@ -77,6 +81,15 @@ public sealed class StatGoal
     public string? Car { get; set; }
     public string? Track { get; set; }
     public bool ThisSeason { get; set; }
+    public string? Category { get; set; }
+    public double? From { get; set; }
+    public DateTime? CreatedUtc { get; set; }
+    public DateTime? ReachedUtc { get; set; }
+    public long? ReachedSession { get; set; }
+    public bool Open { get; set; }
+    public bool Seen { get; set; }
+
+    public static bool IsRating(GoalMetric kind) => kind is GoalMetric.IRating or GoalMetric.SafetyRating;
 
     public static (double Min, double Max, double Step) Limits(GoalMetric kind) => kind switch
     {
@@ -93,6 +106,9 @@ public sealed class StatGoal
         Target = double.IsFinite(Target) ? Math.Clamp(Math.Round(Target / step) * step, min, max) : min;
         Car = string.IsNullOrWhiteSpace(Car) ? null : Car.Trim();
         Track = string.IsNullOrWhiteSpace(Track) ? null : Track.Trim();
-        if (Kind is GoalMetric.IRating or GoalMetric.SafetyRating) { Car = Track = null; ThisSeason = false; }
+        Category = string.IsNullOrWhiteSpace(Category) ? null : Category.Trim();
+        if (From is { } from && !double.IsFinite(from)) From = null;
+        if (IsRating(Kind)) { Car = Track = null; ThisSeason = false; }
+        else { Category = null; From = null; }
     }
 }

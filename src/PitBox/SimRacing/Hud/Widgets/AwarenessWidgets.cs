@@ -9,6 +9,7 @@ internal sealed class TrafficWidget : HudWidget
 {
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
+        TitleRow,
         HudOption.Number("window", "Within", 6, 1, 30, 0.5, Units.S),
         HudOption.Int("max", "Cars at most", 5, 1, 12),
         HudOption.Bool("sameClass", "Include my class", false),

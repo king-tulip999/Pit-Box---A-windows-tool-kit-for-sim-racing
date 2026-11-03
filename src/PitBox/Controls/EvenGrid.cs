@@ -8,6 +8,7 @@ internal sealed class EvenGrid : Panel
     public double MinItemWidth { get; set; } = 190;
     public double ColumnGap { get; set; } = 6;
     public double RowGap { get; set; } = 6;
+    public int[]? ColumnSteps { get; set; }
 
     private int _columns = 1;
     private double[] _rowHeights = Array.Empty<double>();
@@ -21,6 +22,7 @@ internal sealed class EvenGrid : Panel
     {
         int n = InternalChildren.Count;
         _columns = ColumnsFor(available.Width, MinItemWidth, ColumnGap, n);
+        if (ColumnSteps is { Length: > 0 } steps) _columns = steps.Where(c => c <= _columns).DefaultIfEmpty(1).Max();
         double item = double.IsInfinity(available.Width) ? MinItemWidth : ItemWidth(available.Width);
         int rows = (n + _columns - 1) / _columns;
         _rowHeights = new double[rows];

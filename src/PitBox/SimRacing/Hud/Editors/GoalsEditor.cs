@@ -9,7 +9,7 @@ internal static class GoalsEditor
         ContentTitle = "Goals",
         Groups = new HudGroup[]
         {
-            new("main", null, HudTab.Layout, true, O("look"), O("races")),
+            new("main", null, HudTab.Layout, true, O("titleRow"), O("look"), O("races")),
             new("goals", "Goals", HudTab.Content, true, O("goals"),
                 O("cleanLaps") with { ShowIf = o => o.Columns("goals").Contains("clean") },
                 O("consistentLaps") with { ShowIf = o => o.Columns("goals").Contains("consistent") },

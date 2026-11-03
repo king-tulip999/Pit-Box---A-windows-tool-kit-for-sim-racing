@@ -6,7 +6,7 @@ namespace PitBox.SimRacing.Hud;
 internal sealed class HudToolbar
 {
     private const string TitleText = "Arranging the iRacing Overlay";
-    private static readonly (string Id, string Label)[] Buttons = { ("undo", "Undo"), ("redo", "Redo"), ("snap", "Snap"), ("gridDown", ""), ("grid", ""), ("gridUp", ""), ("cancel", "Cancel"), ("done", "Done") };
+    private static readonly (string Id, string Label)[] Buttons = { ("undo", "Undo"), ("redo", "Redo"), ("snap", "Snap"), ("gridShown", "Grid"), ("gridDown", ""), ("grid", ""), ("gridUp", ""), ("cancel", "Cancel"), ("done", "Done") };
     private const float Height = 40, Pad = 6, Gap = 6, Step = 28;
 
     private readonly HudWindow _window = new("Pit-Box · iRacing Overlay editing") { ClickThrough = false };
@@ -28,7 +28,7 @@ internal sealed class HudToolbar
         _boxes.Clear();
         float title = _painter.Measure(TitleText, _painter.SmallBold) + 18;
         float x = Pad + title;
-        string gridLabel = $"Grid {host.Settings.GridSize} px";
+        string gridLabel = $"{host.Settings.GridSize} px";
         foreach (var (id, label) in Buttons)
         {
             float w = id switch
@@ -79,11 +79,16 @@ internal sealed class HudToolbar
                 continue;
             }
             bool primary = id == "done";
-            bool on = id == "snap" && host.Settings.Snap;
+            bool on = id switch { "snap" => host.Settings.Snap, "gridShown" => host.Settings.GridShown, _ => false };
             var fill = primary ? p.P.Accent : on ? p.P.AccentSoft : p.P.SurfaceAlt;
             p.Fill(box, fill, 5);
             p.Outline(box, primary ? p.P.Accent : p.P.LineStrong, 1, 5);
-            string label = id == "snap" ? (host.Settings.Snap ? "Snap on" : "Snap off") : Buttons.First(b => b.Id == id).Label;
+            string label = id switch
+            {
+                "snap" => host.Settings.Snap ? "Snap on" : "Snap off",
+                "gridShown" => host.Settings.GridShown ? "Grid on" : "Grid off",
+                _ => Buttons.First(b => b.Id == id).Label,
+            };
             var color = primary ? p.P.OnAccent : enabled ? p.P.Text : p.P.Faint;
             p.Text(label, p.Bold, color, box, HAlign.Center, VAlign.Center);
         }

@@ -585,7 +585,6 @@ internal sealed partial class IracingControllerSection : StackPanel
         {
             Rect? glideFrom = side && !Global() && _railArea != _area ? Glide.Of(_railSelected, railLayer) : null;
             Button? landing = null;
-            ((string Soft, string Deep) Hue, string Icon) landingLook = default;
             Panel tabs = side ? sideNav : topNav;
             sideNav.Children.Clear();
             topNav.Children.Clear();
@@ -598,12 +597,7 @@ internal sealed partial class IracingControllerSection : StackPanel
                 int modified = listed.Count(x => x.IsModified);
                 int unsaved = listed.Count(x => x.IsChanged);
                 bool selected = !Global() && i == _area;
-                var look = AreaLook(areas[i].Title, i);
-                var glyph = new Icon { Data = Ui.Res<Geometry>(look.Icon), Width = 11, Height = 11, Margin = new Thickness(0, 0, 7, 0), VerticalAlignment = VerticalAlignment.Center };
-                glyph.SetResourceReference(Control.ForegroundProperty, look.Hue.Deep);
                 var row = new DockPanel { LastChildFill = true };
-                DockPanel.SetDock(glyph, Dock.Left);
-                row.Children.Add(glyph);
                 var counts = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
                 if (unsaved > 0)
                 {
@@ -636,16 +630,16 @@ internal sealed partial class IracingControllerSection : StackPanel
                 };
                 if (side)
                 {
-                    b.Height = 31;
-                    b.Padding = new Thickness(10, 0, 8, 0);
+                    b.Height = 38;
+                    b.Padding = new Thickness(12, 0, 10, 0);
+                    b.FontSize = 15;
                 }
                 if (selected && glideFrom is not null)
                 {
                     b.Style = Ui.Res<Style>("QuietButton");
                     landing = b;
-                    landingLook = look;
                 }
-                else if (selected) RailSelected(b, look.Hue);
+                else if (selected) RailSelected(b);
                 if (selected) _railSelected = b;
                 AutomationProperties.SetName(b, areas[i].Title);
                 b.Click += (_, _) =>
@@ -665,9 +659,9 @@ internal sealed partial class IracingControllerSection : StackPanel
                 Glide.To(railLayer, from, target, marker =>
                 {
                     Hairline.Frame(marker);
-                    marker.SetResourceReference(Border.BackgroundProperty, landingLook.Hue.Soft);
-                    marker.SetResourceReference(Border.BorderBrushProperty, landingLook.Hue.Deep);
-                }, () => RailSelected(target, landingLook.Hue));
+                    marker.SetResourceReference(Border.BackgroundProperty, Hues.Accent.Soft);
+                    marker.SetResourceReference(Border.BorderBrushProperty, Hues.Accent.Deep);
+                }, () => RailSelected(target));
         }
 
         void Fill()
@@ -778,26 +772,13 @@ internal sealed partial class IracingControllerSection : StackPanel
     private Button? _railSelected;
     private int _railArea = -1;
 
-    private static void RailSelected(Button b, (string Soft, string Deep) hue)
+    private static void RailSelected(Button b)
     {
         b.Style = Ui.Res<Style>("SelectedButton");
-        b.SetResourceReference(Control.BackgroundProperty, hue.Soft);
-        b.SetResourceReference(Control.BorderBrushProperty, hue.Deep);
-        b.SetResourceReference(Control.ForegroundProperty, hue.Deep);
+        b.SetResourceReference(Control.BackgroundProperty, Hues.Accent.Soft);
+        b.SetResourceReference(Control.BorderBrushProperty, Hues.Accent.Deep);
+        b.SetResourceReference(Control.ForegroundProperty, Hues.Accent.Deep);
     }
-
-    private static ((string Soft, string Deep) Hue, string Icon) AreaLook(string title, int index) => title switch
-    {
-        "Graphics and display" => (Hues.Accent, "I.Monitor"),
-        "View and HUD" => (Hues.Named("Slate"), "I.Eye"),
-        "Wheel and controls" => (Hues.Named("Coral"), "I.Wheel"),
-        "Sound" => (Hues.Named("Gold"), "I.Speaker"),
-        "Spotter and chat" => (Hues.Named("Plum"), "I.Keyboard"),
-        "Pit and setups" => (Hues.Named("Sage"), "I.Sliders"),
-        "Replay and broadcast" => (Hues.Named("Coral"), "I.Play"),
-        "Telemetry and system" => (Hues.Named("Slate"), "I.Gauge"),
-        _ => (Hues.At(index), "I.Sliders"),
-    };
 
     private sealed class SectionCard : Tile
     {
@@ -833,11 +814,10 @@ internal sealed partial class IracingControllerSection : StackPanel
             head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             head.ColumnDefinitions.Add(new ColumnDefinition());
             head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var hue = AreaLook(section.Area, section.AreaIndex).Hue;
-            _chevron.SetResourceReference(Control.ForegroundProperty, hue.Deep);
+            _chevron.SetResourceReference(Control.ForegroundProperty, "TextMuted");
             _chevron.Width = _chevron.Height = 10;
             var badge = new Tile { Width = 18, Height = 18, CornerRadius = ThemeManager.Round(6), VerticalAlignment = VerticalAlignment.Center, Child = _chevron };
-            badge.SetResourceReference(Border.BackgroundProperty, hue.Soft);
+            badge.SetResourceReference(Border.BackgroundProperty, "SurfaceAlt");
             head.Children.Add(badge);
             var name = new WrapPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
             var title = Ui.Text(section.Name, "H3");

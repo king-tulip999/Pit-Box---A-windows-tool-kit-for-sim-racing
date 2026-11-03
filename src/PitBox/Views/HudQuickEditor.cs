@@ -25,7 +25,7 @@ internal sealed class HudQuickEditor : Window, IHudEditorHost
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private readonly Grid _modal = new() { Visibility = Visibility.Collapsed };
     private readonly TextBlock _layout = new();
-    private readonly Button _undo, _redo, _snap;
+    private readonly Button _undo, _redo, _snap, _grid;
     private readonly ComboBox _layoutPick = new() { MinWidth = 122, VerticalAlignment = VerticalAlignment.Center, ToolTip = "The layout on screen (and edited here)" };
     private string _layoutsShown = "";
     private bool _fillingLayouts;
@@ -76,6 +76,8 @@ internal sealed class HudQuickEditor : Window, IHudEditorHost
         _redo = Ui.IconButton("I.Redo", "Redo", () => { _hud.Redo(); Refresh(); });
         _snap = Ui.LabeledButton("I.Hash", "Snap", () => { _hud.ToggleSnap(); Refresh(); }, "GhostButton");
         _snap.ToolTip = "Snap widgets to the grid and to each other while dragging (hold Alt for a free move). Click to switch on / off.";
+        _grid = Ui.LabeledButton("I.Eye", "Grid", () => { _hud.ToggleGrid(); Refresh(); }, "GhostButton");
+        _grid.ToolTip = "Show the snap grid over your screens while arranging. Snapping works with it hidden.";
         _layoutPick.SelectionChanged += (_, _) =>
         {
             if (_fillingLayouts || _layoutPick.SelectedItem is not Choice { Id: { } name } || name == ShownLayout) return;
@@ -93,8 +95,10 @@ internal sealed class HudQuickEditor : Window, IHudEditorHost
         titleText.Children.Add(_layout);
         var tools = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         foreach (var b in new[] { _undo, _redo }) tools.Children.Add(b);
-        _snap.Margin = new Thickness(5, 0, 6, 0);
+        _snap.Margin = new Thickness(5, 0, 0, 0);
         tools.Children.Add(_snap);
+        _grid.Margin = new Thickness(5, 0, 6, 0);
+        tools.Children.Add(_grid);
         tools.Children.Add(_layoutPick);
         add.Margin = new Thickness(5, 0, 6, 0);
         tools.Children.Add(add);
@@ -159,6 +163,9 @@ internal sealed class HudQuickEditor : Window, IHudEditorHost
         bool snap = _app.Config.SimRacing.Hud.Snap;
         Ui.SetToggled(_snap, snap);
         _snap.Content = Ui.IconLabel(snap ? "I.Check" : "I.Hash", snap ? "Snap on" : "Snap off");
+        bool grid = _app.Config.SimRacing.Hud.GridShown;
+        Ui.SetToggled(_grid, grid);
+        _grid.Content = Ui.IconLabel(grid ? "I.Eye" : "I.EyeOff", grid ? "Grid on" : "Grid off");
         FillLayouts();
         bool live = _app.Telemetry.Status == SimStatus.Connected && !_app.Telemetry.Simulated;
         _layout.Text = $"Layout {ShownLayout} · " + (live ? "live from iRacing" : "sample data until a session is running");

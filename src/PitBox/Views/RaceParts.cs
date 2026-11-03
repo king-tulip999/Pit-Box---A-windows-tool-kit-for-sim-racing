@@ -220,7 +220,10 @@ internal sealed class Stripe : Grid
     }
 }
 
-internal sealed record RaceCardData(SessionSummary Session, IReadOnlyList<(double Time, bool Clean)> Laps, double? Consistency, IReadOnlyList<Award> Awards, string Driver);
+internal sealed record RaceCardData(SessionSummary Session, IReadOnlyList<(double Time, bool Clean)> Laps, double? Consistency, IReadOnlyList<Award> Awards, string Driver)
+{
+    public IReadOnlyList<string> Goals { get; init; } = Array.Empty<string>();
+}
 
 internal static class RaceParts
 {
@@ -340,6 +343,15 @@ internal static class RaceParts
         row.Children.Add(new TextBlock { Text = RaceResult.Name(award), Style = Ui.Res<Style>("Caption"), Margin = new Thickness(5, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center }
             .Also(t => t.SetResourceReference(TextBlock.ForegroundProperty, "Heading")));
         return Chip(row, place + "Soft", place + "Edge", RaceResult.Why(award));
+    }
+
+    public static Border GoalChip(string goal, string place)
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        row.Children.Add(Glyph("I.Trophy", 12, place + "Text"));
+        row.Children.Add(new TextBlock { Text = "Goal: " + goal, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(5, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center }
+            .Also(t => t.SetResourceReference(TextBlock.ForegroundProperty, "Heading")));
+        return Chip(row, place + "Soft", place + "Edge", "A goal you set on the Session Stats page, reached in this session");
     }
 
     public static Border AwardSquare(Award award, string place)
@@ -511,11 +523,11 @@ internal static class RaceParts
         int finish = s.FinishPos ?? 0;
         var stack = new StackPanel();
 
-        var hero = new Grid { Height = 138 };
+        var hero = new Grid { Height = 146 };
         hero.Children.Add(new Slant(place + "Wash", 0, 0, 1, 0, 1, 0.55, 0, 1));
         hero.Children.Add(new Slant(place + "Faint", 0, 0, 0.62, 0, 0.3, 1, 0, 1));
         var position = Position(finish, place, 112, label);
-        position.Margin = new Thickness(16, 12, 0, 0);
+        position.Margin = new Thickness(16, 22, 0, 0);
         position.HorizontalAlignment = HorizontalAlignment.Left;
         hero.Children.Add(position);
         var climb = Climb(s, 28);
@@ -531,7 +543,6 @@ internal static class RaceParts
         var car = new Grid { Margin = new Thickness(0, -16, 0, 0) };
         var stripe = CarOnStripe(s.Car, place, 104, 96, 250, lift: 0);
         car.Children.Add(stripe);
-        if (d.Awards.Count > 0) car.Children.Add(Ribbon(d.Awards[0]).Also(r => r.Margin = new Thickness(0, 0, 0, 2)));
         stack.Children.Add(car);
 
         var who = new StackPanel { Margin = new Thickness(16, 8, 16, 0) };
@@ -549,7 +560,8 @@ internal static class RaceParts
         var chips = new WrapPanel { Margin = new Thickness(16, 10, 11, 0) };
         foreach (var chip in Ratings(s)) chips.Children.Add(chip);
         if (s.Incidents is { } inc) chips.Children.Add(Labeled("Inc", inc + "x", "Incidents"));
-        foreach (var award in d.Awards.Skip(1)) chips.Children.Add(AwardChip(award, place));
+        foreach (var award in d.Awards) chips.Children.Add(AwardChip(award, place));
+        foreach (var goal in d.Goals) chips.Children.Add(GoalChip(goal, place));
         stack.Children.Add(chips);
 
         var rows = new StackPanel { Margin = new Thickness(16, 6, 16, 0) };

@@ -36,6 +36,7 @@ internal static class SettingShapes
                 return SettingShape.Switch;
             case "enum" when def.Options is { Count: > 0 } options:
                 if (IsLevels(options)) return SettingShape.Level;
+                if (IsOffOn(options)) return SettingShape.Switch;
                 if (options.Count <= MaxChoices && options.All(o => o.Label.Length is > 0 and <= MaxChoiceLabel)) return SettingShape.Choice;
                 return SettingShape.Row;
             case "num" or "range":
@@ -53,6 +54,11 @@ internal static class SettingShapes
             if (LevelOf(o.Label) is not { } level || !seen.Add(level)) return false;
         return seen.Contains(1) && seen.Contains(3);
     }
+
+    private static bool IsOffOn(List<OptionDef> options) =>
+        options.Count == 2
+        && options.Any(o => o.Value == 0 && LevelOf(o.Label) == 0)
+        && options.Any(o => o.Value == 1 && o.Label.Trim().Equals("on", StringComparison.OrdinalIgnoreCase));
 
     private static bool Slides(SettingDef def)
     {

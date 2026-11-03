@@ -212,6 +212,12 @@ internal sealed class HudHost : IDisposable
         _app.Notify("iRacing Overlay layout applied", _layoutName, NoticeKind.Success);
     }
 
+    public void Announce(string id, string title, string? detail)
+    {
+        Race.Alerts.Fire(id, Race.Now, title, detail, id + ":" + title + ":" + detail);
+        foreach (var s in _slots.Values) s.Dirty = true;
+    }
+
     public void DismissAlerts()
     {
         Race.Alerts.DismissAll();
@@ -430,7 +436,7 @@ internal sealed class HudHost : IDisposable
             var view = new HudView { Frame = frame, Race = Race, Settings = Settings, Config = s.Config, Options = s.Options, Def = s.Def };
             float band = _editing ? EditBand(painter) : 0;
             painter.Inset(0, band, 0, 0);
-            s.Widget.Draw(painter, view);
+            s.Widget.Paint(painter, view);
             painter.EndInset();
             painter.FinishPanels();
             if (_editing) EditFrame(painter, s, _picked == s.Config.Id, band);
@@ -614,6 +620,18 @@ internal sealed class HudHost : IDisposable
 
     public void ToggleSnap() => SetSnap(!Settings.Snap);
 
+    public void ToggleGrid() => SetGridShown(!Settings.GridShown);
+
+    public void SetGridShown(bool on)
+    {
+        if (Settings.GridShown == on) return;
+        Settings.GridShown = on;
+        Save();
+        _toolbarDirty = true;
+        SyncGrid();
+        Changed?.Invoke();
+    }
+
     private void StepGrid(int delta)
     {
         int size = Math.Clamp(Settings.GridSize + delta, RaceHudSettings.MinGrid, RaceHudSettings.MaxGrid);
@@ -772,6 +790,7 @@ internal sealed class HudHost : IDisposable
             case "undo": Undo(); break;
             case "redo": Redo(); break;
             case "snap": ToggleSnap(); break;
+            case "gridShown": ToggleGrid(); break;
             case "gridDown": StepGrid(-RaceHudSettings.GridStep); break;
             case "gridUp": StepGrid(RaceHudSettings.GridStep); break;
             case "cancel": EndEdit(keep: false); break;
@@ -783,7 +802,7 @@ internal sealed class HudHost : IDisposable
     private readonly List<HudWindow> _gridWindows = new();
     private System.Windows.Threading.DispatcherTimer? _gridTimer;
 
-    private bool GridHeld => _editing && Settings.Snap && _active && !_app.Demo;
+    private bool GridHeld => _editing && Settings.GridShown && _active && !_app.Demo;
 
     private void SyncGrid()
     {
@@ -901,7 +920,7 @@ internal sealed class HudHost : IDisposable
         _previewWidgets[key] = preview;
         var widget = preview.Widget;
         var view = new HudView { Frame = race.Frame, Race = race, Settings = Settings, Config = config, Options = preview.Options, Def = def };
-        widget.Draw(painter, view);
+        widget.Paint(painter, view);
         painter.FinishPanels();
     }
 
