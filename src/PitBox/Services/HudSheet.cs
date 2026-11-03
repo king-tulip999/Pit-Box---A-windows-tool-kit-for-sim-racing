@@ -129,25 +129,20 @@ internal static class HudSheet
     }
 
     private const int FrameRate = 60;
-    private const double ClipSeconds = 12, FrameScale = 2.5;
-    private const double EventAt = 2.5;
+    private const double ClipSeconds = 12, FrameScale = 2.5, ShownFrom = 1.5, ShownFor = 3.5, Probe = 0.25, SearchFrom = 60, SearchTo = 1500;
     private static readonly HashSet<string> EveryFrame = new(StringComparer.OrdinalIgnoreCase) { "inputs", "radar", "map", "timing", "wind" };
-    private static readonly HashSet<string> AroundLapLine = new(StringComparer.OrdinalIgnoreCase) { "timing", "laps", "fuel", "goals", "block" };
     private static readonly Dictionary<string, double> Speeds = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["relative"] = 4, ["standings"] = 12, ["timing"] = 2, ["laps"] = 20, ["fuel"] = 20, ["session"] = 10, ["alerts"] = 12,
-        ["traffic"] = 6, ["map"] = 4, ["weather"] = 30, ["wind"] = 6, ["goals"] = 20, ["notes"] = 4, ["events"] = 20, ["block"] = 20,
+        ["relative"] = 4, ["standings"] = 12, ["timing"] = 2, ["laps"] = 40, ["fuel"] = 20, ["session"] = 10, ["alerts"] = 3,
+        ["traffic"] = 4, ["map"] = 4, ["tyres"] = 4, ["weather"] = 30, ["wind"] = 6, ["goals"] = 40, ["notes"] = 8, ["events"] = 30, ["block"] = 40,
     };
 
     private static void RenderFrames(string folder)
     {
-        double lapLine = FirstLapLine();
         foreach (var def in HudCatalog.All)
         {
             double speed = Speeds.GetValueOrDefault(def.Kind, 1);
-            double start = def.Kind == "radar" ? FirstOverlap() - EventAt
-                : AroundLapLine.Contains(def.Kind) ? lapLine - EventAt * speed
-                : 0.25;
+            double start = BusiestStart(def, speed) - ShownFrom * speed;
             var settings = new RaceHudSettings();
             var race = new RaceState(() => settings) { MapLoader = SimRacing.TrackMaps.TrackMapLibrary.ForRace };
             var demo = new DemoTelemetry();
@@ -192,29 +187,64 @@ internal static class HudSheet
         }
     }
 
-    private static double FirstLapLine()
+    private static double BusiestStart(HudWidgetDef def, double speed)
     {
+        var settings = new RaceHudSettings();
+        var race = new RaceState(() => settings) { MapLoader = SimRacing.TrackMaps.TrackMapLibrary.ForRace };
         var demo = new DemoTelemetry();
         var frame = new TelemetryFrame();
-        demo.Fill(frame, 120);
-        int? lap = frame.LapCompleted;
-        for (double t = 120; t < 3600; t += 1.0 / FrameRate)
+        long seq = 0;
+        double simTime = SearchFrom - 600;
+        for (; simTime < SearchFrom; simTime += 0.25) Step(simTime);
+        var palette = HudPalette.Of(settings.Appearance);
+        var config = new HudWidgetConfig { Id = "busy-" + def.Kind, Kind = def.Kind, W = def.W, H = def.H };
+        var options = new HudOptions(def, config);
+        var widget = def.Create();
+        using var painter = new HudPainter();
+        using var surface = new PitBox.Overlay.DibSurface();
+        var size = new Size((int)Math.Round(def.W), (int)Math.Round(def.H));
+        var previous = new int[size.Width * size.Height];
+        var current = new int[previous.Length];
+        var times = new List<double>();
+        var changes = new List<double>();
+        double step = Probe * speed;
+        for (double at = SearchFrom; at < SearchTo; at += step)
         {
-            demo.Fill(frame, t);
-            if (frame.LapCompleted != lap && !frame.OnPitRoad) return t;
+            for (; simTime <= at; simTime += 0.25) Step(simTime);
+            var g = surface.Ensure(size);
+            painter.Simulated = true;
+            painter.MarkSimulated = false;
+            painter.Begin(g, 1, new SizeF((float)def.W, (float)def.H), palette, settings.Appearance);
+            widget.Draw(painter, new HudView { Frame = race.Frame, Race = race, Settings = settings, Config = config, Options = options, Def = def });
+            painter.FinishPanels();
+            painter.End(surface.Dc, surface.Size);
+            var bitmap = surface.Bitmap!;
+            var data = bitmap.LockBits(new Rectangle(Point.Empty, size), System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+            for (int y = 0; y < size.Height; y++)
+                System.Runtime.InteropServices.Marshal.Copy(data.Scan0 + y * data.Stride, current, y * size.Width, size.Width);
+            bitmap.UnlockBits(data);
+            int differing = 0;
+            for (int i = 0; i < current.Length; i++) if (current[i] != previous[i]) differing++;
+            times.Add(at);
+            changes.Add(Math.Min(0.15, differing / (double)current.Length));
+            (previous, current) = (current, previous);
         }
-        return 120;
-    }
+        int window = (int)Math.Round(ShownFor / Probe);
+        double best = -1, bestAt = SearchFrom + ShownFrom * speed;
+        for (int i = 1; i + window <= changes.Count; i++)
+        {
+            if (times[i] - ShownFrom * speed < SearchFrom - 590) continue;
+            double score = 0;
+            for (int j = i; j < i + window; j++) score += changes[j];
+            if (score > best) (best, bestAt) = (score, times[i]);
+        }
+        return bestAt;
 
-    private static double FirstOverlap()
-    {
-        var demo = new DemoTelemetry();
-        var frame = new TelemetryFrame();
-        for (double t = 10; t < 3600; t += 1.0 / FrameRate)
+        void Step(double t)
         {
             demo.Fill(frame, t);
-            if (frame.Sides != CarSides.Clear) return t;
+            frame.Sequence = ++seq;
+            race.Update(frame);
         }
-        return 10;
     }
 }

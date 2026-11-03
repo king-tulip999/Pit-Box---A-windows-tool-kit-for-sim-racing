@@ -9,7 +9,7 @@ internal sealed class DemoTelemetry
     private const int Player = 12, Cars = 28, FirstLmp2 = 23;
     private const int TowedCar = 14, SlowLmp2 = 27;
     private const double WarmUpSeconds = 6 * 110, WarmUpStep = 0.5;
-    private const double TowFrom = 820, TowEvery = 30, BackOnTrack = 1, PitEvery = 750;
+    private const double TowFrom = 820, TowEvery = 30, BackOnTrack = 1, PitEvery = 750, StallFrom = 12, StallTo = 32;
     private static readonly string[] Names =
     {
         "Pace Car", "Daniel Morales", "Chris Walker", "Lucía Fernández", "Mike Turner", "José García", "Sarah Collins", "Pablo Ruiz",
@@ -137,6 +137,12 @@ internal sealed class DemoTelemetry
         return _best[car];
     }
 
+    private static double Spread(int stop, int corner, int reading)
+    {
+        double x = Math.Sin(stop * 12.9898 + corner * 78.233 + reading * 37.719) * 43758.5453;
+        return x - Math.Floor(x);
+    }
+
     private static bool InPits(int car, double t) => car != SlowLmp2 && (t + car * 97) % PitEvery < 40 && t > 60;
 
     private static readonly (double At, double Depth, double Width)[] Corners = { (0.08, 42, 0.02), (0.21, 30, 0.025), (0.33, 22, 0.03), (0.47, 48, 0.018), (0.6, 26, 0.03), (0.74, 35, 0.022), (0.9, 30, 0.025) };
@@ -233,7 +239,7 @@ internal sealed class DemoTelemetry
         double v = SpeedAt(ppct), ahead = SpeedAt(ppct + 0.004);
         f.Speed = f.CarOnPitRoad[Player] ? 16.4 : v;
         f.OnPitRoad = f.CarOnPitRoad[Player];
-        f.InPitStall = f.OnPitRoad && (raceT + Player * 97) % PitEvery is > 12 and < 32;
+        f.InPitStall = f.OnPitRoad && (raceT + Player * 97) % PitEvery is > StallFrom and < StallTo;
         f.PlayerSurface = f.OnPitRoad ? TrackSurface.InPitStall : TrackSurface.OnTrack;
         double accel = ahead - v;
         f.Throttle = f.OnPitRoad ? 0.3 : accel > -0.2 ? Math.Clamp(0.55 + accel / 3, 0, 1) : 0;
@@ -288,11 +294,26 @@ internal sealed class DemoTelemetry
         f.PitstopActive = f.InPitStall;
         f.FastRepairsAvailable = 1;
         f.TyreCompound = 0;
+        double sinceStall = ((raceT + Player * 97) % PitEvery - StallFrom + PitEvery) % PitEvery;
+        int stop = (int)Math.Floor((raceT + Player * 97 - StallFrom) / PitEvery);
+        bool measured = raceT - sinceStall > 60;
+        double cooling = Math.Min(sinceStall, StallTo - StallFrom);
         for (int c = 0; c < 4; c++)
         {
-            f.TyreColdPressure[c] = 172 + c;
-            f.TyreTempInner[c] = 84 + c * 2; f.TyreTempMiddle[c] = 81 + c; f.TyreTempOuter[c] = 77 + c;
-            f.TyreWearInner[c] = 0.94 - c * 0.01; f.TyreWearMiddle[c] = 0.95 - c * 0.01; f.TyreWearOuter[c] = 0.96 - c * 0.01;
+            if (!measured)
+            {
+                f.TyreColdPressure[c] = 172 + c;
+                f.TyreTempInner[c] = 84 + c * 2; f.TyreTempMiddle[c] = 81 + c; f.TyreTempOuter[c] = 77 + c;
+                f.TyreWearInner[c] = 0.94 - c * 0.01; f.TyreWearMiddle[c] = 0.95 - c * 0.01; f.TyreWearOuter[c] = 0.96 - c * 0.01;
+                continue;
+            }
+            f.TyreColdPressure[c] = 176 + 4 * Spread(stop, c, 0) - 0.15 * cooling;
+            f.TyreTempInner[c] = 93 + 6 * Spread(stop, c, 1) + c - 0.35 * cooling;
+            f.TyreTempMiddle[c] = 89 + 5 * Spread(stop, c, 2) + c - 0.35 * cooling;
+            f.TyreTempOuter[c] = 84 + 5 * Spread(stop, c, 3) + c - 0.35 * cooling;
+            f.TyreWearInner[c] = 0.84 + 0.06 * Spread(stop, c, 4);
+            f.TyreWearMiddle[c] = 0.87 + 0.05 * Spread(stop, c, 5);
+            f.TyreWearOuter[c] = 0.89 + 0.05 * Spread(stop, c, 6);
         }
         f.AirTemp = 21.5 + Math.Sin(t / 900);
         f.TrackTemp = 31.2 + 2 * Math.Sin(t / 900);
