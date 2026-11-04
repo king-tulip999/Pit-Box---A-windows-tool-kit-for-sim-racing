@@ -14,7 +14,7 @@ internal static class ProgramPicker
 {
     public static void Show(FrameworkElement anchor, Action<PickedProgram> picked)
     {
-        var search = new TextBox { Tag = "Filter running programs", Margin = new Thickness(0, 0, 0, 6) };
+        var search = Ui.Search(new TextBox { Tag = "Filter running programs", Margin = new Thickness(0, 0, 0, 6) });
         var list = new StackPanel();
         var scroll = new ScrollViewer { Content = list, MaxHeight = 243, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         var popup = new Popup { PlacementTarget = anchor, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true, PopupAnimation = PopupAnimation.Fade };

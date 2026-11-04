@@ -179,7 +179,7 @@ internal static class GrrParts
     public static Button Compact(string icon, string label, Action click, string style = "GhostButton")
     {
         var b = Ui.LabeledButton(icon, label, click, style);
-        b.Margin = new Thickness(0, 0, 5, 5);
+        b.Margin = new Thickness(0, 0, Ui.ButtonGap, Ui.ButtonGap);
         b.VerticalAlignment = VerticalAlignment.Center;
         return b;
     }
@@ -194,7 +194,7 @@ internal static class GrrParts
     public static Button RefreshButton(AppServices app)
     {
         var icon = new Icon { Data = Ui.Res<Geometry>("I.Refresh"), Width = 12, Height = 12, RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new RotateTransform() };
-        var b = new Button { Style = Ui.Res<Style>("IconButton"), Content = icon, Margin = new Thickness(0, 0, 5, 5), VerticalAlignment = VerticalAlignment.Center };
+        var b = new Button { Style = Ui.Res<Style>("IconButton"), Content = icon, Margin = new Thickness(0, 0, Ui.ButtonGap, Ui.ButtonGap), VerticalAlignment = VerticalAlignment.Center };
         System.Windows.Automation.AutomationProperties.SetName(b, "Refresh league data");
         ToolTipService.SetShowOnDisabled(b, true);
         b.Click += (_, _) => _ = app.Grr.RefreshNowAsync();
@@ -218,17 +218,10 @@ internal static class GrrParts
 
     public static Border Badge(string text, string family, string tip)
     {
-        var badge = new Tile
-        {
-            Background = Ui.Res<Brush>(family + "Soft"), BorderBrush = Ui.Res<Brush>(family + "Deep"), BorderThickness = Hairline.Edges(),
-            CornerRadius = ThemeManager.Round(4), Chamfer = true, Padding = new Thickness(6, 1, 6, 2), MinHeight = 17, MinWidth = 24,
-            Margin = new Thickness(5, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, ToolTip = tip,
-            Child = new TextBlock
-            {
-                Text = text, FontSize = 11, FontWeight = FontWeights.Bold, Foreground = Ui.Res<Brush>(family + "Deep"),
-                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-            },
-        };
+        var badge = Ui.Chip(text, family + "Soft", family + "Deep");
+        badge.Margin = new Thickness(5, 0, 0, 0);
+        badge.VerticalAlignment = VerticalAlignment.Center;
+        badge.ToolTip = tip;
         System.Windows.Automation.AutomationProperties.SetName(badge, tip);
         return badge;
     }
@@ -326,7 +319,7 @@ internal static class GrrParts
         foreach (var league in GrrLeagues.All)
         {
             var id = league.Id;
-            var box = new CheckBox { Content = league.Name, IsChecked = picked.Contains(id), Margin = new Thickness(0, 2, 0, 3) };
+            var box = ToggleCards.FromBox(new CheckBox { Content = league.Name, IsChecked = picked.Contains(id), Margin = new Thickness(0, 2, 0, 3) });
             box.Click += (_, _) => { if (box.IsChecked == true) picked.Add(id); else picked.Remove(id); };
             stack.Children.Add(box);
         }

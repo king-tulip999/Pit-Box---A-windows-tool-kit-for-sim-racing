@@ -51,9 +51,58 @@ public static class ConfigStore
 
     public static bool ReadOnly { get; set; }
 
+    private static Task<(AppConfig? Config, DateTime Written, long Length)>? _early;
+
+    public static void ReadEarly() => _early ??= Task.Run(ReadQuietly);
+
+    public static void WarmEarly() => _ = Task.Run(WarmQuietly);
+
+    private static void WarmQuietly()
+    {
+        try
+        {
+            _ = Clone(new FanSettings
+            {
+                Curves = { new FanCurve { MixOf = { "" } } },
+                Hardware = { new FanHardware { Calibration = new FanCalibration { Points = { new CalibrationPoint() } } } },
+                Presets = { new FanPreset { Fans = { new FanPresetEntry() } } },
+                Layout = { new PanelSlot() },
+            });
+        }
+        catch
+        {
+        }
+    }
+
+    private static (AppConfig? Config, DateTime Written, long Length) ReadQuietly()
+    {
+        try
+        {
+            var info = new FileInfo(FilePath);
+            if (!info.Exists) return (null, default, 0);
+            var config = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(FilePath), Options);
+            if (config is not null) _ = JsonSerializer.Serialize(config.Fans, Options);
+            return (config, info.LastWriteTimeUtc, info.Length);
+        }
+        catch
+        {
+            return (null, default, 0);
+        }
+    }
+
+    private static AppConfig? TakeEarly()
+    {
+        if (Interlocked.Exchange(ref _early, null) is not { } early) return null;
+        var (config, written, length) = early.GetAwaiter().GetResult();
+        if (config is null) return null;
+        var now = new FileInfo(FilePath);
+        return now.Exists && now.LastWriteTimeUtc == written && now.Length == length ? config : null;
+    }
+
     public static AppConfig Load(out string? warning)
     {
-        var config = LoadRaw(out warning);
+        warning = null;
+        var config = TakeEarly() ?? LoadRaw(out warning);
         try
         {
             return Normalize(config);

@@ -26,6 +26,7 @@ internal sealed class HudHost : IDisposable
     private HudToolbar? _toolbar;
     private bool _toolbarDirty;
     private bool _active, _holding, _hidden, _editing, _editSimulated, _preview, _overrideRules;
+    private readonly HashSet<HudWidgetConfig> _hiddenWidgets = new(ReferenceEqualityComparer.Instance);
     private string _layoutName = "";
     private bool _raceSimulated;
     private readonly TelemetryFrame _warmUpFrame = new();
@@ -59,9 +60,12 @@ internal sealed class HudHost : IDisposable
         public long CountSince = Stopwatch.GetTimestamp();
         public double PerSecond;
         public bool Empty;
+        public float BandPx;
+        public bool BandTop;
+        public SizeF Fit;
     }
 
-    private readonly record struct WidgetPlace(string Id, string Monitor, HudAnchor Anchor, double X, double Y, double W, double H);
+    private readonly record struct WidgetPlace(string Id, string Monitor, HudAnchor Anchor, double X, double Y, double W, double H, double Scale);
 
     public HudHost(AppServices app)
     {
@@ -157,7 +161,6 @@ internal sealed class HudHost : IDisposable
 
     public void SettingsChanged(bool save = true)
     {
-        _palette = null;
         _webDirty = true;
         if (_web is { Running: true } web) web.ThemeCss = HudWebRenderer.ThemeCss(CurrentPalette());
         if (save) Save();
@@ -178,6 +181,16 @@ internal sealed class HudHost : IDisposable
         _hidden = !_hidden;
         Refresh();
     }
+
+    public void ToggleWidget(HudWidgetConfig widget)
+    {
+        if (!_hiddenWidgets.Remove(widget)) _hiddenWidgets.Add(widget);
+        foreach (var s in _slots.Values)
+            if (ReferenceEquals(s.Config, widget)) s.Dirty = true;
+        Refresh();
+    }
+
+    public bool HiddenByKeybind(HudWidgetConfig widget) => !string.IsNullOrWhiteSpace(widget.Hotkey) && _hiddenWidgets.Contains(widget);
 
     public void SetPreview(bool on)
     {
@@ -335,7 +348,7 @@ internal sealed class HudHost : IDisposable
         long now = Stopwatch.GetTimestamp();
         foreach (var s in _slots.Values)
         {
-            bool visible = show && s.Config.Enabled && (_editing || frame.Status != SimStatus.Connected
+            bool visible = show && s.Config.Enabled && (_editing || !HiddenByKeybind(s.Config)) && (_editing || frame.Status != SimStatus.Connected
                 || s.Config.ShowsIn(frame.SessionKind.ToString()) && !(s.Config.HideInReplay && frame.IsReplayPlaying) && !(s.Config.OnlyOnTrack && !frame.Driving));
             if (!visible)
             {
@@ -389,25 +402,13 @@ internal sealed class HudHost : IDisposable
 
     private HudPalette Palette => _tickPalette ?? CurrentPalette();
 
-    private HudPalette? _palette;
-    private (HudAppearance? Look, HudColors Colors, HudCustomColors? Custom) _paletteFor;
-
-    private HudPalette CurrentPalette()
-    {
-        var look = Settings.Appearance;
-        if (_palette is null || !ReferenceEquals(_paletteFor.Look, look) || _paletteFor.Colors != look.Colors || !ReferenceEquals(_paletteFor.Custom, look.Custom))
-        {
-            _palette = HudPalette.Of(look);
-            _paletteFor = (look, look.Colors, look.Custom);
-        }
-        return _palette;
-    }
+    private HudPalette CurrentPalette() => HudPalette.Of(Settings.Appearance);
 
     private void Draw(Slot s, TelemetryFrame frame)
     {
         long start = Stopwatch.GetTimestamp();
         var monitor = HudGeometry.MonitorFor(s.Config.Monitor, Monitors);
-        var rect = s.Window is { } w0 && w0.Visible && _dragging == s ? w0.Rect : HudGeometry.Place(s.Config, monitor);
+        var fit = SizeOf(s.Config, Race);
         if (s.Window is null)
         {
             var w = new HudWindow("Pit-Box · " + s.Def.Name) { Tag = s.Config.Id };
@@ -417,6 +418,17 @@ internal sealed class HudHost : IDisposable
             w.Clicked += OnClicked;
             s.Window = w;
             s.Painter = new HudPainter();
+        }
+        float band = _editing ? EditBand(s.Painter!) : 0;
+        s.Fit = fit;
+        RectangleF rect;
+        if (s.Window is { } w0 && w0.Visible && _dragging == s) rect = w0.Rect;
+        else
+        {
+            var placed = HudGeometry.Place(s.Config, monitor, fit);
+            float px = band * placed.Width / fit.Width;
+            s.BandTop = placed.Bottom + px > monitor.Bounds.Bottom + 0.5f;
+            rect = new RectangleF(placed.X, s.BandTop ? placed.Y - px : placed.Y, placed.Width, placed.Height + px);
         }
         var window = s.Window;
         window.Rect = rect;
@@ -429,17 +441,17 @@ internal sealed class HudHost : IDisposable
         {
             var g = window.Surface(size);
             var painter = s.Painter!;
-            float scale = size.Width / (float)s.Config.W;
+            float scale = size.Width / fit.Width;
+            s.BandPx = band * scale;
             painter.Simulated = frame.Simulated;
-            painter.Begin(g, scale, new SizeF((float)s.Config.W, (float)s.Config.H), Palette, Settings.Appearance);
+            painter.Begin(g, scale, new SizeF(fit.Width, size.Height / scale), Palette, Settings.Appearance);
             painter.Background = s.Config.Background;
             var view = new HudView { Frame = frame, Race = Race, Settings = Settings, Config = s.Config, Options = s.Options, Def = s.Def };
-            float band = _editing ? EditBand(painter) : 0;
-            painter.Inset(0, band, 0, 0);
+            painter.Inset(0, s.BandTop ? band : 0, 0, s.BandTop ? 0 : band);
             s.Widget.Paint(painter, view);
             painter.EndInset();
             painter.FinishPanels();
-            if (_editing) EditFrame(painter, s, _picked == s.Config.Id, band);
+            if (_editing) EditFrame(painter, s, _picked == s.Config.Id, band, s.BandTop);
             painter.End(window.SurfaceDc, size);
             if (!window.Visible) window.Show();
             window.Present(new Point((int)Math.Round(rect.X), (int)Math.Round(rect.Y)), (byte)Math.Round(s.Config.Opacity * 2.55));
@@ -469,14 +481,14 @@ internal sealed class HudHost : IDisposable
 
     private static float EditBand(HudPainter p) => p.LineHeight(p.SmallBold) + 10;
 
-    private static void EditFrame(HudPainter p, Slot s, bool picked, float band)
+    private static void EditFrame(HudPainter p, Slot s, bool picked, float band, bool top)
     {
         var b = p.Bounds;
         p.Fill(b, HudPalette.Alpha(p.P.AccentSoft, 70));
         p.Outline(new RectangleF(b.X + 1, b.Y + 1, b.Width - 2, b.Height - 2), picked ? p.P.Accent : p.P.AccentText, picked ? 3 : 1.5f, p.Look.Corner);
         string label = s.Def.Name + (s.Config.Locked ? " · locked" : "");
         float w = Math.Min(b.Width - 8, p.Measure(label, p.SmallBold) + 14);
-        var tag = new RectangleF(4, 4, w, band - 6);
+        var tag = new RectangleF(4, top ? 4 : b.Bottom - band + 2, w, band - 6);
         p.Fill(tag, p.P.Accent, 4);
         p.Text(label, p.SmallBold, p.P.OnAccent, tag, HAlign.Center, VAlign.Center);
         if (!s.Config.Locked)
@@ -649,7 +661,7 @@ internal sealed class HudHost : IDisposable
         if (on && (Settings.Layout(_layoutName) ?? Settings.Layout(Settings.ActiveLayout)) is { Widgets.Count: > 0 } layout)
         {
             if (_editing) RecordUndo();
-            HudGeometry.SnapAll(layout.Widgets, Monitors, Settings.GridSize);
+            HudGeometry.SnapAll(layout.Widgets, Monitors, Settings.GridSize, w => SizeOf(w, Race));
             foreach (var s in _slots.Values) { s.Dirty = true; s.Window?.Repaint(); }
             if (_holding) SafeTick();
         }
@@ -690,7 +702,7 @@ internal sealed class HudHost : IDisposable
     private Places Snapshot()
     {
         var layout = Settings.Layout(_layoutName);
-        return new(layout, (layout?.Widgets ?? new()).Select(w => new WidgetPlace(w.Id, w.Monitor, w.Anchor, w.X, w.Y, w.W, w.H)).ToList());
+        return new(layout, (layout?.Widgets ?? new()).Select(w => new WidgetPlace(w.Id, w.Monitor, w.Anchor, w.X, w.Y, w.W, w.H, w.Scale)).ToList());
     }
 
     private void NoteEditStart()
@@ -704,7 +716,7 @@ internal sealed class HudHost : IDisposable
         var widgets = places.Layout?.Widgets ?? new();
         foreach (var p in places.Items)
             if (widgets.FirstOrDefault(w => w.Id == p.Id) is { } w)
-                (w.Monitor, w.Anchor, w.X, w.Y, w.W, w.H) = (p.Monitor, p.Anchor, p.X, p.Y, p.W, p.H);
+                (w.Monitor, w.Anchor, w.X, w.Y, w.W, w.H, w.Scale) = (p.Monitor, p.Anchor, p.X, p.Y, p.W, p.H, p.Scale);
         foreach (var s in _slots.Values) s.Dirty = true;
         Save();
         if (_holding) SafeTick();
@@ -715,14 +727,30 @@ internal sealed class HudHost : IDisposable
         if (!_slots.TryGetValue((string)window.Tag!, out var s)) return;
         if (_dragging != s) { RecordUndo(); _dragging = s; }
         var monitor = HudGeometry.MonitorAt(new PointF(proposed.X + proposed.Width / 2, proposed.Y + proposed.Height / 2), Monitors);
-        float minW = (float)s.Def.MinW * monitor.Scale, minH = (float)s.Def.MinH * monitor.Scale;
-        if (proposed.Width < minW) proposed.Width = minW;
-        if (proposed.Height < minH) proposed.Height = minH;
-        if (Settings.Snap && !HudWindow.Free)
-            proposed = HudGeometry.Snap(proposed, Others(s, monitor), monitor.Bounds, Settings.GridSize * monitor.Scale, 10 * monitor.Scale, resizing);
+        var fit = s.Fit.Width > 0 ? s.Fit : SizeOf(s.Config, Race);
+        bool snap = Settings.Snap && !HudWindow.Free;
+        if (resizing)
+        {
+            var start = window.Rect;
+            float unitW = fit.Width * monitor.Scale, unitH = fit.Height * monitor.Scale;
+            float guess = ((proposed.Width / unitW) + ((proposed.Height - s.BandPx) / unitH)) / 2;
+            var content = new RectangleF(start.X, s.BandTop ? start.Y + s.BandPx : start.Y, unitW * guess, unitH * guess);
+            float scale = HudGeometry.ScaleFor(content, fit, monitor, Settings.GridSize * monitor.Scale, snap);
+            float band = s.BandPx / Math.Max(0.001f, start.Width / unitW) * scale;
+            content = new RectangleF(content.X, content.Y, unitW * scale, unitH * scale);
+            s.BandPx = band;
+            proposed = new RectangleF(content.X, s.BandTop ? content.Y - band : content.Y, content.Width, content.Height + band);
+            window.Rect = proposed;
+            HudGeometry.Store(s.Config, content, monitor, fit);
+            s.Dirty = true;
+            Draw(s, Race.Frame);
+            return;
+        }
+        if (snap)
+            proposed = HudGeometry.Snap(proposed, Others(s, monitor), monitor.Bounds, Settings.GridSize * monitor.Scale, 10 * monitor.Scale, false);
         proposed = HudGeometry.Clamp(proposed, monitor.Bounds);
         window.Rect = proposed;
-        HudGeometry.Store(s.Config, proposed, monitor);
+        HudGeometry.Store(s.Config, Content(s, proposed), monitor, fit);
         s.Dirty = true;
         Draw(s, Race.Frame);
     }
@@ -733,13 +761,16 @@ internal sealed class HudHost : IDisposable
         var monitor = HudGeometry.MonitorAt(new PointF(window.Rect.X + window.Rect.Width / 2, window.Rect.Y + window.Rect.Height / 2), Monitors);
         var rect = window.Rect;
         if (!HudWindow.Free) rect = HudGeometry.Resolve(rect, Others(s, monitor).ToList(), monitor.Bounds);
-        HudGeometry.Store(s.Config, rect, monitor);
+        HudGeometry.Store(s.Config, Content(s, rect), monitor, s.Fit.Width > 0 ? s.Fit : SizeOf(s.Config, Race));
         _dragging = null;
         s.Dirty = true;
         Save();
         Draw(s, Race.Frame);
         Changed?.Invoke();
     }
+
+    private static RectangleF Content(Slot s, RectangleF r) =>
+        new(r.X, s.BandTop ? r.Y + s.BandPx : r.Y, r.Width, Math.Max(1, r.Height - s.BandPx));
 
     private IEnumerable<RectangleF> Others(Slot s, HudMonitor monitor) =>
         _slots.Values.Where(o => o != s && o.Window?.Visible == true && HudGeometry.MonitorFor(o.Config.Monitor, Monitors).Id == monitor.Id)
@@ -748,7 +779,7 @@ internal sealed class HudHost : IDisposable
     private void OnClicked(HudWindow window, PointF at)
     {
         if (!_slots.TryGetValue((string)window.Tag!, out var s)) return;
-        float scale = window.Rect.Width / (float)s.Config.W;
+        float scale = window.Rect.Width / Math.Max(1, s.Fit.Width > 0 ? s.Fit.Width : (float)s.Config.W);
         var view = new HudView { Frame = Race.Frame, Race = Race, Settings = Settings, Config = s.Config, Options = s.Options, Def = s.Def };
         if (s.Widget.Click(new PointF(at.X / scale, at.Y / scale), view))
             foreach (var x in _slots.Values) x.Dirty = true;
@@ -889,30 +920,31 @@ internal sealed class HudHost : IDisposable
 
     public void RenderPreview(HudWidgetConfig config, RaceState race, HudPainter painter, float scale, ref Bitmap? bitmap)
     {
-        int w = Math.Max(1, (int)Math.Round(config.W * scale)), h = Math.Max(1, (int)Math.Round(config.H * scale));
+        var layout = SizeOf(config, race);
+        int w = Math.Max(1, (int)Math.Round(layout.Width * scale)), h = Math.Max(1, (int)Math.Round(layout.Height * scale));
         if (bitmap is null || bitmap.Width != w || bitmap.Height != h)
         {
             bitmap?.Dispose();
             bitmap = new Bitmap(w, h, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
         }
-        DrawPreview(config, race, painter, scale);
+        DrawAt(config, race, painter, scale, layout);
         painter.End(_previewSurface.Dc, _previewSurface.Size);
         using var copy = Graphics.FromImage(bitmap);
         copy.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceCopy;
         copy.DrawImageUnscaled(_previewSurface.Bitmap!, 0, 0);
     }
 
-    public void MeasurePreview(HudWidgetConfig config, RaceState race, HudPainter painter) => DrawPreview(config, race, painter, 1f);
+    public void MeasurePreview(HudWidgetConfig config, RaceState race, HudPainter painter) => DrawAt(config, race, painter, 1f, new SizeF((float)config.W, (float)config.H));
 
-    private void DrawPreview(HudWidgetConfig config, RaceState race, HudPainter painter, float scale)
+    private void DrawAt(HudWidgetConfig config, RaceState race, HudPainter painter, float scale, SizeF layout)
     {
         var def = HudCatalog.Find(config.Kind) ?? throw new InvalidOperationException("Unknown widget " + config.Kind);
-        int w = Math.Max(1, (int)Math.Round(config.W * scale)), h = Math.Max(1, (int)Math.Round(config.H * scale));
+        int w = Math.Max(1, (int)Math.Round(layout.Width * scale)), h = Math.Max(1, (int)Math.Round(layout.Height * scale));
         var g = _previewSurface.Ensure(new Size(w, h));
         painter.Simulated = race.Frame.Simulated;
         painter.MarkSimulated = false;
         painter.IsPreview = true;
-        painter.Begin(g, scale, new SizeF((float)config.W, (float)config.H), Palette, Settings.Appearance);
+        painter.Begin(g, scale, layout, Palette, Settings.Appearance);
         painter.Background = config.Background;
         var key = (config.Id, config.Kind);
         if (!_previewWidgets.TryGetValue(key, out var preview)) preview = (config, def.Create(), new HudOptions(def, config));
@@ -922,6 +954,87 @@ internal sealed class HudHost : IDisposable
         var view = new HudView { Frame = race.Frame, Race = race, Settings = Settings, Config = config, Options = preview.Options, Def = def };
         widget.Paint(painter, view);
         painter.FinishPanels();
+    }
+
+    private readonly record struct FitShape(bool Connected, SessionKind Kind, int Classes, int Cars, int Standings, int Player);
+
+    private readonly Dictionary<(HudWidgetConfig Config, RaceState Race), (int Hash, FitShape Shape, SizeF Size)> _fits = new();
+    private readonly HudPainter _fitPainter = new() { Overflow = new() };
+
+    private const float FitTall = 2400;
+
+    public SizeF SizeOf(HudWidgetConfig config, RaceState race)
+    {
+        var stored = new SizeF((float)Math.Max(1, config.W), (float)Math.Max(1, config.H));
+        if (HudCatalog.Find(config.Kind) is not { } def || def.FixedSize) return stored;
+        var f = race.Frame;
+        var shape = new FitShape(f.Status == SimStatus.Connected, f.SessionKind, f.Session.NumCarClasses, f.Session.ByCar.Count, race.Standings.Count, f.PlayerCarIdx);
+        int hash = FitHash(config);
+        bool known = _fits.TryGetValue((config, race), out var had);
+        if (known && had.Hash == hash && (had.Shape == shape || !shape.Connected)) return had.Size;
+        if (!shape.Connected && def.Natural is null) return known ? had.Size : stored;
+        SizeF size;
+        try { size = Fit(config, def, race, stored); }
+        catch (Exception ex) { LogOnce("fit:" + def.Kind, ex); size = stored; }
+        if (_fits.Count > 256) _fits.Clear();
+        _fits[(config, race)] = (hash, shape, size);
+        return size;
+    }
+
+    private int FitHash(HudWidgetConfig c)
+    {
+        var h = new HashCode();
+        h.Add(c.Kind, StringComparer.OrdinalIgnoreCase);
+        h.Add(c.W);
+        h.Add(c.H);
+        int options = 0;
+        foreach (var (k, v) in c.Options) options += HashCode.Combine(StringComparer.OrdinalIgnoreCase.GetHashCode(k), v);
+        h.Add(options);
+        h.Add(Settings.Appearance.Density);
+        h.Add(Settings.Appearance.FontScale);
+        h.Add(Settings.Units);
+        return h.ToHashCode();
+    }
+
+    private SizeF Fit(HudWidgetConfig config, HudWidgetDef def, RaceState race, SizeF stored)
+    {
+        if (def.Natural is { } natural)
+        {
+            var n = natural(new HudOptions(def, config));
+            return new SizeF(Math.Max(1, n.Width), Math.Max(1, n.Height));
+        }
+        float minW = (float)Math.Max(def.MinW, HudWidgetConfig.MinSize), minH = (float)Math.Max(def.MinH, HudWidgetConfig.MinSize);
+        var first = Trial(config, race, stored.Width, FitTall);
+        if (first.Needed is { } need)
+            return new SizeF(Math.Clamp(Math.Max(need.Width, first.MinWidth), minW, (float)HudWidgetConfig.MaxSize), Math.Clamp(need.Height, minH, FitTall));
+        float width = Math.Max(stored.Width, first.MinWidth);
+        if (!Trial(config, race, width, FitTall).Clean)
+        {
+            float wide = Math.Min((float)HudWidgetConfig.MaxSize, width * 2);
+            if (!Trial(config, race, wide, FitTall).Clean) return stored;
+            width = Smallest(width, wide, x => Trial(config, race, x, FitTall).Clean);
+        }
+        float height = Smallest(minH, FitTall, y => Trial(config, race, width, y).Clean);
+        return new SizeF(width, height);
+    }
+
+    private static float Smallest(float from, float to, Func<float, bool> fits)
+    {
+        if (fits(from)) return from;
+        float lo = from, hi = to;
+        while (hi - lo > 1)
+        {
+            float mid = MathF.Round((lo + hi) / 2);
+            if (mid <= lo || mid >= hi) break;
+            if (fits(mid)) hi = mid; else lo = mid;
+        }
+        return MathF.Ceiling(hi);
+    }
+
+    private (SizeF? Needed, float MinWidth, bool Clean) Trial(HudWidgetConfig config, RaceState race, float width, float height)
+    {
+        DrawAt(config, race, _fitPainter, 1f, new SizeF(width, height));
+        return (_fitPainter.Needed, _fitPainter.MinWidth, _fitPainter.Overflow!.Count == 0 && !_fitPainter.Spilled && _fitPainter.MinWidth <= width + 0.5f);
     }
 
     private readonly PitBox.Overlay.DibSurface _previewSurface = new();
@@ -947,6 +1060,7 @@ internal sealed class HudHost : IDisposable
         _web?.Dispose();
         _webRenderer.Dispose();
         _previewSurface.Dispose();
+        _fitPainter.Dispose();
         _toolbar = null;
         if (_holding) { _holding = false; _app.Telemetry.Release(Consumer); }
     }

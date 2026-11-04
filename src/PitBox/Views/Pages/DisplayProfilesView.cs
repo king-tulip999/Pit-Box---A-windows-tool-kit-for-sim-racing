@@ -23,7 +23,7 @@ internal sealed class DisplayProfilesView : Tile
         _window = window;
         _hasPending = hasPending;
         Style = Ui.Res<Style>("Card");
-        Margin = new Thickness(0, 0, 0, 13);
+        Margin = new Thickness(0, 0, 0, Ui.PanelSpacing);
 
         var stack = new StackPanel();
         var head = new Grid();
@@ -72,33 +72,39 @@ internal sealed class DisplayProfilesView : Tile
         top.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         top.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         top.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        var name = RaceParts.Big(profile.Name, 21, "Heading", italic: false, heavy: false);
+        var name = Ui.Text(profile.Name, "H3");
         name.TextWrapping = TextWrapping.Wrap;
         name.HorizontalAlignment = HorizontalAlignment.Left;
+        name.VerticalAlignment = VerticalAlignment.Center;
         name.Margin = new Thickness(0, 0, 8, 0);
         top.Children.Add(name);
-        var tags = new WrapPanel { Margin = new Thickness(0, 3, 0, 0) };
+        var tags = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
         if (isActive)
         {
-            var activeTag = new Grid { Margin = new Thickness(0, 0, 5, 0), VerticalAlignment = VerticalAlignment.Center };
-            activeTag.Children.Add(new Slant("SageSoft", 0.14, 0, 1, 0, 0.86, 1, 0, 1));
-            var activeText = RaceParts.Big("Active", 12.5, "SageDeep", italic: false, heavy: false);
-            activeText.Margin = new Thickness(11, 1, 11, 2);
-            activeTag.Children.Add(activeText);
+            var activeTag = Ui.Chip("Active", "AccentSoft", "AccentText");
+            activeTag.Margin = new Thickness(0, 0, 8, 0);
+            activeTag.VerticalAlignment = VerticalAlignment.Center;
             tags.Children.Add(activeTag);
         }
         if (profile.Hotkey is { } hk)
-            tags.Children.Add(Ui.Chip(PitBox.Hotkeys.Hotkey.Display(hk)));
+            tags.Children.Add(KeybindsBoard.Caps(hk));
         if (tags.Children.Count > 0)
         {
             Grid.SetRow(tags, 1);
             Grid.SetColumnSpan(tags, 2);
             top.Children.Add(tags);
         }
-        var apply = Ui.LabeledButton("I.Zap", isActive ? "Apply again" : "Apply", () => _ = _app.DisplayProfiles.ApplyAsync(profile));
-        apply.VerticalAlignment = VerticalAlignment.Top;
-        Grid.SetColumn(apply, 1);
-        top.Children.Add(apply);
+        var changes = _app.DisplayProfiles.Preview(profile);
+        if (!isActive || changes.Count > 0)
+        {
+            var apply = Ui.LabeledButton("I.Zap", isActive ? "Reapply" : "Apply", () => _ = _app.DisplayProfiles.ApplyAsync(profile));
+            if (isActive) apply.ToolTip = "Something changed since it was applied";
+            apply.VerticalAlignment = VerticalAlignment.Top;
+            Grid.SetColumn(apply, 1);
+            top.Children.Add(apply);
+        }
+        else
+            top.MinHeight = 28;
         stack.Children.Add(top);
 
         var previewBox = new Tile { Style = Ui.Res<Style>("Inset"), Margin = new Thickness(0, 8, 0, 0), Padding = new Thickness(5) };
@@ -107,7 +113,11 @@ internal sealed class DisplayProfilesView : Tile
         else
         {
             var preview = new MonitorLayoutView { Height = 89 };
-            preview.SetTiles(ProfileLayout.Tiles(_app, profile.Layout));
+            var tiles = ProfileLayout.Tiles(_app, profile.Layout);
+            var unnumbered = tiles.Where(t => !int.TryParse(t.Label, out _)).ToList();
+            preview.SetTiles(tiles.Select(t => unnumbered.Contains(t) ? t with { Label = SimRacing.Race.RaceFormat.Missing, Detail = t.Label } : t).ToList());
+            if (unnumbered.Count > 0)
+                preview.ToolTip = string.Join("\n", unnumbered.Select(t => $"{t.Label}: {t.Detail} (no number while it's off)"));
             previewBox.Child = preview;
         }
         stack.Children.Add(previewBox);
@@ -121,15 +131,14 @@ internal sealed class DisplayProfilesView : Tile
         if (chips.Children.Count > 0)
             stack.Children.Add(chips);
 
-        var changes = isActive ? new List<Display.ProfileChange>() : _app.DisplayProfiles.Preview(profile);
         if (changes.Count > 0)
             stack.Children.Add(ChangesFold(changes.Select(c => (FrameworkElement)Ui.ChangeLine(c.Text, c.Area)).ToList()));
         else
-            stack.Children.Add(new TextBlock { Text = isActive ? "On now: applying it changes nothing" : "Applying it changes nothing", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(5, 9, 0, 3) });
+            stack.Children.Add(new TextBlock { Text = "Matches the current setup", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(5, 9, 0, 3) });
 
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 6) };
         var edit = Ui.LabeledButton("I.Pencil", "Edit", () => _ = EditAsync(profile, isNew: false), "GhostButton");
-        edit.Margin = new Thickness(0, 0, 6, 0);
+        edit.Margin = Ui.AfterButton;
         actions.Children.Add(edit);
         var more = Ui.IconButton("I.More", "More for this profile", () => { });
         more.Click += (_, _) =>
@@ -149,10 +158,10 @@ internal sealed class DisplayProfilesView : Tile
         card.Children.Add(stack);
         var body = new Grid { ClipToBounds = true };
         body.Children.Add(card);
-        return new Tile
+        return new Border
         {
-            Style = Ui.Res<Style>("Inset"), Padding = new Thickness(0), Child = body, ClipToBounds = true, Margin = new Thickness(0, 0, CardGap, CardGap),
-            BorderBrush = Ui.Res<Brush>(isActive ? "Sage" : "Line"), VerticalAlignment = VerticalAlignment.Top,
+            Style = Ui.Res<Style>("Inset"), Padding = new Thickness(0), Child = body, Margin = new Thickness(0, 0, CardGap, CardGap),
+            BorderBrush = Ui.Res<Brush>(isActive ? "Accent" : "Line"), VerticalAlignment = VerticalAlignment.Stretch,
         };
     }
 
@@ -170,17 +179,17 @@ internal sealed class DisplayProfilesView : Tile
         var panel = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
         var list = new StackPanel { Visibility = Visibility.Collapsed, Margin = new Thickness(3, 3, 0, 0) };
         foreach (var line in lines) list.Children.Add(line);
-        var chevron = new Icon { Data = Ui.Res<Geometry>("I.ChevronRight"), Width = 8, Height = 8, VerticalAlignment = VerticalAlignment.Center };
+        var chevron = Ui.FoldChevron(false);
         var label = new StackPanel { Orientation = Orientation.Horizontal };
         label.Children.Add(chevron);
-        label.Children.Add(new TextBlock { Text = lines.Count == 1 ? "What applying it changes (1)" : $"What applying it changes ({lines.Count})", Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
+        label.Children.Add(new TextBlock { Text = $"What applying it changes ({lines.Count})", VerticalAlignment = VerticalAlignment.Center });
         var toggle = new Button { Style = Ui.Res<Style>("QuietButton"), Content = label, HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(5, 3, 6, 3) };
         ClickGuard.SetAllowRepeat(toggle, true);
         toggle.Click += (_, _) =>
         {
             bool open = list.Visibility != Visibility.Visible;
             list.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
-            chevron.Data = Ui.Res<Geometry>(open ? "I.ChevronDown" : "I.ChevronRight");
+            Ui.SetFold(chevron, open);
         };
         panel.Children.Add(toggle);
         panel.Children.Add(list);

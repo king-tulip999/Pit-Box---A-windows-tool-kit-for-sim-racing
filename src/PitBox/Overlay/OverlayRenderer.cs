@@ -39,6 +39,7 @@ internal sealed class OverlayRenderer : IDisposable
     private const int MaxCachedWidths = 512, MaxCachedBrushes = 32, MaxCachedPalettes = 8;
     private readonly Dictionary<string, float> _labelWidths = new(), _valueWidths = new(), _unitWidths = new();
     private readonly Dictionary<string, string> _upper = new();
+    private readonly Dictionary<(string Template, string Prefix, string Unit), float> _cellWidths = new();
     private readonly Dictionary<int, SolidBrush> _brushes = new();
     private readonly Dictionary<(string?, string?, string?, string?, string?, string?, string?, string?), Palette> _palettes = new();
     private OverlayLayout? _presetLayout;
@@ -64,9 +65,11 @@ internal sealed class OverlayRenderer : IDisposable
         _format.FormatFlags |= StringFormatFlags.MeasureTrailingSpaces | StringFormatFlags.NoWrap;
     }
 
+    private DibSurface? _copySurface;
+
     public Bitmap Render(OverlayLayout layout, OverlayData data, float scale)
     {
-        using var surface = new DibSurface();
+        var surface = _copySurface ??= new DibSurface();
         var size = Render(layout, data, scale, surface.Ensure);
         End(surface.Dc, size);
         var bitmap = new Bitmap(size.Width, size.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
@@ -148,15 +151,17 @@ internal sealed class OverlayRenderer : IDisposable
                 float labelWidth = inline ? Measure(group.Label, _labelFont!) : labelColumn;
                 Hits?.Add(new(group.Key, null, new RectangleF(x, y, labelWidth, rowHeight)));
                 x += labelWidth + labelGap;
+                float drawnEnd = x;
                 for (int i = 0; i < group.Cells.Count; i++)
                 {
                     var cell = group.Cells[i];
                     float start = x;
-                    if (i > 0) Rule(g, x - cellGap / 2, y, rowHeight, colors, scale);
-                    float prefixWidth = cell.Prefix.Length > 0 ? Measure(cell.Prefix + " ", _unitFont!) : 0;
+                    float prefixWidth = cell.Prefix.Length > 0 ? Measure(PitBox.SimRacing.Race.PooledText.Concat(cell.Prefix, " "), _unitFont!) : 0;
                     float valueWidth = Measure(cell.Value, _valueFont);
                     float unitWidth = cell.Unit.Length > 0 ? 2 * scale + Measure(cell.Unit, _unitFont!) : 0;
                     x = start + Math.Max(0, (CellWidth(cell) - prefixWidth - valueWidth - unitWidth) / 2);
+                    if (i > 0) Rule(g, (drawnEnd + x) / 2, y, rowHeight, colors, scale);
+                    drawnEnd = x + prefixWidth + valueWidth + unitWidth;
                     if (cell.Prefix.Length > 0)
                         DrawText(g, cell.Prefix, _unitFont!, colors.Secondary, x, y + UnitOffset(g, rowHeight));
                     x += prefixWidth;
@@ -284,7 +289,7 @@ internal sealed class OverlayRenderer : IDisposable
     private static Tone TempTone(float? temp, float warm, float hot) =>
         temp >= hot ? Tone.Critical : temp >= warm ? Tone.Warning : Tone.Normal;
 
-    private static string Num(double? value) => value is { } v ? Math.Round(v).ToString("0") : Missing;
+    private static string Num(double? value) => value is { } v ? PitBox.SimRacing.Race.PooledText.Number("", Math.Round(v), "0", System.Globalization.CultureInfo.CurrentCulture) : Missing;
     private static string Num(float? value) => Num((double?)value);
 
     private void DrawGraph(Graphics g, RectangleF r, double[] times, Palette colors, float scale)
@@ -362,12 +367,15 @@ internal sealed class OverlayRenderer : IDisposable
 
     private float CellWidth(Cell c)
     {
+        var key = (c.Template, c.Prefix, c.Unit);
+        if (_cellWidths.TryGetValue(key, out float known)) return known;
         if (_wideDigit == ' ')
             _wideDigit = "0123456789".MaxBy(d => Measure(d.ToString(), _valueFont!));
         float w = Measure(c.Template.Replace('0', _wideDigit), _valueFont!);
         if (c.Prefix.Length > 0) w += Measure(c.Prefix + " ", _unitFont!);
         if (c.Unit.Length > 0) w += Measure(c.Unit, _unitFont!) + 2 * _fontScale;
-        return w;
+        if (_cellWidths.Count >= MaxCachedWidths) _cellWidths.Clear();
+        return _cellWidths[key] = w;
     }
 
     private float UnitOffset(Graphics g, float rowHeight) =>
@@ -438,7 +446,7 @@ internal sealed class OverlayRenderer : IDisposable
             return;
 
         _labelFont?.Dispose(); _valueFont?.Dispose(); _unitFont?.Dispose();
-        _labelWidths.Clear(); _valueWidths.Clear(); _unitWidths.Clear();
+        _labelWidths.Clear(); _valueWidths.Clear(); _unitWidths.Clear(); _cellWidths.Clear();
         _fontScale = scale;
         _wideDigit = ' ';
         _labelFont = new Font(OverlayFonts.Regular, 11.5f * scale, FontStyle.Bold, GraphicsUnit.Pixel);
@@ -465,6 +473,7 @@ internal sealed class OverlayRenderer : IDisposable
         _baselinePen?.Dispose(); _graphPen?.Dispose(); _rulePen?.Dispose(); _backPath?.Dispose();
         _format.Dispose();
         _sharp.Dispose();
+        _copySurface?.Dispose();
         _measure.Dispose();
         _measureBitmap.Dispose();
     }

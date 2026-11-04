@@ -161,7 +161,7 @@ Pick a program and give its window an exact size and spot: a game stretched acro
 
 1. Download `PitBox.exe` and put it somewhere it can stay (e.g. `C:\Tools\PitBox`).
 2. Run it and answer Windows' two prompts (see [Before you run it](#before-you-run-it)).
-3. On the setup screen, pick what you want Pit-Box for (Overlays, Sim racing, PC tuning, Everything) or choose each tool yourself, then pick a theme and startup options. Click **Get started** under the logo when you're done.
+3. On the setup screen, pick what you want Pit-Box for (Overlays, Sim racing, PC tuning, Everything) or choose each tool yourself, then pick a theme and startup options. Click **Get started** at the bottom when you're done.
 4. *Optional:* install the free **PawnIO** driver for CPU temperatures and motherboard fans (Settings → Hardware access → **Install PawnIO**).
 
 > [!IMPORTANT]

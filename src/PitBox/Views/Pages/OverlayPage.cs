@@ -33,10 +33,12 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
     private readonly DockPanel _noteRow = new();
     private readonly System.Windows.Threading.DispatcherTimer _refresh = new();
     private readonly OverlayPreviewMotion _motion;
-    private readonly Dictionary<OverlayMetric, (DockPanel Row, TextBlock Label)> _metricRows = new();
-    private (DockPanel Row, TextBlock Label)? _litRow;
+    private readonly Dictionary<OverlayMetric, (Grid Row, TextBlock Label)> _metricRows = new();
+    private (Grid Row, TextBlock Label)? _litRow;
     private bool _glideNext, _growNext;
     private readonly TextBlock _contrast = new() { TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed };
+    private readonly Image _closeUp = new() { Stretch = Stretch.None, HorizontalAlignment = HorizontalAlignment.Left, SnapsToDevicePixels = true };
+    private readonly Border _closeUpBox = new() { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 8, 0, 0) };
 
     private OverlaySettings O => _app.Config.Overlay;
     private OverlayLayout L => O.Current;
@@ -101,8 +103,16 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
     private void Blink()
     {
         if (!Motion.Flourish || !O.Visible) return;
-        _liveDot.BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(1, 0.3, TimeSpan.FromMilliseconds(Math.Min(320, RefreshMs * 0.8))) { FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop });
+        var length = TimeSpan.FromMilliseconds(Math.Min(320, RefreshMs * 0.8));
+        if (_blink is null || _blink.Duration.TimeSpan != length)
+        {
+            _blink = new System.Windows.Media.Animation.DoubleAnimation(1, 0.3, length) { FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop };
+            _blink.Freeze();
+        }
+        _liveDot.BeginAnimation(OpacityProperty, _blink);
     }
+
+    private System.Windows.Media.Animation.DoubleAnimation? _blink;
 
     private void Morphing(Action change, double ms = 340)
     {
@@ -173,14 +183,23 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
     private void BuildTitle()
     {
         var header = new Grid { Margin = Ui.HeaderMargin };
+        header.ColumnDefinitions.Add(new ColumnDefinition());
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var titles = new StackPanel();
         titles.Children.Add(Ui.PageTitle("Performance Overlay"));
         header.Children.Add(titles);
         Detached(_visible);
         _visible.Content = null;
-        header.Children.Add(Ui.PageSwitch("Show the overlay", _visible, ShowHelp));
+        var tools = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        _layoutBar.Margin = new Thickness(0, 0, 26, 0);
+        tools.Children.Add(_layoutBar);
+        tools.Children.Add(Ui.PageSwitch("Show the overlay", _visible, ShowHelp));
+        Grid.SetColumn(tools, 1);
+        header.Children.Add(tools);
         _body.Children.Add(header);
     }
+
+    private readonly StackPanel _layoutBar = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
 
     private const string ShowHelp = "Shows over borderless and windowed games, not exclusive fullscreen. Nothing is injected into the game, so it's safe with anti-cheat. On some setups a window on top of the game can stop Windows using its lowest-latency presentation mode; hide the overlay with the keybind for races if you notice it.";
 
@@ -193,10 +212,10 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         _right.Children.Clear();
         BuildLayouts();
         BuildPreview();
-        BuildGeneral();
+        BuildLook();
         BuildPosition();
         BuildMetrics();
-        BuildLook();
+        BuildGeneral();
         UpdateContrast();
     }
 
@@ -204,18 +223,14 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
 
     private void BuildStatus()
     {
-        var title = new TextBlock { Text = "Show the overlay", FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
-        var tip = PitBox.Views.HudSettings.HelpTip.For("Nothing is injected into the game, so it's safe with anti-cheat. On some setups a window on top of the game can stop Windows using its lowest-latency presentation mode; hide the overlay with the keybind for races if you notice it.", "Performance Overlay");
-        tip.VerticalAlignment = VerticalAlignment.Center;
-        var text = new TextBlock { Text = "Over borderless and windowed games, not exclusive fullscreen.", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) };
-        var left = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { new TrimRow { Children = { title, tip } }, text } };
-        Detached(_visible).VerticalAlignment = VerticalAlignment.Center;
-        _visible.Margin = new Thickness(10, 0, 0, 0);
-        _visible.Content = null;
+        var title = ToggleCards.RowTitle("Show the overlay");
+        Ui.AddInfo(title, "Nothing is injected into the game, so it's safe with anti-cheat. On some setups a window on top of the game can stop Windows using its lowest-latency presentation mode; hide the overlay with the keybind for races if you notice it.");
+        Detached(_visible);
+        _visible.Margin = new Thickness(0);
         AutomationProperties.SetName(_visible, "Show overlay");
-        var right = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { _statusChip, _visible } };
+        ToggleCards.Row(_visible, title, "Over borderless and windowed games, not exclusive fullscreen.");
         RefreshStatus();
-        _body.Children.Add(new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, 13), Child = Ui.SplitRow(left, right, 24, stackLeft: true, together: 420) });
+        _body.Children.Add(new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Child = _visible });
     }
 
     private void RefreshStatus()
@@ -246,6 +261,14 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         head.Children.Add(hint);
         stack.Children.Add(head);
         stack.Children.Add(new Tile { CornerRadius = ThemeManager.Round(12), Margin = new Thickness(0, 10, 0, 0), Child = new Tile { CornerRadius = ThemeManager.Round(12), Child = scene, ClipToBounds = true } });
+        if (_closeUpBox.Child is null)
+        {
+            var closeUpStack = new StackPanel();
+            closeUpStack.Children.Add(new TextBlock { Text = "Actual size", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 0, 0, 4) });
+            closeUpStack.Children.Add(new ScrollViewer { Content = _closeUp, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false });
+            _closeUpBox.Child = closeUpStack;
+        }
+        stack.Children.Add(Detached(_closeUpBox));
         _previewNote.Style = Ui.Res<Style>("Caption");
         _previewNote.TextWrapping = TextWrapping.Wrap;
         _noteRow.Margin = new Thickness(0, 8, 0, 0);
@@ -392,9 +415,10 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
 
     private void BuildLayouts()
     {
-        var stack = new StackPanel();
-        stack.Children.Add(Ui.Text("Layout", "H2"));
-        var row = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
+        var row = _embedded ? new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) } : _layoutBar;
+        row.Children.Clear();
+        var label = new TextBlock { Text = "Layout", Style = Ui.Res<Style>("Muted"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 9, 0) };
+        row.Children.Add(label);
         var pick = Ui.Combo(O.Layouts.Select(l => new Choice(l.Name, l.Name)), O.ActiveLayout, c =>
         {
             Morphing(() =>
@@ -404,49 +428,79 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
             }, 380);
             QueueBuild();
         }, 162);
-        pick.Margin = new Thickness(0, 0, 5, 5);
+        AutomationProperties.SetName(pick, "Layout");
         row.Children.Add(pick);
-        bool builtIn = L.IsDefault;
-        var dup = Ui.IconButton("I.Copy", "Duplicate this layout", () => _ = NewLayoutAsync(copy: true));
-        var rename = Ui.IconButton("I.Pencil", builtIn ? "The default layout keeps its name" : "Rename this layout", () => _ = RenameAsync());
-        rename.IsEnabled = !builtIn;
-        var delete = Ui.IconButton("I.Trash", builtIn ? "The default layout is always there" : "Delete this layout", () => _ = DeleteAsync());
-        delete.IsEnabled = !builtIn && O.Layouts.Count > 1;
-        foreach (var b in new[] { dup, rename, delete })
-        {
-            ToolTipService.SetShowOnDisabled(b, true);
-            row.Children.Add(Wrapped(b));
-        }
-        row.Children.Add(Wrapped(Ui.LabeledButton("I.Plus", "New layout", () => _ = NewLayoutAsync(copy: false), "PrimaryButton")));
-        var reset = Ui.LabeledButton("I.Undo", "Reset to default", () => _ = ResetLayoutAsync(), "GhostButton");
-        reset.ToolTip = "Puts every setting of this layout back as it comes with Pit-Box";
-        row.Children.Add(Wrapped(reset));
+        var edit = Ui.IconButton("I.Pencil", "Rename, duplicate, reset or delete this layout", () => _ = EditLayoutAsync(), "GhostButton");
+        edit.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0);
+        row.Children.Add(edit);
+        var add = Ui.IconButton("I.Plus", "New layout", () => _ = NewLayoutAsync(copy: false), "GhostButton");
+        add.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0);
+        row.Children.Add(add);
+        Ui.Anchor(row, "overlay.layouts");
+        if (!_embedded) return;
+        var stack = new StackPanel();
+        stack.Children.Add(Ui.Text("Layout", "H2"));
         stack.Children.Add(row);
-        var card = Card(stack);
-        Ui.Anchor(card, "overlay.layouts");
-        _left.Children.Add(card);
+        _left.Children.Add(Card(stack));
+    }
+
+    private async Task EditLayoutAsync()
+    {
+        var layout = L;
+        bool builtIn = layout.IsDefault;
+        var name = new TextBox { Text = layout.Name, MaxLength = Ui.NameLength, IsEnabled = !builtIn };
+        var error = new TextBlock { Visibility = Visibility.Collapsed };
+        var content = new StackPanel();
+        content.Children.Add(Ui.FieldRow("Name", name, hint: builtIn ? "The default layout keeps its name." : null));
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 12, 0, 0) };
+        var dup = Ui.LabeledButton("I.Copy", "Duplicate", () => { _window.CloseModal(false); _ = NewLayoutAsync(copy: true); });
+        var reset = Ui.LabeledButton("I.Undo", "Reset to default", () => { _window.CloseModal(false); _ = ResetLayoutAsync(); });
+        reset.ToolTip = "What it shows, its order, names, look and place on screen go back to the defaults";
+        reset.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0);
+        actions.Children.Add(dup);
+        actions.Children.Add(reset);
+        content.Children.Add(actions);
+        Button? delete = null;
+        if (!builtIn && O.Layouts.Count > 1)
+        {
+            delete = new Button { Content = "Delete", Style = Ui.Res<Style>("DangerButton") };
+            delete.Click += (_, _) => { _window.CloseModal(false); _ = DeleteAsync(); };
+        }
+        var card = Ui.Dialog(_window, "Edit layout", "", content,
+            Ui.DialogButtons(_window, "Save", () =>
+            {
+                string wanted = name.Text.Trim();
+                if (builtIn || wanted == layout.Name) return true;
+                if (ValidateName(wanted, layout) is { } problem)
+                {
+                    error.Text = problem;
+                    error.Visibility = Visibility.Visible;
+                    return false;
+                }
+                layout.Name = wanted;
+                O.ActiveLayout = wanted;
+                return true;
+            }), error, 421, delete);
+        if (!await _window.ShowModal(card)) return;
+        Changed();
+        BuildSettings();
     }
 
     private void BuildGeneral()
     {
         var hotkey = HotkeyEditor("overlay", () => O.Hotkey, hk => O.Hotkey = hk);
-        var std = new OverlayLayout();
         Ui.SettingDefault D(Func<bool> same, Action reset, string shown) => new(same, () => { reset(); Changed(); BuildSettings(); }, shown);
-        var keys = new SettingsFlow();
-        keys.Children.Add(Ui.Text("Keybinds", "H2"));
-        keys.Children.Add(Anchored(Ui.SettingRow("Show / hide", null, hotkey), "overlay.hotkey"));
-        keys.Children.Add(Anchored(Ui.SettingRow("Reset FPS statistics", null,
-            HotkeyEditor("overlay.fps", () => O.ResetFpsHotkey, hk => O.ResetFpsHotkey = hk)), "overlay.fpshotkey"));
-        _left.Children.Add(Card(keys));
         var general = new SettingsFlow();
-        general.Children.Add(Ui.Text("Data", "H2"));
-        general.Children.Add(Anchored(Ui.SettingRow("Update rate", "How often the overlay redraws, in every layout. Sensors are still read at Settings → Performance's rate.",
-            Ui.Segmented(new[] { "Fast", "Normal", "Relaxed" }, O.UpdateIntervalMs switch { <= 250 => 0, >= 1000 => 2, _ => 1 },
+        general.Children.Add(Ui.Text("Data and keybinds", "H2"));
+        general.Children.Add(Anchored(Ui.SettingRow("Update rate", "All layouts. Sensors follow Settings → Performance.",
+            Ui.Segmented(new[] { "4 " + Units.Hz, "2 " + Units.Hz, "1 " + Units.Hz }, O.UpdateIntervalMs switch { <= 250 => 0, >= 1000 => 2, _ => 1 },
                 i => { O.UpdateIntervalMs = i switch { 0 => 250, 2 => 1000, _ => 500 }; _refresh.Interval = TimeSpan.FromMilliseconds(RefreshMs); Changed(); }, "Rate",
-                new[] { "Fast: 4 times a second. Smoothest numbers, slightly more CPU", "Normal: twice a second", "Relaxed: once a second. The lightest; numbers jump less" }),
-            D(() => O.UpdateIntervalMs == 500, () => O.UpdateIntervalMs = 500, "Normal")), "overlay.rate"));
-        general.Children.Add(Ui.SettingRow("FPS statistics", "Average and 1% low cover the whole session for each game; average temperatures, the time the overlay has been showing.",
-            ResetButton()));
+                new[] { "Smoothest numbers, slightly more CPU", "Redraws twice a second", "The lightest; numbers jump less" }),
+            D(() => O.UpdateIntervalMs == 500, () => O.UpdateIntervalMs = 500, "2 " + Units.Hz)), "overlay.rate"));
+        general.Children.Add(Ui.SettingRow("FPS statistics", "Averages and 1% low, per game session.", ResetButton()));
+        general.Children.Add(Anchored(Ui.SettingRow("Show / hide", null, hotkey), "overlay.hotkey"));
+        general.Children.Add(Anchored(Ui.SettingRow("Reset FPS statistics", null,
+            HotkeyEditor("overlay.fps", () => O.ResetFpsHotkey, hk => O.ResetFpsHotkey = hk)), "overlay.fpshotkey"));
         _left.Children.Add(Card(general));
     }
 
@@ -464,14 +518,11 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
             D(() => L.FontScale == std.FontScale, () => L.FontScale = std.FontScale, std.FontScale + "%")), "overlay.font"));
         general.Children.Add(Anchored(Ui.SettingRow("Background", null, Ui.SliderWithValue(0, 100, L.BackgroundOpacity, "{0:0}%", v => Fading(() => { L.BackgroundOpacity = (int)v; Changed(); }), 105, 5),
             D(() => L.BackgroundOpacity == std.BackgroundOpacity, () => L.BackgroundOpacity = std.BackgroundOpacity, std.BackgroundOpacity + "%")), "overlay.opacity"));
-        general.Children.Add(Anchored(Ui.SettingRow("Frame-time graph", "Spikes are stutters.",
-            Ui.Switch(L.ShowGraph, v => { L.ShowGraph = v; Changed(); }),
+        general.Children.Add(Anchored(Ui.SettingRow("Frame-time graph", null,
+            Ui.Switch(L.ShowGraph, v => { L.ShowGraph = v; Changed(); RenderPreview(); }),
             D(() => L.ShowGraph == std.ShowGraph, () => L.ShowGraph = std.ShowGraph, std.ShowGraph ? "On" : "Off")), "overlay.graph"));
-        var rename = Ui.LabeledButton("I.Pencil", "Rename items…", () => _ = RenameItemsAsync());
-        rename.ToolTip = "Your own names for what the overlay shows (e.g. GPU → 7900 XTX)";
-        general.Children.Add(Anchored(Ui.SettingRow("Names", null, rename), "overlay.names"));
         BuildColors(general);
-        _right.Children.Add(Card(general));
+        _left.Children.Add(Card(general));
     }
 
     private void BuildPosition()
@@ -520,10 +571,24 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         _lit = default;
         _motion.Spotlight(null, null);
         var metrics = new StackPanel { Margin = new Thickness(0, 11, 0, 0) };
-        metrics.Children.Add(Ui.Text("What to show", "H2"));
-        var cards = new MasonryPanel { MinColumnWidth = MetricCardWidth, MaxColumns = 4, Gap = 8, Margin = new Thickness(0, 10, 0, 0) };
-        foreach (var group in L.GroupOrder())
-            cards.Children.Add(MetricCard(group, L.Metrics.Where(m => OverlayLayout.GroupOf(m.Metric) == group).ToList()));
+        var head = new DockPanel { LastChildFill = false };
+        var rename = Ui.LabeledButton("I.Pencil", "Rename items…", () => _ = RenameItemsAsync());
+        rename.ToolTip = "Your own names for the groups and values the overlay shows (e.g. GPU → 7900 XTX). The layout's own name is under the pencil next to Layout.";
+        DockPanel.SetDock(rename, Dock.Right);
+        head.Children.Add(Anchored(rename, "overlay.names"));
+        var title = Ui.Text("What to show", "H2");
+        title.VerticalAlignment = VerticalAlignment.Center;
+        head.Children.Add(title);
+        metrics.Children.Add(head);
+        var groups = L.GroupOrder().Select(g => (Group: g, Entries: L.Metrics.Where(m => OverlayLayout.GroupOf(m.Metric) == g).ToList())).ToList();
+        var sizes = groups.Select(g => g.Entries.Count + 1.0).ToArray();
+        var cards = new MasonryPanel
+        {
+            MinColumnWidth = MetricCardWidth, MaxColumns = 4, Gap = 8, Margin = new Thickness(0, 10, 0, 0),
+            ColumnOf = (columns, index) => index < sizes.Length ? SplitInOrder(sizes, columns)[index] : null,
+        };
+        foreach (var (group, entries) in groups)
+            cards.Children.Add(MetricCard(group, entries));
         metrics.Children.Add(cards);
         Ui.Anchor(metrics, "overlay.metrics");
         _position.Children.Add(Ui.Divider());
@@ -532,18 +597,65 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
 
     private const double MetricCardWidth = 150;
 
+    internal static int[] SplitInOrder(IReadOnlyList<double> sizes, int columns)
+    {
+        var result = new int[sizes.Count];
+        if (sizes.Count == 0 || columns <= 1) return result;
+        double low = sizes.Max(), high = sizes.Sum();
+        for (int step = 0; step < 40; step++)
+        {
+            double mid = (low + high) / 2;
+            if (ColumnsNeeded(sizes, mid) <= columns) high = mid; else low = mid;
+        }
+        int column = 0;
+        double filled = 0;
+        for (int i = 0; i < sizes.Count; i++)
+        {
+            if (filled > 0 && filled + sizes[i] > high + 1e-6 && column < columns - 1) { column++; filled = 0; }
+            filled += sizes[i];
+            result[i] = column;
+        }
+        return result;
+    }
+
+    private static int ColumnsNeeded(IReadOnlyList<double> sizes, double capacity)
+    {
+        int columns = 1;
+        double filled = 0;
+        foreach (var size in sizes)
+        {
+            if (filled > 0 && filled + size > capacity + 1e-6) { columns++; filled = 0; }
+            filled += size;
+        }
+        return columns;
+    }
+
     private Tile MetricCard(string group, List<OverlayMetricEntry> entries)
     {
         var name = new TextBlock { Text = group, Style = Ui.Res<Style>("Eyebrow"), VerticalAlignment = VerticalAlignment.Center };
         var count = RaceParts.LiveFigure("", 10.5, "TextFaint", italic: false, heavy: false);
         count.Margin = new Thickness(7, 0, 0, 0);
-        var all = new Button { Style = Ui.Res<Style>("GhostButton"), Height = 22, MinWidth = 0, Padding = new Thickness(7, 0, 7, 0), FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center };
-        if (entries.Count < 2) all.Visibility = Visibility.Hidden;
-        var head = new DockPanel { Margin = new Thickness(10, 6, 6, 6), LastChildFill = false };
-        DockPanel.SetDock(all, Dock.Right);
-        head.Children.Add(all);
-        head.Children.Add(name);
-        head.Children.Add(count);
+        count.VerticalAlignment = VerticalAlignment.Center;
+        var allLamp = new PitBox.Controls.Lamp();
+        var partly = new System.Windows.Shapes.Rectangle { Width = 7, Height = 2, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false, SnapsToDevicePixels = true, Visibility = Visibility.Collapsed };
+        partly.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "Accent");
+        bool several = entries.Count > 1;
+        var title = new StackPanel { Orientation = Orientation.Horizontal, Children = { name, count } };
+        var lampHost = new Grid { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0), Children = { allLamp, partly } };
+        DockPanel.SetDock(lampHost, Dock.Left);
+        FrameworkElement headFace = several ? new DockPanel { LastChildFill = true, Children = { lampHost, title } } : title;
+        var head = new Border { Padding = new Thickness(16, 0, 10, 0), MinHeight = 34, Background = Brushes.Transparent, Child = headFace };
+        headFace.VerticalAlignment = VerticalAlignment.Center;
+        if (several)
+        {
+            head.Cursor = Cursors.Hand;
+            head.Focusable = true;
+            head.FocusVisualStyle = Ui.Res<Style>("FocusRing");
+            head.ToolTip = $"Show or hide every {group} value";
+            AutomationProperties.SetName(head, $"All {group} values");
+            head.MouseEnter += (_, _) => allLamp.Hot = true;
+            head.MouseLeave += (_, _) => allLamp.Hot = false;
+        }
 
         var body = new StackPanel();
         body.Children.Add(head);
@@ -554,27 +666,38 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         {
             int on = entries.Count(e => e.Enabled);
             TextCase.Set(count, $"{on}/{entries.Count}");
-            all.Content = on == entries.Count ? "None" : "All";
-            name.SetResourceReference(TextBlock.ForegroundProperty, on == 0 ? "TextFaint" : "EyebrowText");
+            allLamp.On = on == entries.Count;
+            bool some = on > 0 && on < entries.Count;
+            partly.Visibility = some ? Visibility.Visible : Visibility.Collapsed;
+            AutomationProperties.SetItemStatus(head, on == entries.Count ? "On" : some ? "Partly on" : "Off");
+            name.SetResourceReference(TextBlock.ForegroundProperty, on == 0 ? "TextFaint" : "AccentText");
         }
 
         foreach (var entry in entries)
         {
             var label = TextFit.TipWhenTrimmed(new TextBlock { Text = ShortLabel(entry.Metric), Style = Ui.Res<Style>("Body"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
-            var toggle = Ui.Switch(entry.Enabled, _ => { });
-            AutomationProperties.SetName(toggle, MetricLabel(entry.Metric));
-            var row = new DockPanel { Height = 30, Background = Brushes.Transparent, Cursor = Cursors.Hand, ToolTip = MetricLabel(entry.Metric) };
-            DockPanel.SetDock(toggle, Dock.Right);
-            toggle.Margin = new Thickness(8, 0, 10, 0);
-            label.Margin = new Thickness(10, 0, 0, 0);
-            row.Children.Add(toggle);
-            row.Children.Add(label);
+            var bar = new PitBox.Controls.Lamp();
+            var face = ToggleCards.WithLamp(bar, label);
+            face.Margin = new Thickness(10, 0, 10, 0);
+            face.VerticalAlignment = VerticalAlignment.Center;
+            var row = new Grid { MinHeight = 36, Background = Brushes.Transparent, Children = { face } };
+            var tile = new Border
+            {
+                Child = row, Cursor = Cursors.Hand, ToolTip = MetricLabel(entry.Metric), Focusable = true, FocusVisualStyle = Ui.Res<Style>("FocusRing"),
+                Margin = new Thickness(6, 4, 6, 0), BorderThickness = Hairline.Edges(),
+            };
+            tile.SetResourceReference(Border.BackgroundProperty, "SurfaceAlt");
+            tile.SetResourceReference(Border.BorderBrushProperty, "Line");
+            tile.MouseEnter += (_, _) => tile.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
+            tile.MouseLeave += (_, _) => tile.SetResourceReference(Border.BorderBrushProperty, "Line");
+            AutomationProperties.SetName(tile, MetricLabel(entry.Metric));
 
             void Show(bool on)
             {
-                toggle.IsChecked = on;
                 label.Tag = on;
                 Paint(label, on);
+                bar.On = on;
+                AutomationProperties.SetItemStatus(tile, on ? "On" : "Off");
             }
             void Apply(bool on)
             {
@@ -587,17 +710,22 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
                 });
                 if (row.IsMouseOver) Light(group, entry.Metric);
             }
-            toggle.Click += (_, _) => Apply(toggle.IsChecked == true);
-            row.MouseLeftButtonUp += (_, e) => { if (!toggle.IsMouseOver) { Apply(!entry.Enabled); e.Handled = true; } };
+            tile.MouseLeftButtonUp += (_, e) => { Apply(!entry.Enabled); e.Handled = true; };
+            tile.KeyDown += (_, e) =>
+            {
+                if (e.Key is not (Key.Space or Key.Enter)) return;
+                e.Handled = true;
+                Apply(!entry.Enabled);
+            };
             row.MouseEnter += (_, _) => Light(group, entry.Metric);
             row.MouseLeave += (_, _) => Light(null, null);
             _metricRows[entry.Metric] = (row, label);
             setters.Add(on => { entry.Enabled = on; Show(on); });
             Show(entry.Enabled);
-            body.Children.Add(row);
+            body.Children.Add(tile);
         }
 
-        all.Click += (_, _) =>
+        void ToggleAll()
         {
             bool on = entries.Any(e => !e.Enabled);
             Morphing(() =>
@@ -606,7 +734,17 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
                 Sync();
                 Changed();
             });
-        };
+        }
+        if (several)
+        {
+            head.MouseLeftButtonUp += (_, e) => { ToggleAll(); e.Handled = true; };
+            head.KeyDown += (_, e) =>
+            {
+                if (e.Key is not (Key.Space or Key.Enter)) return;
+                e.Handled = true;
+                ToggleAll();
+            };
+        }
         Sync();
         return new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(0, 0, 0, 4), Child = body };
     }
@@ -662,7 +800,7 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         OverlayMetric.Ram => "RAM used",
         OverlayMetric.Ping => "Ping",
         OverlayMetric.Network => "Down / up",
-        _ => "Fan speeds",
+        _ => "Speeds",
     };
 
     public static string MetricLabel(OverlayMetric m) => m switch
@@ -775,19 +913,6 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         (OverlayMetric.Fps, ""), (OverlayMetric.GpuTemp, ""), (OverlayMetric.GpuLoad, ""), (OverlayMetric.CpuTemp, ""), (OverlayMetric.CpuLoad, ""),
     };
 
-    private async Task RenameAsync()
-    {
-        var layout = L;
-        if (layout.IsDefault) return;
-        string? name = await _window.Prompt("Rename layout", "A name for this layout.", layout.Name, n => n == layout.Name ? null : ValidateName(n, layout));
-        if (name is null || name == layout.Name) return;
-        string old = layout.Name;
-        layout.Name = name;
-        O.ActiveLayout = name;
-        Changed();
-        BuildSettings();
-    }
-
     private async Task ResetLayoutAsync()
     {
         var layout = L;
@@ -815,13 +940,7 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         name.Length == 0 ? "Give the layout a name."
         : O.Layouts.Any(l => l != self && string.Equals(l.Name, name, StringComparison.OrdinalIgnoreCase)) ? $"There's already a layout named “{name}”." : null;
 
-    private static Border Card(UIElement child) => new Tile { Style = Ui.Res<Style>("Card"), Child = child, Margin = new Thickness(0, 0, 0, 13) };
-
-    private static FrameworkElement Wrapped(FrameworkElement e)
-    {
-        e.Margin = new Thickness(0, 0, 5, 5);
-        return e;
-    }
+    private static Border Card(UIElement child) => new Tile { Style = Ui.Res<Style>("Card"), Child = child, Margin = new Thickness(0, 0, 0, Ui.PanelSpacing) };
 
     private static T Detached<T>(T element) where T : FrameworkElement
     {
@@ -849,12 +968,15 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         var times = game is { } g ? _app.Frames.GetFrameTimes(g.ProcessId, 120) : FrameRateService.SampleFrameTimes(120);
         _previewNote.Text = game is not null
             ? $"Live values · FPS from {game.Value.Name}"
-            : "Live temperatures and load. FPS and the frame-time graph show sample values until a game is running.";
+            : L.ShowGraph ? "Sample FPS and frame times until a game is running." : "Sample FPS until a game is running.";
         try
         {
             double dpi = VisualTreeHelper.GetDpi(_preview).DpiScaleX;
             using var bitmap = _app.Overlay.RenderPreview(L, stats, times, (float)dpi);
             _preview.Source = BitmapConvert.ToSource(bitmap, dpi);
+            bool closeUp = L.Style == OverlayStyle.Compact;
+            _closeUp.Source = closeUp ? _preview.Source : null;
+            _closeUpBox.Visibility = closeUp ? Visibility.Visible : Visibility.Collapsed;
             double wasWidth = _overlaySize.W;
             _overlaySize = (bitmap.Width / dpi, bitmap.Height / dpi);
             if (_growNext && wasWidth > 0)

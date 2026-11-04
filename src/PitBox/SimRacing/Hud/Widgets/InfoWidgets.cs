@@ -8,6 +8,9 @@ namespace PitBox.SimRacing.Hud.Widgets;
 
 internal sealed class SessionWidget : HudWidget
 {
+    private readonly List<(string, string)> _cells = new();
+    private readonly List<string> _ids = new();
+
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
         TitleRow,
@@ -35,8 +38,10 @@ internal sealed class SessionWidget : HudWidget
         var session = f.CurrentSession;
         var area = p.Header(session?.Name is { Length: > 0 } n ? n : v.Race.SessionLabel, f.Session.TrackDisplayName);
         int me = f.PlayerCarIdx;
-        var cells = new List<(string, string)>();
-        var ids = new List<string>();
+        var cells = _cells;
+        var ids = _ids;
+        cells.Clear();
+        ids.Clear();
         foreach (var id in v.Options.Columns("fields"))
         {
             int before = cells.Count;
@@ -45,16 +50,16 @@ internal sealed class SessionWidget : HudWidget
                 case "remain": cells.Add(("TIME LEFT", Strips.TimeLeft(v) ?? RaceFormat.Missing)); break;
                 case "lapsleft": cells.Add(("LAPS LEFT", Strips.LapsLeft(v) ?? RaceFormat.Missing)); break;
                 case "elapsed": cells.Add(("ELAPSED", RaceFormat.Clock(f.SessionTime))); break;
-                case "lap": cells.Add(("LAP", f.Lap is { } l ? (session?.Laps is > 0 and var total ? $"{l} / {total}" : l.ToString()) : RaceFormat.Missing)); break;
+                case "lap": cells.Add(("LAP", f.Lap is { } l ? (session?.Laps is > 0 and var total ? PooledText.Number("", l, " / ", total) : l.ToString()) : RaceFormat.Missing)); break;
                 case "pos": cells.Add(("POSITION", (uint)me < TelemetryFrame.MaxCars && f.CarPosition[me] > 0 ? RaceFormat.Pos(f.CarPosition[me]) : RaceFormat.Missing)); break;
                 case "cpos":
-                    cells.Add(("In " + (f.Session.Player?.ClassName is { Length: > 0 } cn ? cn : "class"),
+                    cells.Add((PooledText.Concat("In ", f.Session.Player?.ClassName is { Length: > 0 } cn ? cn : "class"),
                         v.Race.StandingOf(me)?.ClassPosition is > 0 and var cp ? RaceFormat.Pos(cp) : RaceFormat.Missing));
                     break;
                 case "phase": cells.Add(("PHASE", RaceControl.SessionPhaseLabel(f.Phase) is { Length: > 0 } ph ? ph : RaceFormat.Missing)); break;
                 case "track": cells.Add(("TRACK", f.Session.TrackConfig.Length > 0 ? f.Session.TrackConfig : f.Session.TrackDisplayName)); break;
-                case "temps": cells.Add(("AIR / TRACK", $"{RaceFormat.Temp(f.AirTemp, v.Units)} / {RaceFormat.Temp(f.TrackTemp, v.Units)}")); break;
-                case "inc": cells.Add(("INCIDENTS", f.Incidents is { } i ? $"{i}x" + (f.Session.IncidentLimit is { } lim ? $" / {lim}x" : "") : RaceFormat.Missing)); break;
+                case "temps": cells.Add(("AIR / TRACK", PooledText.Concat(RaceFormat.Temp(f.AirTemp, v.Units), " / ", RaceFormat.Temp(f.TrackTemp, v.Units)))); break;
+                case "inc": cells.Add(("INCIDENTS", f.Incidents is { } i ? (f.Session.IncidentLimit is { } lim ? PooledText.Number("", i, "x / ", lim, "x") : PooledText.Number("", i, "x")) : RaceFormat.Missing)); break;
                 case "clock": cells.Add(("TIME", RaceFormat.TimeOfDay(DateTime.Now))); break;
                 case "finish":
                     double? togo = v.Race.Fuel?.LapsToGo ?? (f.SessionKind == SessionKind.Race ? v.Race.LapsToGo(f) : null);
@@ -155,6 +160,7 @@ internal sealed class AlertsWidget : HudWidget
         var title = big ? p.Big : p.Bold;
         float rowH = p.LineHeight(title) + p.LineHeight(p.Small) + 10 * p.Density;
         int max = v.Options.Int("max");
+        p.Need(b.Width, pad * 2 + max * rowH + (max - 1) * 4 + (history ? p.LineHeight(p.Tiny) + 2 : 0));
         if (history)
         {
             p.Text("RECENT", p.Tiny, p.P.Faint, area.Top(p.LineHeight(p.Tiny) + 2, out area), HAlign.Left);
@@ -324,7 +330,7 @@ internal sealed class WeatherWidget : HudWidget
         var area = body.Inflated(-10 * d, -6 * d);
         _cells[0] = ("AIR", Temp(f.AirTemp));
         _cells[1] = ("TRACK", Temp(f.TrackTemp));
-        _cells[2] = ("HUMIDITY", f.Humidity is { } h ? $"{h * 100:0}%" : RaceFormat.Missing);
+        _cells[2] = ("HUMIDITY", f.Humidity is { } h ? PooledText.Number("", h * 100, "0", System.Globalization.CultureInfo.CurrentCulture, "%") : RaceFormat.Missing);
         var font = p.Big;
         float cellPad = 8 * d;
         float need = 0;
@@ -378,12 +384,23 @@ internal sealed class WeatherWidget : HudWidget
         Icon(p, icon, sky, f.Precipitation is > 0);
         bool wet = f.Precipitation is > 0 || f.TrackWetness is > 1 || f.DeclaredWet == true;
         string state = (f.DeclaredWet == true ? "DECLARED WET · " : "") + RaceFormat.Wetness(f.TrackWetness).ToUpperInvariant() + (f.Precipitation is { } rain ? $" · RAIN {rain * 100:0}%" : "");
-        string skyText = sky.Length > 0 ? sky : RaceFormat.Missing;
+        string skyText = sky.Length > 0 ? SentenceCase(sky) : RaceFormat.Missing;
         float skyX = icon.Right + 8 * d;
         float stateW = Math.Min(p.Measure(state, p.Label) + 4, inner.Right - skyX - p.Measure(skyText, p.Bold) - 12 * d);
         if (stateW < 40 * d) stateW = 0;
         else p.Text(state, p.Label, wet ? p.P.WarnText : p.P.Muted, new RectangleF(inner.Right - stateW, inner.Y, stateW, inner.Height), HAlign.Right, VAlign.Center);
         p.Text(skyText, p.Bold, p.P.Heading, new RectangleF(skyX, inner.Y, Math.Max(0, inner.Right - stateW - skyX), inner.Height), HAlign.Left, VAlign.Center);
+    }
+
+    private static (string From, string To) _skyCase = ("", "");
+
+    private static string SentenceCase(string sky)
+    {
+        var known = _skyCase;
+        if (ReferenceEquals(known.From, sky) || known.From == sky) return known.To;
+        string shown = sky[..1] + sky[1..].ToLowerInvariant();
+        _skyCase = (sky, shown);
+        return shown;
     }
 
     private static void Icon(HudPainter p, RectangleF r, string sky, bool raining)
@@ -527,6 +544,8 @@ internal sealed class WindWidget : HudWidget
 
 internal sealed class LapsWidget : HudWidget
 {
+    private readonly List<string> _marks = new(3);
+
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
         TitleRow,
@@ -541,15 +560,17 @@ internal sealed class LapsWidget : HudWidget
         if (DrawWaiting(p, v, "Laps")) return;
         var laps = v.Race.Laps.Laps;
         var stats = LapMath.Stats(laps, v.Options.Int("window"));
-        var area = p.Header("Laps", laps.Count == 0 ? "none yet" : $"{laps.Count} this session");
+        var area = p.Header("Laps", laps.Count == 0 ? "none yet" : PooledText.Number("", laps.Count, " this session"));
+        p.NeedBelow(area, p.LineHeight(p.Bold) + 10 * p.Density + 4 + p.LineHeight(p.Tiny) + 4 + p.LineHeight(p.Body) * 1.3f * p.Density * v.Options.Int("count")
+            + (v.Options.Bool("stats") ? p.StripHeight + 4 : 0));
         if (v.Options.Bool("stats") && stats is not null && area.Height > p.StripHeight * 3)
         {
             var foot = new RectangleF(area.X, area.Bottom - p.StripHeight, area.Width, p.StripHeight);
             area = new RectangleF(area.X, area.Y, area.Width, area.Height - foot.Height - 4);
-            p.Strip(foot, new (string, string, Color?)[] { ("AVG", RaceFormat.LapTime(stats.Average), null), ("SPREAD", $"{stats.Spread:0.00} {Units.S}", null), ("σ", $"{stats.StdDev:0.000}", null) });
+            p.Strip(foot, new (string, string, Color?)[] { ("AVG", RaceFormat.LapTime(stats.Average), null), ("SPREAD", PooledText.Number("", stats.Spread, "0.00", System.Globalization.CultureInfo.CurrentCulture, " " + Units.S), null), ("σ", PooledText.Number("", stats.StdDev, "0.000", System.Globalization.CultureInfo.CurrentCulture), null) });
         }
         if (laps.Count == 0) { p.Text("Laps appear here as you complete them", p.Small, p.P.Faint, area, HAlign.Center, VAlign.Center); return; }
-        double? best = laps.Where(l => l.Clean).Select(l => (double?)l.Time).Min();
+        double? best = BestClean(laps);
         float bandH = p.LineHeight(p.Bold) + 10 * p.Density;
         if (best is { } top && area.Height > bandH * 3)
         {
@@ -612,14 +633,29 @@ internal sealed class LapsWidget : HudWidget
                 p.Text(RaceFormat.Gap(off, 2), p.Small, dc, delta, HAlign.Right);
             }
             if (fuel && lap.FuelUsed is { } fu && rest.Width >= fuelW + 12 * p.Density) { var fb = rest.Right(fuelW, out rest); p.Text(RaceFormat.Fuel(fu, v.Units), p.Small, p.P.Muted, fb.Inflated(-4, 0), HAlign.Right); }
-            var marks = new List<string>(3);
+            var marks = _marks;
+            marks.Clear();
             if (lap.PitLap) marks.Add("PIT");
-            if (lap.IncidentsGained > 0) marks.Add($"{lap.IncidentsGained}x");
+            if (lap.IncidentsGained > 0) marks.Add(PooledText.Number("", lap.IncidentsGained, "x"));
             if (lap.Caution) marks.Add("YEL");
-            if (v.Race.TrackLimits.OnLap(lap.Lap) is > 0 and var offs) marks.Add(offs > 1 ? $"OFF {offs}" : "OFF");
-            if (marks.Count > 0) p.Text(string.Join(" ", marks), p.Tiny, p.P.WarnText, rest.Inflated(-6, 0), HAlign.Left);
+            if (v.Race.TrackLimits.OnLap(lap.Lap) is > 0 and var offs) marks.Add(offs > 1 ? PooledText.Number("OFF ", offs) : "OFF");
+            if (marks.Count > 0) p.Text(PooledText.Join(" ", marks), p.Tiny, p.P.WarnText, rest.Inflated(-6, 0), HAlign.Left);
             y += rowH;
         }
+    }
+
+    private static double? BestClean(IReadOnlyList<LapRecord> laps)
+    {
+        double? best = null;
+        foreach (var lap in laps)
+        {
+            if (!lap.Clean) continue;
+            double t = lap.Time;
+            if (best is not { } b) { best = t; if (double.IsNaN(t)) return best; continue; }
+            if (t < b) best = t;
+            else if (double.IsNaN(t)) return t;
+        }
+        return best;
     }
 }
 
@@ -632,8 +668,9 @@ internal sealed class EventsWidget : HudWidget
         if (DrawWaiting(p, v, "Race events")) return;
         var events = v.Race.Events;
         var area = p.Header("Race events");
-        if (events.Count == 0) { p.Text("Nothing yet", p.Small, p.P.Faint, area, HAlign.Center, VAlign.Center); return; }
         float rowH = p.LineHeight(p.Small) * 1.55f * p.Density, y = area.Y;
+        p.NeedBelow(area, rowH * v.Options.Int("count"));
+        if (events.Count == 0) { p.Text("Nothing yet", p.Small, p.P.Faint, area, HAlign.Center, VAlign.Center); return; }
         float timeW = p.Measure("00:00:00", p.Small) + 8 * p.Density;
         for (int i = events.Count - 1, n = 0; i >= 0 && n < v.Options.Int("count"); i--, n++)
         {

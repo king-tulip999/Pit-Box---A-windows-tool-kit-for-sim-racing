@@ -4,7 +4,6 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using PitBox.Config;
-using PitBox.Controls;
 using PitBox.Theme;
 
 namespace PitBox.Views;
@@ -25,15 +24,9 @@ internal static class ThemeMenu
     public static Button OverlayButton(Func<Pick> current, Action<Pick> picked, bool followApp, string? customLabel, double minWidth = 162)
     {
         var text = TextFit.TipWhenTrimmed(new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
-        var row = new DockPanel { LastChildFill = true };
-        var chevron = new Icon { Data = Ui.Res<Geometry>("I.ChevronDown"), Width = 10, Height = 10, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-        DockPanel.SetDock(chevron, Dock.Right);
-        row.Children.Add(chevron);
         var dots = new ContentControl { Focusable = false, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center };
-        DockPanel.SetDock(dots, Dock.Left);
-        row.Children.Add(dots);
-        row.Children.Add(text);
-        var button = new Button { Style = Ui.Res<Style>("Btn"), Content = row, MinWidth = minWidth, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(8, 2, 8, 2) };
+        var row = Ui.MenuFace(text, dots);
+        var button = new Button { Style = Ui.Res<Style>("MenuButton"), Content = row, MinWidth = minWidth };
         void Show()
         {
             var pick = current();
@@ -83,62 +76,6 @@ internal static class ThemeMenu
             {
                 menu.Items.Add(new Separator());
                 menu.Items.Add(Item(customLabel, null, pick.Custom, new Pick(false, true, pick.Theme, null)));
-            }
-            menu.IsOpen = true;
-        };
-        return button;
-    }
-
-    public static Button PaletteButton(Func<string?> current, Action<string, ThemeSpec> picked, string otherLabel, double minWidth = 220)
-    {
-        var text = TextFit.TipWhenTrimmed(new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
-        var chevron = new Icon { Data = Ui.Res<Geometry>("I.ChevronDown"), Width = 10, Height = 10, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-        DockPanel.SetDock(chevron, Dock.Right);
-        var row = new DockPanel { LastChildFill = true, Children = { chevron, text } };
-        var button = new Button { Style = Ui.Res<Style>("Btn"), Content = row, MinWidth = minWidth, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(8, 2, 8, 2) };
-        void Show() => text.Text = current() ?? otherLabel;
-        Show();
-        button.Click += (_, _) =>
-        {
-            string? now = current();
-            var menu = new ContextMenu { PlacementTarget = button, Placement = PlacementMode.Bottom, MinWidth = Math.Max(220, button.ActualWidth) };
-            Ui.DropBelow(menu);
-            MenuItem Leaf(string name, ThemeSpec spec)
-            {
-                var item = new MenuItem { Header = Header(name, spec), IsChecked = name == now };
-                item.Click += (_, _) => { picked(name, spec); Show(); };
-                return item;
-            }
-            MenuItem Group(string header, IEnumerable<MenuItem> items)
-            {
-                var group = new MenuItem { Header = header };
-                foreach (var item in items)
-                {
-                    group.IsChecked |= item.IsChecked;
-                    group.Items.Add(item);
-                }
-                return group;
-            }
-            menu.Items.Add(Leaf(Themes.Dark.Name, Themes.Dark));
-            var custom = Group(Themes.DefaultCustomName, new[] { Leaf(Themes.DefaultCustomName, Themes.Custom) });
-            custom.Items.Add(new Separator());
-            foreach (var family in CustomPalette.Families)
-            {
-                var group = Group(family, CustomPalette.Presets.Where(p => p.Family == family).Select(p => Leaf(p.Name, Themes.ForSet(AppTheme.Custom, p.Name))));
-                custom.IsChecked |= group.IsChecked;
-                custom.Items.Add(group);
-            }
-            menu.Items.Add(custom);
-            foreach (var set in ThemeSets.All)
-            {
-                var top = new MenuItem { Header = set.Name };
-                foreach (var family in set.Families)
-                {
-                    var group = Group(family, set.Presets.Where(p => p.Family == family).Select(p => Leaf(p.Name, Themes.ForSet(set.Id, p.Name))));
-                    top.IsChecked |= group.IsChecked;
-                    top.Items.Add(group);
-                }
-                menu.Items.Add(top);
             }
             menu.IsOpen = true;
         };

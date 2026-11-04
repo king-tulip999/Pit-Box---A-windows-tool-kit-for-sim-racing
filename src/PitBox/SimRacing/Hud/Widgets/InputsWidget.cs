@@ -383,7 +383,7 @@ internal sealed class InputsWidget : HudWidget
         if (_rpm)
         {
             var small = p.Font(S(10.5f), true);
-            p.Text(RpmText(live.Rpm), small, p.P.Faint, new RectangleF(r.X, r.Bottom - p.LineHeight(small), r.Width, p.LineHeight(small)), HAlign.Center, VAlign.Bottom, false);
+            p.Text(RpmText(live.Rpm), small, p.P.Muted, new RectangleF(r.X, r.Bottom - p.LineHeight(small), r.Width, p.LineHeight(small)), HAlign.Center, VAlign.Bottom, false);
         }
     }
 

@@ -36,11 +36,22 @@ internal sealed class SessionStatsService : IDisposable
         };
     }
 
-    public StatsStore? Store { get; private set; }
+    private Task _opening = Task.CompletedTask;
+    private StatsStore? _store;
+    private TraceStore? _traces;
+    private string? _problem;
 
-    public TraceStore? Traces { get; private set; }
+    public StatsStore? Store { get { Opened(); return _store; } private set => _store = value; }
 
-    public string? Problem { get; private set; }
+    public TraceStore? Traces { get { Opened(); return _traces; } private set => _traces = value; }
+
+    public string? Problem { get { Opened(); return _problem; } }
+
+    private void Opened()
+    {
+        var opening = _opening;
+        if (!opening.IsCompleted) opening.Wait();
+    }
 
     public (int Done, int Total)? Importing { get; private set; }
 
@@ -86,31 +97,55 @@ internal sealed class SessionStatsService : IDisposable
     {
         if (_started) return;
         _started = true;
+        bool demo = _app.Demo;
+        var opening = _opening = Task.Run(() => Open(demo));
+        var dispatcher = Dispatcher.CurrentDispatcher;
+        opening.ContinueWith(_ => dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+        {
+            if (!_started || !ReferenceEquals(opening, _opening)) return;
+            if (_failure is { } failure)
+            {
+                _app.Notify("Session Stats couldn't start", failure, NoticeKind.Error, important: true);
+                return;
+            }
+            if (demo || _problem is not null) return;
+            _app.Telemetry.AddObserver(_observer);
+            _app.Telemetry.Acquire(Consumer);
+            _app.Watcher.Stopped += OnProcessStopped;
+            ImportNewFiles();
+        })), TaskScheduler.Default);
+    }
+
+    private string? _failure;
+
+    private void Open(bool demo)
+    {
         try
         {
-            Store = StatsStore.Open(_app.Demo ? ":memory:" : StatsStore.DefaultPath);
-            try { Store.Traces = Traces = TraceStore.Open(_app.Demo ? ":memory:" : TraceStore.DefaultPath); }
+            var store = _store = StatsStore.Open(demo ? ":memory:" : StatsStore.DefaultPath);
+            try { store.Traces = _traces = TraceStore.Open(demo ? ":memory:" : TraceStore.DefaultPath); }
             catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException) { App.LogError(ex); }
-            if (_app.Demo) StatsDemo.Fill(Store);
-            RaceHistory.Use(Store);
+            if (demo) StatsDemo.Fill(store);
+            RaceHistory.Use(store);
         }
         catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or InvalidOperationException or IOException or UnauthorizedAccessException)
         {
-            Problem = "The stats database couldn't be opened: " + ex.Message;
+            _problem = "The stats database couldn't be opened: " + ex.Message;
             App.LogError(ex);
-            return;
         }
-        if (_app.Demo) return;
-        _app.Telemetry.AddObserver(_observer);
-        _app.Telemetry.Acquire(Consumer);
-        _app.Watcher.Stopped += OnProcessStopped;
-        ImportNewFiles();
+        catch (Exception ex)
+        {
+            App.LogError(ex);
+            _failure = ex.Message;
+            _problem = "The stats database couldn't be opened: " + ex.Message;
+        }
     }
 
     public void Stop()
     {
         if (!_started) return;
         _started = false;
+        Opened();
         _app.Watcher.Stopped -= OnProcessStopped;
         _scanAfterExit?.Stop();
         _app.Telemetry.RemoveObserver(_observer);

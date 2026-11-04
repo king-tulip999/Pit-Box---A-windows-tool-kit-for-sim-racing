@@ -15,7 +15,7 @@ internal sealed class SetupTree : Grid
 {
     public const double RowHeight = 30, Indent = 20, GapHeight = 12;
     private const double NameSize = 13.5, MetaSize = 12.5, IconSize = 16;
-    private const double Threshold = 6, NameMax = 820, NameRoom = 120;
+    private const double Threshold = 6, NameMax = 460, NameRoom = 120;
 
     private readonly StackPanel _rows = new();
     private readonly Canvas _overlay = new() { IsHitTestVisible = false };
@@ -49,13 +49,15 @@ internal sealed class SetupTree : Grid
     public void Show(IEnumerable<(SetupNode Node, int Depth, bool Open, bool Selected, bool Target, int NewCount)> items)
     {
         _rows.Children.Clear();
+        var list = items.ToList();
+        _anySelected = list.Any(i => i.Selected && !i.Node.IsFolder);
         var open = new Stack<OpenFolder>();
         void Close(bool more)
         {
             var f = open.Pop();
             if (f.Listed) _rows.Children.Add(Gap(f.Node, f.Depth, more));
         }
-        foreach (var (node, depth, isOpen, selected, target, fresh) in items)
+        foreach (var (node, depth, isOpen, selected, target, fresh) in list)
         {
             while (open.Count > 0 && open.Peek().Depth >= depth) Close(more: true);
             if (open.Count > 0) open.Peek().Listed = true;
@@ -64,6 +66,8 @@ internal sealed class SetupTree : Grid
         }
         while (open.Count > 0) Close(more: false);
     }
+
+    private bool _anySelected;
 
     private sealed class OpenFolder(SetupNode node, int depth)
     {
@@ -74,9 +78,10 @@ internal sealed class SetupTree : Grid
 
     private FrameworkElement Row(SetupNode node, int depth, bool open, bool selected, bool target, int fresh)
     {
+        CheckBox? ticks = null;
         var grid = new Grid { Height = RowHeight };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(depth * Indent + 4) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(28) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1000, GridUnitType.Star), MaxWidth = NameMax });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -86,7 +91,7 @@ internal sealed class SetupTree : Grid
         {
             var arrow = new Button
             {
-                Style = Ui.Res<Style>("QuietIconButton"), Width = 22, Height = 22, Padding = new Thickness(0), Focusable = false,
+                Style = Ui.Res<Style>("QuietIconButton"), Focusable = false,
                 Content = new Icon { Data = Ui.Res<Geometry>(open ? "I.ChevronDown" : "I.ChevronRight"), Width = 13, Height = 13 },
                 ToolTip = open ? "Close folder" : "Open folder",
             };
@@ -100,8 +105,10 @@ internal sealed class SetupTree : Grid
         {
             var tick = new CheckBox { IsChecked = selected, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Focusable = false, ToolTip = "Select" };
             tick.Click += (_, _) => Checked?.Invoke(node);
+            tick.Opacity = selected || _anySelected ? 1 : 0;
             Grid.SetColumn(tick, 1);
             grid.Children.Add(tick);
+            ticks = tick;
         }
         var icon = new Icon
         {
@@ -139,7 +146,7 @@ internal sealed class SetupTree : Grid
         if (node.IsFolder && fresh > 0) metaText.Foreground = Ui.Res<Brush>("AccentText");
         Grid.SetColumn(metaText, 4);
         grid.Children.Add(metaText);
-        double metaWidth = -1, lead = depth * Indent + 4 + 48;
+        double metaWidth = -1, lead = depth * Indent + 4 + 52;
         grid.SizeChanged += (_, e) =>
         {
             if (metaWidth < 0)
@@ -156,12 +163,13 @@ internal sealed class SetupTree : Grid
         {
             Tag = node, Child = grid, CornerRadius = ThemeManager.Round(6), Cursor = Cursors.Arrow,
             Background = selected ? Ui.Res<Brush>("AccentSoft") : Brushes.Transparent,
+            BorderThickness = new Thickness(3, 0, 0, 0), BorderBrush = selected ? Ui.Res<Brush>("Accent") : Brushes.Transparent,
             RenderTransform = new TranslateTransform(),
         };
         row.SetValue(DepthProperty, depth);
         row.SetValue(ParentFolderProperty, node.Parent);
-        row.MouseEnter += (_, _) => { if (_drag is null && !selected) row.Background = Ui.Res<Brush>("SurfaceAlt"); };
-        row.MouseLeave += (_, _) => { if (_drag is null && !selected) row.Background = Brushes.Transparent; };
+        row.MouseEnter += (_, _) => { if (ticks is not null) ticks.Opacity = 1; if (_drag is null && !selected) row.Background = Ui.Res<Brush>("Hover"); };
+        row.MouseLeave += (_, _) => { if (ticks is not null && !selected && !_anySelected) ticks.Opacity = 0; if (_drag is null && !selected) row.Background = Brushes.Transparent; };
         return row;
     }
 

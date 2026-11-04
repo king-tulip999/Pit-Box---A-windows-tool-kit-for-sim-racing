@@ -284,8 +284,7 @@ internal sealed class LapReplayView : Grid
         var refSwitch = _refSwitch;
         System.Windows.Automation.AutomationProperties.SetName(refSwitch, "Show the reference lap");
         var refRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-        refRow.Children.Add(new TextBlock { Text = "Reference", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) });
-        refRow.Children.Add(refSwitch);
+        refRow.Children.Add(ToggleCards.Compact(refSwitch, "Reference"));
         refRow.ToolTip = "Show the reference lap's line and car";
         var sync = Ui.Segmented(new[] { "Distance", "Time" }, settings.ReplaySync == "time" ? 1 : 0, i =>
         {
@@ -305,7 +304,7 @@ internal sealed class LapReplayView : Grid
         {
             if (groups.Children.Count > 0)
             {
-                var rule = Hairline.Rule(new Border { Height = 21, Margin = new Thickness(8, 3, 8, 3), VerticalAlignment = VerticalAlignment.Center }, Orientation.Vertical);
+                var rule = Hairline.Rule(new Border { Height = 21, Margin = new Thickness(6, 3, 6, 3), VerticalAlignment = VerticalAlignment.Center }, Orientation.Vertical);
                 rule.SetResourceReference(Border.BackgroundProperty, "Line");
                 groups.Children.Add(rule);
             }
@@ -315,7 +314,11 @@ internal sealed class LapReplayView : Grid
         Group(playRow);
         Group(zoomRow);
         if (showRow.Children.Count > 0) Group(showRow);
-        if (compared) { Group(gap); Group(syncRow); }
+        if (compared)
+        {
+            syncRow.Margin = new Thickness(14, 0, 0, 0);
+            Group(new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { gap, syncRow } });
+        }
 
         var bar = new StackPanel();
         bar.Children.Add(_scrubber);
@@ -541,6 +544,7 @@ internal sealed class LapReplayView : Grid
         if (compared is null)
         {
             _gapSeconds.Text = _gapMetres.Text = _sectorGap.Text = RaceFormatMissing;
+            _sectorGap.Visibility = Visibility.Collapsed;
             Tone(_gapSeconds, 0, ref _gapSign);
             Tone(_sectorGap, 0, ref _sectorSign);
             return;
@@ -553,6 +557,7 @@ internal sealed class LapReplayView : Grid
         _gapMetres.Foreground = _gapSeconds.Foreground;
         double sectorGap = LapReplay.SectorGap(compared.Trace, reference, _sectorStarts, compared.Distance);
         _sectorGap.Text = Signed(sectorGap, "0.000");
+        if (_sectorGap.Visibility != Visibility.Visible) _sectorGap.Visibility = Visibility.Visible;
         Tone(_sectorGap, sectorGap, ref _sectorSign);
     }
 
@@ -587,7 +592,7 @@ internal sealed class ReplayWind : Tile
         var title = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 5) };
         title.Children.Add(new TextBlock { Text = "Wind", Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
         var north = new Grid { Width = 15, Height = 15, Margin = new Thickness(8, 0, 0, 0), RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = _north, ToolTip = "North" };
-        var needle = new Icon { Data = Geometry.Parse("M12 3l4 9h-8z"), Width = 15, Height = 15, StrokeThickness = 1.3 };
+        var needle = new Icon { Data = Ui.Res<Geometry>("I.Needle"), Width = 15, Height = 15 };
         needle.SetResourceReference(Icon.ForegroundProperty, "TextMuted");
         var n = new TextBlock { Text = "N", Style = Ui.Res<Style>("Caption"), FontSize = 7, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom };
         north.Children.Add(needle);
@@ -608,7 +613,7 @@ internal sealed class ReplayWind : Tile
             _arrows.Add((turn, to));
             var arrow = new Icon
             {
-                Data = Geometry.Parse("M12 20V4M6 10l6-6 6 6"), Width = 13, Height = 13, StrokeThickness = 1.78, Margin = new Thickness(0, 0, 8, 0),
+                Data = Ui.Res<Geometry>("I.ArrowUp"), Width = 13, Height = 13, Margin = new Thickness(0, 0, 8, 0),
                 VerticalAlignment = VerticalAlignment.Center, RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = turn,
             };
             arrow.SetResourceReference(Icon.ForegroundProperty, line.BrushKey);
@@ -966,10 +971,27 @@ internal sealed class ReplayStage : FrameworkElement
         }
     }
 
+    private static readonly (bool Right, bool Down)[] CalloutCorners = { (true, false), (false, false), (true, true), (false, true) };
+    private const double CalloutGap = 16;
+    private double _carPx = CarShape.MinPixels;
+
+    private bool Free(Rect box)
+    {
+        foreach (var r in _taken) if (r.IntersectsWith(box)) return false;
+        return true;
+    }
+
     private void PlaceNotes(Matrix m, ReplayCar follow)
     {
         _taken.Clear();
         _taken.AddRange(Avoid);
+        foreach (var label in _labelAt)
+        {
+            var at = m.Transform(label);
+            _taken.Add(new Rect(at.X - 16, at.Y - 12, 32, 24));
+        }
+        var carAt = m.Transform(new Point(follow.Px, follow.Py));
+        _taken.Add(new Rect(carAt.X - _carPx / 2, carAt.Y - _carPx / 2, _carPx, _carPx));
         int n = _notes.Count, first = 0;
         while (first < n && _notes[first].Distance < follow.Distance - 30) first++;
         var view = new Rect(4, 4, ActualWidth - 8, ActualHeight - 8);
@@ -980,11 +1002,18 @@ internal sealed class ReplayStage : FrameworkElement
             double x = Math.Round(p.X), y = Math.Round(p.Y);
             note.MarkerAt.Matrix = new Matrix(1, 0, 0, 1, x, y);
             note.Marker.Opacity = _settings.ReplayTips && view.Contains(p) ? 1 : 0;
-            var box = new Rect(x + 12, y - 12, note.Box.Width, note.Box.Height);
-            if (box.Right > view.Right) box.X = x - 12 - box.Width;
-            if (box.Bottom > view.Bottom) box.Y = y + 12 - box.Height;
-            bool show = _settings.ReplayTips && view.Contains(p) && view.Contains(box);
-            foreach (var r in _taken) if (show && r.IntersectsWith(box)) show = false;
+            double w = note.Box.Width, h = note.Box.Height;
+            var box = new Rect(x + CalloutGap, y - CalloutGap - h, w, h);
+            bool show = false;
+            if (_settings.ReplayTips && view.Contains(p))
+                foreach (var (right, down) in CalloutCorners)
+                {
+                    var at = new Rect(right ? x + CalloutGap : x - CalloutGap - w, down ? y + CalloutGap : y - CalloutGap - h, w, h);
+                    if (!view.Contains(at) || !Free(at)) continue;
+                    box = at;
+                    show = true;
+                    break;
+                }
             if (show) _taken.Add(box);
             note.Callout.Opacity = show ? 1 : 0;
             note.CalloutAt.Matrix = new Matrix(1, 0, 0, 1, box.X, box.Y);
@@ -1042,6 +1071,7 @@ internal sealed class ReplayStage : FrameworkElement
             DrawPedals(dc, follow, 3.5 * px);
         }
         double carPx = Math.Max(_carLength * CarShape.Enlarge * scale, CarShape.MinPixels);
+        _carPx = carPx;
         for (int i = 0; i < _cars.Count; i++)
         {
             var brush = Ui.Res<Brush>(_cars[i].Line.BrushKey);
@@ -1659,13 +1689,15 @@ internal sealed class SectorTable : Grid
         foreach (var _ in cars) ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         for (int r = 0; r <= sectors + 1; r++) RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        Add(new TextBlock { Text = "Sectors", Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 11, 5) }, 0, 0);
+        Add(new TextBlock { Text = "Sectors", Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 11, 5), VerticalAlignment = VerticalAlignment.Bottom }, 0, 0);
         for (int c = 0; c < cars.Count; c++)
         {
-            var swatch = new Border { Height = 2, Width = 28, Margin = new Thickness(10, 0, 0, 5), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+            var swatch = new Border { Height = 2, Width = 28, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 0, 3) };
             swatch.SetResourceReference(Border.BackgroundProperty, cars[c].Line.BrushKey);
-            swatch.ToolTip = cars[c].Line.Label;
-            Add(swatch, 0, c + 1);
+            var name = new TextBlock { Text = cars[c].Line.Short, Style = Ui.Res<Style>("Caption"), HorizontalAlignment = HorizontalAlignment.Right, TextWrapping = TextWrapping.NoWrap };
+            name.MinWidth = Math.Ceiling(TextFit.Width(name, name.Text));
+            var head = new StackPanel { Margin = new Thickness(10, 0, 2, 5), VerticalAlignment = VerticalAlignment.Bottom, ToolTip = cars[c].Line.Label, Children = { swatch, name } };
+            Add(head, 0, c + 1);
         }
         for (int k = 0; k <= sectors; k++)
         {

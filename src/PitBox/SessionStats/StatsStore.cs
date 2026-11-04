@@ -38,6 +38,7 @@ internal sealed class StatsStore : IDisposable
                 track_temp_min REAL, track_temp_max REAL, distance_km REAL NOT NULL, pit_stops INTEGER NOT NULL, pit_s REAL NOT NULL,
                 source TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS sessions_start ON sessions(start_utc);
+            CREATE INDEX IF NOT EXISTS sessions_subsession ON sessions(subsession, driver_id, session_num);
             CREATE TABLE IF NOT EXISTS laps(
                 session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
                 lap INTEGER NOT NULL, time REAL NOT NULL, clean INTEGER NOT NULL, top_speed REAL, fuel_used REAL,

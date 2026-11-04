@@ -33,7 +33,7 @@ internal static class CustomPalette
         ("Lava", "Glow", Make("#0A0200", "#7A3F2E", "#FFEDE6", "#FF4D1A", "#FFB020", "#6EE07A", "#FFC233", "#E8336B")),
         ("Deep Glow", "Glow", Make("#000608", "#2F6670", "#E3FFFD", "#00E5D0", "#6B8CFF", "#9DFF6B", "#FFD45C", "#FF5C8A")),
 
-        ("Ocean", "Night", Make("#000000", "#4A6A78", "#E6F6FA", "#00B4D8", "#90E0EF", "#2DD4A0", "#FFC145", "#FF5A5F")),
+        ("Ocean", "Night", Make("#000000", "#587683", "#E6F6FA", "#00B4D8", "#90E0EF", "#2DD4A0", "#FFC145", "#FF5A5F")),
         ("Midnight", "Night", Make("#03050C", "#4A5578", "#E8ECFA", "#5B7CFA", "#A5B8FF", "#4ADE80", "#FBBF24", "#F87171")),
         ("Deep Sea", "Night", Make("#00040A", "#355A78", "#E2F1FF", "#2D8CFF", "#5CF2E6", "#4CE08A", "#FFC145", "#FF6B6B")),
         ("Glacier", "Night", Make("#000000", "#56707F", "#EEF7FB", "#4FC3F7", "#E1F5FE", "#69F0AE", "#FFD54F", "#FF6E6E")),
@@ -164,33 +164,44 @@ internal static class CustomPalette
         static Color A(Color c, byte alpha) => Color.FromArgb(alpha, c.R, c.G, c.B);
         bool darkBg = ThemeManager.Contrast(bg, Colors.Black) < 4.5;
         edge = Readable(edge, bg, 3);
-        var card = M(bg, edge, 0.06);
+        var seed = bg;
+        double lift = darkBg ? 1 : 0.2;
+        while (lift > 0.05 && ThemeManager.Contrast(accent, M(seed, edge, 0.36 * lift)) < 3) lift -= 0.1;
+        Color Step(double t) => M(seed, edge, t * lift);
+        bg = Step(0.3);
+        var card = Step(0.36);
         text = Readable(text, bg, c => ThemeManager.Contrast(c, card) >= 7 && ThemeManager.Contrast(M(bg, c, 0.66), card) >= 4.5);
         var hiText = Readable(hi, bg, 4.5);
 
         var p = new Dictionary<string, Color>(Palettes.Custom);
 
         var tint = M(edge, accent, 0.5);
-        p["Bg"] = p["Panel"] = p["LogoBg"] = p["LogoEdge"] = bg;
-        p["Surface"] = M(bg, edge, 0.06);
-        p["SurfaceAlt"] = p["SegmentBg"] = M(bg, edge, 0.12);
-        p["TileRaised"] = M(bg, edge, 0.17);
-        p["MeterTrack"] = p["TooltipBg"] = p["BtnHover"] = p["SwitchTrackHover"] = M(bg, tint, 0.11);
-        p["Hover"] = M(bg, tint, 0.17);
-        p["HoverRaised"] = M(bg, tint, 0.26);
-        p["SwitchTrack"] = p["Surface"];
-        p["Line"] = p["TileHighlight"] = p["TileEdge"] = p["ChipBorder"] = p["SidebarEdge"] = p["ScrollThumbBrush"] = M(bg, edge, 0.35);
-        p["ButtonEdge"] = p["InputEdge"] = p["SwitchBorder"] = edge;
-        p["LineStrong"] = M(bg, edge, 0.78);
+        p["Bg"] = p["LogoBg"] = p["LogoEdge"] = bg;
+        p["Panel"] = p["Surface"] = card;
+        p["SidebarBg"] = Step(0.25);
+        p["SurfaceAlt"] = p["SegmentBg"] = Step(0.22);
+        p["TileRaised"] = p["IconWell"] = Step(0.46);
+        p["MeterTrack"] = p["TooltipBg"] = p["BtnHover"] = p["SwitchTrackHover"] = M(card, tint, 0.11);
+        p["Hover"] = M(card, tint, 0.14);
+        p["HoverRaised"] = M(card, tint, 0.24);
+        p["Selected"] = Step(0.56);
+        p["SelectedHover"] = Step(0.64);
+        p["SelectedEdge"] = Step(0.8);
+        p["SwitchTrack"] = Step(0.46);
+        p["Line"] = p["TileHighlight"] = p["TileEdge"] = p["ChipBorder"] = p["SidebarEdge"] = p["ScrollThumbBrush"] = Step(0.5);
+        p["ButtonEdge"] = p["SwitchBorder"] = edge;
+        p["InputEdge"] = Readable(edge, card, 3);
+        p["LineStrong"] = Readable(Step(0.82), card, 2.3);
         p["InputEdgeHover"] = M(edge, text, 0.25);
-        p["ScrollThumbBrushHover"] = M(bg, edge, 0.6);
-        p["Knob"] = M(bg, edge, 0.95);
-        p["GridLine"] = M(bg, edge, 0.16);
-        p["SegmentEdge"] = M(bg, edge, 0.5);
-        p["QuietEdge"] = M(bg, edge, 0.65);
+        p["ScrollThumbBrushHover"] = Step(0.68);
+        p["Knob"] = Step(0.95);
+        p["GridLine"] = Step(0.42);
+        p["SegmentEdge"] = Step(0.58);
+        p["QuietEdge"] = Step(0.7);
 
         p["Heading"] = p["BtnHoverFg"] = p["LogoFg"] = text;
         p["Text"] = p["TooltipText"] = p["BtnFg"] = M(bg, text, 0.93);
+        p["IconInk"] = M(bg, text, 0.85);
         p["TextMuted"] = M(bg, text, 0.66);
         p["TextFaint"] = M(bg, text, 0.56);
 
@@ -208,6 +219,7 @@ internal static class CustomPalette
         p["OnAccent"] = p["PrimaryHoverFg"] = onAccent;
         p["AccentSoft"] = M(bg, accent, 0.165);
         p["AccentSoftHover"] = M(bg, accent, 0.225);
+        p["ToggleOff"] = M(bg, accent, 0.34);
         p["AccentText"] = p["PrimaryFg"] = p["MetricText"] = accentText;
         p["PrimaryBg"] = A(accent, 0x12);
         p["SwitchOn"] = M(bg, accent, 0.115);
@@ -215,7 +227,8 @@ internal static class CustomPalette
         p["ActiveModeBg"] = A(hi, 0x1A);
         p["ActiveModeHover"] = A(hi, 0x33);
         p["ActiveModeFg"] = hiText;
-        p["ActiveModeEdge"] = p["FocusEdge"] = Readable(hi, bg, 3);
+        p["ActiveModeEdge"] = Readable(hi, bg, 3);
+        p["FocusEdge"] = Readable(accent, bg, 3);
 
         p["Slate"] = hi;
         p["SlateSoft"] = M(bg, hi, 0.12);

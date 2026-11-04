@@ -42,7 +42,7 @@ internal sealed class GoalsWidget : HudWidget
 
     internal static int Rows(int count) => count <= 3 ? 1 : 2;
 
-    private readonly record struct Goal(string Id, string Title, string Mark, GoalProgress Progress);
+    private readonly record struct Goal(string Id, string Title, string Head, GoalProgress Progress);
 
     private readonly List<Goal> _goals = new(6);
     private double _within, _under;
@@ -59,22 +59,22 @@ internal sealed class GoalsWidget : HudWidget
             switch (id)
             {
                 case "clean":
-                    _goals.Add(new(id, "Clean run", "C", PracticeGoals.CleanStreak(laps, o.Int("cleanLaps"))));
+                    _goals.Add(new(id, "Clean run", "Clean", PracticeGoals.CleanStreak(laps, o.Int("cleanLaps"))));
                     break;
                 case "consistent":
-                    _goals.Add(new(id, $"Within {_within.ToString("0.0#", CultureInfo.InvariantCulture)} {Units.S}", "S", PracticeGoals.Consistent(laps, o.Int("consistentLaps"), _within)));
+                    _goals.Add(new(id, $"Within {_within.ToString("0.0#", CultureInfo.InvariantCulture)} {Units.S}", "Even", PracticeGoals.Consistent(laps, o.Int("consistentLaps"), _within)));
                     break;
                 case "near":
-                    _goals.Add(new(id, "Near best", "N", PracticeGoals.NearBest(laps, o.Int("nearLaps"), o.Number("nearWithin"))));
+                    _goals.Add(new(id, "Near best", "Near", PracticeGoals.NearBest(laps, o.Int("nearLaps"), o.Number("nearWithin"))));
                     break;
                 case "under":
-                    _goals.Add(new(id, "Under " + RaceFormat.LapTime(_under, 1), "U", PracticeGoals.UnderTime(laps, o.Int("underLaps"), _under)));
+                    _goals.Add(new(id, "Under " + RaceFormat.LapTime(_under, 1), "Under", PracticeGoals.UnderTime(laps, o.Int("underLaps"), _under)));
                     break;
                 case "total":
-                    _goals.Add(new(id, "Clean laps", "T", PracticeGoals.CleanLaps(laps, o.Int("totalLaps"))));
+                    _goals.Add(new(id, "Clean laps", "Laps", PracticeGoals.CleanLaps(laps, o.Int("totalLaps"))));
                     break;
                 case "minutes":
-                    _goals.Add(new(id, "Clean min", "M", PracticeGoals.CleanMinutes(laps, o.Int("minutes"))));
+                    _goals.Add(new(id, "Clean min", "Min", PracticeGoals.CleanMinutes(laps, o.Int("minutes"))));
                     break;
             }
     }
@@ -129,16 +129,21 @@ internal sealed class GoalsWidget : HudWidget
             Count(p, g.Progress, inner.X, chip.Bottom - 7 * d, 20 * d, g.Progress.Done ? p.P.GoodText : p.P.Heading, slash, "/ ");
         }
         float y = area.Y + rows * (chipH + gap) + 4 * d;
-        float rowH = 20 * d, markSize = 9 * d, markStep = 17 * d;
+        float rowH = 20 * d, markSize = 9 * d;
         float lapX = area.X, timeX = area.X + 30 * d, deltaX = area.X + 102 * d, offX = area.X + 158 * d;
-        float MarkX(int j) => area.Right - (n - 1 - j) * markStep - markSize;
+        float headW = 0;
+        for (int j = 0; j < n; j++) headW = Math.Max(headW, p.Measure(p.LabelText(_goals[j].Head), label));
+        bool words = n * (headW + 4 * d) <= area.Right - offX - 24 * d;
+        float colW = words ? headW : markSize, markStep = words ? headW + 4 * d : 17 * d;
+        float MarkMid(int j) => area.Right - (n - 1 - j) * markStep - colW / 2;
+        float MarkX(int j) => MarkMid(j) - markSize / 2;
         float labelH = p.LineHeight(label);
         if (y + labelH + rowH > area.Bottom + 1) return;
         p.Text(p.LabelText("Lap"), label, p.P.Faint, new RectangleF(lapX, y, 28 * d, labelH), HAlign.Left, VAlign.Top, false);
         p.Text(p.LabelText("Time"), label, p.P.Faint, new RectangleF(timeX, y, 60 * d, labelH), HAlign.Left, VAlign.Top, false);
         p.Text(p.LabelText("Best"), label, p.P.Faint, new RectangleF(deltaX, y, 50 * d, labelH), HAlign.Left, VAlign.Top, false);
         for (int j = 0; j < n; j++)
-            p.Text(_goals[j].Mark, label, p.P.Faint, new RectangleF(MarkX(j) - 4 * d, y, markSize + 8 * d, labelH), HAlign.Center, VAlign.Top, false);
+            p.Text(words ? p.LabelText(_goals[j].Head) : p.LabelText(_goals[j].Head[..1]), label, p.P.Faint, new RectangleF(MarkMid(j) - colW / 2 - 4 * d, y, colW + 8 * d, labelH), HAlign.Center, VAlign.Top, false);
         y += labelH + 2 * d;
         int shown = Math.Max(0, (int)((area.Bottom - y + 1) / rowH));
         double? best = null;

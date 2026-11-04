@@ -67,7 +67,7 @@ internal sealed class CustomThemeSection : StackPanel
             Style = Ui.Res<Style>("Btn"), Width = SwatchWidth, Height = SwatchHeight, Margin = new Thickness(0, 0, 6, 6), Padding = new Thickness(6, 5, 6, 4),
             HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch,
             Background = Of("Bg"), BorderBrush = selected ? Ui.Res<Brush>("Accent") : Ui.Res<Brush>("LineStrong"),
-            BorderThickness = new Thickness(selected ? 2 : 1), Content = face, ToolTip = name,
+            BorderThickness = selected ? new Thickness(2) : Hairline.Edges(), Content = face, ToolTip = name,
         };
         button.MouseEnter += (_, _) => button.BorderBrush = Ui.Res<Brush>("Accent");
         button.MouseLeave += (_, _) => button.BorderBrush = selected ? Ui.Res<Brush>("Accent") : Ui.Res<Brush>("LineStrong");

@@ -83,7 +83,7 @@ internal sealed class AnalysisState
 
 internal static class LapAnalysisView
 {
-    public static readonly string[] LapBrushes = { "AccentText", "Tool2Deep", "Tool7Deep", "Tool3Deep" };
+    public static readonly string[] LapBrushes = { "AccentText", "Tool7Deep", "Tool1Deep", "Tool3Deep" };
 
     private static readonly Dictionary<string, string> LaneNames = new()
     {
@@ -194,12 +194,14 @@ internal static class LapAnalysisView
         mapMode.VerticalAlignment = VerticalAlignment.Top;
         var mapTitle = StatsSections.Chart("Line", s.Lines.Any(l => l.Line is not null) ? (s.Single ? "Where the lap drove" : "Where each lap drove; the wide band is the reference's") : null, new Border());
         mapTitle.Children.RemoveAt(mapTitle.Children.Count - 1);
-        var mapBody = new StackPanel { Children = { Ui.SplitRow(mapTitle, mapMode, 9.5, stackLeft: true) } };
+        mapMode.HorizontalAlignment = HorizontalAlignment.Left;
+        mapMode.Margin = new Thickness(0, 10, 0, 0);
+        var mapBody = new StackPanel { Children = { mapTitle, mapMode } };
         mapHost.Margin = new Thickness(0, 10, 0, 0);
         mapBody.Children.Add(mapHost);
         var mapCard = Card(mapBody);
         var chartCard = Card(StatsSections.Chart("Telemetry", "Drag across to zoom, double-click for the whole lap"
-            + (s.Lines.Any(l => l.PushToPass.Count > 0) ? "; strips along the bottom of each lane = push-to-pass in use" : "")
+            + (s.Lines.Any(l => l.PushToPass.Count > 0) ? "; shaded spans = push-to-pass in use" : "")
             + (s.Single ? ". One lap only: tick more laps in the session's lap list to compare them" : ""), chartHost));
         mapCard.Margin = chartCard.Margin = new Thickness(0);
         void MatchHeights()
@@ -249,14 +251,12 @@ internal static class LapAnalysisView
         {
             var line = s.Lines.FirstOrDefault(l => ReferenceEquals(l.Trace, lap.Trace));
             var plate = new StackPanel { Margin = new Thickness(0, 0, 26, 4) };
-            var mark = new Border { Width = 24, Height = 4, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(3, 0, 0, 6), RenderTransform = new SkewTransform(-30, 0) };
-            mark.SetResourceReference(Border.BackgroundProperty, line?.BrushKey ?? place);
-            plate.Children.Add(mark);
-            var time = RaceParts.BigFigure(StatFormat.LapTime(lap.Time), 34, lap.Time == fastest ? place + "Text" : "Heading");
+            var time = RaceParts.BigFigure(StatFormat.LapTime(lap.Time), 34, lap.Time == fastest ? line?.BrushKey ?? place + "Text" : "Heading");
             time.HorizontalAlignment = HorizontalAlignment.Left;
-            plate.Children.Add(time);
+            var mark = RaceParts.FigureMark(time, 4, line?.BrushKey ?? place, 10);
+            plate.Children.Add(new DockPanel { LastChildFill = true, Children = { mark, time } });
             string gap = lap.Time == fastest || data.Laps.Count == 1 ? "" : " · " + StatFormat.Value(StatKind.LapDelta, lap.Time - fastest, false);
-            plate.Children.Add(new TextBlock { Text = $"Lap {lap.Lap.ToString(CultureInfo.CurrentCulture)}{gap}", Style = Ui.Res<Style>("Caption") });
+            plate.Children.Add(new TextBlock { Text = $"Lap {lap.Lap.ToString(CultureInfo.CurrentCulture)}{gap}", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(14, 0, 0, 0) });
             plates.Children.Add(plate);
         }
         left.Children.Add(plates);
@@ -849,7 +849,7 @@ internal sealed class TraceChart : FrameworkElement
         var grid = Hairline.Pen(Ui.Res<Brush>("GridLine"), px);
         var strong = Hairline.Pen(Ui.Res<Brush>("LineStrong"), px);
         var muted = Ui.Res<Brush>("TextMuted");
-        var boost = _s.Lines.Where(l => l.PushToPass.Count > 0).Select(l => (LapAnalysisView.Brush(l.BrushKey), l.PushToPass)).ToList();
+        var boost = _s.Lines.Where(l => l.PushToPass.Count > 0).Select(l => (Faint(LapAnalysisView.Brush(l.BrushKey)), l.PushToPass)).ToList();
         double top = 0;
         foreach (var lane in Lanes)
         {
@@ -857,7 +857,7 @@ internal sealed class TraceChart : FrameworkElement
             var (lo, hi) = Range(lane);
             Layout[lane] = (plotTop, plotH, lo, hi);
             double Y(double v) => plotTop + plotH * (hi - v) / Math.Max(1e-9, hi - lo);
-            dc.DrawText(LapAnalysisView.Text(this, LapAnalysisView.LaneLabel(lane, _s.Imperial), Ui.Res<Brush>(LapAnalysisView.LaneHue(lane)), 10, bold: true), new Point(0, top + 1));
+            dc.DrawText(LapAnalysisView.Text(this, LapAnalysisView.LaneLabel(lane, _s.Imperial), Ui.Res<Brush>("Heading"), 10, bold: true), new Point(0, top + 1));
             var hiText = LapAnalysisView.Text(this, LapAnalysisView.Format(lane, hi), muted, 9.5);
             var loText = LapAnalysisView.Text(this, LapAnalysisView.Format(lane, lo), muted, 9.5);
             dc.DrawText(hiText, new Point(Left - 8 - hiText.Width, plotTop - hiText.Height / 2));
@@ -871,7 +871,7 @@ internal sealed class TraceChart : FrameworkElement
                 foreach (var (from, to) in boost[k].PushToPass)
                 {
                     double a = X(from), b = X(to);
-                    if (b >= Left && a <= ActualWidth - Right) dc.DrawRectangle(boost[k].Item1, null, new Rect(a, plotTop + plotH - BoostStrip * (k + 1), Math.Max(1, b - a), BoostStrip - 1));
+                    if (b >= Left && a <= ActualWidth - Right) dc.DrawRectangle(boost[k].Item1, null, new Rect(a, plotTop, Math.Max(1, b - a), plotH));
                 }
             if (!_s.Lines.Any(l => l.Lanes.TryGetValue(lane, out var has) && has.A is not null))
             {
@@ -925,7 +925,14 @@ internal sealed class TraceChart : FrameworkElement
             }
         }
         if (lo > hi) return (0, 1);
-        if (lane is "delta" or "steering" or "latg")
+        if (lane == "delta")
+        {
+            lo = Math.Min(lo, 0);
+            hi = Math.Max(hi, 0);
+            double margin = Math.Max(hi - lo, 0.05) * 0.08;
+            return (lo - margin, hi + margin);
+        }
+        if (lane is "steering" or "latg")
         {
             double m = Math.Max(Math.Max(Math.Abs(lo), Math.Abs(hi)), lane == "delta" ? 0.05 : 0.1) * 1.08;
             return (-m, m);
@@ -935,6 +942,14 @@ internal sealed class TraceChart : FrameworkElement
         if (lane == "bias") return (lo - Math.Max(0.5, (hi - lo) * 0.2), hi + Math.Max(0.5, (hi - lo) * 0.2));
         double pad = Math.Max(1e-6, (hi - lo) * 0.06);
         return (lo - pad, hi + pad);
+    }
+
+    private static Brush Faint(SolidColorBrush brush)
+    {
+        var faint = brush.Clone();
+        faint.Opacity = 0.14;
+        faint.Freeze();
+        return faint;
     }
 
     private static Pen PenFor(AnalysisLine line, bool second, string lane, bool single)

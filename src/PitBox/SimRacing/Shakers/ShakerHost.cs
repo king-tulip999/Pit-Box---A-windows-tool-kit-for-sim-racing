@@ -3,6 +3,7 @@ using PitBox.Audio;
 using PitBox.Config;
 using PitBox.Processes;
 using PitBox.Services;
+using PitBox.SimRacing.Shakers.Games;
 using PitBox.SimRacing.Telemetry;
 
 namespace PitBox.SimRacing.Shakers;
@@ -12,12 +13,16 @@ internal enum ShakerSource { None, Effects, GameAudio }
 internal sealed class ShakerHost : IDisposable
 {
     private const string Consumer = "Bass shakers";
+    private const string IracingFeed = "iracing";
     private static readonly TimeSpan TestTail = TimeSpan.FromSeconds(ShakerMixer.TestSeconds + 0.5);
 
     private readonly AppServices _app;
     private readonly ShakerFeed _feed = new();
     private readonly object _gate = new();
     private readonly SynchronizationContext _ui;
+    private readonly Dictionary<string, GameReader> _readers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _seenLive = new(StringComparer.OrdinalIgnoreCase);
+    private volatile string? _feeding;
     private ShakerLevels _levels;
     private AudioRender? _render;
     private AudioLoopback? _loopback;
@@ -45,6 +50,8 @@ internal sealed class ShakerHost : IDisposable
 
     public string? Game { get; private set; }
 
+    public ShakerGame? WaitingFor { get; private set; }
+
     private ShakerSettings S => _app.Config.SimRacing.Shakers;
 
     public void SetActive(bool on)
@@ -56,6 +63,7 @@ internal sealed class ShakerHost : IDisposable
         {
             StopRender();
             _testTimer?.Stop();
+            _seenLive.Clear();
         }
         SyncInputs();
         Sync();
@@ -89,7 +97,7 @@ internal sealed class ShakerHost : IDisposable
 
     private void SyncInputs()
     {
-        bool telemetry = _active && S.InIracing == ShakerIracing.Effects;
+        bool telemetry = _active && S.Mode == ShakerMode.Effects;
         if (telemetry != _telemetryHeld)
         {
             _telemetryHeld = telemetry;
@@ -135,9 +143,15 @@ internal sealed class ShakerHost : IDisposable
     {
         var names = new List<string>();
         if (S.OtherGames) names.AddRange(S.Games);
-        if (names.Count > 0 || S.InIracing == ShakerIracing.GameAudio) names.Add(TelemetryService.SimProcess);
+        if (S.Mode != ShakerMode.Off)
+            foreach (var game in EnabledGames()) names.AddRange(game.Processes);
+        if (names.Count > 0 || S.Mode == ShakerMode.GameAudio) names.Add(TelemetryService.SimProcess);
         return names;
     }
+
+    private IEnumerable<ShakerGame> EnabledGames() => ShakerGames.All.Where(g => S.GameOn(g.Id));
+
+    private string? RunningProcess(ShakerGame game) => _watching ? game.Processes.FirstOrDefault(p => _app.Watcher.IsRunning(p)) : null;
 
     private void OnApp(string _) => Sync();
 
@@ -145,46 +159,106 @@ internal sealed class ShakerHost : IDisposable
 
     private void OnFrame(TelemetryFrame f)
     {
+        if (_feeding != IracingFeed) return;
         var levels = _feed.Update(f);
         lock (_gate) _levels = levels;
     }
 
+    private void SyncReaders()
+    {
+        var wanted = new Dictionary<string, ShakerGame>(StringComparer.OrdinalIgnoreCase);
+        if (_active && S.Mode == ShakerMode.Effects)
+            foreach (var game in EnabledGames())
+                if (RunningProcess(game) is not null) wanted[ReaderKey(game)] = game;
+        foreach (var game in ShakerGames.All)
+            if (RunningProcess(game) is null) _seenLive.Remove(game.Id);
+        foreach (string key in _readers.Keys.Where(k => !wanted.ContainsKey(k)).ToList())
+        {
+            _readers[key].Dispose();
+            _readers.Remove(key);
+        }
+        foreach (var (key, game) in wanted)
+        {
+            if (_readers.ContainsKey(key)) continue;
+            string id = game.Id;
+            var reader = game.Open(S.Port(id, game.Port), input =>
+            {
+                if (_feeding != id) return;
+                var levels = _feed.Update(input);
+                lock (_gate) _levels = levels;
+            });
+            reader.StateChanged += () => _ui.Post(_ => Sync(), null);
+            _readers[key] = reader;
+            reader.Start();
+        }
+    }
+
+    private string ReaderKey(ShakerGame game) => $"{game.Id}|{S.Port(game.Id, game.Port)}";
+
+    private GameReader? ReaderFor(ShakerGame game) => _readers.GetValueOrDefault(ReaderKey(game));
+
     private bool IracingRunning =>
         _telemetryHeld && _app.Telemetry.Status == SimStatus.Connected || _watching && _app.Watcher.IsRunning(TelemetryService.SimProcess);
 
-    private (ShakerSource Source, string? Game, string? Process) Pick()
+    private sealed record Choice(ShakerSource Source, string? Game = null, string? Process = null, string? Feed = null, ShakerGame? Waiting = null, string? Problem = null);
+
+    private Choice Pick()
     {
-        if (!_active || S.DeviceId is null) return (ShakerSource.None, null, null);
-        if (DateTime.UtcNow < _testUntil) return (ShakerSource.Effects, null, null);
+        if (!_active || S.DeviceId is null) return new(ShakerSource.None);
+        if (DateTime.UtcNow < _testUntil) return new(ShakerSource.Effects);
         if (IracingRunning)
-            return S.InIracing switch
+            return S.Mode switch
             {
-                ShakerIracing.Effects when _app.Telemetry.Status == SimStatus.Connected => (ShakerSource.Effects, null, null),
-                ShakerIracing.GameAudio => (ShakerSource.GameAudio, "iRacing", TelemetryService.SimProcess),
-                _ => (ShakerSource.None, null, null),
+                ShakerMode.Effects when _app.Telemetry.Status == SimStatus.Connected => new(ShakerSource.Effects, "iRacing", Feed: IracingFeed),
+                ShakerMode.GameAudio => new(ShakerSource.GameAudio, "iRacing", TelemetryService.SimProcess),
+                _ => new(ShakerSource.None),
             };
-        if (S.OtherGames && _watching && S.Games.FirstOrDefault(g => _app.Watcher.IsRunning(g)) is { } game)
-            return (ShakerSource.GameAudio, Path.GetFileNameWithoutExtension(game), AppWatcher.Normalize(game));
-        return (ShakerSource.None, null, null);
+        ShakerGame? waiting = null;
+        string? problem = null;
+        if (S.Mode != ShakerMode.Off)
+            foreach (var game in EnabledGames())
+            {
+                if (RunningProcess(game) is not { } running) continue;
+                string process = AppWatcher.Normalize(running);
+                if (S.Mode == ShakerMode.GameAudio) return new(ShakerSource.GameAudio, game.Name, process);
+                var reader = ReaderFor(game);
+                if (reader?.Live == true) _seenLive.Add(game.Id);
+                if (_seenLive.Contains(game.Id)) return new(ShakerSource.Effects, game.Name, Feed: game.Id);
+                waiting ??= game;
+                problem ??= reader?.Problem;
+                if (S.OtherGames && S.Games.Any(g => AppWatcher.Normalize(g) == process))
+                    return new(ShakerSource.GameAudio, game.Name, process, Waiting: game);
+            }
+        if (S.OtherGames && _watching && S.Games.FirstOrDefault(g => _app.Watcher.IsRunning(g)) is { } listed)
+            return new(ShakerSource.GameAudio, Path.GetFileNameWithoutExtension(listed), AppWatcher.Normalize(listed), Waiting: waiting, Problem: problem);
+        return new(ShakerSource.None, Waiting: waiting, Problem: problem);
     }
 
     private void Sync()
     {
-        var (source, game, process) = Pick();
-        Source = source;
-        Game = game;
-        string key = $"{source}|{S.DeviceId}|{S.Channel}|{process}";
-        if (source == ShakerSource.None)
+        SyncReaders();
+        var choice = Pick();
+        Source = choice.Source;
+        Game = choice.Game;
+        WaitingFor = choice.Waiting;
+        if (choice.Feed != _feeding)
+        {
+            _feeding = choice.Feed;
+            _feed.Reset();
+            lock (_gate) _levels = default;
+        }
+        string key = $"{choice.Source}|{S.DeviceId}|{S.Channel}|{choice.Process}";
+        if (choice.Source == ShakerSource.None)
         {
             StopRender();
-            Problem = null;
+            Problem = choice.Problem;
         }
         else if (_render is null || key != _renderKey)
         {
             StopRender();
             _renderKey = key;
             Problem = null;
-            Start(source, process);
+            Start(choice.Source, choice.Process);
         }
         Changed?.Invoke();
     }
@@ -253,5 +327,10 @@ internal sealed class ShakerHost : IDisposable
         _renderKey = null;
     }
 
-    public void Dispose() => SetActive(false);
+    public void Dispose()
+    {
+        SetActive(false);
+        foreach (var reader in _readers.Values) reader.Dispose();
+        _readers.Clear();
+    }
 }

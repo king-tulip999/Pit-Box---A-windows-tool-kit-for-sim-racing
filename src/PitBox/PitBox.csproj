@@ -19,7 +19,7 @@
     <ApplicationIcon>Assets\PitBox.ico</ApplicationIcon>
     <AssemblyName>PitBox</AssemblyName>
     <RootNamespace>PitBox</RootNamespace>
-    <Version>2.91.0</Version>
+    <Version>3.0.0</Version>
     <Title>Pit-Box</Title>
     <AssemblyTitle>Pit-Box</AssemblyTitle>
     <Product>Pit-Box</Product>
@@ -48,6 +48,7 @@
   <ItemGroup>
     <!-- iRacing settings catalog (Sim Racing Tools → iRacing Controller). -->
     <EmbeddedResource Include="SimRacing\IracingFiles\catalog.json" />
+    <EmbeddedResource Include="SimRacing\IracingFiles\demo-values.json" />
     <EmbeddedResource Include="SimRacing\Hud\Web\Pages\*" LogicalName="web/%(Filename)%(Extension)" />
     <EmbeddedResource Include="Assets\TrackMaps.zip" LogicalName="TrackMaps.zip" Condition="Exists('Assets\TrackMaps.zip')" />
   </ItemGroup>

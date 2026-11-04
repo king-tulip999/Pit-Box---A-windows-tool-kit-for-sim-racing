@@ -177,16 +177,51 @@ internal sealed partial class IracingControllerSection
 
     private Border SwitchTile(Setting s)
     {
-        var host = Hairline.Frame(new Border { Padding = new Thickness(9, 6, 8, 6), MinHeight = 34 });
-        host.SetResourceReference(Border.BackgroundProperty, "SurfaceAlt");
-        host.SetResourceReference(Border.BorderBrushProperty, "Line");
-        return CompactItem(s, refreshed =>
+        var host = new Border();
+        var head = new ContentControl { Focusable = false, IsTabStop = false };
+        var actions = new ContentControl { Focusable = false, IsTabStop = false };
+        var notes = new StackPanel();
+        Action refill = () => { };
+        var toggle = Ui.Switch(s.IsOn(s.Draft), on => Apply(s, on != s.Def.Invert ? "1" : "0", refill));
+        AutomationProperties.SetName(toggle, s.Def.Label);
+        CardTop.Align(ToggleCards.Dress(toggle, head, s.Def.Help.Length > 0 ? s.Def.Help : null, notes, help => Ui.Highlight(help, s.Def.Help, _words), actions));
+        var grid = new Grid();
+        grid.Children.Add(toggle);
+        host.Child = grid;
+        bool wasChanged = s.IsChanged;
+        var edge = AddUnsavedEdge(grid, host, s, false);
+        void Fill()
         {
-            var toggle = Ui.Switch(s.IsOn(s.Draft), on => Apply(s, on != s.Def.Invert ? "1" : "0", refreshed));
-            toggle.VerticalAlignment = VerticalAlignment.Center;
-            AutomationProperties.SetName(toggle, s.Def.Label);
-            return toggle;
-        }, stacked: false, host);
+            bool grow = !wasChanged;
+            wasChanged = s.IsChanged;
+            toggle.IsChecked = s.IsOn(s.Draft);
+            var title = ToggleCards.Title(s.Def.Label, false);
+            Ui.Highlight(title, s.Def.Label, _words);
+            var line = new WrapPanel();
+            line.Children.Add(title);
+            if (s.IsChanged)
+            {
+                var chip = UnsavedChip(s);
+                line.Children.Add(chip);
+                if (grow) Reveal.PopIn(chip);
+            }
+            var marked = Ui.Marked(line, out var dot);
+            dot.Visibility = s.IsModified ? Visibility.Visible : Visibility.Collapsed;
+            if (dot is FrameworkElement d && Session!.DefaultOf(s) is { } std) d.ToolTip = "Changed from iRacing's default (" + s.Show(std) + ")";
+            head.Content = marked;
+            notes.Children.Clear();
+            Notes(s, notes);
+            notes.Margin = new Thickness(0, notes.Children.Count > 0 ? 4 : 0, 0, 0);
+            var buttons = ItemActions(s, Fill);
+            actions.Content = buttons.Children.Count > 0 ? buttons : null;
+            toggle.ToolTip = Details(s);
+            ToolTipService.SetInitialShowDelay(toggle, 700);
+            grid.Opacity = s.IsInert ? 0.6 : 1;
+            ShowEdge(edge, s, grow);
+        }
+        refill = Fill;
+        Fill();
+        return host;
     }
 
     private Border ChoiceItem(Setting s)
@@ -216,22 +251,20 @@ internal sealed partial class IracingControllerSection
     {
         double min = s.Def.Min!.Value, max = s.Def.Max!.Value, step = s.Def.Step is > 0 and var st ? st : 1;
         CommentInference.TryNumber(s.Draft, out var n);
-        var shown = new TextBlock { Width = 64, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Text = s.Show(s.Draft) };
-        shown.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
-        System.Windows.Documents.Typography.SetNumeralAlignment(shown, FontNumeralAlignment.Tabular);
         var slider = new Slider
         {
             Minimum = min, Maximum = max, Value = Math.Clamp(n, min, max), IsSnapToTickEnabled = true, TickFrequency = step,
             SmallChange = step, LargeChange = step * Math.Max(1, Math.Round((max - min) / step / 20)), VerticalAlignment = VerticalAlignment.Center,
         };
         AutomationProperties.SetName(slider, s.Def.Label);
+        SliderFace.SetText(slider, s.Show(s.Draft));
         bool dragging = false;
         slider.AddHandler(Thumb.DragStartedEvent, new DragStartedEventHandler((_, _) => dragging = true));
         slider.AddHandler(Thumb.DragCompletedEvent, new DragCompletedEventHandler((_, _) => { dragging = false; refreshed(); }));
         slider.ValueChanged += (_, e) =>
         {
             Session!.SetDraft(s, Setting.Format(e.NewValue));
-            shown.Text = s.Show(s.Draft);
+            SliderFace.SetText(slider, s.Show(s.Draft));
             UpdatePending();
             if (!dragging) refreshed();
         };
@@ -244,27 +277,23 @@ internal sealed partial class IracingControllerSection
             slider.ToolTip = "iRacing default: " + s.Show(std);
             void Place()
             {
-                double half = (slider.Template?.FindName("PART_Track", slider) as Track)?.Thumb?.ActualWidth / 2 ?? 6;
-                tick.Margin = new Thickness(Math.Max(0, half + (slider.ActualWidth - 2 * half) * (d - min) / (max - min) - 1), 0, 0, 0);
+                tick.Margin = new Thickness(Math.Clamp(slider.ActualWidth * (d - min) / (max - min) - 1, 0, Math.Max(0, slider.ActualWidth - 2)), 0, 0, 0);
             }
             slider.SizeChanged += (_, _) => Place();
             slider.Loaded += (_, _) => Place();
             track.Children.Add(tick);
         }
         var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition());
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.Children.Add(track);
-        Grid.SetColumn(shown, 1);
-        grid.Children.Add(shown);
         return grid;
     }
 
     private static Grid LevelColumns()
     {
-        var grid = new Grid { MaxWidth = LevelLabelMax + LevelCell * SettingShapes.Levels.Length, HorizontalAlignment = HorizontalAlignment.Left };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { MinWidth = 140 });
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1000, GridUnitType.Star), MinWidth = 140, MaxWidth = LevelLabelMax });
         foreach (var _ in SettingShapes.Levels) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(LevelCell) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         return grid;
     }
 
@@ -451,10 +480,15 @@ internal sealed partial class IracingControllerSection
 
         public void Show(IReadOnlyList<Setting> listed)
         {
-            var c = CultureInfo.CurrentCulture;
-            TextCase.Set(_total, listed.Count.ToString(c));
-            TextCase.Set(_changed, listed.Count(s => s.IsModified).ToString(c));
-            TextCase.Set(_unsaved, listed.Count(s => s.IsChanged).ToString(c));
+            TextCase.Set(_total, listed.Count.ToString(CultureInfo.CurrentCulture));
+            ShowCount(_changed, listed.Count(s => s.IsModified));
+            ShowCount(_unsaved, listed.Count(s => s.IsChanged));
+        }
+
+        private static void ShowCount(TextBlock number, int count)
+        {
+            TextCase.Set(number, count.ToString(CultureInfo.CurrentCulture));
+            number.SetResourceReference(TextBlock.ForegroundProperty, count > 0 ? "AccentText" : "TextFaint");
         }
     }
 
@@ -492,8 +526,6 @@ internal sealed partial class IracingControllerSection
         {
             var more = Ui.LabeledButton("I.Eye", $"{pending.Count - (int)TrayChips} more", () => _ = Review(), "GhostButton");
             more.Margin = new Thickness(0, 6, 0, 0);
-            more.Height = 24;
-            more.MinHeight = 0;
             _pendingChips.Children.Add(more);
         }
     }

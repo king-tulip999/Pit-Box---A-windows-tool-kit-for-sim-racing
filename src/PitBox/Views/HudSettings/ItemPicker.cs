@@ -1,12 +1,11 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
-using System.Windows.Input;
 using System.Windows.Media;
 using PitBox.Controls;
 using PitBox.SimRacing.Hud;
 using PitBox.SimRacing.Hud.Editors;
 using PitBox.SimRacing.Race;
+using PitBox.Theme;
 
 namespace PitBox.Views.HudSettings;
 
@@ -14,20 +13,30 @@ internal sealed record PickerLane(string Key, string? Name, string Value, string
 
 internal sealed class ItemPicker : StackPanel
 {
-    private readonly IReadOnlyList<HudCategory> _categories;
+    private const double SingleColumn = 128, LaneColumn = 196, LaneTick = 46, FlatItem = 150;
+    private const string DoesntFit = "Doesn't fit at this width, so not drawn. Widen the widget or take one out.";
+    private const string NoRoom = "No room: take one out first, or widen the widget";
+
+    private sealed class ItemRow
+    {
+        public required string Id { get; init; }
+        public required HudChoice Choice { get; init; }
+        public required Border Box { get; init; }
+        public required TextBlock Label { get; init; }
+        public required TextBlock Tag { get; init; }
+        public required CheckBox[] Ticks { get; init; }
+    }
+
     private readonly IReadOnlyList<PickerLane> _lanes;
     private readonly Action<IReadOnlyList<string>> _save;
     private readonly ItemPickerModel _model;
     private readonly Dictionary<string, (IReadOnlySet<string> Hidden, IReadOnlySet<string> Blocked)> _marks = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<TextBlock> _summaries = new();
-    private readonly List<Button> _adds = new();
-    private readonly List<Button> _removes = new();
-    private readonly string _title;
+    private readonly Dictionary<string, ItemRow> _items = new(StringComparer.OrdinalIgnoreCase);
+    private ItemRow? _linked;
 
     public ItemPicker(string title, string? help, IReadOnlyList<HudChoice> choices, IReadOnlyList<HudCategory> categories, IReadOnlyList<PickerLane> lanes, Action<IReadOnlyList<string>> save, bool showTitle = true)
     {
-        _title = title;
-        _categories = categories;
         _lanes = lanes;
         _save = save;
         _model = new ItemPickerModel(choices, lanes.Select(l => ItemPickerModel.Split(l.Value)));
@@ -41,49 +50,49 @@ internal sealed class ItemPicker : StackPanel
             Children.Add(titleRow);
         }
 
-        var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(SettingRows.LabelWidth) });
-        for (int i = 0; i < 2; i++) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        var summary = new Grid();
+        summary.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(SettingRows.LabelWidth) });
+        summary.ColumnDefinitions.Add(new ColumnDefinition());
         for (int lane = 0; lane < lanes.Count; lane++)
         {
-            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            double top = lane == 0 ? 0 : 6;
-            void Place(FrameworkElement e, int column)
-            {
-                Grid.SetRow(e, lane);
-                Grid.SetColumn(e, column);
-                if (e.Margin.Top == 0) e.Margin = new Thickness(e.Margin.Left, top, e.Margin.Right, e.Margin.Bottom);
-                e.VerticalAlignment = VerticalAlignment.Center;
-                grid.Children.Add(e);
-            }
-            string where = lanes.Count > 1 ? $"{title} ({lanes[lane].Name})" : title;
-            var label = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 10, 0) };
+            summary.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto, MinHeight = 26 });
+            var label = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             label.Children.Add(new TextBlock { Text = lanes.Count > 1 ? lanes[lane].Name : "Shows", Style = Ui.Res<Style>("Body"), VerticalAlignment = VerticalAlignment.Center });
             if (lane == 0 && help is not null && !showTitle) label.Children.Add(HelpTip.For(help, title));
-            Place(label, 0);
-            int at = lane;
-            var add = Ui.LabeledButton("I.Plus", "Add", () => { }, "SoftButton");
-            add.Click += (_, _) => OpenAdd(at);
-            System.Windows.Automation.AutomationProperties.SetName(add, "Add to " + where);
-            _adds.Add(add);
-            Place(add, 1);
-            var remove = Ui.LabeledButton("I.Minus", "Remove", () => { }, "GhostButton");
-            remove.Click += (_, _) => OpenRemove(at);
-            remove.Margin = new Thickness(5, 0, 0, 0);
-            System.Windows.Automation.AutomationProperties.SetName(remove, "Remove from " + where);
-            _removes.Add(remove);
-            Place(remove, 2);
-            var summary = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(12, 0, 0, 0) };
-            summary.Style = Ui.Res<Style>("Caption");
-            _summaries.Add(summary);
-            Place(summary, 3);
+            Grid.SetRow(label, lane);
+            summary.Children.Add(label);
+            var text = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
+            Grid.SetRow(text, lane);
+            Grid.SetColumn(text, 1);
+            summary.Children.Add(text);
+            _summaries.Add(text);
         }
-        Children.Add(grid);
+        Children.Add(summary);
+
+        var groups = _model.Grouped(categories, "");
+        bool laned = lanes.Count > 1;
+        if (!laned && groups.Count == 1 && groups[0].Title is null)
+        {
+            var flat = new WrapPanel { ItemWidth = FlatItem, Margin = new Thickness(-4, 6, 0, 0) };
+            foreach (var c in groups[0].Items) flat.Children.Add(Row(c));
+            Children.Add(flat);
+        }
+        else
+        {
+            var panel = new MasonryPanel { MinColumnWidth = laned ? LaneColumn : SingleColumn, MaxColumns = 3, Gap = 14, Margin = new Thickness(0, 8, 0, 0) };
+            foreach (var (groupTitle, items) in groups)
+            {
+                var stack = new StackPanel();
+                stack.Children.Add(Header(groupTitle));
+                foreach (var c in items) stack.Children.Add(Row(c));
+                panel.Children.Add(stack);
+            }
+            Children.Add(panel);
+        }
         Rebuild();
     }
 
-    public void ShowAdd(string? key = null) => OpenAdd(Math.Max(0, _lanes.ToList().FindIndex(l => string.Equals(l.Key, key, StringComparison.OrdinalIgnoreCase))));
+    public Action<string, string?>? HoverItem { get; set; }
 
     public void Reload(IReadOnlyList<string> values)
     {
@@ -97,163 +106,140 @@ internal sealed class ItemPicker : StackPanel
         Rebuild();
     }
 
-    private bool Blocked(int lane, string id) => _marks.TryGetValue(_lanes[lane].Key, out var m) && m.Blocked.Contains(id);
+    public bool Owns(string key) => _lanes.Any(l => string.Equals(l.Key, key, StringComparison.OrdinalIgnoreCase));
 
-    private bool Hidden(int lane, string id) => _marks.TryGetValue(_lanes[lane].Key, out var m) && m.Hidden.Contains(id);
+    public Border? RowFor(string key, string id) => Owns(key) && _items.TryGetValue(id, out var row) ? row.Box : null;
 
-    private void Save()
+    public void ShowLinked(string? key, string? id)
     {
+        var row = key is not null && id is not null && Owns(key) && _items.TryGetValue(id, out var found) ? found : null;
+        if (ReferenceEquals(row, _linked)) return;
+        var before = _linked;
+        _linked = row;
+        if (before is not null) Paint(before);
+        if (row is not null) Paint(row);
+    }
+
+    private FrameworkElement Header(string? title)
+    {
+        var grid = new Grid { Margin = new Thickness(0, 0, 0, 3) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        var name = new TextBlock { Text = title ?? "", Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Bottom, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(4, 0, 0, 3) };
+        grid.Children.Add(name);
+        if (_lanes.Count > 1)
+            for (int lane = 0; lane < _lanes.Count; lane++)
+            {
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(LaneTick) });
+                var head = new TextBlock { Text = _lanes[lane].Name, Style = Ui.Res<Style>("Caption"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 3) };
+                Grid.SetColumn(head, lane + 1);
+                grid.Children.Add(head);
+            }
+        var edge = Hairline.Frame(new Border { Child = grid }, Sides.Bottom);
+        edge.SetResourceReference(Border.BorderBrushProperty, "Line");
+        edge.Margin = new Thickness(0, 0, 0, 2);
+        return edge;
+    }
+
+    private Border Row(HudChoice c)
+    {
+        var label = TextFit.TipWhenTrimmed(new TextBlock { Text = c.Label, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center });
+        var tag = new TextBlock { Style = Ui.Res<Style>("Caption"), Text = "doesn't fit", Visibility = Visibility.Collapsed };
+        tag.SetResourceReference(TextBlock.ForegroundProperty, "WarnDeep");
+        var line = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { label, tag } };
+        CheckBox[] ticks;
+        FrameworkElement content;
+        if (_lanes.Count > 1)
+        {
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition());
+            grid.Children.Add(line);
+            ticks = new CheckBox[_lanes.Count];
+            for (int lane = 0; lane < _lanes.Count; lane++)
+            {
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(LaneTick) });
+                int at = lane;
+                var tick = new CheckBox { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+                System.Windows.Automation.AutomationProperties.SetName(tick, $"{c.Label} in {_lanes[lane].Name}");
+                ToolTipService.SetShowOnDisabled(tick, true);
+                tick.Click += (_, _) => Toggle(c.Id, at);
+                Grid.SetColumn(tick, lane + 1);
+                grid.Children.Add(tick);
+                ticks[lane] = tick;
+            }
+            content = grid;
+        }
+        else
+        {
+            var tick = new CheckBox { Content = line, VerticalAlignment = VerticalAlignment.Center };
+            System.Windows.Automation.AutomationProperties.SetName(tick, c.Label);
+            ToolTipService.SetShowOnDisabled(tick, true);
+            tick.Click += (_, _) => Toggle(c.Id, 0);
+            ticks = new[] { tick };
+            content = tick;
+        }
+        var box = new Border { Child = content, MinHeight = 28, Padding = new Thickness(4, 3, 2, 3), Background = Brushes.Transparent };
+        var row = new ItemRow { Id = c.Id, Choice = c, Box = box, Label = label, Tag = tag, Ticks = ticks };
+        box.MouseEnter += (_, _) => { Paint(row); HoverItem?.Invoke(LaneKey(c.Id), c.Id); };
+        box.MouseLeave += (_, _) => { Paint(row); HoverItem?.Invoke(LaneKey(c.Id), null); };
+        _items[c.Id] = row;
+        return box;
+    }
+
+    private void Paint(ItemRow row)
+    {
+        if (ReferenceEquals(row, _linked)) row.Box.SetResourceReference(Border.BackgroundProperty, "AccentSoft");
+        else if (row.Box.IsMouseOver) row.Box.SetResourceReference(Border.BackgroundProperty, "Hover");
+        else row.Box.Background = Brushes.Transparent;
+    }
+
+    private int LaneOf(string id) => _model.Lanes.FindIndex(l => l.Contains(id));
+
+    private string LaneKey(string id) => _lanes[Math.Max(0, LaneOf(id))].Key;
+
+    private void Toggle(string id, int lane)
+    {
+        int at = LaneOf(id);
+        if (at == lane) _model.Remove(lane, id);
+        else
+        {
+            if (at >= 0) _model.Remove(at, id);
+            _model.Add(id, lane);
+        }
         _save(_model.Values);
         Rebuild();
     }
+
+    private bool Blocked(int lane, string id) => _marks.TryGetValue(_lanes[lane].Key, out var m) && m.Blocked.Contains(id);
+
+    private bool Hidden(int lane, string id) => _marks.TryGetValue(_lanes[lane].Key, out var m) && m.Hidden.Contains(id);
 
     private void Rebuild()
     {
         for (int lane = 0; lane < _lanes.Count; lane++)
         {
             int count = _model.Lanes[lane].Count;
-            string counted = count == 0 ? "Nothing shown: Add some" : RaceFormat.Count(count, "item");
-            string text = counted;
+            string text = count == 0 ? "Nothing shown" : RaceFormat.Count(count, "item");
             var hidden = _model.Lanes[lane].Where(id => Hidden(lane, id)).Select(id => _model.Choice(id).Label).ToList();
             if (hidden.Count is 1 or 2) text += $" · {string.Join(" and ", hidden)} {(hidden.Count == 1 ? "doesn't" : "don't")} fit";
             else if (hidden.Count > 2) text += $" · {hidden.Count} don't fit";
             _summaries[lane].Text = text;
-            _summaries[lane].ToolTip = hidden.Count > 0 ? "Doesn't fit at this width, so not drawn: " + string.Join(", ", hidden) + ". Widen the widget or remove some." : null;
-            _removes[lane].IsEnabled = count > 0;
+            _summaries[lane].ToolTip = hidden.Count > 0 ? "Doesn't fit at this width, so not drawn: " + string.Join(", ", hidden) + ". Widen the widget or take some out." : null;
         }
-    }
-
-    private static Popup PopupBelow(Button anchor, FrameworkElement card)
-    {
-        var popup = new Popup
+        foreach (var row in _items.Values)
         {
-            PlacementTarget = anchor, Placement = PlacementMode.Custom, StaysOpen = false, AllowsTransparency = true, PopupAnimation = PopupAnimation.Fade,
-            CustomPopupPlacementCallback = (size, target, _) => new[] { new CustomPopupPlacement(new Point(target.Width - size.Width, target.Height), PopupPrimaryAxis.Horizontal) },
-            Child = new Tile { Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(8), Margin = new Thickness(0, 3, 0, 0), Child = card, MaxWidth = 308 },
-        };
-        RenderOptions.SetClearTypeHint(popup.Child, ClearTypeHint.Enabled);
-        Ui.FollowTarget(popup);
-        popup.Child.PreviewKeyDown += (_, e) =>
-        {
-            if (e.Key != Key.Escape) return;
-            popup.IsOpen = false;
-            anchor.Focus();
-            e.Handled = true;
-        };
-        return popup;
-    }
-
-    private void OpenRemove(int lane)
-    {
-        var list = new StackPanel();
-        KeyboardNavigation.SetDirectionalNavigation(list, KeyboardNavigationMode.Contained);
-        var card = new ScrollViewer { MaxHeight = 300, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = list, Focusable = false, MinWidth = 227 };
-        var popup = PopupBelow(_removes[lane], card);
-
-        void Fill()
-        {
-            list.Children.Clear();
-            foreach (var id in _model.Lanes[lane]) list.Children.Add(Option(id));
-            if (list.Children.Count == 0) popup.IsOpen = false;
-        }
-
-        Button Option(string id)
-        {
-            var choice = _model.Choice(id);
-            var line = new DockPanel { LastChildFill = true };
-            var x = new Icon { Data = Ui.Res<Geometry>("I.X"), Width = 9, Height = 9, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
-            x.SetResourceReference(Control.ForegroundProperty, "TextMuted");
-            DockPanel.SetDock(x, Dock.Right);
-            line.Children.Add(x);
-            if (Hidden(lane, id))
+            int lane = LaneOf(row.Id);
+            bool hidden = lane >= 0 && Hidden(lane, row.Id);
+            for (int l = 0; l < row.Ticks.Length; l++)
             {
-                var tag = new TextBlock { Text = "doesn't fit", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
-                DockPanel.SetDock(tag, Dock.Right);
-                line.Children.Add(tag);
+                var tick = row.Ticks[l];
+                bool on = lane == l, blocked = !on && Blocked(l, row.Id);
+                if (tick.IsChecked != on) tick.IsChecked = on;
+                if (tick.IsEnabled == blocked) tick.IsEnabled = !blocked;
+                tick.ToolTip = blocked ? NoRoom : on && hidden ? DoesntFit : row.Ticks.Length > 1 ? null : row.Choice.Help;
             }
-            var label = new TextBlock { Text = choice.Label, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
-            label.SetResourceReference(TextBlock.ForegroundProperty, "Text");
-            line.Children.Add(label);
-            var b = new Button { Style = Ui.Res<Style>("QuietButton"), Content = line, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(6, 5, 6, 5), ToolTip = choice.Help };
-            System.Windows.Automation.AutomationProperties.SetName(b, "Take out " + choice.Label);
-            b.Click += (_, _) =>
-            {
-                if (_model.Remove(lane, id)) Save();
-                Fill();
-                list.Children.OfType<Button>().FirstOrDefault()?.Focus();
-            };
-            return b;
+            row.Label.SetResourceReference(TextBlock.ForegroundProperty, lane >= 0 ? "Heading" : "Text");
+            row.Tag.Visibility = hidden ? Visibility.Visible : Visibility.Collapsed;
+            if (row.Ticks.Length > 1) row.Box.ToolTip = hidden ? DoesntFit : row.Choice.Help;
         }
-
-        Fill();
-        popup.IsOpen = true;
-        Dispatcher.BeginInvoke(() => list.Children.OfType<Button>().FirstOrDefault()?.Focus(), System.Windows.Threading.DispatcherPriority.Input);
-    }
-
-    private void OpenAdd(int lane)
-    {
-        var search = new TextBox { Tag = "Search…", Padding = new Thickness(23, 5, 6, 5), MinWidth = 227 };
-        System.Windows.Automation.AutomationProperties.SetName(search, "Search " + _title);
-        var searchIcon = new Icon { Data = Ui.Res<Geometry>("I.Search"), Width = 11, Height = 11, IsHitTestVisible = false, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(8, 0, 0, 0) };
-        searchIcon.SetResourceReference(Control.ForegroundProperty, "TextFaint");
-        var card = new StackPanel();
-        card.Children.Add(new Grid { Children = { search, searchIcon } });
-        var list = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
-        KeyboardNavigation.SetDirectionalNavigation(list, KeyboardNavigationMode.Contained);
-        card.Children.Add(new ScrollViewer { MaxHeight = 275, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = list, Focusable = false });
-        var popup = PopupBelow(_adds[lane], card);
-
-        void Fill()
-        {
-            list.Children.Clear();
-            var groups = _model.Grouped(_categories, search.Text.Trim());
-            foreach (var (title, items) in groups)
-            {
-                if (title is not null)
-                    list.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(6, list.Children.Count == 0 ? 2 : 8, 0, 4) });
-                foreach (var c in items) list.Children.Add(Option(c));
-            }
-            if (groups.Count == 0) list.Children.Add(new TextBlock { Text = "Nothing matches", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(5, 3, 0, 3) });
-        }
-
-        Button Option(HudChoice c)
-        {
-            bool added = _model.IsAdded(c.Id), blocked = !added && Blocked(lane, c.Id);
-            var line = new DockPanel { LastChildFill = true };
-            if (added || blocked)
-            {
-                var tag = new TextBlock { Text = added ? "Added" : "Doesn't fit", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
-                DockPanel.SetDock(tag, Dock.Right);
-                line.Children.Add(tag);
-            }
-            var label = new TextBlock { Text = c.Label, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
-            if (!added && !blocked) label.SetResourceReference(TextBlock.ForegroundProperty, "Text");
-            line.Children.Add(label);
-            var b = new Button
-            {
-                Style = Ui.Res<Style>("QuietButton"), Content = line, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(6, 5, 6, 5),
-                IsEnabled = !added && !blocked, Opacity = added || blocked ? 0.5 : 1,
-                ToolTip = blocked ? "No room: take one out first, or widen the widget" : c.Help,
-            };
-            ToolTipService.SetShowOnDisabled(b, true);
-            b.Click += (_, _) =>
-            {
-                if (_model.Add(c.Id, lane)) Save();
-                Fill();
-                search.Focus();
-            };
-            return b;
-        }
-
-        search.TextChanged += (_, _) => Fill();
-        search.PreviewKeyDown += (_, e) =>
-        {
-            var first = list.Children.OfType<Button>().FirstOrDefault(b => b.IsEnabled);
-            if (e.Key == Key.Down && first is not null) { first.Focus(); e.Handled = true; }
-            else if (e.Key == Key.Enter && first is not null && search.Text.Trim().Length > 0) { first.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); e.Handled = true; }
-        };
-        Fill();
-        popup.IsOpen = true;
-        Dispatcher.BeginInvoke(() => { search.Focus(); Keyboard.Focus(search); }, System.Windows.Threading.DispatcherPriority.Input);
     }
 }

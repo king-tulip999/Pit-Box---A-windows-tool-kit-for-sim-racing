@@ -34,16 +34,56 @@ internal static class HudGeometry
         return dx * dx + dy * dy;
     }
 
-    public static RectangleF Place(HudWidgetConfig w, HudMonitor m)
+    public static RectangleF Place(HudWidgetConfig w, HudMonitor m) => Place(w, m, new SizeF((float)w.W, (float)w.H));
+
+    public static RectangleF Place(HudWidgetConfig w, HudMonitor m, SizeF size)
     {
-        float s = m.Scale, width = (float)w.W * s, height = (float)w.H * s;
+        float s = m.Scale, k = s * (float)w.Scale, width = size.Width * k, height = size.Height * k;
         var (fx, fy) = Fraction(w.Anchor);
         float ax = m.Bounds.Left + m.Bounds.Width * fx, ay = m.Bounds.Top + m.Bounds.Height * fy;
         var r = new RectangleF(ax + (float)w.X * s - width * fx, ay + (float)w.Y * s - height * fy, width, height);
         return Clamp(r, m.Bounds);
     }
 
+    public static void Store(HudWidgetConfig w, RectangleF r, HudMonitor m, SizeF size)
+    {
+        float s = m.Scale <= 0 ? 1 : m.Scale;
+        if (size.Width > 0) w.Scale = Math.Round(Math.Clamp(r.Width / (size.Width * s), HudWidgetConfig.MinScale, HudWidgetConfig.MaxScale), 3);
+        Anchor(w, r, m);
+        w.Clamp();
+    }
+
+    public static float ScaleFor(RectangleF r, SizeF size, HudMonitor m, float grid, bool snap)
+    {
+        float s = m.Scale <= 0 ? 1 : m.Scale;
+        float scale = r.Width / Math.Max(1, size.Width * s);
+        if (snap && grid > 1)
+        {
+            float byRight = SnapEdge(r.Left, size.Width * s, scale, m.Bounds.Left, grid);
+            float byBottom = SnapEdge(r.Top, size.Height * s, scale, m.Bounds.Top, grid);
+            scale = Math.Abs(byRight - scale) * size.Width <= Math.Abs(byBottom - scale) * size.Height ? byRight : byBottom;
+        }
+        return (float)Math.Clamp(scale, HudWidgetConfig.MinScale, HudWidgetConfig.MaxScale);
+    }
+
+    private static float SnapEdge(float start, float unit, float scale, float origin, float grid)
+    {
+        float edge = start + unit * scale;
+        float snapped = origin + MathF.Round((edge - origin) / grid) * grid;
+        if (snapped <= start) snapped += grid;
+        return (snapped - start) / Math.Max(1, unit);
+    }
+
     public static void Store(HudWidgetConfig w, RectangleF r, HudMonitor m)
+    {
+        float s = (m.Scale <= 0 ? 1 : m.Scale) * (float)(w.Scale > 0 ? w.Scale : 1);
+        w.W = Math.Round(r.Width / s, 1);
+        w.H = Math.Round(r.Height / s, 1);
+        Anchor(w, r, m);
+        w.Clamp();
+    }
+
+    private static void Anchor(HudWidgetConfig w, RectangleF r, HudMonitor m)
     {
         float s = m.Scale <= 0 ? 1 : m.Scale;
         float cx = (r.Left + r.Width / 2 - m.Bounds.Left) / m.Bounds.Width, cy = (r.Top + r.Height / 2 - m.Bounds.Top) / m.Bounds.Height;
@@ -52,11 +92,8 @@ internal static class HudGeometry
         var (fx, fy) = Fraction(w.Anchor);
         float ax = m.Bounds.Left + m.Bounds.Width * fx, ay = m.Bounds.Top + m.Bounds.Height * fy;
         w.Monitor = m.Primary ? "primary" : m.Id;
-        w.W = Math.Round(r.Width / s, 1);
-        w.H = Math.Round(r.Height / s, 1);
         w.X = Math.Round((r.Left + r.Width * fx - ax) / s, 1);
         w.Y = Math.Round((r.Top + r.Height * fy - ay) / s, 1);
-        w.Clamp();
     }
 
     public static RectangleF Clamp(RectangleF r, RectangleF area)
@@ -96,15 +133,16 @@ internal static class HudGeometry
         return new RectangleF(x, y, r.Width, r.Height);
     }
 
-    public static void SnapAll(IEnumerable<HudWidgetConfig> widgets, IReadOnlyList<HudMonitor> monitors, float grid)
+    public static void SnapAll(IEnumerable<HudWidgetConfig> widgets, IReadOnlyList<HudMonitor> monitors, float grid, Func<HudWidgetConfig, SizeF>? sizeOf = null)
     {
         var placed = new List<(string Monitor, RectangleF Rect)>();
         foreach (var w in widgets)
         {
             var m = MonitorFor(w.Monitor, monitors);
             var others = placed.Where(p => p.Monitor == m.Id).Select(p => p.Rect);
-            var r = Clamp(Snap(Place(w, m), others, m.Bounds, grid * m.Scale, 10 * m.Scale, resizing: false), m.Bounds);
-            Store(w, r, m);
+            var size = sizeOf?.Invoke(w) ?? new SizeF((float)w.W, (float)w.H);
+            var r = Clamp(Snap(Place(w, m, size), others, m.Bounds, grid * m.Scale, 10 * m.Scale, resizing: false), m.Bounds);
+            Store(w, r, m, size);
             placed.Add((m.Id, r));
         }
     }

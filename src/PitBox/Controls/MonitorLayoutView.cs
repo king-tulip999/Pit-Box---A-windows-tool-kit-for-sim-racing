@@ -16,12 +16,11 @@ public sealed class MonitorLayoutView : FrameworkElement
 
     private static Brush TileFill => ThemeManager.Brush("TileRaised", Brushes.WhiteSmoke);
     private static Brush TileStroke => ThemeManager.Brush("TileEdge", Brushes.LightGray);
-    private static Brush PrimaryFill => ThemeManager.Brush("AccentSoft", Brushes.Plum);
     private static Brush PrimaryStroke => ThemeManager.Brush("Accent", Brushes.SlateBlue);
     private static Brush TextBrush => ThemeManager.Brush("Text", Brushes.Black);
     private static Brush DetailBrush => ThemeManager.Brush("TextMuted", Brushes.Gray);
     private const double MinLabelHeight = 22;
-    private Pen? _tilePen, _primaryPen, _targetPen;
+    private Pen? _tilePen, _targetPen;
     private Rect? _target;
 
     public void SetTiles(IReadOnlyList<LayoutTile> tiles)
@@ -64,25 +63,31 @@ public sealed class MonitorLayoutView : FrameworkElement
         double ox = (w - (maxX - minX) * scale) / 2, oy = (h - (maxY - minY) * scale) / 2;
         double dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
         _tilePen = Frozen(_tilePen, TileStroke, 1);
-        _primaryPen = Frozen(_primaryPen, PrimaryStroke, 1.6);
 
         foreach (var t in _tiles)
         {
             var r = new Rect(ox + (t.X - minX) * scale + 2, oy + (t.Y - minY) * scale + 2, Math.Max(0, t.Width * scale - 4), Math.Max(0, t.Height * scale - 4));
             if (r.Width <= 2 || r.Height <= 2)
                 continue;
-            dc.DrawGeometry(t.Primary ? PrimaryFill : TileFill, t.Primary ? _primaryPen : _tilePen, Tile.Shape(r, ThemeManager.Round(6)));
+            dc.DrawGeometry(TileFill, _tilePen, Tile.Shape(r, ThemeManager.Round(6)));
+            if (t.Primary)
+                dc.DrawRectangle(PrimaryStroke, null, new Rect(r.X, r.Y, r.Width, Math.Min(3, r.Height)));
             if (r.Height < MinLabelHeight || string.IsNullOrEmpty(t.Label))
                 continue;
 
             double size = Math.Clamp(r.Height * 0.4, 8, 30);
             var label = new FormattedText(ThemeManager.Case(t.Label), CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, ThemeManager.RaceFace, size, TextBrush, dpi);
+            if (label.Width > r.Width - 8 && label.Width > 0)
+            {
+                size = Math.Max(8, size * (r.Width - 8) / label.Width);
+                label = new FormattedText(ThemeManager.Case(t.Label), CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, ThemeManager.RaceFace, size, TextBrush, dpi);
+            }
             double total = label.Height;
             FormattedText? detail = null;
-            if (!string.IsNullOrEmpty(t.Detail) && r.Height > 44)
+            if (!string.IsNullOrEmpty(t.Detail))
             {
                 detail = new FormattedText(ThemeManager.Case(t.Detail), CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, DetailFace, Math.Clamp(size * 0.55, 9, 11), DetailBrush, dpi);
-                if (detail.Width > r.Width - 6)
+                if (detail.Width > r.Width - 6 || total + detail.Height + 1 > r.Height - 6)
                     detail = null;
                 else
                     total += detail.Height + 1;

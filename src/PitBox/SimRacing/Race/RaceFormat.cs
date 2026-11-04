@@ -9,13 +9,25 @@ internal static class RaceFormat
 {
     public const string Missing = "–";
 
-    public static string About(string value) => "≈" + value;
+    public static string About(string value) => PooledText.Concat("≈", value);
 
-    public static string Count(long n, string word) => n.ToString("N0", Inv) + " " + (n == 1 ? word : Plural(word));
+    public static string Count(long n, string word)
+    {
+        var t = new PooledBuilder(stackalloc char[PooledText.Room]);
+        t.Add(n, "N0", Inv);
+        t.Add(' ');
+        t.Add(word);
+        if (n != 1) t.Add(PluralEnding(word));
+        return t.Done();
+    }
 
-    public static string Plural(string word) =>
-        word.EndsWith("s", StringComparison.Ordinal) || word.EndsWith("x", StringComparison.Ordinal) || word.EndsWith("ch", StringComparison.Ordinal) || word.EndsWith("sh", StringComparison.Ordinal) ? word + "es" : word + "s";
+    public static string Plural(string word) => word + PluralEnding(word);
+
+    private static string PluralEnding(string word) =>
+        word.EndsWith("s", StringComparison.Ordinal) || word.EndsWith("x", StringComparison.Ordinal) || word.EndsWith("ch", StringComparison.Ordinal) || word.EndsWith("sh", StringComparison.Ordinal) ? "es" : "s";
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+
+    private static readonly string[] SecondFormats = { "0.0", "0.00", "0.000" }, WideSecondFormats = { "00.0", "00.00", "00.000" };
 
     public static string LapTime(double? seconds, int decimals = 3)
     {
@@ -24,16 +36,29 @@ internal static class RaceFormat
         double r = Math.Round(s, decimals);
         int min = (int)(r / 60);
         double rest = Math.Max(0, r - min * 60);
-        string sec = decimals switch { 1 => "0.0", 2 => "0.00", _ => "0.000" };
-        return min > 0 ? $"{min}:{rest.ToString("0" + sec, Inv)}" : rest.ToString(sec, Inv);
+        if (min <= 0) return PooledText.Number("", rest, SecondFormats[decimals - 1], Inv);
+        var t = new PooledBuilder(stackalloc char[PooledText.Room]);
+        t.Add(min);
+        t.Add(':');
+        t.Add(rest, WideSecondFormats[decimals - 1], Inv);
+        return t.Done();
     }
 
     public static string Gap(double? seconds, int decimals = 1)
     {
         if (seconds is not { } s || !double.IsFinite(s)) return Missing;
-        string v = Math.Abs(s).ToString(decimals == 2 ? "0.00" : decimals == 3 ? "0.000" : "0.0", Inv);
-        if (double.Parse(v, Inv) == 0) return v;
-        return (s > 0 ? "+" : "−") + v;
+        string format = decimals == 2 ? "0.00" : decimals == 3 ? "0.000" : "0.0";
+        Span<char> buffer = stackalloc char[64];
+        if (!Math.Abs(s).TryFormat(buffer[1..], out int written, format, Inv))
+        {
+            string v = Math.Abs(s).ToString(format, Inv);
+            if (double.Parse(v, Inv) == 0) return v;
+            return (s > 0 ? "+" : "−") + v;
+        }
+        var digits = buffer.Slice(1, written);
+        if (double.Parse(digits, Inv) == 0) return PooledText.Of(digits);
+        buffer[0] = s > 0 ? '+' : '−';
+        return PooledText.Of(buffer[..(written + 1)]);
     }
 
     public static string Signed(double value, string format, IFormatProvider? culture = null)
@@ -42,8 +67,13 @@ internal static class RaceFormat
         return magnitude.Any(c => c is >= '1' and <= '9') ? (value < 0 ? "−" : "+") + magnitude : magnitude;
     }
 
+    private static string AbsFormat(int decimals) => decimals switch { <= 0 => "0", 2 => "0.00", >= 3 => "0.000", _ => "0.0" };
+
     public static string Abs(double? seconds, int decimals = 1) =>
-        seconds is { } s && double.IsFinite(s) ? Math.Abs(s).ToString(decimals switch { <= 0 => "0", 2 => "0.00", >= 3 => "0.000", _ => "0.0" }, Inv) : Missing;
+        seconds is { } s && double.IsFinite(s) ? PooledText.Number("", Math.Abs(s), AbsFormat(decimals), Inv) : Missing;
+
+    public static string Plus(double? seconds, int decimals = 1) =>
+        seconds is { } s && double.IsFinite(s) ? PooledText.Number("+", Math.Abs(s), AbsFormat(decimals), Inv) : "+" + Missing;
 
     public static string LapTime(double? seconds, string format)
     {
@@ -52,18 +82,36 @@ internal static class RaceFormat
         if (format is "sfull" or "smixed" or "s")
         {
             double r = Math.Round(s, decimals);
-            return (r - Math.Floor(r / 60) * 60).ToString(decimals switch { 0 => "0", 1 => "0.0", _ => "0.000" }, Inv);
+            return PooledText.Number("", r - Math.Floor(r / 60) * 60, decimals switch { 0 => "0", 1 => "0.0", _ => "0.000" }, Inv);
         }
         if (decimals == 0)
         {
             int whole = (int)Math.Round(s);
-            return $"{whole / 60}:{whole % 60:00}";
+            var t = new PooledBuilder(stackalloc char[PooledText.Room]);
+            t.Add(whole / 60);
+            t.Add(':');
+            t.Add(whole % 60, "00", CultureInfo.CurrentCulture);
+            return t.Done();
         }
         return LapTime(s, decimals);
     }
 
+    private const int Remembered = 1024;
+
+    [ThreadStatic] private static Dictionary<(string Name, string Format, bool NoDigits), string>? _names;
+
     public static string Name(string name, string format, bool noDigits = false)
     {
+        var names = _names ??= new();
+        var key = (name, format, noDigits);
+        if (names.TryGetValue(key, out var known)) return known;
+        if (names.Count >= Remembered) names.Clear();
+        return names[key] = FormatName(name, format, noDigits);
+    }
+
+    private static string FormatName(string name, string format, bool noDigits)
+    {
+        name = ProAm.Strip(name);
         if (noDigits)
         {
             var kept = new System.Text.StringBuilder(name.Length);
@@ -84,20 +132,42 @@ internal static class RaceFormat
 
     public static string Delta(double? seconds) => Gap(seconds, seconds is { } s && Math.Abs(s) < 10 ? 3 : 1);
 
-    public static string TimeOfDay(DateTime t) => t.ToString("h:mm tt", System.Globalization.CultureInfo.InvariantCulture);
+    [ThreadStatic] private static long _clockMinute;
+    [ThreadStatic] private static string? _clockText;
+
+    public static string TimeOfDay(DateTime t)
+    {
+        long minute = t.Ticks / TimeSpan.TicksPerMinute;
+        if (_clockText is not null && minute == _clockMinute) return _clockText;
+        _clockMinute = minute;
+        return _clockText = t.ToString("h:mm tt", System.Globalization.CultureInfo.InvariantCulture);
+    }
 
     public static string Clock(double? seconds)
     {
         if (seconds is not { } s || s < 0 || !double.IsFinite(s)) return Missing;
-        var t = TimeSpan.FromSeconds(Math.Floor(s));
-        return t.TotalHours >= 1 ? $"{(int)t.TotalHours}:{t.Minutes:00}:{t.Seconds:00}" : $"{t.Minutes}:{t.Seconds:00}";
+        var span = TimeSpan.FromSeconds(Math.Floor(s));
+        var current = CultureInfo.CurrentCulture;
+        var t = new PooledBuilder(stackalloc char[PooledText.Room]);
+        if (span.TotalHours >= 1)
+        {
+            t.Add((int)span.TotalHours);
+            t.Add(':');
+            t.Add(span.Minutes, "00", current);
+        }
+        else t.Add(span.Minutes);
+        t.Add(':');
+        t.Add(span.Seconds, "00", current);
+        return t.Done();
     }
 
     public static string Speed(double metresPerSecond, HudUnits u) =>
-        u == HudUnits.Imperial ? $"{metresPerSecond * 2.23694:0} {Units.Mph}" : $"{metresPerSecond * 3.6:0} {Units.Kmh}";
+        u == HudUnits.Imperial ? PooledText.Number("", metresPerSecond * 2.23694, "0", CultureInfo.CurrentCulture, " " + Units.Mph)
+            : PooledText.Number("", metresPerSecond * 3.6, "0", CultureInfo.CurrentCulture, " " + Units.Kmh);
 
     public static string SpeedKph(double kph, HudUnits u) =>
-        u == HudUnits.Imperial ? $"{kph / 1.609344:0} {Units.Mph}" : $"{kph:0} {Units.Kmh}";
+        u == HudUnits.Imperial ? PooledText.Number("", kph / 1.609344, "0", CultureInfo.CurrentCulture, " " + Units.Mph)
+            : PooledText.Number("", kph, "0", CultureInfo.CurrentCulture, " " + Units.Kmh);
 
     public static double SpeedValue(double metresPerSecond, HudUnits u) => u == HudUnits.Imperial ? metresPerSecond * 2.23694 : metresPerSecond * 3.6;
 
@@ -111,29 +181,32 @@ internal static class RaceFormat
     {
         if (litres is not { } l || !double.IsFinite(l)) return Missing;
         double v = FuelValue(l, u);
-        return v.ToString("0.00", Inv) + " " + FuelUnit(u);
+        return PooledText.Number("", v, "0.00", Inv, u == HudUnits.Imperial ? " " + Units.Gal : " " + Units.L);
     }
 
     public static string Temp(double? celsius, HudUnits u)
     {
         if (celsius is not { } c || !double.IsFinite(c)) return Missing;
-        return u == HudUnits.Imperial ? $"{c * 9 / 5 + 32:0}°F" : $"{c:0}°C";
+        return u == HudUnits.Imperial ? PooledText.Number("", c * 9 / 5 + 32, "0", CultureInfo.CurrentCulture, "°F")
+            : PooledText.Number("", c, "0", CultureInfo.CurrentCulture, "°C");
     }
 
     public static string TempDelta(double celsius, HudUnits u) =>
-        u == HudUnits.Imperial ? (celsius * 9 / 5).ToString("0.0", Inv) + "°F" : celsius.ToString("0.0", Inv) + "°C";
+        u == HudUnits.Imperial ? PooledText.Number("", celsius * 9 / 5, "0.0", Inv, "°F") : PooledText.Number("", celsius, "0.0", Inv, "°C");
 
     public static string Spread(double? seconds) =>
-        seconds is { } s && double.IsFinite(s) && s >= 0 ? "±" + (s / 2).ToString(s / 2 < 10 ? "0.00" : "0.0", Inv) : Missing;
+        seconds is { } s && double.IsFinite(s) && s >= 0 ? PooledText.Number("±", s / 2, s / 2 < 10 ? "0.00" : "0.0", Inv) : Missing;
 
     public static string Pressure(double? kpa, HudUnits u)
     {
         if (kpa is not { } p || !double.IsFinite(p) || p <= 0) return Missing;
-        return u == HudUnits.Imperial ? $"{p * 0.145038:0.0} {Units.Psi}" : $"{p:0} {Units.KPa}";
+        return u == HudUnits.Imperial ? PooledText.Number("", p * 0.145038, "0.0", CultureInfo.CurrentCulture, " " + Units.Psi)
+            : PooledText.Number("", p, "0", CultureInfo.CurrentCulture, " " + Units.KPa);
     }
 
     public static string Distance(double metres, HudUnits u) =>
-        u == HudUnits.Imperial ? $"{metres * 3.28084:0} {Units.Ft}" : $"{metres:0} {Units.M}";
+        u == HudUnits.Imperial ? PooledText.Number("", metres * 3.28084, "0", CultureInfo.CurrentCulture, " " + Units.Ft)
+            : PooledText.Number("", metres, "0", CultureInfo.CurrentCulture, " " + Units.M);
 
     public static string Gear(int? gear) => gear switch { null => Missing, -1 => "R", 0 => "N", { } g => g.ToString(Inv) };
 
@@ -160,7 +233,7 @@ internal static class RaceFormat
         _ => "Extremely wet",
     };
 
-    public static string Pos(int position) => position > 0 ? "P" + position.ToString(Inv) : Missing;
+    public static string Pos(int position) => position > 0 ? PooledText.Number("P", position) : Missing;
 
     private static readonly string[] CompassPoints = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
 
@@ -171,7 +244,16 @@ internal static class RaceFormat
         return CompassPoints[(int)Math.Round(deg / 45) % 8];
     }
 
-    public static string License(string lic) => lic.StartsWith("Rookie", StringComparison.OrdinalIgnoreCase) ? "R" + lic[6..] : lic;
+    public static string License(string lic)
+    {
+        if (!lic.StartsWith("Rookie", StringComparison.OrdinalIgnoreCase)) return lic;
+        var t = new PooledBuilder(stackalloc char[PooledText.Room]);
+        t.Add('R');
+        t.AddSpan(lic.AsSpan(6));
+        return t.Done();
+    }
 
-    public static string IRating(int? ir) => ir is not { } v ? Missing : v >= 1000 ? (v / 1000.0).ToString("0.0", Inv) + "k" : v.ToString(Inv);
+    public static string IRating(int? ir) => ir is not { } v ? Missing
+        : v >= 1000 ? PooledText.Number("", v / 1000.0, "0.0", Inv, "k")
+        : v >= 0 ? PooledText.Number("", v) : v.ToString(Inv);
 }

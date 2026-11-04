@@ -8,6 +8,14 @@ internal static class Undercut
 
     public static double Needed(double gap, int laps) => Math.Abs(gap) / Math.Max(1, laps);
 
+    public static int? FirstLap(double gap, double? tyreGain)
+    {
+        if (tyreGain is not { } gain) return null;
+        for (int k = 1; k <= Laps; k++)
+            if (Needed(gap, k) <= gain) return k;
+        return null;
+    }
+
     public static double? TyreGain(IReadOnlyList<LapRecord> laps, int stintStartLap)
     {
         var stint = new List<double>();

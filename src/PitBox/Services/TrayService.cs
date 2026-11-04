@@ -107,6 +107,15 @@ internal sealed class TrayService : IDisposable
         Safe(() => _icon.ShowBalloonTip(3000, title, text, icon));
     }
 
+    internal static string SentenceCase(string title)
+    {
+        var words = title.Split(' ');
+        for (int i = 1; i < words.Length; i++)
+            if (words[i].Length > 1 && words[i].Skip(1).All(c => !char.IsUpper(c)))
+                words[i] = char.ToLowerInvariant(words[i][0]) + words[i][1..];
+        return string.Join(' ', words);
+    }
+
     private void Rebuild()
     {
         var old = _menu.Items.Cast<ToolStripItem>().ToList();
@@ -120,12 +129,18 @@ internal sealed class TrayService : IDisposable
         if (_app.Updates.Available && _app.Updates.Latest is { } update)
             _menu.Items.Add(new ToolStripMenuItem("Install update", null, (_, _) => _ = _app.Updates.InstallAsync()) { Font = Bold, Enabled = _app.Updates.State != UpdateState.Downloading });
         _menu.Items.Add(new ToolStripSeparator());
+        var pages = new ToolStripMenuItem("Go to page");
         foreach (var (key, title) in _app.NavPages().Where(p => p.Key != "settings"))
         {
             var k = key;
-            _menu.Items.Add(new ToolStripMenuItem(title, null, (_, _) => OpenRequested?.Invoke(k)));
+            pages.DropDownItems.Add(new ToolStripMenuItem(SentenceCase(title), null, (_, _) => OpenRequested?.Invoke(k)));
         }
-        _menu.Items.Add(new ToolStripSeparator());
+        if (pages.DropDownItems.Count > 0)
+        {
+            _menu.Items.Add(pages);
+            _menu.Items.Add(new ToolStripSeparator());
+        }
+        else pages.Dispose();
 
         if (_app.Plugins.IsActive(Plugins.PluginIds.Displays))
         {

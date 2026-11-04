@@ -61,6 +61,30 @@ internal sealed class SimRacingPlugin : Plugin
         yield return new PluginHotkey("hud.layout", "Next iRacing Overlay layout", () => h.NextLayoutHotkey, k => h.NextLayoutHotkey = k, () => Hud?.NextLayout(), "iRacing Overlay");
         yield return new PluginHotkey("hud.layout.previous", "Previous iRacing Overlay layout", () => h.PreviousLayoutHotkey, k => h.PreviousLayoutHotkey = k, () => Hud?.PreviousLayout(), "iRacing Overlay");
         yield return new PluginHotkey("hud.dismiss", "Dismiss iRacing Overlay alerts", () => h.DismissHotkey, k => h.DismissHotkey = k, () => Hud?.DismissAlerts(), "iRacing Overlay");
+        foreach (var layout in h.Layouts)
+        {
+            string group = $"Show / hide widgets in “{layout.Name}”";
+            foreach (var widget in layout.Widgets)
+            {
+                var w = widget;
+                if (HudCatalog.Find(w.Kind) is null) continue;
+                yield return new PluginHotkey(WidgetHotkeyId(layout, w), WidgetName(layout, w), () => w.Hotkey, k => w.Hotkey = k, () => Hud?.ToggleWidget(w), group);
+            }
+        }
+    }
+
+    public static string WidgetHotkeyId(Config.HudLayout layout, Config.HudWidgetConfig widget) => $"hud.widget:{layout.Name}:{widget.Id}";
+
+    public static string WidgetName(Config.HudLayout layout, Config.HudWidgetConfig widget)
+    {
+        string name = HudCatalog.Find(widget.Kind)?.Name ?? widget.Kind;
+        int index = 0;
+        foreach (var other in layout.Widgets)
+        {
+            if (ReferenceEquals(other, widget)) break;
+            if (other.Kind == widget.Kind) index++;
+        }
+        return index > 0 ? $"{name} {index + 1}" : name;
     }
 
     public override void AddTrayItems(WinForms.ToolStripItemCollection items, AppServices app)

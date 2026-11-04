@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using PitBox.Config;
+using PitBox.Theme;
 
 namespace PitBox.Views.Pages;
 
@@ -43,11 +44,12 @@ internal sealed partial class RaceHudWidgets
     private void EndNav()
     {
         if (_navLanding is not { } target || _navFrom is not { } from) return;
+        bool card = target.Style == Ui.Res<Style>("NavCard");
         Glide.To(_navLayer, from, target, marker =>
         {
-            marker.BorderThickness = new Thickness(3, 0, 0, 0);
-            marker.SetResourceReference(Border.BackgroundProperty, "AccentSoft");
-            marker.SetResourceReference(Border.BorderBrushProperty, "AccentText");
+            marker.BorderThickness = card ? Hairline.Edges() : new Thickness(3, 0, 0, 0);
+            marker.SetResourceReference(Border.BackgroundProperty, "Selected");
+            marker.SetResourceReference(Border.BorderBrushProperty, card ? "SelectedEdge" : "Accent");
         }, () =>
         {
             _navQuiet = true;

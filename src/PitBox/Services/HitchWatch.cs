@@ -151,6 +151,9 @@ internal static class HitchWatch
         foreach (var g in hitches.GroupBy(h => h.What).OrderByDescending(g => g.Max(h => h.Ms)))
             yield return $"  {g.Count(),4} × max {g.Max(h => h.Ms),6:0} ms  {g.Key}";
         yield return "";
+        foreach (var g in hitches.GroupBy(h => h.Context).OrderByDescending(g => g.Count()).Take(top))
+            yield return $"  {g.Count(),4} in [{g.Key}], {g.Sum(h => h.Ms),7:0} ms in all";
+        yield return "";
         foreach (var h in hitches.OrderByDescending(h => h.Ms).Take(top))
             yield return $"{h.Ms,6:0} ms  {h.What}  [{h.Context}]";
     }

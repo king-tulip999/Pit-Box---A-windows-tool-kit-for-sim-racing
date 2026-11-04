@@ -1,8 +1,10 @@
+using System.Text.Json.Serialization;
+
 namespace PitBox.Config;
 
 public enum ShakerChannel { Both, Left, Right }
 
-public enum ShakerIracing { Effects, GameAudio, Off }
+public enum ShakerMode { Effects, GameAudio, Off }
 
 public sealed class ShakerEffectSettings
 {
@@ -13,7 +15,7 @@ public sealed class ShakerEffectSettings
 
 public sealed class ShakerSettings
 {
-    public const int MinHz = 15, MaxHz = 120, MinCutoffHz = 40;
+    public const int MinHz = 15, MaxHz = 120, MinCutoffHz = 40, MinPort = 1024, MaxPort = 65535;
 
     public static readonly string[] DefaultGames =
     {
@@ -26,7 +28,10 @@ public sealed class ShakerSettings
     public ShakerChannel Channel { get; set; } = ShakerChannel.Both;
     public int Volume { get; set; } = 70;
 
-    public ShakerIracing InIracing { get; set; } = ShakerIracing.Effects;
+    [JsonPropertyName("InIracing")]
+    public ShakerMode Mode { get; set; } = ShakerMode.Effects;
+    public List<string> GamesOff { get; set; } = new();
+    public Dictionary<string, int> Ports { get; set; } = new();
     public bool OtherGames { get; set; }
     public int GameAudioStrength { get; set; } = 50;
     public int GameAudioCutoffHz { get; set; } = 80;
@@ -49,7 +54,19 @@ public sealed class ShakerSettings
         GameAudioStrength = Math.Clamp(GameAudioStrength, 0, 100);
         GameAudioCutoffHz = Math.Clamp(GameAudioCutoffHz, MinCutoffHz, MaxHz);
         Games = ParseGames(string.Join(",", Games ?? DefaultGames.ToList()));
+        GamesOff = (GamesOff ?? new()).Where(g => !string.IsNullOrWhiteSpace(g)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        Ports = (Ports ?? new()).Where(p => p.Key.Length > 0 && p.Value is >= MinPort and <= MaxPort).ToDictionary(p => p.Key, p => p.Value, StringComparer.OrdinalIgnoreCase);
     }
+
+    public bool GameOn(string id) => !GamesOff.Contains(id, StringComparer.OrdinalIgnoreCase);
+
+    public void SetGameOn(string id, bool on)
+    {
+        GamesOff.RemoveAll(g => string.Equals(g, id, StringComparison.OrdinalIgnoreCase));
+        if (!on) GamesOff.Add(id);
+    }
+
+    public int Port(string id, int fallback) => Ports.TryGetValue(id, out int port) ? port : fallback;
 
     public static List<string> ParseGames(string text) =>
         text.Split(new[] { ',', ';', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)

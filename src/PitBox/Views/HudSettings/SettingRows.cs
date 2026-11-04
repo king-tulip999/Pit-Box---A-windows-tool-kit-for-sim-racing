@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Documents;
 using PitBox.Config;
 using PitBox.Controls;
 using PitBox.SimRacing.Hud;
@@ -21,6 +20,7 @@ internal sealed class HudSettingContext
     public Action? Rebuild { get; init; }
     public Func<string, IReadOnlyList<IReadOnlyDictionary<string, string>>, IReadOnlyList<System.Windows.Media.ImageSource>?>? Pictures { get; init; }
     public Dictionary<string, ItemPicker> Pickers { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Action<string, string?>? HoverItem { get; init; }
     public HudOptions Options => new(Def, W);
     public HudOption Option(string key) => Def.Option(key) ?? throw new InvalidOperationException($"{Def.Kind} has no option {key}");
     public void SetOne(string key, string? value) => Set(new Dictionary<string, string?> { [key] = value });
@@ -29,6 +29,7 @@ internal sealed class HudSettingContext
 internal static class SettingRows
 {
     public const double LabelWidth = 172;
+    private const double UnpickedPicture = 0.5;
     private const double ComboWidth = 194;
 
     public static FrameworkElement Build(HudSetting s, HudSettingContext c, string? groupTitle = null) => s switch
@@ -46,12 +47,18 @@ internal static class SettingRows
     {
         var grid = new Grid { Margin = new Thickness(0, 2, 0, 2) };
         Ui.NameFor(control, label);
+        if (ToggleCards.IsSwitch(control))
+        {
+            grid.Margin = new Thickness(0, 3, 0, 3);
+            grid.Children.Add(ToggleCards.Row((CheckBox)control, ToggleCards.RowTitle(label), help));
+            return grid;
+        }
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(LabelWidth) });
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto, MinHeight = 28 });
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         var name = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
-        name.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Body"), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, MaxWidth = LabelWidth - 34 });
+        name.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Body"), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, MaxWidth = help is not null && !inlineHelp ? LabelWidth - 34 : LabelWidth - 10 });
         if (help is not null && !inlineHelp) name.Children.Add(HelpTip.For(help, label));
         grid.Children.Add(new Border { MinHeight = 28, VerticalAlignment = VerticalAlignment.Top, Child = name });
         control.HorizontalAlignment = HorizontalAlignment.Left;
@@ -98,7 +105,7 @@ internal static class SettingRows
                 int index = Math.Max(0, o.Choices.ToList().FindIndex(ch => ch.Id == current));
                 if (o.Choices.Count <= 3 && o.Choices.All(ch => ch.Label.Length < 22)
                     && c.Pictures?.Invoke(s.Id, o.Choices.Select(ch => (IReadOnlyDictionary<string, string>)new Dictionary<string, string> { [s.Key] = ch.Id }).ToList()) is { Count: > 0 } pictures && pictures.Count == o.Choices.Count)
-                    return Row(label, o.Help, true, PictureChoice(o.Choices.Select(ch => ch.Label).ToList(), o.Choices.Select(ch => ch.Help).ToList(), pictures, index, i => c.SetOne(s.Key, o.Choices[i].Id), "pic" + c.W.Id + s.Key));
+                    return PictureRow(label, o.Help, PictureChoice(o.Choices.Select(ch => ch.Label).ToList(), o.Choices.Select(ch => ch.Help).ToList(), pictures, index, i => c.SetOne(s.Key, o.Choices[i].Id), "pic" + c.W.Id + s.Key));
                 if (o.Choices.Count <= 3 && o.Choices.All(ch => ch.Label.Length < 22))
                     return Row(label, o.Help, true, Ui.Segmented(o.Choices.Select(ch => ch.Label).ToList(), index, i => c.SetOne(s.Key, o.Choices[i].Id), "opt" + c.W.Id + s.Key, o.Choices.Select(ch => ch.Help).ToList()));
                 string? help = string.Join("\n", new[] { o.Help }.Concat(o.Choices.Where(ch => ch.Help is not null).Select(ch => $"{ch.Label}: {ch.Help}")).OfType<string>());
@@ -108,6 +115,35 @@ internal static class SettingRows
             default:
                 return Row(label, o.Help, s.InlineHelp, new TextBlock { Text = current });
         }
+    }
+
+    private static Grid PictureRow(string label, string? help, FrameworkElement control)
+    {
+        var grid = Row(label, help, true, control);
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        bool? below = null;
+        void Place()
+        {
+            var tile = ((control as ContentControl)?.Content as Tile) ?? (control as Tile);
+            if (tile is not { Child: Panel panel }) return;
+            double need = tile.Padding.Left + tile.Padding.Right + tile.BorderThickness.Left + tile.BorderThickness.Right;
+            foreach (UIElement child in panel.Children)
+            {
+                child.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                need += child.DesiredSize.Width;
+            }
+            bool now = grid.ActualWidth - LabelWidth < need && grid.ActualWidth >= need;
+            if (now == below) return;
+            below = now;
+            Grid.SetRow(control, now ? 2 : 0);
+            Grid.SetColumn(control, now ? 0 : 1);
+            Grid.SetColumnSpan(control, now ? 2 : 1);
+            control.Margin = new Thickness(0, now ? 4 : 0, 0, 0);
+        }
+        grid.SizeChanged += (_, e) => { if (e.WidthChanged) Place(); };
+        if (control is ContentControl host)
+            host.Loaded += (_, _) => { below = null; Place(); };
+        return grid;
     }
 
     private static Tile PictureChoice(IReadOnlyList<string> labels, IReadOnlyList<string?> tips, IReadOnlyList<System.Windows.Media.ImageSource> pictures, int selected, Action<int> pick, string group)
@@ -126,7 +162,10 @@ internal static class SettingRows
                 Padding = new Thickness(7, 0, 7, 5), Margin = new Thickness(2, 0, 2, 4), ToolTip = tips[i],
             };
             System.Windows.Automation.AutomationProperties.SetName(rb, labels[i]);
-            rb.Checked += (_, _) => pick(index);
+            void Dim() => picture.Opacity = rb.IsChecked == true ? 1 : UnpickedPicture;
+            Dim();
+            rb.Checked += (_, _) => { Dim(); pick(index); };
+            rb.Unchecked += (_, _) => Dim();
             panel.Children.Add(rb);
         }
         return new Tile { Style = Ui.Res<Style>("Segmented"), Child = panel };
@@ -134,23 +173,15 @@ internal static class SettingRows
 
     public static WrapPanel Toggles(IReadOnlyList<(string Id, string Label, string? Help)> items, Func<string, bool> isOn, Action<string, bool> changed)
     {
-        var panel = new WrapPanel();
+        var panel = new WrapPanel { Margin = new Thickness(0, 2, 0, 2) };
         foreach (var (id, label, help) in items)
         {
-            var box = new CheckBox { Content = label, IsChecked = isOn(id), ToolTip = help };
+            var box = new CheckBox { Content = label, IsChecked = isOn(id), Margin = new Thickness(0, 5, 18, 5), ToolTip = help };
+            System.Windows.Automation.AutomationProperties.SetName(box, label);
             box.Click += (_, _) => changed(id, box.IsChecked == true);
-            panel.Children.Add(TickChip(box));
+            panel.Children.Add(box);
         }
         return panel;
-    }
-
-    public static Tile TickChip(CheckBox box)
-    {
-        box.Margin = new Thickness(3, 0, 5, 0);
-        box.VerticalAlignment = VerticalAlignment.Center;
-        var chip = new Tile { Style = Ui.Res<Style>("Chip"), Child = box, MinHeight = 24, Padding = new Thickness(5, 0, 5, 0), Margin = new Thickness(0, 0, 5, 5) };
-        chip.SetValue(TextElement.FontSizeProperty, 10.0);
-        return chip;
     }
 
     private static FrameworkElement Merged(MergedSetting m, HudSettingContext c)
@@ -176,7 +207,7 @@ internal static class SettingRows
                 host.Content = Ui.Segmented(labels, m.Index(o), Pick, "merged" + c.W.Id + m.Id, tips);
         }
         Render();
-        return Row(m.Label ?? m.Title, m.Help, true, host);
+        return PictureRow(m.Label ?? m.Title, m.Help, host);
     }
 
     private static bool Repeats(string title, string? groupTitle) => string.Equals(title, groupTitle, StringComparison.OrdinalIgnoreCase);
@@ -187,7 +218,7 @@ internal static class SettingRows
         string title = p.Label ?? o.Label;
         var picker = new ItemPicker(title, o.Help, o.Choices, p.Categories,
             new[] { new PickerLane(p.Key, null, c.Options.Value(p.Key), o.Default) },
-            values => c.SetOne(p.Key, values[0]), !Repeats(title, groupTitle));
+            values => c.SetOne(p.Key, values[0]), !Repeats(title, groupTitle)) { HoverItem = c.HoverItem };
         c.Pickers[p.Key] = picker;
         return picker;
     }
@@ -197,8 +228,8 @@ internal static class SettingRows
         var first = c.Option(l.Lanes[0].Key);
         var lanes = l.Lanes.Select(x => new PickerLane(x.Key, x.Lane, c.Options.Value(x.Key), c.Option(x.Key).Default)).ToList();
         string title = l.Label ?? l.Title;
-        var picker = new ItemPicker(title, l.Help ?? "Items in a bar above or below the widget. Drag between Top and Bottom.", first.Choices, l.Categories, lanes,
-            values => c.Set(l.Lanes.Select((x, i) => (x.Key, values[i])).ToDictionary(v => v.Key, v => (string?)v.Item2, StringComparer.OrdinalIgnoreCase)), !Repeats(title, groupTitle));
+        var picker = new ItemPicker(title, l.Help ?? "Bars above and below the widget. Drag items in the preview to reorder them or move them between bars.", first.Choices, l.Categories, lanes,
+            values => c.Set(l.Lanes.Select((x, i) => (x.Key, values[i])).ToDictionary(v => v.Key, v => (string?)v.Item2, StringComparer.OrdinalIgnoreCase)), !Repeats(title, groupTitle)) { HoverItem = c.HoverItem };
         foreach (var x in l.Lanes) c.Pickers[x.Key] = picker;
         return picker;
     }

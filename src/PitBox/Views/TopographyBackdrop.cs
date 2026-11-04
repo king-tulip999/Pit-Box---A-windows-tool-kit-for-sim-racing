@@ -16,6 +16,18 @@ internal sealed class TopographyBackdrop : Grid
 
     private static byte[]? _mask;
     private static int _maskWidth, _maskHeight;
+    private static readonly object MaskGate = new();
+
+    public static void Preload()
+    {
+        var thread = new Thread(() =>
+        {
+            LoadMask();
+            System.Windows.Threading.Dispatcher.FromThread(Thread.CurrentThread)?.InvokeShutdown();
+        }) { IsBackground = true, Name = "Pit-Box backdrop" };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+    }
 
     private readonly Image _image = new() { Stretch = Stretch.UniformToFill, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
 
@@ -29,15 +41,15 @@ internal sealed class TopographyBackdrop : Grid
         Unloaded += (_, _) => ThemeManager.Changed -= Apply;
     }
 
-    public static Color Bg => ThemeManager.Current.BackdropBg ?? ThemeManager.ColorOf("Bg", Colors.Black);
+    public static Color Bg => ThemeManager.ColorOf("Bg", Colors.Black);
 
-    public static Color Line => ThemeManager.Current.BackdropLine ?? ThemeManager.ColorOf(LineKey, Colors.Gray);
+    public static Color Line => ThemeManager.ColorOf(LineKey, Colors.Gray);
 
     private void Apply()
     {
         var bg = Bg;
         var line = Line;
-        double alpha = ThemeManager.Current.BackdropLine is null ? BackdropLook.LineAlpha(line, bg) : 1;
+        double alpha = BackdropLook.LineAlpha(line, bg);
         var fill = new SolidColorBrush(bg);
         fill.Freeze();
         Background = fill;
@@ -57,27 +69,30 @@ internal sealed class TopographyBackdrop : Grid
 
     private static bool LoadMask()
     {
-        if (_mask is not null) return true;
-        try
+        lock (MaskGate)
         {
-            var source = new BitmapImage();
-            source.BeginInit();
-            source.UriSource = new Uri("pack://application:,,,/Assets/BackdropLines.png");
-            source.DecodePixelWidth = DecodeWidth;
-            source.CacheOption = BitmapCacheOption.OnLoad;
-            source.EndInit();
-            var gray = new FormatConvertedBitmap(source, PixelFormats.Gray8, null, 0);
-            _maskWidth = gray.PixelWidth;
-            _maskHeight = gray.PixelHeight;
-            var bytes = new byte[_maskWidth * _maskHeight];
-            gray.CopyPixels(bytes, _maskWidth, 0);
-            _mask = bytes;
-            return true;
-        }
-        catch (Exception ex)
-        {
-            App.LogError(ex);
-            return false;
+            if (_mask is not null) return true;
+            try
+            {
+                var source = new BitmapImage();
+                source.BeginInit();
+                source.UriSource = new Uri("pack://application:,,,/Assets/BackdropLines.png");
+                source.DecodePixelWidth = DecodeWidth;
+                source.CacheOption = BitmapCacheOption.OnLoad;
+                source.EndInit();
+                var gray = new FormatConvertedBitmap(source, PixelFormats.Gray8, null, 0);
+                _maskWidth = gray.PixelWidth;
+                _maskHeight = gray.PixelHeight;
+                var bytes = new byte[_maskWidth * _maskHeight];
+                gray.CopyPixels(bytes, _maskWidth, 0);
+                _mask = bytes;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                App.LogError(ex);
+                return false;
+            }
         }
     }
 }

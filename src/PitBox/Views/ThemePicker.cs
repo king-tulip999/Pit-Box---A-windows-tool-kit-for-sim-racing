@@ -24,6 +24,13 @@ internal sealed class ThemePicker : UniformGrid
         }
     }
 
+    public static int Balanced(int most = 3)
+    {
+        int count = Math.Max(1, Themes.All.Count);
+        int rows = (count + most - 1) / most;
+        return (count + rows - 1) / rows;
+    }
+
     private static Button Swatch(ThemeSpec theme, bool selected, Action<AppTheme> pick, double height, Action<FrameworkElement>? menu)
     {
         var c = ThemeManager.Resolve(theme);
@@ -77,7 +84,7 @@ internal sealed class ThemePicker : UniformGrid
             Style = Ui.Res<Style>("Btn"), Height = height, Margin = new Thickness(0, 0, 8, 8), Padding = new Thickness(4),
             HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch,
             Background = Of("Bg"), BorderBrush = selected ? Ui.Res<Brush>("Accent") : Ui.Res<Brush>("LineStrong"),
-            BorderThickness = new Thickness(selected ? 2 : 1), Content = face, ToolTip = theme.Label,
+            BorderThickness = selected ? new Thickness(2) : Hairline.Edges(), Content = face, ToolTip = theme.Label,
         };
         button.MouseEnter += (_, _) => button.BorderBrush = Ui.Res<Brush>("Accent");
         button.MouseLeave += (_, _) => button.BorderBrush = selected ? Ui.Res<Brush>("Accent") : Ui.Res<Brush>("LineStrong");

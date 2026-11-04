@@ -533,8 +533,9 @@ internal sealed class HardwareService : IDisposable
             try
             {
                 SyncExtra(full, monitorMs);
-                if (quick) UpdateSnapshotDevices();
-                else UpdateDevices(computer);
+                if (deep) UpdateDevices(computer);
+                else if (fanLoop) UpdateFanDevices(fans);
+                else UpdateSnapshotDevices();
 
                 bool recount = !quick && _sensorsChanged;
                 if (recount) _sensorsChanged = false;
@@ -725,6 +726,22 @@ internal sealed class HardwareService : IDisposable
     private void UpdateDevices(IComputer computer)
     {
         foreach (var hw in computer.Hardware) UpdateTimed(hw);
+        ReadSlowDevices();
+    }
+
+    private readonly List<IHardware> _fanDevices = new();
+
+    private void UpdateFanDevices(FanController fans)
+    {
+        UpdateSnapshotDevices();
+        fans.DevicesInUse(_fanDevices);
+        foreach (var hw in _fanDevices)
+            if (hw != _cpu && hw != _gpu && !_memory.Contains(hw)) UpdateTimed(hw);
+        ReadSlowDevices();
+    }
+
+    private void ReadSlowDevices()
+    {
         if (_slowRead is { IsCompletedSuccessfully: true } read)
         {
             _slowRead = null;
@@ -936,9 +953,13 @@ internal sealed class HardwareService : IDisposable
             .FirstOrDefault();
 
         _memory.Clear();
-        _memory.AddRange(computer.Hardware.Where(h => h.HardwareType == HardwareType.Memory));
+        _memory.AddRange(computer.Hardware.Where(FeedsRam));
         InvalidateSensorCache();
     }
+
+    private static bool FeedsRam(IHardware hw) =>
+        hw.HardwareType == HardwareType.Memory && !hw.Name.Contains("Virtual", StringComparison.OrdinalIgnoreCase)
+        && Find(hw, SensorType.Data, "Memory Used", "Memory Available").Length > 0;
 
     private sealed class SnapshotSensors
     {

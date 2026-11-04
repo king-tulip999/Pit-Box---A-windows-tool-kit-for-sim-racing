@@ -72,7 +72,7 @@ internal sealed class HudQuickEditor : Window, IHudEditorHost
         SetResourceReference(BorderBrushProperty, "LineStrong");
         Hairline.Frame(this);
 
-        _undo = Ui.IconButton("I.Undo", "Undo the last move or resize", () => { _hud.Undo(); Refresh(); });
+        _undo = Ui.IconButton("I.Undo", "Undo the last move or scale", () => { _hud.Undo(); Refresh(); });
         _redo = Ui.IconButton("I.Redo", "Redo", () => { _hud.Redo(); Refresh(); });
         _snap = Ui.LabeledButton("I.Hash", "Snap", () => { _hud.ToggleSnap(); Refresh(); }, "GhostButton");
         _snap.ToolTip = "Snap widgets to the grid and to each other while dragging (hold Alt for a free move). Click to switch on / off.";
@@ -111,7 +111,7 @@ internal sealed class HudQuickEditor : Window, IHudEditorHost
 
         var hint = new TextBlock
         {
-            Text = "Drag a widget on screen to move it; drag its right or bottom edge or its corner to resize. Click one on screen to open its settings here.",
+            Text = "Drag a widget on screen to move it; drag its corner to scale it. Click one on screen to open its settings here.",
             Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(15, 8, 15, 2),
         };
         _widgets = new RaceHudWidgets(app, this);
@@ -146,6 +146,8 @@ internal sealed class HudQuickEditor : Window, IHudEditorHost
     public string ShownLayout => _hud.LayoutName is { Length: > 0 } n ? n : _app.Config.SimRacing.Hud.ActiveLayout;
 
     public void Changed() => _hud.SettingsChanged();
+
+    public void ShowSettings() => _widgets.ShowTab(null);
 
     private void OnPicked(string id) => _widgets.SelectId(id);
 
@@ -198,7 +200,7 @@ internal sealed class HudQuickEditor : Window, IHudEditorHost
         stack.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("H3"), TextWrapping = TextWrapping.Wrap });
         stack.Children.Add(new TextBlock { Text = message, Style = Ui.Res<Style>("Muted"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 5, 0, 11) });
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        var cancel = new Button { Content = "Cancel", Margin = new Thickness(0, 0, 6, 0) };
+        var cancel = new Button { Content = "Cancel", Margin = Ui.AfterButton };
         cancel.Click += (_, _) => EndConfirm(false);
         var ok = new Button { Content = confirmText, Style = Ui.Res<Style>(danger ? "DangerConfirmButton" : "PrimaryButton") };
         ok.Click += (_, _) => EndConfirm(true);

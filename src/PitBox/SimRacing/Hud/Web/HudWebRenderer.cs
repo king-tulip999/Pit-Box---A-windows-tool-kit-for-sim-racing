@@ -20,6 +20,7 @@ internal sealed class HudWebRenderer : IDisposable
         public HudWidget? Widget;
         public readonly HudPainter Painter = new();
         public readonly DibSurface Surface = new();
+        public readonly PresentGuard Drawn = new();
         public long LastSeq = -1;
         public long LastDraw;
         public byte[]? Last;
@@ -35,6 +36,7 @@ internal sealed class HudWebRenderer : IDisposable
 
     private static readonly byte[] Empty = Array.Empty<byte>();
     private readonly Dictionary<HudWebClient, Target> _targets = new(ReferenceEqualityComparer.Instance);
+    private readonly List<HudWebClient> _stale = new();
     private readonly Dictionary<string, HudWidgetConfig> _fallbacks = new(StringComparer.OrdinalIgnoreCase);
     private readonly MemoryStream _png = new();
     private readonly TelemetryFrame _sampleFrame = new();
@@ -48,11 +50,15 @@ internal sealed class HudWebRenderer : IDisposable
     public int Render(IReadOnlyList<HudWebClient> clients, TelemetryFrame frame, RaceState race, RaceHudSettings settings, HudLayout? layout, HudPalette palette, bool dirty)
     {
         int fastest = 0;
-        foreach (var stale in _targets.Keys.Where(k => !clients.Contains(k)).ToList())
+        _stale.Clear();
+        foreach (var known in _targets.Keys)
+            if (!clients.Contains(known)) _stale.Add(known);
+        foreach (var stale in _stale)
         {
             _targets[stale].Dispose();
             _targets.Remove(stale);
         }
+        _stale.Clear();
         long now = Stopwatch.GetTimestamp();
         bool live = frame.Status == SimStatus.Connected;
         bool sampled = !live && AdvanceSample(clients, settings);
@@ -84,7 +90,7 @@ internal sealed class HudWebRenderer : IDisposable
                 client.Say(string.Create(CultureInfo.InvariantCulture, $"{{\"type\":\"look\",\"opacity\":{Math.Clamp(config.Opacity / 100, 0, 1):0.###}}}"));
             }
             var bytes = Draw(t, shown, shownRace, settings, palette, size);
-            if (t.Last is not null && bytes.AsSpan().SequenceEqual(t.Last)) continue;
+            if (ReferenceEquals(bytes, t.Last) || t.Last is not null && bytes.AsSpan().SequenceEqual(t.Last)) continue;
             t.Last = bytes;
             client.Offer(bytes);
         }
@@ -144,6 +150,7 @@ internal sealed class HudWebRenderer : IDisposable
         t.Widget!.Paint(p, view);
         p.FinishPanels();
         p.End(t.Surface.Dc, size);
+        if (t.Drawn.Same(t.Surface.Bits, size.Width * size.Height * 4, new Point(size.Width, size.Height), 255) && t.Last is { Length: > 0 } unchanged) return unchanged;
         _png.SetLength(0);
         t.Surface.Bitmap!.Save(_png, ImageFormat.Png);
         return _png.ToArray();

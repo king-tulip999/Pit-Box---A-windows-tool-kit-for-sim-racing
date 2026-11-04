@@ -677,7 +677,7 @@ internal sealed class RaceState
     private static readonly string[] SlowerKeys = Enumerable.Range(0, TelemetryFrame.MaxCars).Select(i => "traffic.slower:" + i).ToArray();
 
     public static string Name(TelemetryFrame f, int car) =>
-        f.Session.ByCar.TryGetValue(car, out var d) ? (d.Name.Length > 0 ? d.Name : d.TeamName) : $"Car {car}";
+        f.Session.ByCar.TryGetValue(car, out var d) ? (d.Name.Length > 0 ? ProAm.Strip(d.Name) : d.TeamName) : $"Car {car}";
 
     private void AddEvent(TelemetryFrame f, string text, AlertLevel level)
     {

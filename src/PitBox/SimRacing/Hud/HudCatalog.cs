@@ -25,19 +25,19 @@ internal static class HudCatalog
         new("traffic", "Multiclass traffic", "Other classes within a few seconds, closing rates and when you'll meet.", 320, 160, () => new TrafficWidget())
             { MinW = 180, MinH = 70, DefaultHz = 5, Options = TrafficWidget.Options, Editor = Editors.TrafficEditor.Def, HideWhenEmpty = true },
         new("radar", "Car radar", "The cars around you from above: alongside in red from iRacing's spotter signal, ahead and behind in amber getting stronger as they close, with the distance to the nearest.", 140, 220, () => new RadarWidget())
-            { MinW = 80, MinH = 110, DefaultHz = 30, Options = RadarWidget.Options, Editor = Editors.RadarEditor.Def, HideWhenEmpty = true,
+            { FixedSize = true, MinW = 80, MinH = 110, DefaultHz = 30, Options = RadarWidget.Options, Editor = Editors.RadarEditor.Def, HideWhenEmpty = true,
               Limits = "iRacing doesn't publish where other cars are across the track, only which side is taken, so with a car on each side Pit-Box can't tell which is which. Car lengths are learned from your first few overlaps; until then ahead and behind show as lines." },
         new("tyres", "Tires", "Pressures, temperatures (inner / middle / outer) and wear for each corner.", 280, 180, () => new TyresWidget())
-            { MinW = 180, MinH = 124, DefaultHz = 2, Options = TyresWidget.Options, Editor = Editors.TyresEditor.Def,
+            { FixedSize = true, MinW = 180, MinH = 124, DefaultHz = 2, Options = TyresWidget.Options, Editor = Editors.TyresEditor.Def,
               Limits = "iRacing updates tire data in the pit box, not while driving." },
         new("weather", "Weather and track", "The sky, track wetness and rain, air and track temperature, humidity, and the wind as a pointer turning with your car.", 340, 124, () => new WeatherWidget())
-            { MinW = 140, MinH = 80, DefaultHz = 5, Options = WeatherWidget.Options, Editor = Editors.WeatherEditor.Def,
+            { FixedSize = true, MinW = 140, MinH = 80, DefaultHz = 5, Options = WeatherWidget.Options, Editor = Editors.WeatherEditor.Def,
               Limits = "No forecast: iRacing doesn't publish one." },
         new("wind", "Wind", "A pointer in a dotted dial showing where the wind blows, with its speed under it, turning with your car: red for a headwind, amber across, green behind.", 150, 150, () => new WindWidget())
-            { MinW = 70, MinH = 70, DefaultHz = 5, Options = WindWidget.Options, Editor = Editors.WindEditor.Def,
+            { FixedSize = true, MinW = 70, MinH = 70, DefaultHz = 5, Options = WindWidget.Options, Editor = Editors.WindEditor.Def,
               Limits = "iRacing gives the wind at the start / finish line, the same all round the track." },
         new("map", "Track map", "The track from iRacing's own maps, upright or turning with your car, whole or zoomed in on you, with the pit lane, start / finish and turn numbers, and every car as a dot in its class color; you stand out.", 300, 260, () => new MapWidget())
-            { MinW = 140, MinH = 120, DefaultHz = 15, MovingHz = 60, Moves = MapWidget.Moves, Background = 0, Options = MapWidget.Options, Editor = Editors.MapEditor.Def,
+            { FixedSize = true, MinW = 140, MinH = 120, DefaultHz = 15, MovingHz = 60, Moves = MapWidget.Moves, Background = 0, Options = MapWidget.Options, Editor = Editors.MapEditor.Def,
               Limits = "Cars are placed along the track's center line from their distance round the lap; tracks without a bundled map show none." },
         new("laps", "Lap history", "Your laps with deltas, what happened on them, fuel used, and consistency.", 320, 260, () => new LapsWidget())
             { MinW = 200, MinH = 110, DefaultHz = 2, Options = LapsWidget.Options, Editor = Editors.LapsEditor.Def },
@@ -45,7 +45,7 @@ internal static class HudCatalog
             { MinW = 180, MinH = 80, DefaultHz = 2, Options = GoalsWidget.Options, Editor = Editors.GoalsEditor.Def, HideWhenEmpty = true, Natural = GoalsWidget.Natural,
               Limits = "Counts the laps the overlay sees this session; laps with incident points or pit road don't count." },
         new("notes", "Notes", "Your notes for this track and car: the next corner's note lights up as you get close, with the notes for the whole track under it.", 300, 140, () => new NotesWidget())
-            { MinW = 180, MinH = 60, DefaultHz = 5, Options = NotesWidget.Options, Editor = Editors.NotesEditor.Def, HideWhenEmpty = true,
+            { FixedSize = true, MinW = 180, MinH = 60, DefaultHz = 5, Options = NotesWidget.Options, Editor = Editors.NotesEditor.Def, HideWhenEmpty = true,
               Limits = "Notes are written in Session Stats, on the Performance card for each car and track." },
         new("events", "Race events", "A timeline of flags, pit stops, places gained or lost, incidents and best laps.", 320, 200, () => new EventsWidget())
             { MinW = 300, MinH = 130, DefaultHz = 2, Options = EventsWidget.Options, Editor = Editors.EventsEditor.Def },
@@ -56,7 +56,7 @@ internal static class HudCatalog
             { MinW = 225, MinH = 50, DefaultHz = 30, Options = InputsWidget.Options, Editor = Editors.InputsEditor.Def, Natural = InputsWidget.Natural,
               Limits = "The shift point, limiter flash and RPM scale come from iRacing's figures for your car." },
         new("block", "Data block", "Any single value (live, session or calculated) as a number, bar or graph.", 170, 80, () => new BlockWidget())
-            { MinW = 150, MinH = 72, DefaultHz = 10, Options = BlockWidget.Options, Editor = Editors.BlockEditor.Def },
+            { FixedSize = true, MinW = 150, MinH = 72, DefaultHz = 10, Options = BlockWidget.Options, Editor = Editors.BlockEditor.Def },
     };
 
     private static readonly Dictionary<string, HudWidgetDef> ByKind = All.ToDictionary(d => d.Kind, StringComparer.OrdinalIgnoreCase);

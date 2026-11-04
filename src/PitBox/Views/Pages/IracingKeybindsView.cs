@@ -65,7 +65,7 @@ internal sealed class KeybindsBoard : StackPanel
     private readonly StackPanel _filters = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
     private readonly StackPanel _rail = new();
     private readonly Border _pane = new();
-    private readonly TextBox _search = new() { Tag = "Search keybinds", Width = 300, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBox _search = Ui.Search(new TextBox { Tag = "Search keybinds", Width = 300, VerticalAlignment = VerticalAlignment.Center });
     private readonly HotkeyBox _findBox = new() { Placeholder = "Find a key", ForSearch = true, NumpadByPosition = true, Width = 150, VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock _setNumber = SetNumber();
 
@@ -194,14 +194,13 @@ internal sealed class KeybindsBoard : StackPanel
         grid.Children.Add(ProfileBlock());
         Grid.SetColumn(_summary, 1);
         grid.Children.Add(_summary);
-        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Margin = new Thickness(0, 0, 0, 12), ClipToBounds = true, Child = grid };
+        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), ClipToBounds = true, Child = grid };
     }
 
     private FrameworkElement ProfileBlock()
     {
         var stack = new StackPanel { Margin = new Thickness(20, 14, 22, 13) };
-        var eyebrow = new TextBlock { Text = "Editing control profile", Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 7) };
-        eyebrow.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
+        var eyebrow = new TextBlock { Text = "Editing control profile", Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 0, 0, 7) };
         Ui.AddInfo(eyebrow, IracingKeybindsView.ProfileExplained + " iRacing saves its own copy of the keys when it exits, so changes here only work while it's closed. Wheel and button-box bindings are shown but set in iRacing. To bind a number-pad key, turn Num Lock off first.");
         stack.Children.Add(eyebrow);
         stack.Children.Add(ProfilePicker());
@@ -366,7 +365,7 @@ internal sealed class KeybindsBoard : StackPanel
         {
             int n = _entries.Count(e => Passes(e, filter));
             var count = new TextBlock { Text = n.ToString(CultureInfo.CurrentCulture), Margin = new Thickness(7, 0, 0, 0), Opacity = 0.6, VerticalAlignment = VerticalAlignment.Center };
-            var button = new Button { Content = new StackPanel { Orientation = Orientation.Horizontal, Children = { new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center }, count } }, Margin = new Thickness(0, 0, 4, 0) };
+            var button = new Button { Content = new StackPanel { Orientation = Orientation.Horizontal, Children = { new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center }, count } }, Margin = Ui.AfterButton };
             Ui.SetToggled(button, _filter == filter);
             var pick = filter;
             button.Click += (_, _) => { _filter = pick; _clash = null; Render(); };
@@ -402,7 +401,7 @@ internal sealed class KeybindsBoard : StackPanel
             var grid = new Grid();
             grid.ColumnDefinitions.Add(new ColumnDefinition());
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var name = TextFit.TipWhenTrimmed(new TextBlock { Text = group, FontSize = RailText, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 8, 0) });
+            var name = TextFit.TipWhenTrimmed(new TextBlock { Text = group, FontSize = RailText, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 16, 0) });
             if (on) name.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
             grid.Children.Add(name);
             var count = new TextBlock { Style = Ui.Res<Style>("Caption"), FontSize = RailCount, VerticalAlignment = VerticalAlignment.Center };
@@ -416,7 +415,7 @@ internal sealed class KeybindsBoard : StackPanel
             if (on)
             {
                 holder.SetResourceReference(Panel.BackgroundProperty, "AccentSoft");
-                var bar = new Border { Width = 2, HorizontalAlignment = HorizontalAlignment.Left };
+                var bar = new Border { Width = 3, HorizontalAlignment = HorizontalAlignment.Left };
                 bar.SetResourceReference(Border.BackgroundProperty, "Accent");
                 holder.Children.Add(bar);
             }
@@ -536,14 +535,22 @@ internal sealed class KeybindsBoard : StackPanel
         if (blocks.Count > 0)
         {
             var columns = new MasonryPanel { MinColumnWidth = 340, MaxColumns = 2, Gap = 28, Stable = true };
+            bool titled = blocks.Count > 1 && blocks.Any(b => b.Title is not null);
             foreach (var (title, items) in blocks)
             {
                 var block = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
                 if (title is not null) block.Children.Add(SectionHead(title));
+                else if (titled) block.Children.Add(SectionHead(""));
                 foreach (var e in items) block.Children.Add(Row(e));
                 columns.Children.Add(block);
             }
             stack.Children.Add(columns);
+            if (_clash is { } rowClash && blocks.Any(b => b.Items.Any(e => e.Id == rowClash.Entry.Id)))
+            {
+                var strip = ClashStrip(rowClash, named: true);
+                strip.Margin = new Thickness(10, 12, 0, 0);
+                stack.Children.Add(strip);
+            }
         }
         if (gears is not null)
         {
@@ -559,7 +566,7 @@ internal sealed class KeybindsBoard : StackPanel
     }
 
     private static TextBlock SectionHead(string title) =>
-        new() { Text = title, Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 4) };
+        new() { Text = title, Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 0, 0, 4) };
 
     private static readonly Dictionary<string, string> Titles = new(StringComparer.Ordinal)
     {
@@ -594,9 +601,11 @@ internal sealed class KeybindsBoard : StackPanel
         else if (set) keys.Child = Caps(entry.Get()!);
         else
         {
-            hint = new TextBlock { Text = "Set", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 0, 6, 0) };
-            hint.SetResourceReference(TextBlock.ForegroundProperty, "TextFaint");
-            keys.Child = hint;
+            hint = new TextBlock { Text = "Set keybind", FontWeight = FontWeights.SemiBold, FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center };
+            hint.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
+            var action = Hairline.Frame(new Border { Height = 24, Padding = new Thickness(8, 0, 8, 0), Child = hint });
+            action.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
+            keys.Child = action;
         }
         Grid.SetColumn(keys, 1);
         grid.Children.Add(keys);
@@ -613,19 +622,12 @@ internal sealed class KeybindsBoard : StackPanel
             grid.Children.Add(undo);
         }
 
-        if (_clash is { } clash && clash.Entry.Id == entry.Id)
-        {
-            var strip = ClashStrip(clash);
-            Grid.SetRow(strip, 1);
-            Grid.SetColumnSpan(strip, 3);
-            grid.Children.Add(strip);
-        }
-
+        bool clashing = _clash is { } clash && clash.Entry.Id == entry.Id;
         var holder = new Grid { Background = Brushes.Transparent, Children = { grid } };
-        if (changed)
+        if (changed || clashing)
         {
             var bar = new Border { Width = 2, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Height = RowHeight - 18, Margin = new Thickness(0, 9, 0, 0) };
-            bar.SetResourceReference(Border.BackgroundProperty, "Accent");
+            bar.SetResourceReference(Border.BackgroundProperty, clashing ? "Apricot" : "Accent");
             holder.Children.Add(bar);
         }
         var row = Hairline.Frame(new Border { Child = holder, Cursor = locked ? null : Cursors.Hand, ToolTip = locked ? entry.Locked : null }, Sides.Bottom);
@@ -633,7 +635,7 @@ internal sealed class KeybindsBoard : StackPanel
         AutomationProperties.SetName(row, entry.Label);
         row.MouseEnter += (_, _) =>
         {
-            holder.SetResourceReference(Panel.BackgroundProperty, "SurfaceAlt");
+            holder.SetResourceReference(Panel.BackgroundProperty, "Hover");
             if (undo is not null) undo.Opacity = 1;
             hint?.SetResourceReference(TextBlock.ForegroundProperty, "AccentText");
         };
@@ -641,7 +643,7 @@ internal sealed class KeybindsBoard : StackPanel
         {
             holder.Background = Brushes.Transparent;
             if (undo is not null) undo.Opacity = 0;
-            hint?.SetResourceReference(TextBlock.ForegroundProperty, "TextFaint");
+            hint?.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
         };
         if (!locked)
             row.MouseLeftButtonUp += (_, e) =>
@@ -674,10 +676,10 @@ internal sealed class KeybindsBoard : StackPanel
             ToolTip = locked ? entry.Locked : entry.Label,
         });
         tile.SetResourceReference(Border.BackgroundProperty, "SurfaceAlt");
-        tile.SetResourceReference(Border.BorderBrushProperty, _clash?.Entry.Id == entry.Id ? "Apricot" : "LineStrong");
+        tile.SetResourceReference(Border.BorderBrushProperty, _clash?.Entry.Id == entry.Id ? "Apricot" : "Line");
         AutomationProperties.SetName(tile, entry.Label);
-        tile.MouseEnter += (_, _) => tile.SetResourceReference(Border.BorderBrushProperty, "TextMuted");
-        tile.MouseLeave += (_, _) => tile.SetResourceReference(Border.BorderBrushProperty, _clash?.Entry.Id == entry.Id ? "Apricot" : "LineStrong");
+        tile.MouseEnter += (_, _) => tile.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
+        tile.MouseLeave += (_, _) => tile.SetResourceReference(Border.BorderBrushProperty, _clash?.Entry.Id == entry.Id ? "Apricot" : "Line");
         if (!locked) tile.MouseLeftButtonUp += (_, _) => Edit(entry, keys, GearWidth - 8);
         return tile;
     }
@@ -745,17 +747,19 @@ internal sealed class KeybindsBoard : StackPanel
         return other is null ? null : new Clash(mine, other, hotkey, before);
     }
 
-    private FrameworkElement ClashStrip(Clash clash)
+    private FrameworkElement ClashStrip(Clash clash, bool named = false)
     {
         var line = new WrapPanel { Margin = new Thickness(10, 2, 0, 9) };
         var text = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 4), TextWrapping = TextWrapping.Wrap, MaxWidth = 420 };
         text.SetResourceReference(TextBlock.ForegroundProperty, "ApricotDeep");
         string where = GroupOf(clash.Other) == GroupOf(clash.Entry) ? "" : $" ({GroupOf(clash.Other)})";
-        text.Text = $"{PitBox.Hotkeys.Hotkey.Display(clash.Keys)} also does “{clash.Other.Label}”{where}";
+        text.Text = named
+            ? $"{PitBox.Hotkeys.Hotkey.Display(clash.Keys)} for “{clash.Entry.Label}” also does “{clash.Other.Label}”{where}"
+            : $"{PitBox.Hotkeys.Hotkey.Display(clash.Keys)} also does “{clash.Other.Label}”{where}";
         line.Children.Add(text);
         Button Act(string label, string tip, Action run)
         {
-            var b = new Button { Content = label, Style = Ui.Res<Style>("GhostButton"), ToolTip = tip, Margin = new Thickness(0, 0, 4, 4) };
+            var b = new Button { Content = label, Style = Ui.Res<Style>("GhostButton"), ToolTip = tip, Margin = new Thickness(0, 0, Ui.ButtonGap, Ui.ButtonGap) };
             b.Click += (_, _) => run();
             return b;
         }
@@ -794,7 +798,7 @@ internal sealed class KeybindsBoard : StackPanel
         }));
     }
 
-    private static FrameworkElement Caps(string hotkey)
+    internal static FrameworkElement Caps(string hotkey)
     {
         var panel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         var parts = PitBox.Hotkeys.Hotkey.Display(hotkey).Split('+');
@@ -813,7 +817,7 @@ internal sealed class KeybindsBoard : StackPanel
                 panel.Children.Add(plus);
             }
             var label = new TextBlock { Text = keys[i], FontWeight = FontWeights.SemiBold, FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
-            var cap = new Border { MinWidth = 26, Height = 24, Padding = new Thickness(7, 0, 7, 0), BorderThickness = new Thickness(1, 1, 1, 3), Child = label };
+            var cap = new Border { MinWidth = 30, Height = 24, Padding = new Thickness(8, 0, 8, 0), BorderThickness = new Thickness(1, 1, 1, 3), Child = label };
             cap.SetResourceReference(Border.BackgroundProperty, "SurfaceAlt");
             cap.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
             panel.Children.Add(cap);

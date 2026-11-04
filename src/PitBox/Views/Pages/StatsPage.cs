@@ -18,8 +18,8 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
     private readonly AppServices _app;
     private readonly MainWindow _window;
     private readonly StackPanel _body = new() { Margin = new Thickness(23, 0, 23, 23) };
-    private readonly TextBlock _driver = TextFit.TipWhenTrimmed(new TextBlock { FontSize = 14.5, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
-    private readonly TextBlock _number = new() { FontSize = 14, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBlock _driver = TextFit.TipWhenTrimmed(new TextBlock { FontSize = 13.5, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
+    private readonly TextBlock _number = new() { FontSize = 13.5, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
     private readonly Tile _numberPlate = new() { MinWidth = 36, Height = 24, Padding = new Thickness(7, 0, 7, 0), BorderThickness = new Thickness(1.5), Margin = new Thickness(0, 0, 8, 0) };
     private readonly StackPanel _driverPlate = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
     private readonly StackPanel _crumbs = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
@@ -70,6 +70,11 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
             var more = Ui.IconButton("I.Sliders", "Units and car number", () => { });
             more.Click += (_, _) => OpenOptions(more, stats);
             more.Margin = new Thickness(8, 0, 0, 0);
+            var panels = Ui.LabeledButton("I.Eye", "Panels", () => { });
+            panels.ToolTip = "Show or hide panels on this page";
+            panels.Click += (_, _) => OpenPanels(panels, stats);
+            panels.Margin = new Thickness(8, 0, 0, 0);
+            _tools.Children.Add(panels);
             _tools.Children.Add(more);
         }
     }
@@ -111,6 +116,33 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         var number = new MenuItem { Header = "Car number…" };
         number.Click += (_, _) => _ = EditNumberAsync();
         menu.Items.Add(number);
+        menu.IsOpen = true;
+    }
+
+    private void OpenPanels(Button anchor, SessionStatsService stats)
+    {
+        var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom, MinWidth = 178 };
+        Ui.DropBelow(menu);
+        var hidden = stats.Settings.HiddenPanels;
+        foreach (var (id, name) in Config.SessionStatsSettings.Panels)
+        {
+            bool shown = !hidden.Contains(id);
+            var lamp = new PitBox.Controls.Lamp { On = shown };
+            var label = new TextBlock { Text = name, VerticalAlignment = VerticalAlignment.Center, Opacity = shown ? 1 : ToggleCards.OffOpacity };
+            var item = new MenuItem { Header = ToggleCards.WithLamp(lamp, label), StaysOpenOnClick = true };
+            System.Windows.Automation.AutomationProperties.SetName(item, name);
+            System.Windows.Automation.AutomationProperties.SetItemStatus(item, shown ? "On" : "Off");
+            item.Click += (_, _) =>
+            {
+                bool hide = !hidden.Contains(id);
+                if (hide) hidden.Add(id); else hidden.Remove(id);
+                lamp.On = !hide;
+                label.Opacity = hide ? ToggleCards.OffOpacity : 1;
+                System.Windows.Automation.AutomationProperties.SetItemStatus(item, hide ? "Off" : "On");
+                Changed();
+            };
+            menu.Items.Add(item);
+        }
         menu.IsOpen = true;
     }
 
@@ -460,11 +492,12 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         var sessionsCard = StatsSessions.Card(sessions, traced, _filter, stats.Settings, Refresh, s => Open(s.Id), TraceSettings.Button(_app, stats, _window), races);
         _performance = new ContentControl { Focusable = false, IsTabStop = false, Content = StatsSections.Performance(charts, stats, Changed, PairPicked) };
         var lastRace = sessions.FirstOrDefault(RaceParts.Raced);
-        var sections = StatsSections.Page(results, charts, stats, q, Changed, sessionsCard, races.Card(lastRace), StatsAchievements.Card(achievements), _performance);
+        var sections = StatsSections.Page(results, charts, stats, q, Changed, sessionsCard, lastRace is null ? null : RaceParts.Card(races.Data(lastRace) with { Driver = "" }, "Last race"), StatsAchievements.Card(achievements), _performance);
         page.Children.Add(sections);
-        page.Children.Add(_telemetry = new TelemetryFilesCard(_app, _window, stats) { Margin = new Thickness(0, Ui.PanelSpacing, 0, 0) });
+        _telemetry = new TelemetryFilesCard(_app, _window, stats) { Margin = new Thickness(0, Ui.PanelSpacing, 0, 0) };
+        if (stats.Settings.Shows("telemetry")) page.Children.Add(_telemetry);
         if (!restoreOffset && sections is Panel parts)
-            Motion.InTurns(parts.Children.Cast<UIElement>().Skip(2).Append(_telemetry));
+            Motion.InTurns(stats.Settings.Shows("telemetry") ? parts.Children.Cast<UIElement>().Skip(2).Append(_telemetry) : parts.Children.Cast<UIElement>().Skip(2));
         bool arriving = _content.Content is null;
         _content.Content = page;
         if (arriving) Motion.FadeIn(page);
@@ -771,6 +804,7 @@ internal static class StatsSections
     public static FrameworkElement Page(List<(StatDef Def, StatResult Result)> results, StatsCharts.Data charts, SessionStatsService service, StatQuery q, Action changed,
         FrameworkElement? sessions = null, FrameworkElement? lastRace = null, FrameworkElement? achievements = null, FrameworkElement? performance = null)
     {
+        var settings = service.Settings;
         var byId = results.ToDictionary(r => r.Def.Id, r => r);
         (StatDef Def, StatResult Result)? Get(string id) => byId.TryGetValue(id, out var r) ? r : null;
         IEnumerable<(StatDef, StatResult)> Many(params string[] ids) => ids.Select(Get).OfType<(StatDef, StatResult)>();
@@ -783,7 +817,7 @@ internal static class StatsSections
             page.Children.Add(element);
         }
 
-        var groups = new StatGrid { MinTileWidth = 340, Gap = 32, RowGap = 23, Columns = 3 };
+        var groups = new StatGrid { MinTileWidth = 340, Gap = 32, RowGap = 23, Columns = 3, FillLastRow = true };
         void Group(string title, IEnumerable<(StatDef, StatResult)> stats)
         {
             var list = stats.ToList();
@@ -798,34 +832,34 @@ internal static class StatsSections
             "race.starts", "race.finishes", "race.wins", "race.podiums", "race.top5", "race.league", "race.avgstart", "race.avgfinish", "race.gained", "race.irating", "race.sr",
             "inc.total", "inc.zero", "style.fuel", "style.pits", "cond.rain", "cond.night" };
         Group("More", results.Where(r => !known.Contains(r.Def.Id)));
-        Add(Hero(charts, q, StatsUi.RangeName(service.Range), Many("pace.laps", "time.total", "pace.distance", "pace.top").ToList(), groups, lastRace));
-        Add(sessions);
+        if (settings.Shows("overview")) Add(Hero(charts, q, StatsUi.RangeName(service.Range), Many("pace.laps", "time.total", "pace.distance", "pace.top").ToList(), groups, lastRace));
+        if (settings.Shows("sessions")) Add(sessions);
 
         var types = charts.SessionTypes;
-        var activity = Section("Driving activity", "I.Clock", $"{SimRacing.Race.RaceFormat.Count(charts.Sessions, "session")}", null, Stack(
+        var activity = Section("Driving activity", $"{SimRacing.Race.RaceFormat.Count(charts.Sessions, "session")}", null, Stack(
             Chart("Session mix", null, StatsCharts.SessionMix(types)),
             StatsLayout.Pair(
-                Chart("When you drive", "Darker squares are the hours you drive most", StatsCharts.Heatmap(charts.Heatmap, charts.HeatmapDays)),
+                Chart("When you drive", "Brighter squares are the hours you drive most", StatsCharts.Heatmap(charts.Heatmap, charts.HeatmapDays)),
                 Chart(charts.Trend.Title, $"Each bar is your total driving time for that {charts.Trend.Unit}", StatsCharts.Trend(charts.Trend)), 1050, gap: 26),
-            Metrics(Many("time.week", "time.month", "time.weekly", "time.streak", "time.session", "time.stint", "time.garage"))));
+            Metrics(Many(service.Range == StatRange.Week ? new[] { "time.week", "time.month", "time.streak", "time.session", "time.stint", "time.garage" } : new[] { "time.week", "time.month", "time.weekly", "time.streak", "time.session", "time.stint", "time.garage" }))));
         Ui.Anchor(activity, "stats.activity");
-        Add(activity);
+        if (settings.Shows("activity")) Add(activity);
 
         string? variety = string.Join(" · ", new[] { Count(Get("car.unique"), "car"), Count(Get("track.unique"), "track") }.OfType<string>());
         var rankings = new StatGrid { MinTileWidth = 227, Gap = 26, Columns = 3 };
         rankings.Children.Add(Chart("Cars", "By driving time", StatsCharts.Ranked(charts.Cars, "Accent", "No cars in this range", cars: true)));
         rankings.Children.Add(Chart("Tracks", "By driving time", StatsCharts.Ranked(charts.Tracks, "Slate", "No tracks in this range")));
         rankings.Children.Add(Chart("Classes", "By driving time", StatsCharts.Ranked(charts.Classes, "Gold", "No classes in this range")));
-        var cars = Section("Cars and tracks", "I.Flag", variety.Length > 0 ? variety : null, null, Stack(rankings, PersonalBests(charts, q, Get("combo.top"))));
+        var cars = Section("Cars and tracks", variety.Length > 0 ? variety : null, null, Stack(rankings, PersonalBests(charts, q, Get("combo.top"))));
         Ui.Anchor(cars, "stats.cars");
-        Add(cars);
-        Add(performance);
-        Add(achievements);
+        if (settings.Shows("cars")) Add(cars);
+        if (settings.Shows("performance")) Add(performance);
+        if (settings.Shows("achievements")) Add(achievements);
         return page;
     }
 
     internal static Tile Performance(StatsCharts.Data charts, SessionStatsService service, Action changed, Action pairPicked) =>
-        Section("Performance", "I.Stats", null, PickPair(charts, service, pairPicked), Stack(
+        Section("Performance", null, PickPair(charts, service, pairPicked), Stack(
             charts.Report is { } report ? StatsReport.Card(report, service, changed) : null,
             StatsLayout.Pair(
                 Chart("Personal best progression", "Your best clean lap in this car and track, session by session", charts.Timeline.Count switch
@@ -842,12 +876,9 @@ internal static class StatsSections
 
     internal static FrameworkElement Empty(string text) => new TextBlock { Text = text, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 3, 0, 0) };
 
-    internal static Tile Section(string title, string icon, string? note, FrameworkElement? tools, FrameworkElement body)
+    internal static Tile Section(string title, string? note, FrameworkElement? tools, FrameworkElement body)
     {
         var left = new StackPanel { Orientation = Orientation.Horizontal };
-        var mark = new Icon { Data = Ui.Res<Geometry>(icon), Width = 16, Height = 16, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
-        mark.SetResourceReference(Control.ForegroundProperty, "AccentText");
-        left.Children.Add(mark);
         var text = Ui.Text(title, "H2");
         text.VerticalAlignment = VerticalAlignment.Center;
         left.Children.Add(text);
@@ -891,7 +922,7 @@ internal static class StatsSections
 
     internal static FrameworkElement? Metrics(IEnumerable<(StatDef Def, StatResult Result)> stats, double size = 18)
     {
-        var grid = new StatGrid { MinTileWidth = 122, Gap = 0, RowGap = 13 };
+        var grid = new StatGrid { MinTileWidth = 134, Gap = 0, RowGap = 13 };
         foreach (var (def, result) in stats)
         {
             var element = Metric(def, result, size);
@@ -928,20 +959,20 @@ internal static class StatsSections
             glyph.SetResourceReference(Control.ForegroundProperty, mark.Deep);
             label.Children.Add(glyph);
         }
-        label.Children.Add(new TextBlock { Text = def.Label, Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap });
-        var bar = new Border { Width = 18, Height = 3, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(2, 0, 0, 6), RenderTransform = new SkewTransform(-30, 0) };
-        bar.SetResourceReference(Border.BackgroundProperty, result.NoData ? "Line" : tone?.Deep ?? hue ?? "Place4");
-        FrameworkElement shown = value;
+        label.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = def.Label, Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis }));
+        TextBlock shown = value;
         if (!result.NoData && !name)
         {
             var figure = RaceParts.LiveFigure(result.Value, size * 1.25, tone?.Deep ?? hue ?? "Heading");
             figure.HorizontalAlignment = HorizontalAlignment.Left;
             shown = figure;
         }
-        var stack = new StackPanel { Children = { bar, shown, label } };
+        var bar = RaceParts.FigureMark(shown, 3, result.NoData ? "Line" : tone?.Deep ?? hue ?? "Place4", 8);
+        var stack = new StackPanel { Children = { new DockPanel { LastChildFill = true, Children = { bar, shown } }, label } };
+        label.Margin = new Thickness(11, 2, 0, 0);
         if (result.Detail is { Length: > 0 } detail && !result.NoData)
         {
-            var line = new TextBlock { Text = detail, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 2, 0, 0), TextWrapping = TextWrapping.Wrap };
+            var line = TextFit.TipWhenTrimmed(new TextBlock { Text = detail, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(11, 2, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis });
             line.SetResourceReference(TextBlock.ForegroundProperty, "TextFaint");
             stack.Children.Add(line);
         }
@@ -989,8 +1020,7 @@ internal static class StatsSections
             void Fact(FrameworkElement element) { element.Margin = new Thickness(0, 0, 8, 3); element.VerticalAlignment = VerticalAlignment.Center; facts.Children.Add(element); }
             if (pb.InRange && q.From > 0)
             {
-                var (goldSoft, goldDeep) = StatsUi.Hue("Gold");
-                Fact(Ui.Chip($"New {range}", goldSoft, goldDeep));
+                Fact(Ui.Chip($"New {range}"));
             }
             Fact(new TextBlock { Text = $"Set {Dates.Day(pb.When.ToLocalTime())} · {SimRacing.Race.RaceFormat.Count(pb.Laps, "clean lap")} {range}", Style = Ui.Res<Style>("Caption") });
             if (charts.HeroFirst is { } first && first.Lap - pb.Best > 0.0005)
@@ -1002,7 +1032,7 @@ internal static class StatsSections
             best.Children.Add(facts);
             best.ToolTip = "The all-time best clean lap in the car and track you drove last in this range";
         }
-        else best.Children.Add(new TextBlock { Text = "No clean laps in this range yet", Style = Ui.Res<Style>("Muted"), Margin = new Thickness(0, 6, 0, 0) });
+        else best.Children.Add(Ui.EmptyState("I.Stats", "No clean laps yet", "None in this range."));
         block.Children.Add(best);
 
         var right = new StackPanel { Children = { block } };
@@ -1080,7 +1110,10 @@ internal static class StatsSections
         }
         TextBlock Text(string text, string style) => new() { Text = text, Style = Ui.Res<Style>(style), TextWrapping = TextWrapping.Wrap };
         table.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        Cell(Text("Car", "Eyebrow"), 0); Cell(Text("Track", "Eyebrow"), 1); Cell(Text("Clean laps", "Eyebrow"), 2, center: true); Cell(Text("Best lap", "Eyebrow"), 3, true); Cell(Text("Set", "Eyebrow"), 5, true);
+        double carIndent = charts.Bests.Any(b => CarPictures.For(b.Car) is not null) ? 18 * CarPictures.SlotAspect + 6.5 : 0;
+        var carHead = Text("Car", "Eyebrow");
+        carHead.Padding = new Thickness(carIndent, 0, 0, 0);
+        Cell(carHead, 0); Cell(Text("Track", "Eyebrow"), 1); Cell(Text("Clean laps", "Eyebrow"), 2, center: true); Cell(Text("Best lap", "Eyebrow"), 3, true); Cell(Text("Set", "Eyebrow"), 5, true);
         var (goldSoft, goldDeep) = StatsUi.Hue("Gold");
         var later = new List<UIElement>();
         foreach (var pb in charts.Bests)
@@ -1093,7 +1126,9 @@ internal static class StatsSections
             Grid.SetRow(rule, row);
             Grid.SetColumnSpan(rule, 7);
             table.Children.Add(rule);
-            Cell(CarPictures.Beside(Text(pb.Car, "Body"), pb.Car, 18, 6.5), 0);
+            var carName = Text(pb.Car, "Body");
+            if (CarPictures.For(pb.Car) is null) carName.Padding = new Thickness(carIndent, 0, 0, 0);
+            Cell(CarPictures.Beside(carName, pb.Car, 18, 6.5), 0);
             var track = Text(pb.Config.Length > 0 ? $"{pb.Track} · {pb.Config}" : pb.Track, "Body");
             track.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
             Cell(track, 1);
@@ -1201,6 +1236,7 @@ internal sealed class StatGrid : Panel
     public double Gap { get; init; } = 8;
     public double? RowGap { get; init; }
     public int Columns { get; init; } = int.MaxValue;
+    public bool FillLastRow { get; init; }
 
     private readonly List<(UIElement Child, int Row, int Col, int Span)> _places = new();
     private readonly List<double> _rows = new();
@@ -1238,6 +1274,14 @@ internal sealed class StatGrid : Panel
             _rows[row] = Math.Max(_rows[row], child.DesiredSize.Height);
             _places.Add((child, row, col, span));
             col += span;
+        }
+        if (FillLastRow && row > 0 && col < columns && _places.Count > 0)
+        {
+            var (last, lastRow, lastCol, lastSpan) = _places[^1];
+            int wide = lastSpan + columns - col;
+            if (measure) last.Measure(new Size(cell * wide + Gap * (wide - 1), double.PositiveInfinity));
+            _rows[lastRow] = Math.Max(_rows[lastRow], last.DesiredSize.Height);
+            _places[^1] = (last, lastRow, lastCol, wide);
         }
     }
 
@@ -1713,8 +1757,10 @@ internal static class StatsCharts
 
         protected double Dpi => VisualTreeHelper.GetDpi(this).PixelsPerDip;
 
-        protected FormattedText Text(string s, Brush? brush = null, bool bold = false, double size = 10.5) =>
-            new(ThemeManager.Case(s), CultureInfo.CurrentCulture, FlowDirection.LeftToRight, ThemeManager.UiFace(bold: bold), size, brush ?? Ui.Res<Brush>("TextMuted"), Dpi);
+        protected virtual double LabelSize => 10.5;
+
+        protected FormattedText Text(string s, Brush? brush = null, bool bold = false, double? size = null) =>
+            new(ThemeManager.Case(s), CultureInfo.CurrentCulture, FlowDirection.LeftToRight, ThemeManager.UiFace(bold: bold), size ?? LabelSize, brush ?? Ui.Res<Brush>("TextMuted"), Dpi);
 
         protected Func<double, double> LapAxis(DrawingContext dc, double lo, double hi, double step)
         {

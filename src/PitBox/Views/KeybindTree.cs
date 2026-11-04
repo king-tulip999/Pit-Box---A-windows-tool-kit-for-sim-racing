@@ -119,7 +119,7 @@ internal sealed class KeybindTree : Tile
         var entries = _app.Hotkeys.Catalog().Where(e => _app.Hotkeys.IsAvailable(e) && _include(e) && (_flat ? e.Path.Count >= _skip : e.Path.Count > _skip)).ToList();
         if (entries.Count == 0)
         {
-            _root.Children.Add(new TextBlock { Text = "No keybinds yet: window profiles, display profiles and the overlay add theirs when they're on.", Style = Ui.Res<Style>("Caption") });
+            _root.Children.Add(Ui.EmptyState("I.Keyboard", "No keybinds yet", "Window profiles, display profiles and the overlay add theirs when they're on."));
             return;
         }
         string prefix = string.Join("/", entries[0].Path.Take(_skip));
@@ -345,7 +345,6 @@ internal sealed class KeybindTree : Tile
 
         var reset = Ui.IconButton("I.Undo", "Back to the default: " + entry.Default, () => { }, "QuietIconButton");
         if (reset.Content is Icon undo) undo.SetResourceReference(Control.ForegroundProperty, hue.Deep);
-        reset.Width = reset.Height = 23;
         reset.Margin = new Thickness(2, 0, 0, 0);
         Grid.SetColumn(reset, 2);
 
@@ -399,14 +398,12 @@ internal sealed class KeybindTree : Tile
         if (_navigate is not null && entry.Page != "settings")
         {
             var open = Ui.IconButton("I.ChevronRight", $"Open where it's set up ({entry.Path[0]})", () => _navigate(entry.Page), "QuietIconButton");
-            open.Width = open.Height = 23;
             open.Margin = new Thickness(2, 0, 0, 0);
             Grid.SetColumn(open, 3);
             grid.Children.Add(open);
         }
         var row = new Border { CornerRadius = ThemeManager.Round(6), Background = Brushes.Transparent, Child = grid };
-        row.MouseEnter += (_, _) => row.SetResourceReference(Border.BackgroundProperty, "SurfaceAlt");
-        row.MouseLeave += (_, _) => row.Background = Brushes.Transparent;
+        Ui.HoverHighlight(row);
         return row;
     }
 

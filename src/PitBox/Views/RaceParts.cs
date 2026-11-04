@@ -264,6 +264,25 @@ internal static class RaceParts
 
     public static double FigureLineHeight(double size) => Math.Round(size * 1.08);
 
+    public static Border FigureMark(TextBlock figure, double width, string brush, double gap)
+    {
+        var mark = new Border { Width = width, VerticalAlignment = VerticalAlignment.Top, IsHitTestVisible = false };
+        mark.SetResourceReference(Border.BackgroundProperty, brush);
+        void Place()
+        {
+            var family = figure.FontFamily;
+            double size = figure.FontSize, line = figure.LineHeight;
+            double baseline = double.IsNaN(line) || family.LineSpacing <= 0 ? family.Baseline * size : line * family.Baseline / family.LineSpacing;
+            double caps = new Typeface(family, figure.FontStyle, figure.FontWeight, figure.FontStretch).TryGetGlyphTypeface(out var glyphs) ? glyphs.CapsHeight * size : size * 0.7;
+            mark.Height = Math.Max(1, Math.Round(caps));
+            mark.Margin = new Thickness(0, Math.Max(0, Math.Round(baseline - caps)), gap, 0);
+        }
+        figure.Loaded += (_, _) => Place();
+        Place();
+        DockPanel.SetDock(mark, Dock.Left);
+        return mark;
+    }
+
     public static TextBlock Value(string text, double size = 15, string brush = "Heading")
     {
         var t = new TextBlock { Text = text, FontSize = size, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
@@ -282,33 +301,6 @@ internal static class RaceParts
         var glyph = new Icon { Data = Ui.Res<Geometry>(icon), Width = size, Height = size, VerticalAlignment = VerticalAlignment.Center };
         glyph.SetResourceReference(Control.ForegroundProperty, brush);
         return glyph;
-    }
-
-    public static WrapPanel SlantTabs(IReadOnlyList<string> options, int selected, Action<int> pick, IReadOnlyList<string?>? tips = null)
-    {
-        var row = new WrapPanel();
-        for (int i = 0; i < options.Count; i++)
-        {
-            int index = i;
-            bool on = i == selected;
-            var back = new Slant(on ? "Accent" : "SurfaceAlt", 0.14, 0, 1, 0, 0.86, 1, 0, 1);
-            var text = Big(options[i], 16, on ? "OnAccent" : "TextMuted", italic: false, heavy: false);
-            text.Margin = new Thickness(22, 5, 22, 6);
-            var tab = new Grid { Cursor = System.Windows.Input.Cursors.Hand, Focusable = true, Margin = new Thickness(0, 0, -2, 4), Background = Brushes.Transparent,
-                ToolTip = tips is not null && i < tips.Count ? tips[i] : null };
-            System.Windows.Automation.AutomationProperties.SetName(tab, options[i]);
-            tab.Children.Add(back);
-            tab.Children.Add(text);
-            if (!on)
-            {
-                tab.MouseEnter += (_, _) => back.SetResourceReference(Slant.FillProperty, "Hover");
-                tab.MouseLeave += (_, _) => back.SetResourceReference(Slant.FillProperty, "SurfaceAlt");
-                tab.MouseLeftButtonUp += (_, e) => { e.Handled = true; pick(index); };
-                tab.KeyDown += (_, e) => { if (e.Key is System.Windows.Input.Key.Enter or System.Windows.Input.Key.Space) { e.Handled = true; pick(index); } };
-            }
-            row.Children.Add(tab);
-        }
-        return row;
     }
 
     public static FrameworkElement Ribbon(Award award)
@@ -419,13 +411,11 @@ internal static class RaceParts
     public static FrameworkElement Tile(string value, string label, string bar, string valueBrush = "Heading", double size = 30, string? tip = null)
     {
         var stack = new StackPanel { Margin = new Thickness(16, 12, 12, 12) };
-        var mark = new Border { Width = 22, Height = 3, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(3, 0, 0, 7), RenderTransform = new SkewTransform(-30, 0) };
-        mark.SetResourceReference(Border.BackgroundProperty, bar);
-        stack.Children.Add(mark);
         var number = LiveFigure(value, size, valueBrush);
         number.HorizontalAlignment = HorizontalAlignment.Left;
-        stack.Children.Add(number);
-        stack.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) });
+        var mark = FigureMark(number, 3, bar, 9);
+        stack.Children.Add(new DockPanel { LastChildFill = true, Children = { mark, number } });
+        stack.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(12, 2, 0, 0) });
         var cell = Hairline.Frame(new Border { Child = stack, ToolTip = tip }, Sides.Left);
         cell.SetResourceReference(Border.BorderBrushProperty, "Line");
         return cell;

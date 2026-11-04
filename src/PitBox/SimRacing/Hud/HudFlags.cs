@@ -10,64 +10,98 @@ internal static class HudFlags
     public static bool HasPicture(FlagKind k) => k is FlagKind.Disqualified or FlagKind.Black or FlagKind.Meatball or FlagKind.Red
         or FlagKind.Caution or FlagKind.Yellow or FlagKind.Debris or FlagKind.Blue or FlagKind.White or FlagKind.Checkered or FlagKind.Green;
 
-    private static readonly Color Stripe = Color.FromArgb(0xFF, 0xE0, 0x00), Meatball = Color.FromArgb(0xF7, 0x8A, 0x1D);
+    private static readonly Color Stripe = Color.FromArgb(0xFF, 0xE0, 0x00), Meatball = Color.FromArgb(0xF7, 0x8A, 0x1D),
+        Frame = Color.FromArgb(235, 0x0A, 0x0A, 0x0C);
 
-    public static void Draw(HudPainter p, RectangleF r, FlagKind kind)
+    private const float TileRatio = 1.5f;
+
+    [ThreadStatic] private static PointF[]? _quad;
+
+    private static Color Base(FlagKind k) => k switch
     {
-        r = p.Snap(r);
+        FlagKind.Green => HudPalette.FlagGreen,
+        FlagKind.Yellow or FlagKind.Caution or FlagKind.Debris => HudPalette.FlagYellow,
+        FlagKind.Blue => HudPalette.FlagBlue,
+        FlagKind.Red => HudPalette.FlagRed,
+        FlagKind.White or FlagKind.Checkered => HudPalette.FlagWhite,
+        _ => HudPalette.FlagBlack,
+    };
+
+    public static void Draw(HudPainter p, RectangleF area, FlagKind kind)
+    {
+        if (!HasPicture(kind)) return;
+        float s = p.PixelScale, px = 1 / s;
+        int wPx = (int)MathF.Floor(Math.Min(area.Width, area.Height * TileRatio) * s) - 2;
+        int hPx = (int)MathF.Round(wPx / TileRatio);
+        if (wPx < 4 || hPx < 3) return;
+        int cell = 0;
+        if (kind == FlagKind.Checkered)
+        {
+            int rows = Math.Max(3, (int)MathF.Round(hPx / 4f));
+            cell = Math.Max(1, hPx / rows);
+            hPx = cell * rows;
+            wPx = cell * Math.Max(2, (int)MathF.Round(wPx / (float)cell));
+        }
+        float x = p.Snap(area.X + (area.Width - wPx / s) / 2), y = p.Snap(area.Y + (area.Height - hPx / s) / 2);
+        var r = new RectangleF(x, y, wPx / s, hPx / s);
         var g = p.G;
+        g.FillRectangle(p.Brush(Frame), r.X - px, r.Y - px, r.Width + 2 * px, r.Height + 2 * px);
+        var state = g.Save();
+        g.SetClip(r, CombineMode.Intersect);
+        g.FillRectangle(p.Brush(Base(kind)), r);
+        float w = r.Width, h = r.Height;
         switch (kind)
         {
-            case FlagKind.Green: p.Fill(r, HudPalette.FlagGreen); break;
-            case FlagKind.Yellow or FlagKind.Caution: p.Fill(r, HudPalette.FlagYellow); break;
-            case FlagKind.Red: p.Fill(r, HudPalette.FlagRed); break;
-            case FlagKind.White: p.Fill(r, HudPalette.FlagWhite); break;
-            case FlagKind.Black: p.Fill(r, HudPalette.FlagBlack); break;
             case FlagKind.Meatball:
-            {
-                p.Fill(r, HudPalette.FlagBlack);
-                float d = r.Height * 0.62f;
-                p.Dot(r.X + r.Width / 2, r.Y + r.Height / 2, d / 2, Meatball);
+                p.Dot(r.X + w / 2, r.Y + h / 2, Math.Min(w, h) * 0.32f, Meatball);
                 break;
-            }
-            case FlagKind.Blue or FlagKind.Disqualified:
+            case FlagKind.Blue:
+                g.DrawLine(p.FlatPen(Stripe, Math.Max(2 * px, h * 0.26f)), r.Left - 2 * px, r.Bottom + 2 * px * h / w, r.Right + 2 * px, r.Top - 2 * px * h / w);
+                break;
+            case FlagKind.Disqualified:
             {
-                p.Fill(r, kind == FlagKind.Blue ? HudPalette.FlagBlue : HudPalette.FlagBlack);
-                var state = g.Save();
-                g.SetClip(r);
-                float w = r.Height * (kind == FlagKind.Blue ? 0.26f : 0.18f);
-                var pen = p.Pen(kind == FlagKind.Blue ? Stripe : HudPalette.FlagWhite, w);
+                var pen = p.FlatPen(HudPalette.FlagWhite, Math.Max(1.6f * px, h * 0.17f));
+                g.DrawLine(pen, r.Left, r.Top, r.Right, r.Bottom);
                 g.DrawLine(pen, r.Left, r.Bottom, r.Right, r.Top);
-                if (kind == FlagKind.Disqualified) g.DrawLine(pen, r.Left, r.Top, r.Right, r.Bottom);
-                g.Restore(state);
                 break;
             }
             case FlagKind.Debris:
             {
-                const int stripes = 6;
-                float sw = r.Width / stripes;
-                for (int i = 0; i < stripes; i++)
-                    p.Fill(new RectangleF(r.X + i * sw, r.Y, sw + (i < stripes - 1 ? 0.5f : 0), r.Height), i % 2 == 0 ? HudPalette.FlagYellow : HudPalette.FlagRed);
+                int n = wPx >= 18 ? 6 : 4;
+                for (int i = 1; i < n; i += 2)
+                {
+                    float x0 = p.Snap(r.X + i * w / n), x1 = p.Snap(r.X + (i + 1) * w / n);
+                    g.FillRectangle(p.Brush(HudPalette.FlagRed), x0, r.Y, x1 - x0, h);
+                }
+                break;
+            }
+            case FlagKind.Caution:
+            {
+                float sw = Math.Max(2 * px, p.Snap(h * 0.2f));
+                for (float xx = -h; xx < w + h; xx += sw * 3) Slanted(g, p.Brush(HudPalette.Alpha(HudPalette.FlagBlack, 204)), r.X + xx, r.Top, r.Bottom, h, sw);
                 break;
             }
             case FlagKind.Checkered:
-                Checks(p, r, Math.Max(2, (int)Math.Round(r.Height / 4)));
+            {
+                float c = cell / s;
+                int rows = hPx / cell, cols = wPx / cell;
+                for (int j = 0; j < rows; j++)
+                    for (int i = j % 2; i < cols; i += 2)
+                        g.FillRectangle(p.Brush(HudPalette.FlagBlack), r.X + i * c, r.Y + j * c, c, c);
                 break;
-            default: return;
+            }
         }
-        bool dark = kind is FlagKind.Black or FlagKind.Meatball or FlagKind.Disqualified;
-        p.Outline(r, dark ? HudPalette.Alpha(HudPalette.FlagWhite, 120) : HudPalette.Alpha(HudPalette.FlagBlack, 150), 1);
+        g.Restore(state);
     }
 
-    private static void Checks(HudPainter p, RectangleF r, int rows)
+    private static void Slanted(Graphics g, Brush brush, float x, float top, float bottom, float lean, float width)
     {
-        p.Fill(r, HudPalette.FlagWhite);
-        float cell = r.Height / rows;
-        int cols = Math.Max(1, (int)Math.Round(r.Width / cell));
-        float cw = r.Width / cols;
-        for (int y = 0; y < rows; y++)
-            for (int x = y % 2; x < cols; x += 2)
-                p.Fill(new RectangleF(r.X + x * cw, r.Y + y * cell, cw, cell), HudPalette.FlagBlack);
+        var q = _quad ??= new PointF[4];
+        q[0] = new PointF(x, bottom);
+        q[1] = new PointF(x + lean, top);
+        q[2] = new PointF(x + lean + width, top);
+        q[3] = new PointF(x + width, bottom);
+        g.FillPolygon(brush, q);
     }
 
     public static FlagKind BannerKind(RaceFlags flags)
@@ -83,7 +117,7 @@ internal static class HudFlags
         Help = "A bar above the widget with the flag and its name while a flag is out. Room for it is kept, so the table never moves.",
     };
 
-    private const float Band = 24, BandGap = 5;
+    private const float Band = 24, BandGap = 5, Rule = 2, LabelRoom = 16;
 
     public const string OldSide = "side";
 
@@ -110,48 +144,98 @@ internal static class HudFlags
         _ => (HudPalette.FlagGreen, Color.White, "GREEN FLAG"),
     };
 
+    private static Color RuleColor(FlagKind k, Color fill) => k switch
+    {
+        FlagKind.Meatball => Meatball,
+        FlagKind.Black or FlagKind.Disqualified => HudPalette.Alpha(HudPalette.FlagWhite, 90),
+        _ => HudPalette.Mix(fill, Color.Black, 0.28),
+    };
+
+    private static bool HasEnds(FlagKind k) => k is not (FlagKind.Green or FlagKind.Red or FlagKind.White or FlagKind.Black);
+
     public static void DrawBanner(HudPainter p, RectangleF outer, FlagKind kind, string where, float rightSpare = 0)
     {
         if (kind == FlagKind.None || where != "top") return;
         var (fill, text, label) = Look(kind);
         outer = p.Snap(outer);
         var band = p.Snap(RectangleF.FromLTRB(outer.Left, outer.Top, outer.Right - rightSpare, outer.Top + Band));
-        p.Fill(band, fill, p.CornerRadius(4));
         var g = p.G;
-        var state = g.Save();
-        g.SetClip(band, CombineMode.Intersect);
-        Ends(p, band, kind);
+        float s = p.PixelScale, rule = Math.Max(1 / s, p.Snap(Rule));
+        var face = RectangleF.FromLTRB(band.Left, band.Top, band.Right, band.Bottom - rule);
+        g.FillRectangle(p.Brush(fill), face);
+        g.FillRectangle(p.Brush(RuleColor(kind, fill)), band.Left, face.Bottom, band.Width, rule);
         var font = p.Font(12.5f, true);
-        float flagH = band.Height * 0.56f, flagW = flagH * 1.5f, gap = 7;
-        float textW = Math.Min(p.Measure(label, font), band.Width - flagW - gap - 16);
-        float x = band.X + (band.Width - flagW - gap - textW) / 2;
-        Draw(p, new RectangleF(x, band.Y + (band.Height - flagH) / 2, flagW, flagH), kind);
-        p.Text(label, font, text, new RectangleF(x + flagW + gap, band.Y, textW + 2, band.Height), HAlign.Left, VAlign.Center);
-        g.Restore(state);
+        if (HasEnds(kind))
+        {
+            int cellPx = Math.Max(2, (int)MathF.Round(face.Height * s / 4));
+            float unit = 2 * cellPx / s;
+            float room = (band.Width - p.Measure(label, font)) / 2 - LabelRoom;
+            if (room >= unit)
+            {
+                var end = new RectangleF(face.Left, face.Top, MathF.Floor(room / unit) * unit, face.Height);
+                var state = g.Save();
+                End(p, end, kind, fill, cellPx / s);
+                g.TranslateTransform(face.Left + face.Right, 0);
+                g.ScaleTransform(-1, 1);
+                End(p, end, kind, fill, cellPx / s);
+                g.Restore(state);
+            }
+        }
+        p.CenteredCaps(label, font, text, band);
     }
 
-    private static void Ends(HudPainter p, RectangleF band, FlagKind kind)
+    private static void End(HudPainter p, RectangleF r, FlagKind kind, Color fill, float cell)
     {
-        float len = Math.Min(band.Width * 0.22f, 90);
-        if (kind == FlagKind.Checkered)
-        {
-            int rows = 3;
-            Checks(p, new RectangleF(band.X, band.Y, len, band.Height), rows);
-            Checks(p, new RectangleF(band.Right - len, band.Y, len, band.Height), rows);
-            return;
-        }
-        if (kind is not (FlagKind.Yellow or FlagKind.Caution or FlagKind.Debris)) return;
         var g = p.G;
-        var color = kind == FlagKind.Debris ? HudPalette.Alpha(HudPalette.FlagRed, 200) : HudPalette.Alpha(HudPalette.FlagBlack, 70);
-        var pen = p.Pen(color, 4);
-        for (int end = 0; end < 2; end++)
+        var state = g.Save();
+        g.SetClip(r, CombineMode.Intersect);
+        float w = r.Width, h = r.Height, solid = 0.35f;
+        switch (kind)
         {
-            var part = new RectangleF(end == 0 ? band.X : band.Right - len, band.Y, len, band.Height);
-            var state = g.Save();
-            g.SetClip(part, CombineMode.Intersect);
-            for (float sx = part.X - band.Height; sx < part.Right; sx += 10)
-                g.DrawLine(pen, sx, part.Bottom, sx + band.Height, part.Y);
-            g.Restore(state);
+            case FlagKind.Checkered:
+                for (int j = 0; j * cell < h; j++)
+                    for (int i = j % 2; i * cell < w; i += 2)
+                        g.FillRectangle(p.Brush(HudPalette.FlagBlack), r.X + i * cell, r.Y + j * cell, cell, cell);
+                break;
+            case FlagKind.Yellow or FlagKind.Caution:
+            {
+                var brush = p.Brush(HudPalette.Alpha(HudPalette.FlagBlack, kind == FlagKind.Caution ? 209 : 46));
+                for (float xx = -h; xx < w + h; xx += 10) Slanted(g, brush, r.X + xx, r.Top, r.Bottom, h, 4);
+                break;
+            }
+            case FlagKind.Debris:
+            {
+                var brush = p.Brush(HudPalette.FlagRed);
+                for (float xx = -h + 5; xx < w + h; xx += 10) Slanted(g, brush, r.X + xx, r.Top, r.Bottom, h * 0.5f, 5);
+                break;
+            }
+            case FlagKind.Blue:
+            {
+                var pen = p.FlatPen(Stripe, 3);
+                for (float xx = -h; xx < w + h; xx += 10) g.DrawLine(pen, r.X + xx, r.Bottom, r.X + xx + h, r.Top);
+                break;
+            }
+            case FlagKind.Meatball:
+            {
+                float step = MathF.Round(h * 0.8f), dot = h * 0.24f;
+                for (float cx = r.X + step / 2; cx < r.Right; cx += step) p.Dot(cx, r.Y + h / 2, dot, Meatball);
+                break;
+            }
+            case FlagKind.Disqualified:
+            {
+                solid = 0.7f;
+                float step = h * 0.7f, arm = step * 0.5f;
+                for (float cx = r.X; cx < r.Right; cx += step)
+                {
+                    double t = Math.Clamp(((cx + arm / 2 - r.X) / w - 0.15) / 0.65, 0, 1);
+                    var pen = p.FlatPen(HudPalette.Mix(HudPalette.FlagWhite, HudPalette.FlagRed, Math.Round(t * 12) / 12), 1.5f);
+                    g.DrawLine(pen, cx, r.Y + h * 0.3f, cx + arm, r.Y + h * 0.7f);
+                    g.DrawLine(pen, cx, r.Y + h * 0.7f, cx + arm, r.Y + h * 0.3f);
+                }
+                break;
+            }
         }
+        p.Gradient(new RectangleF(r.X + w * solid, r.Y, w * (1 - solid), h), HudPalette.Alpha(fill, 0), fill);
+        g.Restore(state);
     }
 }

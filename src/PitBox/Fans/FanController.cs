@@ -21,6 +21,7 @@ internal sealed class FanController : IDisposable
     private readonly Dictionary<string, ISensor?> _rpmForControl = new();
     private readonly Dictionary<string, ISensor> _temps = new();
     private readonly Dictionary<string, IHardware> _tempDevice = new();
+    private readonly Dictionary<string, IHardware> _fanDevice = new();
     private readonly Dictionary<string, WriteState> _written = new();
     private readonly Dictionary<string, string> _errors = new();
     private readonly Dictionary<string, int> _handBack = new();
@@ -111,6 +112,7 @@ internal sealed class FanController : IDisposable
         _rpmForControl.Clear();
         _temps.Clear();
         _tempDevice.Clear();
+        _fanDevice.Clear();
         _monitorOnly.Clear();
         _names.Clear();
         foreach (var hw in computer.Hardware)
@@ -170,6 +172,7 @@ internal sealed class FanController : IDisposable
             if (sensor.SensorType == SensorType.Control && sensor.Control is not null)
             {
                 _controls[id] = sensor;
+                _fanDevice[id] = device;
                 if (hw.HardwareType == HardwareType.GpuAmd && AmdFor(hw) is { } amd)
                     _amd[id] = amd;
                 _rpmForControl[id] = hw.Sensors.FirstOrDefault(s => s.SensorType == SensorType.Fan && s.Index == sensor.Index);
@@ -184,6 +187,7 @@ internal sealed class FanController : IDisposable
             {
                 string id = fan.Identifier.ToString();
                 _monitorOnly[id] = fan;
+                _fanDevice[id] = device;
                 _names[id] = ($"{hw.Name} · {fan.Name}", hw.Name);
             }
         }
@@ -465,6 +469,37 @@ internal sealed class FanController : IDisposable
                 false, null, Controllable: false, HasRpm: true));
         }
         return list;
+    }
+
+    public void DevicesInUse(List<IHardware> into)
+    {
+        into.Clear();
+        lock (_restoreGate)
+        {
+            if (_restored) return;
+            var settings = _settings;
+            foreach (var curve in settings.Curves)
+                if (curve.Type == FanCurveType.Graph && curve.SensorId is { } sensor && _tempDevice.TryGetValue(sensor, out var device))
+                    AddDevice(into, device);
+            if (settings.Active is { } preset)
+                foreach (var fan in preset.Fans)
+                    AddFanDevice(into, fan.ControlId);
+            foreach (var id in _written.Keys) AddFanDevice(into, id);
+            foreach (var id in _handBack.Keys) AddFanDevice(into, id);
+            foreach (var id in _overrides.Keys) AddFanDevice(into, id);
+            foreach (var id in _spinUntil.Keys) AddFanDevice(into, id);
+            foreach (var id in _monitorOnly.Keys) AddFanDevice(into, id);
+        }
+    }
+
+    private void AddFanDevice(List<IHardware> into, string id)
+    {
+        if (_fanDevice.TryGetValue(id, out var device)) AddDevice(into, device);
+    }
+
+    private static void AddDevice(List<IHardware> into, IHardware device)
+    {
+        if (!into.Contains(device)) into.Add(device);
     }
 
     private float? Evaluate(FanCurve curve, FanSettings settings, double dt,

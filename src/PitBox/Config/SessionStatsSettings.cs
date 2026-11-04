@@ -38,6 +38,16 @@ public sealed class SessionStatsSettings
 
     public bool AnalysisWind { get; set; } = true;
 
+    public List<string> HiddenPanels { get; set; } = new();
+
+    public static readonly (string Id, string Name)[] Panels =
+    {
+        ("overview", "Overview"), ("sessions", "Sessions"), ("activity", "Driving activity"), ("cars", "Cars and tracks"),
+        ("performance", "Performance"), ("achievements", "Achievements"), ("telemetry", "Telemetry files"),
+    };
+
+    public bool Shows(string panel) => !HiddenPanels.Contains(panel);
+
     public static readonly int[] KeepDayChoices = { 30, 90, 182, 365, 730, 0 };
     public static readonly int[] LapChoices = { 0, 10, 3, 1 };
     public static readonly string[] Lanes = { "delta", "speed", "pedals", "steering", "gear", "rpm", "latg", "bias", "abs", "tc" };
@@ -48,6 +58,7 @@ public sealed class SessionStatsSettings
         if (!KeepDayChoices.Contains(TraceKeepDays)) TraceKeepDays = 365;
         if (!LapChoices.Contains(TraceLapsPerSession)) TraceLapsPerSession = 0;
         if (AnalysisLanes is not null) AnalysisLanes = AnalysisLanes.Where(l => Lanes.Contains(l)).Distinct().ToList();
+        HiddenPanels = (HiddenPanels ?? new()).Where(p => Panels.Any(x => x.Id == p)).Distinct().ToList();
         DriverNumber = string.IsNullOrWhiteSpace(DriverNumber) ? null : DriverNumber.Trim().TrimStart('#');
         if (Range is not ("week" or "month" or "season" or "all")) Range = "season";
         if (ReplaySync is not ("distance" or "time")) ReplaySync = "distance";

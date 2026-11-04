@@ -10,7 +10,7 @@ internal static class RelativeEditor
         Groups = new HudGroup[]
         {
             new("layout", "Table", HudTab.Layout, true, O("ahead"), O("behind"), O("showHeader"), O("stripes")),
-            new("rows", "Rows", HudTab.Layout, true, MyRow, O("lapColors"), O("close"), O("nameFormat"), O("noDigits"),
+            new("rows", "Rows", HudTab.Layout, true, MyRow, O("lapColors"), O("close"), O("nameFormat"), O("noDigits"), O("proAm"),
                 O("badgeFormat") with { ShowIf = Has("columns", "badge") }),
             new("timing", "Timing", HudTab.Layout, false, O("timeFormat"), O("decimals"), O("avgLaps") with { ShowIf = Has("columns", "avglap") }),
             new("pit", "Pit", HudTab.Layout, false, O("pitShow") with { ShowIf = Has("columns", "pit") }, O("pitTime") with { ShowIf = Has("columns", "pit") }),

@@ -29,10 +29,10 @@ public sealed class WindowMapView : FrameworkElement, Views.IFrameStep
     private double _px;
 
     private static Brush ScreenFill => ThemeManager.Brush("TileRaised", Brushes.WhiteSmoke);
-    private static Brush ScreenStroke => ThemeManager.Brush("TileEdge", Brushes.LightGray);
+    private static Brush ScreenStroke => ThemeManager.Brush("LineStrong", Brushes.LightGray);
     private static Brush TextBrush => ThemeManager.Brush("Text", Brushes.Black);
     private static Brush MutedBrush => ThemeManager.Brush("TextMuted", Brushes.Gray);
-    private const double LabelSize = 12, NumberSize = 13, Pad = 6;
+    private const double LabelSize = 12, NumberSize = 13, Pad = 6, WindowInset = 4;
 
     public event Action<string>? WindowClicked;
 
@@ -209,6 +209,7 @@ public sealed class WindowMapView : FrameworkElement, Views.IFrameStep
         foreach (var t in targets)
         {
             var r = Place(t.Area);
+            if (r.Width > 12 && r.Height > 12) r.Inflate(-WindowInset, -WindowInset);
             bool fresh = _fromWindows is not null && !_fromWindows.ContainsKey(t.Key);
             if (_fromWindows is not null && _fromWindows.TryGetValue(t.Key, out var was)) r = Lerp(was, r, e);
             _shownWindows[t.Key] = r;
@@ -223,6 +224,12 @@ public sealed class WindowMapView : FrameworkElement, Views.IFrameStep
             }
             if (fresh) dc.Pop();
             _hits.Add((t, r));
+        }
+        foreach (var r in _shownScreens.Values)
+        {
+            var edge = r;
+            edge.Inflate(-2, -2);
+            if (edge.Width > 4 && edge.Height > 4) dc.DrawGeometry(null, _screenPen, Tile.Shape(Hairline.SnapBox(edge, px), ThemeManager.Round(6)));
         }
         if (active is not null)
         {
@@ -244,7 +251,7 @@ public sealed class WindowMapView : FrameworkElement, Views.IFrameStep
         {
             if (Label(t.Label, LabelSize, t.Key == active, _accent!, dpi) is not { } text) continue;
             if (text.Width + Pad * 2 > r.Width || text.Height + 4 > r.Height) continue;
-            var spots = new[] { r.Y + (r.Height - text.Height) / 2, r.Y + Pad, r.Bottom - Pad - text.Height }
+            var spots = new[] { r.Bottom - Pad - text.Height, r.Y + Pad, r.Y + (r.Height - text.Height) / 2 }
                 .Where(y => y >= r.Y + 2 && y + text.Height <= r.Bottom - 2)
                 .Select(y => (Rect?)new Rect(r.X + Pad, y, text.Width, text.Height));
             if (spots.FirstOrDefault(s => !taken.Any(o => o.IntersectsWith(s!.Value))) is not { } spot) continue;

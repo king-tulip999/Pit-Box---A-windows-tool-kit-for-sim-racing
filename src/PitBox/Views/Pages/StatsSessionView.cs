@@ -34,7 +34,7 @@ internal static class StatsSessionView
             return page;
         }
 
-        var chartCard = Card(StatsSections.Chart("Lap times", "Every lap in order; hollow = not clean (an incident, the pit lane or off track), arrow = slower than the scale shows", new LapTimeChart(laps) { Height = 178 }));
+        var chartCard = Card(StatsSections.Chart("Lap times", "Every lap in order; hollow = not clean (an incident, the pit lane or off track), arrow = slower than the scale shows", new LapTimeChart(laps) { Height = 178, HorizontalAlignment = HorizontalAlignment.Left, MaxWidth = laps.Count < 10 ? 140 + 64 * laps.Count : double.PositiveInfinity }));
 
         double? sessionBest = cleanLaps.Select(l => (double?)l.Time).Min();
         var bestSoFar = new double?[sectors];
@@ -160,6 +160,7 @@ internal static class StatsSessionView
                     else ticked.Remove(number);
                     Sync();
                 };
+                if (d.Traced.Count == 0) tickHost.Visibility = Visibility.Collapsed;
                 Cell(table, row, c++, tickHost);
                 Cell(table, row, c++, Caption(lap.Lap.ToString(CultureInfo.CurrentCulture)), true);
                 var time = StatsSessions.Time(lap.Time, isPb ? pbDeep : isBest ? "AccentText" : lap.Clean ? "Heading" : "TextMuted");
@@ -178,6 +179,14 @@ internal static class StatsSessionView
                             text.SetResourceReference(TextBlock.ForegroundProperty, "TimingBest");
                             text.FontWeight = FontWeights.SemiBold;
                             text.ToolTip = "Best sector of the session";
+                            if (isPb || isBest)
+                            {
+                                var plate = new Border { Child = text, Padding = new Thickness(4, 0, 4, 0), ToolTip = text.ToolTip };
+                                plate.SetResourceReference(Border.BackgroundProperty, "Surface");
+                                if (bestSoFar[k] is not { } earlier || sv < earlier) bestSoFar[k] = sv;
+                                Cell(table, row, c++, plate, true);
+                                continue;
+                            }
                         }
                         else if (bestSoFar[k] is not { } before || sv < before)
                         {
@@ -228,7 +237,7 @@ internal static class StatsSessionView
             legend.SetResourceReference(TextBlock.ForegroundProperty, "TextFaint");
             lapsBody = new StackPanel { Children = { lapsBody, new NoWidth { Child = legend } } };
         }
-        var lapsCard = StatsSections.Section("Laps", "I.Flag", d.Traced.Count > 0 ? $"{d.Traced.Count} with a trace" : "No lap traces", analyzeButton, lapsBody);
+        var lapsCard = StatsSections.Section("Laps", d.Traced.Count > 0 ? $"{d.Traced.Count} with a trace" : "No lap traces", analyzeButton, lapsBody);
         page.Children.Add(chartCard);
         if (StatsSessionTools.Sectors(laps) is { } sectorCard)
         {
@@ -497,6 +506,8 @@ internal static class StatsSessionView
 
         private const double Inset = 11;
 
+        protected override double LabelSize => 12;
+
         private double X(int i) => Left + Inset + (ActualWidth - Left - Right - 2 * Inset) * (_laps.Count == 1 ? 0.5 : (double)i / (_laps.Count - 1));
 
         protected override int HitAt(Point p)
@@ -579,7 +590,7 @@ internal static class StatsSessionView
                 if (i % step == 0 || i == _laps.Count - 1)
                 {
                     var label = Text(_laps[i].Lap.ToString(CultureInfo.CurrentCulture));
-                    dc.DrawText(label, new Point(p.X - label.Width / 2, ActualHeight - Bottom + 6));
+                    dc.DrawText(label, new Point(p.X - label.Width / 2, ActualHeight - Bottom + 3));
                 }
             }
         }

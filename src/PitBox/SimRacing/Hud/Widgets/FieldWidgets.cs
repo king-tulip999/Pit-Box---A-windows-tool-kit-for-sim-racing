@@ -16,6 +16,8 @@ internal sealed record Column(string Id, string Header, string Template, HAlign 
     public Action<int, List<(string Text, Color Fill, Color Fore, FlagKind Flag)>>? Marks { get; init; }
 
     public Action<HudPainter, int, RectangleF, bool>? Draw { get; init; }
+
+    public Func<int, bool?>? ProTag { get; init; }
 }
 
 internal readonly record struct RowStyle(bool PositionBlock = true)
@@ -47,23 +49,69 @@ internal static class HudTable
     public static List<(Column Col, float Width)> Fit(HudPainter p, IReadOnlyList<Column> columns, float width, Font font, string key = "columns")
     {
         var bold = Bold(p, font);
-        var natural = columns.Select(c => c.Flex
-            ? (c.Template.Length > 0 ? p.Measure(c.Template, font) : 0) + (c.Marks is not null ? p.Measure(FastestMark, p.Tiny) + 12 : 0)
-            : Math.Max(p.Measure(c.Template, IsPosition(c) ? bold : font), p.Measure(c.Header, p.Tiny)) + 2).ToList();
-        var (kept, widths) = Layout(natural, columns.Select(c => c.Flex).ToList(), columns.Select(IsPosition).ToList(), width, columns.Select(c => c.Id == "gap").ToList());
+        int count = columns.Count;
+        var natural = new float[count];
+        var flex = new bool[count];
+        var position = new bool[count];
+        var keep = new bool[count];
+        for (int i = 0; i < count; i++)
+        {
+            var c = columns[i];
+            natural[i] = c.Flex
+                ? (c.Template.Length > 0 ? p.Measure(c.Template, font) : 0) + (c.ProTag is not null ? ProTagWidth(p) + 6 : 0)
+                : Math.Max(p.Measure(c.Template, IsPosition(c) ? bold : font), p.Measure(c.Header, p.Tiny)) + 2;
+            flex[i] = c.Flex;
+            position[i] = IsPosition(c);
+            keep[i] = c.Id == "gap";
+        }
+        var (kept, widths) = Layout(natural, flex, position, width, keep);
+        if (p.Overflow is { } overflow)
+            for (int i = 0; i < count; i++)
+                if (!kept.Contains(i)) overflow.Add((key, columns[i].Id));
+        var fitted = new List<(Column Col, float Width)>(kept.Count);
+        foreach (int i in kept) fitted.Add((columns[i], widths[i]));
+        return fitted;
+    }
+
+    public static float Natural(HudPainter p, IReadOnlyList<Column> columns, Font font)
+    {
+        var bold = Bold(p, font);
+        float sum = StripeLead + (columns.Count > 0 && IsPosition(columns[0]) ? BlockPad : 0);
         for (int i = 0; i < columns.Count; i++)
-            if (!kept.Contains(i)) p.Overflow?.Add((key, columns[i].Id));
-        return kept.Select(i => (columns[i], widths[i])).ToList();
+        {
+            var c = columns[i];
+            sum += c.Flex
+                ? Math.Max(60, (c.Template.Length > 0 ? p.Measure(c.Template, font) : 0) + (c.ProTag is not null ? ProTagWidth(p) + 6 : 0))
+                : Math.Max(p.Measure(c.Template, IsPosition(c) ? bold : font), p.Measure(c.Header, p.Tiny)) + 2;
+            if (i > 0) sum += Gap;
+        }
+        return MathF.Ceiling(sum);
     }
 
     internal static (List<int> Kept, float[] Widths) Layout(IReadOnlyList<float> natural, IReadOnlyList<bool> flex, IReadOnlyList<bool> position, float width, IReadOnlyList<bool>? keep = null)
     {
         const float NameMin = 60;
-        var kept = Enumerable.Range(0, natural.Count).ToList();
+        var kept = new List<int>(natural.Count);
+        for (int i = 0; i < natural.Count; i++) kept.Add(i);
         float Lead() => StripeLead + (kept.Count > 0 && position[kept[0]] ? BlockPad : 0);
-        int Flexes() => kept.Count(i => flex[i]);
-        float FlexMin() => kept.Where(i => flex[i]).Sum(i => Math.Max(NameMin, natural[i]));
-        float Fixed() => kept.Sum(i => flex[i] ? 0 : natural[i]) + Gap * Math.Max(0, kept.Count - 1);
+        int Flexes()
+        {
+            int n = 0;
+            foreach (int i in kept) if (flex[i]) n++;
+            return n;
+        }
+        float FlexMin()
+        {
+            double sum = 0;
+            foreach (int i in kept) if (flex[i]) sum += Math.Max(NameMin, natural[i]);
+            return (float)sum;
+        }
+        float Fixed()
+        {
+            double sum = 0;
+            foreach (int i in kept) sum += flex[i] ? 0 : natural[i];
+            return (float)sum + Gap * Math.Max(0, kept.Count - 1);
+        }
         while (kept.Count > 1 && Lead() + Fixed() + FlexMin() > width)
         {
             int drop = kept.FindLastIndex(i => !flex[i] && keep?[i] != true);
@@ -103,7 +151,11 @@ internal static class HudTable
     public static void Row(HudPainter p, List<(Column Col, float Width)> cols, RectangleF row, int car, Color classColor, int emphasis, bool dim, Font font, Color? tint = null, bool alternate = false, RowStyle style = default)
     {
         var pal = p.P;
-        if (emphasis == 1) p.Fill(row, p.Solid(HudPalette.Mix(pal.Surface, pal.Player, 0.26), 185));
+        if (emphasis == 1)
+        {
+            p.Fill(row, p.Solid(HudPalette.Mix(pal.Surface, pal.RowTint, 0.26), 185));
+            if (pal.HighlightEdge is { } edge) p.Outline(row, edge);
+        }
         else if (alternate) p.Fill(row, HudPalette.Alpha(pal.Heading, 7));
         p.Fill(new RectangleF(row.X, row.Y, ClassEdge + 1, row.Height), dim ? HudPalette.Alpha(classColor, 150) : classColor);
         Color? over = emphasis == 1 ? pal.PlayerText : tint;
@@ -152,36 +204,38 @@ internal static class HudTable
             {
                 _marks.Clear();
                 marks(car, _marks);
-                float mx = box.Right, mh = Math.Min(row.Height - 4, p.LineHeight(p.Tiny) + 5);
-                for (int m = _marks.Count - 1; m >= 0; m--)
+                FlagKind flag = FlagKind.None;
+                bool fastest = false;
+                Color fastFill = default, fastFore = default;
+                foreach (var (text, tagFill, fore, kind) in _marks)
                 {
-                    var (text, tagFill, fore, flag) = _marks[m];
-                    if (text == FastestMark)
-                    {
-                        float side = row.Height - 2;
-                        var outside = new RectangleF(p.Bounds.Right + 3, row.Y + 1, side, side);
-                        p.Fill(outside, dim ? HudPalette.Alpha(tagFill, 150) : tagFill, 2);
-                        Stopwatch(p, outside, fore);
-                        continue;
-                    }
-                    float mw = flag != FlagKind.None ? mh * 1.5f : p.Measure(text, p.Tiny) + 9;
-                    if (mx - mw < box.X + 40) break;
-                    mx -= mw;
-                    var tag = new RectangleF(mx, row.Y + (row.Height - mh) / 2, mw, mh);
-                    if (flag != FlagKind.None) HudFlags.Draw(p, tag, flag);
-                    else
-                    {
-                        p.Fill(tag, dim ? HudPalette.Alpha(tagFill, 150) : tagFill, 2);
-                        p.Text(text, p.Tiny, fore, tag, HAlign.Center, VAlign.Center, false);
-                    }
-                    mx -= 3;
+                    if (text == FastestMark) { fastest = true; fastFill = tagFill; fastFore = fore; }
+                    else if (kind != FlagKind.None && flag == FlagKind.None) flag = kind;
                 }
-                box = new RectangleF(box.X, box.Y, mx - box.X, box.Height);
+                float side = row.Height - 2;
+                var outside = new RectangleF(p.Bounds.Right + 3, row.Y + 1, side, side);
+                if (flag != FlagKind.None) HudFlags.Draw(p, outside, flag);
+                else if (fastest)
+                {
+                    p.Fill(outside, dim ? HudPalette.Alpha(fastFill, 150) : fastFill, 2);
+                    Stopwatch(p, outside, fastFore);
+                }
+            }
+            if (col.ProTag?.Invoke(car) is { } pro && box.Width > ProTagWidth(p) + 40)
+            {
+                float tw = ProTagWidth(p), th = Math.Min(row.Height - 4, p.LineHeight(p.Tiny) + 5);
+                var tag = new RectangleF(box.Right - tw, row.Y + (row.Height - th) / 2, tw, th);
+                var fill = pro ? pal.Accent : HudPalette.Alpha(Color.White, 26);
+                p.Fill(tag, dim ? HudPalette.Alpha(fill, 150) : fill, 2);
+                p.Text(pro ? "PRO" : "AM", p.Tiny, pro ? HudPalette.On(pal.Accent) : HudPalette.Alpha(Color.White, dim ? 150 : 255), tag, HAlign.Center, VAlign.Center, false);
+                box = new RectangleF(box.X, box.Y, box.Width - tw - 6, box.Height);
             }
             p.Text(cell.Text, cell.Bold ? bold : font, Shade(cell.Color), box, col.Align, VAlign.Center);
             x += w + Gap;
         }
     }
+
+    private static float ProTagWidth(HudPainter p) => p.Measure("PRO", p.Tiny) + 10;
 
     private static void Stopwatch(HudPainter p, RectangleF tag, Color c)
     {
@@ -296,16 +350,35 @@ internal static class FieldColumns
     public static readonly HudOption FlagEdgeOption = HudOption.Bool("flagEdge", "Flag color around the widget", false, "A border in the color of a yellow, red, blue, white or checkered flag while it's out");
     public static readonly HudOption FlagWidth = HudOption.Int("flagWidth", "Flag border width", 4, 1, 10, "px");
 
+    public static readonly HudOption ProAmOption = HudOption.Bool("proAm", "PRO / AM", true,
+        "For names starting with PRO or AM: a tag instead, and PRO and AM split like classes");
+
+    public static bool ProAmOn(HudView v) => v.Def.Option(ProAmOption.Key) is not null && v.Options.Bool(ProAmOption.Key) && v.Frame.Session.HasProAm;
+
+    [ThreadStatic] private static (TelemetryFrame? Frame, long Sequence, int[] Positions, Dictionary<(int Class, bool Pro), int> Counts)? _proAmMemo;
+
+    public static int ProAmPosition(HudView v, int car)
+    {
+        var f = v.Frame;
+        var memo = _proAmMemo ??= (null, 0, new int[TelemetryFrame.MaxCars], new Dictionary<(int Class, bool Pro), int>());
+        if (!ReferenceEquals(memo.Frame, f) || memo.Sequence != f.Sequence)
+        {
+            ProAm.Positions(v.Race.Standings, f.Session, memo.Positions, memo.Counts);
+            _proAmMemo = memo = (f, f.Sequence, memo.Positions, memo.Counts);
+        }
+        return (uint)car < (uint)memo.Positions.Length ? memo.Positions[car] : 0;
+    }
+
     public static readonly HudOption[] Shared =
     {
-        NameFormat, NoDigits, TimeFormat, Decimals, BadgeFormat, PitShow, PitTime, AvgLaps,
+        NameFormat, NoDigits, ProAmOption, TimeFormat, Decimals, BadgeFormat, PitShow, PitTime, AvgLaps,
         PositionBlock, FlagEdgeOption, FlagWidth,
     };
 
     private static void Marks(HudPalette pal, TelemetryFrame f, int car, List<(string, Color, Color, FlagKind)> list)
     {
         int? cls = f.Session.NumCarClasses > 1 && f.Session.ByCar.TryGetValue(car, out var d) ? d.ClassId : null;
-        if (f.CarBestLap[car] > 0 && FieldOrder.FastestLap(f, cls) is { } fl && fl.Car == car) list.Add((HudTable.FastestMark, pal.Fastest, Color.White, FlagKind.None));
+        if (f.CarBestLap[car] > 0 && Fastest(f, cls) is { } fl && fl.Car == car) list.Add((HudTable.FastestMark, pal.Fastest, Color.White, FlagKind.None));
         var flags = f.CarFlags[car];
         if ((flags & RaceFlags.Disqualify) != 0) list.Add(("", default, default, FlagKind.Disqualified));
         else if ((flags & RaceFlags.Black) != 0) list.Add(("", default, default, FlagKind.Black));
@@ -313,8 +386,38 @@ internal static class FieldColumns
         if ((flags & RaceFlags.Blue) != 0) list.Add(("", default, default, FlagKind.Blue));
     }
 
-    public static readonly HudOption MarksOption = HudOption.Bool("marks", "FL and flag tags", true,
-        "FL on the session's fastest lap (per class in multiclass), and the flag when a driver has a black, repair (meatball), disqualified or blue flag");
+    private sealed class FastestMemo
+    {
+        public TelemetryFrame? Frame;
+        public long Sequence;
+        public (int Car, double Time)? All;
+        public bool AllKnown;
+        public readonly Dictionary<int, (int Car, double Time)?> ByClass = new();
+    }
+
+    [ThreadStatic] private static FastestMemo? _fastest;
+
+    internal static (int Car, double Time)? Fastest(TelemetryFrame f, int? classId)
+    {
+        var m = _fastest ??= new FastestMemo();
+        if (!ReferenceEquals(m.Frame, f) || m.Sequence != f.Sequence)
+        {
+            m.Frame = f;
+            m.Sequence = f.Sequence;
+            m.AllKnown = false;
+            m.ByClass.Clear();
+        }
+        if (classId is not { } c)
+        {
+            if (!m.AllKnown) { m.All = FieldOrder.FastestLap(f); m.AllKnown = true; }
+            return m.All;
+        }
+        if (!m.ByClass.TryGetValue(c, out var known)) m.ByClass[c] = known = FieldOrder.FastestLap(f, c);
+        return known;
+    }
+
+    public static readonly HudOption MarksOption = HudOption.Bool("marks", "Fastest lap and flag marks", true,
+        "Beside the row: a stopwatch on the session's fastest lap (per class in multiclass), or the flag when a driver has a black, repair (meatball), disqualified or blue flag");
 
     public static Column? Make(string id, HudPainter p, HudView v, Func<int, Cell> gap, string gapHeader)
     {
@@ -330,6 +433,7 @@ internal static class FieldColumns
         int Int(HudOption o) => v.Def.Option(o.Key) is not null ? v.Options.Int(o.Key) : int.Parse(o.Default, CultureInfo.InvariantCulture);
         string times = Choice(TimeFormat);
         string Time(double? t) => RaceFormat.LapTime(t, times);
+        bool proAm = ProAmOn(v);
         switch (id)
         {
             case "pos":
@@ -338,28 +442,32 @@ internal static class FieldColumns
             case "cpos":
                 return new Column(id, multi ? "CL" : "P", "P00", HAlign.Center, car =>
                 {
-                    int cp = r.StandingOf(car)?.ClassPosition ?? f.CarClassPosition[car];
+                    int cp = proAm ? ProAmPosition(v, car) : r.StandingOf(car)?.ClassPosition ?? f.CarClassPosition[car];
                     return new Cell(cp > 0 ? cp.ToString() : RaceFormat.Missing, Text(car),
                         Pill: f.CarSurface[car] == TrackSurface.OffTrack && f.CarActive(car) ? HudPalette.FlagYellow : null);
                 });
             case "change":
                 return new Column(id, "+/−", "▲00", HAlign.Right, car => r.PositionsGained(car) switch
                 {
-                    > 0 and var g => new Cell("▲" + g, pal.GoodText),
-                    < 0 and var l => new Cell("▼" + -l, pal.DangerText),
+                    > 0 and var g => new Cell(PooledText.Number("▲", g), pal.GoodText),
+                    < 0 and var l => new Cell(PooledText.Number("▼", -l), pal.DangerText),
                     0 => new Cell("–", pal.Faint),
                     _ => None,
                 });
-            case "num": return new Column(id, "#", "#000", HAlign.Center, car => D(car) is { CarNumber.Length: > 0 } d ? new Cell("#" + d.CarNumber, pal.Muted) : None);
+            case "num": return new Column(id, "#", "#000", HAlign.Center, car => D(car) is { CarNumber.Length: > 0 } d ? new Cell(PooledText.Concat("#", d.CarNumber), pal.Muted) : None);
             case "name":
                 string nameFormat = Choice(NameFormat);
                 bool noDigits = Flag(NoDigits);
                 return new Column(id, "DRIVER", nameFormat == "last" ? "Lastname" : "Driver Lastname", HAlign.Left, car =>
                 {
                     var d = D(car);
-                    string name = d is null ? $"Car {car}" : d.Name.Length > 0 ? RaceFormat.Name(d.Name, nameFormat, noDigits) : d.TeamName;
+                    string name = d is null ? PooledText.Number("Car ", car) : d.Name.Length > 0 ? RaceFormat.Name(d.Name, nameFormat, noDigits) : d.TeamName;
                     return new Cell(name, Text(car), car == f.PlayerCarIdx);
-                }, Flex: true) { Marks = v.Def.Option("marks") is not null && v.Options.Bool("marks") ? (car, list) => Marks(pal, f, car, list) : null };
+                }, Flex: true)
+                {
+                    Marks = v.Def.Option("marks") is not null && v.Options.Bool("marks") ? (car, list) => Marks(pal, f, car, list) : null,
+                    ProTag = proAm ? car => D(car) is { } pd ? ProAm.IsPro(pd.Name) : null : null,
+                };
             case "team": return new Column(id, "TEAM", "Team Name Here", HAlign.Left, car => D(car) is { TeamName.Length: > 0 } d ? new Cell(d.TeamName, pal.Muted) : None);
             case "badge":
                 string badgeFormat = Choice(BadgeFormat);
@@ -374,7 +482,7 @@ internal static class FieldColumns
             case "lapsdone": return new Column(id, "LAPS", "000", HAlign.Right, car => new Cell(f.CarLapCompleted[car] > 0 ? f.CarLapCompleted[car].ToString(CultureInfo.InvariantCulture) : RaceFormat.Missing, pal.Muted));
             case "irchange":
                 return new Column(id, "iR ±", "+000", HAlign.Right, car => r.IRatingChangeOf(car) is not { } c ? None
-                    : Math.Round(c) == 0 ? new Cell("0", pal.Muted) : new Cell((c > 0 ? "+" : "−") + Math.Abs(Math.Round(c)), c > 0 ? pal.GoodText : pal.DangerText));
+                    : Math.Round(c) == 0 ? new Cell("0", pal.Muted) : new Cell(Signed(c), c > 0 ? pal.GoodText : pal.DangerText));
             case "last":
                 return new Column(id, "LAST", Time(538.888), HAlign.Right, car =>
                     new Cell(Time(f.CarLastLap[car] > 0 ? f.CarLastLap[car] : null), Text(car)));
@@ -382,7 +490,7 @@ internal static class FieldColumns
                 return new Column(id, "BEST", Time(538.888), HAlign.Right, car =>
                 {
                     double t = f.CarBestLap[car];
-                    bool fastest = t > 0 && FieldOrder.FastestLap(f, D(car)?.ClassId) is { } fl && fl.Car == car;
+                    bool fastest = t > 0 && Fastest(f, D(car)?.ClassId) is { } fl && fl.Car == car;
                     return new Cell(Time(t > 0 ? t : null), fastest ? pal.Fastest : Text(car), fastest);
                 });
             case "delta":
@@ -399,20 +507,20 @@ internal static class FieldColumns
                 return new Column(id, "PIT", pitTime ? "PIT 00" : "L00", HAlign.Center, car =>
                 {
                     if (r.Towing(car))
-                        return new Cell(pitTime && r.TowLeft(car) is { } towLeft ? $"TOW {Math.Ceiling(towLeft):0}" : "TOW", pal.Text, Pill: pal.Danger);
+                        return new Cell(pitTime && r.TowLeft(car) is { } towLeft ? PooledText.Number("TOW ", Math.Ceiling(towLeft), "0", CultureInfo.CurrentCulture) : "TOW", pal.Text, Pill: pal.Danger);
                     if (f.CarOnPitRoad[car])
-                        return new Cell(pitTime && r.PitLaneTime(car) is { } inLane ? $"PIT {inLane:0}" : "PIT", pal.Text, Pill: pal.Warn);
+                        return new Cell(pitTime && r.PitLaneTime(car) is { } inLane ? PooledText.Number("PIT ", inLane, "0", CultureInfo.CurrentCulture) : "PIT", pal.Text, Pill: pal.Warn);
                     if (r.OnOutLap(car)) return new Cell("OUT", pal.Text, Pill: pal.Slate);
                     return pitShow switch
                     {
-                        "stops" => r.StopsOf(car) is > 0 and var n ? new Cell(n + "×", pal.Muted) : None,
-                        "since" => r.LastPitLap(car) is not null ? new Cell(r.StintLapsOf(car) + " L", pal.Muted) : None,
-                        _ => r.LastPitLap(car) is { } lap ? new Cell("L" + lap.ToString(CultureInfo.InvariantCulture), pal.Muted) : None,
+                        "stops" => r.StopsOf(car) is > 0 and var n ? new Cell(PooledText.Number("", n, "×"), pal.Muted) : None,
+                        "since" => r.LastPitLap(car) is not null ? new Cell(PooledText.Number("", r.StintLapsOf(car), " L"), pal.Muted) : None,
+                        _ => r.LastPitLap(car) is { } lap ? new Cell(PooledText.Number("L", lap), pal.Muted) : None,
                     };
                 });
-            case "stint": return new Column(id, "STINT", "00 L", HAlign.Right, car => new Cell(r.StintLapsOf(car) + " L", pal.Muted));
+            case "stint": return new Column(id, "STINT", "00 L", HAlign.Right, car => new Cell(PooledText.Number("", r.StintLapsOf(car), " L"), pal.Muted));
             case "out": return new Column(id, "", "OUT", HAlign.Center, car => r.OnOutLap(car) ? new Cell("OUT", pal.Text, Pill: pal.Slate) : None);
-            case "inc": return new Column(id, "INC", "00x", HAlign.Right, car => D(car)?.Incidents is { } i ? new Cell(i + "x", pal.Muted) : None);
+            case "inc": return new Column(id, "INC", "00x", HAlign.Right, car => D(car)?.Incidents is { } i ? new Cell(PooledText.Number("", i, "x"), pal.Muted) : None);
             case "trend":
                 return new Column(id, "", "▼", HAlign.Center, car =>
                 {
@@ -427,10 +535,16 @@ internal static class FieldColumns
                     int me = f.PlayerCarIdx;
                     if (car == me || (uint)me >= TelemetryFrame.MaxCars || FieldOrder.Distance(f, car) is not { } dc || FieldOrder.Distance(f, me) is not { } dm) return None;
                     int diff = (int)Math.Round(dc - dm - FieldOrder.Wrap(f.CarLapDistPct[car], f.CarLapDistPct[me]));
-                    return diff == 0 ? None : new Cell((diff > 0 ? "+" : "−") + Math.Abs(diff) + "L", diff > 0 ? pal.DangerText : pal.Slate);
+                    return diff == 0 ? None : new Cell(PooledText.Number(diff > 0 ? "+" : "−", Math.Abs(diff), "L"), diff > 0 ? pal.DangerText : pal.Slate);
                 });
         }
         return null;
+    }
+
+    private static string Signed(double c)
+    {
+        double whole = Math.Abs(Math.Round(c));
+        return whole < 1e9 ? PooledText.Number(c > 0 ? "+" : "−", (long)whole) : (c > 0 ? "+" : "−") + whole;
     }
 }
 
@@ -458,7 +572,7 @@ internal sealed class RelativeWidget : HudWidget
         HudOption.Columns("footer", "Footer", "clock,track,air,wind,cars,inc", Strips.Footer),
         HudOption.Bool("showHeader", "Column headings", true),
         HudOption.Bool("highlightMe", "Highlight my row", true, "Your row tinted in the accent color, your position in a block"),
-        HudOption.Bool("stripes", "Row shading", true, "Every other row a shade darker"),
+        HudOption.Bool("stripes", "Row shading", true),
         HudFlags.BannerOption,
     }.Concat(FieldColumns.Shared).Select(o => o.Key == "posBlock" ? o with { Default = "false" } : o).ToArray();
 
@@ -534,6 +648,8 @@ internal sealed class RelativeWidget : HudWidget
         foreach (var id in o.Columns("columns"))
             if (FieldColumns.Make(id, p, v, car => GapCell(p, v, rows, car, close), "GAP") is { } c) cols.Add(c);
         var fitted = HudTable.Fit(p, cols, area.Width, font);
+        float chrome = (header.Count > 0 ? pill + sep : 0) + (footer.Count > 0 ? pill + sep : 0);
+        p.Need(HudTable.Natural(p, cols, font) + pad * 2, chrome + pad * 2 + headH + (o.Int("ahead") + o.Int("behind") + 1) * rowH);
         var style = RowStyle.Of(v);
         float y = area.Y;
         p.Region("rows", area);
@@ -543,7 +659,8 @@ internal sealed class RelativeWidget : HudWidget
             p.Region("headings", new RectangleF(area.X, y, area.Width, headH));
             y += headH;
         }
-        int missingAbove = ahead - rows.Count(r => r.TrackDistance > 0);
+        int missingAbove = ahead;
+        foreach (var r in rows) if (r.TrackDistance > 0) missingAbove--;
         y += Math.Max(0, missingAbove) * rowH;
         bool lapColors = o.Bool("lapColors") && f.SessionKind == SessionKind.Race;
         bool highlight = o.Bool("highlightMe"), stripes = o.Bool("stripes");
@@ -598,6 +715,55 @@ internal sealed class RelativeWidget : HudWidget
 internal sealed class StandingsWidget : HudWidget
 {
     private readonly List<(int Car, RectangleF Row)> _hits = new();
+    private readonly List<StandingRow> _shown = new();
+    private readonly List<List<StandingRow>> _single = new(), _blocks = new(), _grouped = new(), _freeBlocks = new();
+    private readonly List<int> _blockClasses = new(), _blockOrder = new();
+    private readonly List<(double Order, int Min)> _blockKeys = new();
+    private Comparison<int>? _byBlockKey;
+
+    private List<List<StandingRow>> Blocks(TelemetryFrame f, List<StandingRow> standings, bool fastestFirst, bool proAm)
+    {
+        foreach (var used in _grouped) { used.Clear(); _freeBlocks.Add(used); }
+        _grouped.Clear();
+        _blocks.Clear();
+        _blockClasses.Clear();
+        foreach (var s in standings)
+        {
+            int cls = FieldOrder.ClassOf(f, s.CarIdx) * 2 + (proAm && ProAm.IsPro(f.Session, s.CarIdx) ? 0 : 1);
+            int at = _blockClasses.IndexOf(cls);
+            if (at < 0)
+            {
+                at = _blockClasses.Count;
+                _blockClasses.Add(cls);
+                List<StandingRow> rows;
+                if (_freeBlocks.Count > 0) { rows = _freeBlocks[^1]; _freeBlocks.RemoveAt(_freeBlocks.Count - 1); }
+                else rows = new List<StandingRow>();
+                _grouped.Add(rows);
+            }
+            _grouped[at].Add(s);
+        }
+        _blockKeys.Clear();
+        _blockOrder.Clear();
+        for (int i = 0; i < _grouped.Count; i++)
+        {
+            var rows = _grouped[i];
+            double order = fastestFirst ? f.Session.ByCar.GetValueOrDefault(rows[0].CarIdx)?.ClassEstLapTime ?? double.MaxValue : 0;
+            int min = int.MaxValue;
+            foreach (var s in rows) min = Math.Min(min, s.Position > 0 ? s.Position : 999);
+            _blockKeys.Add((order, min));
+            _blockOrder.Add(i);
+        }
+        _byBlockKey ??= (a, b) =>
+        {
+            int c = _blockKeys[a].Order.CompareTo(_blockKeys[b].Order);
+            if (c != 0) return c;
+            c = _blockKeys[a].Min.CompareTo(_blockKeys[b].Min);
+            return c != 0 ? c : a.CompareTo(b);
+        };
+        _blockOrder.Sort(_byBlockKey);
+        foreach (int i in _blockOrder) _blocks.Add(_grouped[i]);
+        return _blocks;
+    }
 
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
@@ -611,22 +777,23 @@ internal sealed class StandingsWidget : HudWidget
         HudOption.Set("classInfo", "Class headings", "cars,sof,laps", null,
             new HudChoice("cars", "Cars in the class"), new HudChoice("sof", "Strength of field"), new HudChoice("laps", "Laps the leader will do", "Timed races: from the class leader's recent pace")),
         HudOption.Choice("divider", "Break in the list", "accent", new HudChoice("line", "A line"), new HudChoice("accent", "An accent line"), new HudChoice("none", "Nothing"))
-            with { Help = "Where cars are left out (the list doesn't fit): between the leaders and the cars around you" },
+            with { Help = "Between the leaders and the cars around you, where cars are left out" },
         HudOption.Bool("title", "Title row", true, "Session name and time or laps left"),
         HudOption.Bool("progress", "Session progress bar", true, "Under the title row"),
         HudOption.Choice("gapTo", "Gap to", "leader", new HudChoice("leader", "Leader (class leader when grouped)"), new HudChoice("interval", "Car ahead"), new HudChoice("player", "You")),
         Editors.HudClassFilter.Scope,
         Editors.HudClassFilter.List,
-        HudOption.Int("top", "Leaders kept", 5, 1, 20, help: "When the list doesn't fit: this many from the top of your class, then the cars around you."),
-        HudOption.Int("otherTop", "Leaders per other class", 3, 1, 20, help: "Multiclass: always kept from the top of every other class, before your class takes the rest."),
-        HudOption.Int("otherRows", "Cars per other class", 0, 0, 30, help: "Multiclass: at most this many cars of each class but yours (0 = as many as fit)."),
+        HudOption.Int("top", "Leaders", 5, 1, 20, help: "This many from the top of your class, then the cars around you."),
+        HudOption.Int("around", "Cars around you", 6, 0, 30, help: "Your class: the cars just ahead of and behind you, under the leaders. The widget grows to fit them."),
+        HudOption.Int("otherTop", "Leaders per other class", 3, 1, 20, help: "Multiclass: shown from the top of every other class."),
+        HudOption.Int("otherRows", "Cars per other class", 0, 0, 30, help: "Multiclass: at most this many cars of each class but yours (0 = no limit)."),
         FieldColumns.MarksOption,
         HudOption.Bool("retired", "Show cars that left", true, "Cars no longer in the session stay in the list, dimmed."),
         HudOption.Bool("showHeader", "Column headings", true),
         HudOption.Columns("header", "Header", "session,csof,cars,pos,lapsleft,lap", Strips.Header),
         HudOption.Columns("footer", "Footer", "remain,classFastest,best,last", Strips.Footer),
         HudOption.Bool("highlightMe", "Highlight my row", true, "Your row tinted in the accent color, your position in a block"),
-        HudOption.Bool("stripes", "Row shading", true, "Every other row a shade darker"),
+        HudOption.Bool("stripes", "Row shading", true),
     }.Concat(FieldColumns.Shared).ToArray();
 
     public override void Draw(HudPainter p, HudView v)
@@ -664,22 +831,28 @@ internal sealed class StandingsWidget : HudWidget
             box = new RectangleF(box.X, hr.Bottom + sep, box.Width, box.Height - pill - sep);
         }
         var footerItems = o.Columns("footer");
-        if (footerItems.Count > 0 && Room())
+        bool footShown = footerItems.Count > 0 && Room();
+        if (footShown)
         {
             var fr = new RectangleF(box.X, box.Bottom - pill, box.Width, pill);
             p.Panel(fr);
             Strips.FooterLine(p, v, footerItems, fr);
             box = new RectangleF(box.X, box.Y, box.Width, box.Height - pill - sep);
         }
-        bool split = o.Bool("group") && f.Session.NumCarClasses > 1;
+        bool proAm = FieldColumns.ProAmOn(v);
+        bool split = o.Bool("group") && (f.Session.NumCarClasses > 1 || proAm);
         if (!split) p.Panel(box);
         var area = split ? new RectangleF(box.X + pad, box.Y, box.Width - pad * 2, box.Height) : box.Inflated(-pad, -pad);
         bool race = f.SessionKind == SessionKind.Race;
         bool multi = f.Session.NumCarClasses > 1;
-        bool group = o.Bool("group") && multi;
+        bool group = o.Bool("group") && (multi || proAm);
         string gapTo = o.Choice("gapTo");
         int me = f.PlayerCarIdx;
-        var standings = v.Race.Standings.Where(s => v.ClassShown(s.CarIdx) && (o.Bool("retired") || f.CarActive(s.CarIdx))).ToList();
+        bool retired = o.Bool("retired");
+        var standings = _shown;
+        standings.Clear();
+        foreach (var s in v.Race.Standings)
+            if (v.ClassShown(s.CarIdx) && (retired || f.CarActive(s.CarIdx))) standings.Add(s);
         var None = Cell.Empty(p.P);
 
         Cell Gap(int car)
@@ -695,15 +868,25 @@ internal sealed class StandingsWidget : HudWidget
                 bool aheadOfMe = IndexOf(v, car) < IndexOf(v, me);
                 var (gg, l) = aheadOfMe ? FieldOrder.Behind(f, me, car, race) : FieldOrder.Behind(f, car, me, race);
                 g = gg is { } x ? (aheadOfMe ? -x : x) : null;
-                if (l > 0) return new Cell((aheadOfMe ? "−" : "+") + l + "L", p.P.Slate);
+                if (l > 0) return new Cell(PooledText.Number(aheadOfMe ? "−" : "+", l, "L"), p.P.Slate);
                 laps = 0;
             }
             else if (gapTo == "interval") { g = group ? st.ClassInterval : st.Interval; laps = 0; }
             else { g = group ? st.GapToClassLeader : st.GapToLeader; laps = group ? st.ClassLapsDown : st.LapsDown; }
             bool leader = gapTo == "leader" && (group ? st.ClassPosition == 1 : st.Position == 1);
+            if (group && proAm && gapTo == "leader")
+            {
+                int tierPos = FieldColumns.ProAmPosition(v, car);
+                leader = tierPos == 1;
+                if (!leader && TierLeader(v, car) is { } top)
+                {
+                    g = g is { } mine && top.GapToClassLeader is { } theirs ? mine - theirs : null;
+                    laps = Math.Max(0, st.ClassLapsDown - top.ClassLapsDown);
+                }
+            }
             if (leader) return new Cell(race ? "Leader" : RaceFormat.LapTime(f.CarBestLap[car] > 0 ? f.CarBestLap[car] : null), p.P.Muted);
-            if (laps > 0 && gapTo != "interval") return new Cell($"+{laps}L", p.P.Slate);
-            return new Cell(g is null ? RaceFormat.Missing : gapTo == "player" ? RaceFormat.Gap(g, Math.Max(1, decimals)) : "+" + RaceFormat.Abs(g, decimals), p.P.Text);
+            if (laps > 0 && gapTo != "interval") return new Cell(PooledText.Number("+", laps, "L"), p.P.Slate);
+            return new Cell(g is null ? RaceFormat.Missing : gapTo == "player" ? RaceFormat.Gap(g, Math.Max(1, decimals)) : RaceFormat.Plus(g, decimals), p.P.Text);
         }
 
         var cols = new List<Column>();
@@ -712,7 +895,7 @@ internal sealed class StandingsWidget : HudWidget
             Column? c = id switch
             {
                 "int" => new Column(id, "INT", "+00.0", HAlign.Right, car => v.Race.StandingOf(car) is { } s && (group ? s.ClassInterval : s.Interval) is { } i
-                    ? new Cell("+" + RaceFormat.Abs(i, o.Int("decimals")), p.P.Muted) : None),
+                    ? new Cell(RaceFormat.Plus(i, o.Int("decimals")), p.P.Muted) : None),
                 "gapme" => new Column(id, "YOU", "+00.0", HAlign.Right, car => car == me || (uint)me >= TelemetryFrame.MaxCars ? None
                     : FieldOrder.GapSeconds(f, me, car, v.Race.Profile) is { } g2 ? new Cell(RaceFormat.Gap(-g2), p.P.Muted) : new Cell(RaceFormat.Missing, p.P.Faint)),
                 _ => FieldColumns.Make(id, p, v, Gap, gapTo == "interval" ? "INT" : gapTo == "player" ? "YOU" : "GAP"),
@@ -734,26 +917,32 @@ internal sealed class StandingsWidget : HudWidget
         }
         float blockGap = p.PieceGap, blockPad = 5 * p.Density;
         bool fastestFirst = o.Choice("classOrder") == "fastest";
-        var blocks = group
-            ? standings.GroupBy(s => FieldOrder.ClassOf(f, s.CarIdx))
-                .OrderBy(g => fastestFirst ? f.Session.ByCar.GetValueOrDefault(g.First().CarIdx)?.ClassEstLapTime ?? double.MaxValue : 0)
-                .ThenBy(g => g.Min(s => s.Position > 0 ? s.Position : 999)).Select(g => g.ToList()).ToList()
-            : new List<List<StandingRow>> { standings };
+        List<List<StandingRow>> blocks;
+        if (group) blocks = Blocks(f, standings, fastestFirst, proAm);
+        else
+        {
+            _single.Clear();
+            _single.Add(standings);
+            blocks = _single;
+        }
         float classHead = group ? p.LineHeight(p.SmallBold) + 9 * p.Density : 0;
         float underHead = group ? blockPad : 0;
-        float perBlock = group ? classHead + underHead + blockGap + blockPad * 2 : 0;
         int otherRows = o.Int("otherRows");
         var pickFrom = group && otherRows > 0
             ? blocks.Select(b => b.Any(s => s.CarIdx == me) ? b : b.Take(otherRows).ToList()).ToList()
             : blocks;
-        float breaks = o.Choice("divider") == "none" ? 0 : BreakRoom(p) * blocks.Count;
-        int fit = Math.Max(1, (int)((area.Bottom - y - perBlock * blocks.Count - (group ? headH : 0) - breaks) / rowH));
-        var shown = Pick(pickFrom, fit, o.Int("top"), o.Int("otherTop"), me);
-        if (group)
+        int top = o.Int("top"), otherTop = o.Int("otherTop"), around = o.Int("around");
+        int fit = top + around + 1;
+        bool mineFound = false;
+        foreach (var block in pickFrom)
         {
-            int empty = shown.Count(s => s.Count == 0);
-            if (empty > 0) shown = Pick(pickFrom, Math.Max(1, (int)((area.Bottom - y - perBlock * (blocks.Count - empty) - (group ? headH : 0) - breaks) / rowH)), o.Int("top"), o.Int("otherTop"), me);
+            bool mine = false;
+            foreach (var s in block) if (s.CarIdx == me) { mine = true; break; }
+            if (mine) mineFound = true;
+            else if (group) fit += Math.Min(otherTop, block.Count);
         }
+        if (!mineFound && group && pickFrom.Count > 0) fit -= Math.Min(otherTop, pickFrom[0].Count);
+        var shown = Pick(pickFrom, Math.Max(1, fit), top, otherTop, me, around);
         bool highlight = o.Bool("highlightMe"), stripes = o.Bool("stripes");
         int drawn = 0;
         bool firstBlock = true;
@@ -785,7 +974,9 @@ internal sealed class StandingsWidget : HudWidget
                 var hr = new RectangleF(area.X, y + 2, area.Width, classHead - 4);
                 p.Region("classhead", hr);
                 float radius = p.CornerRadius(2);
-                string name = (d?.ClassName is { Length: > 0 } cn ? cn : "Class").ToUpperInvariant();
+                string className = d?.ClassName is { Length: > 0 } cn ? cn : "Class";
+                string tier = ProAm.IsPro(f.Session, first.CarIdx) ? "PRO" : "AM";
+                string name = p.LabelText(!proAm ? className : multi ? PooledText.Concat(className, " ", tier) : tier);
                 var tag = new RectangleF(hr.X, hr.Y, Math.Min(hr.Width * 0.6f, p.Measure(name, p.SmallBold) + 16), hr.Height);
                 p.Fill(new RectangleF(tag.X, tag.Y, 3, tag.Height), cc);
                 p.Text(name, p.SmallBold, p.P.Heading, new RectangleF(tag.X + 3, tag.Y, tag.Width - 3, tag.Height), HAlign.Center, VAlign.Center);
@@ -824,9 +1015,21 @@ internal sealed class StandingsWidget : HudWidget
             }
             if (group) y += blockPad + blockGap;
         }
+        float footH = footShown ? pill + sep : 0;
+        p.Need(HudTable.Natural(p, cols, font) + pad * 2, y + (group ? 0 : pad) + footH);
         if (group && y < box.Bottom - 1) p.Panel(RectangleF.FromLTRB(box.X, y, box.Right, box.Bottom));
         HudTable.Track(p, fitted, RectangleF.FromLTRB(area.X, area.Y, area.Right, Math.Max(y, area.Y + rowH)));
         if (o.Bool("flagEdge")) HudTable.FlagEdge(p, f, o.Int("flagWidth"));
+    }
+
+    private static StandingRow? TierLeader(HudView v, int car)
+    {
+        var f = v.Frame;
+        int cls = FieldOrder.ClassOf(f, car);
+        bool pro = ProAm.IsPro(f.Session, car);
+        foreach (var s in v.Race.Standings)
+            if (FieldOrder.ClassOf(f, s.CarIdx) == cls && ProAm.IsPro(f.Session, s.CarIdx) == pro) return s;
+        return null;
     }
 
     private static double? Progress(TelemetryFrame f)
@@ -839,21 +1042,29 @@ internal sealed class StandingsWidget : HudWidget
     private static string ClassInfo(HudView v, List<StandingRow> block)
     {
         var f = v.Frame;
-        var parts = new List<string>(3);
         var show = v.Options.Columns("classInfo");
         int classId = FieldOrder.ClassOf(f, block[0].CarIdx);
+        var t = new PooledBuilder(stackalloc char[PooledText.Room]);
+        bool any = false;
         foreach (var id in show)
+        {
+            string? part = null;
             switch (id)
             {
-                case "cars": parts.Add($"{RaceFormat.Count(block.Count, "car")}"); break;
-                case "sof": if (Strips.StrengthOfField(f.Session, classId) is { } sof) parts.Add("SOF " + RaceFormat.IRating(sof)); break;
+                case "cars": part = RaceFormat.Count(block.Count, "car"); break;
+                case "sof": if (Strips.StrengthOfFieldCached(f.Session, classId) is { } sof) part = PooledText.Concat("SOF ", RaceFormat.IRating(sof)); break;
                 case "laps":
                     int leader = block[0].CarIdx;
                     if (f.CurrentSession?.Laps is not > 0 && f.SessionTimeRemain is { } left && v.Race.PaceOf(leader) is { } pace && pace > 0)
-                        parts.Add(RaceFormat.About(RaceFormat.Count((long)(f.CarLapCompleted[leader] + Math.Ceiling(left / pace) + 1), "lap")));
+                        part = RaceFormat.About(RaceFormat.Count((long)(f.CarLapCompleted[leader] + Math.Ceiling(left / pace) + 1), "lap"));
                     break;
             }
-        return string.Join(" · ", parts);
+            if (part is null) continue;
+            if (any) t.Add(" · ");
+            t.Add(part);
+            any = true;
+        }
+        return t.Done();
     }
 
     private static int IndexOf(HudView v, int car)
@@ -865,7 +1076,7 @@ internal sealed class StandingsWidget : HudWidget
 
     private static float BreakRoom(HudPainter p) => 7 * p.Density;
 
-    public static List<List<(StandingRow Row, int Index)>> Pick(List<List<StandingRow>> blocks, int fit, int top, int otherTop, int player)
+    public static List<List<(StandingRow Row, int Index)>> Pick(List<List<StandingRow>> blocks, int fit, int top, int otherTop, int player, int around = -1)
     {
         var result = blocks.Select(_ => new List<(StandingRow, int)>()).ToList();
         int total = blocks.Sum(b => b.Count);
@@ -888,7 +1099,7 @@ internal sealed class StandingsWidget : HudWidget
         if (playerBlock >= 0)
         {
             int count = blocks[playerBlock].Count;
-            shares[playerBlock] = Math.Min(left, Math.Min(count, Math.Max(top + 3, (int)Math.Round((double)fit * count / total))));
+            shares[playerBlock] = Math.Min(left, Math.Min(count, around >= 0 ? top + around + 1 : Math.Max(top + 3, (int)Math.Round((double)fit * count / total))));
             left -= shares[playerBlock];
         }
         int others = blocks.Where((_, b) => b != playerBlock).Sum(b => b.Count);
@@ -901,17 +1112,19 @@ internal sealed class StandingsWidget : HudWidget
             shares[b] += add;
             left -= add;
         }
+        var take = _marks ??= new Marks();
         for (int b = 0; b < blocks.Count; b++)
         {
             var block = blocks[b];
             int share = shares[b];
-            var take = new SortedSet<int>();
+            take.Reset(block.Count);
             int keep = b == playerBlock ? top : otherTop;
             for (int i = 0; i < Math.Min(keep, block.Count) && take.Count < share; i++) take.Add(i);
             if (b == playerBlock)
             {
-                int at = block.FindIndex(r => r.CarIdx == player);
-                if (share > 0 && take.Count >= share && !take.Contains(at)) take.Remove(take.Max);
+                int at = -1;
+                for (int i = 0; i < block.Count; i++) if (block[i].CarIdx == player) { at = i; break; }
+                if (share > 0 && take.Count >= share && !take.Contains(at)) take.RemoveMax();
                 for (int d = 0; take.Count < share && (at - d >= 0 || at + d < block.Count); d++)
                 {
                     if (at - d >= 0) take.Add(at - d);
@@ -919,10 +1132,43 @@ internal sealed class StandingsWidget : HudWidget
                 }
             }
             for (int i = 0; take.Count < share && i < block.Count; i++) take.Add(i);
-            foreach (int i in take) result[b].Add((block[i], i));
+            for (int i = 0; i < block.Count; i++) if (take.Contains(i)) result[b].Add((block[i], i));
         }
         return result;
     }
+
+    private sealed class Marks
+    {
+        private bool[] _on = new bool[TelemetryFrame.MaxCars];
+        private int _size;
+        public int Count { get; private set; }
+
+        public void Reset(int size)
+        {
+            if (_on.Length < size) _on = new bool[size];
+            Array.Clear(_on, 0, size);
+            _size = size;
+            Count = 0;
+        }
+
+        public bool Contains(int i) => (uint)i < (uint)_size && _on[i];
+
+        public void Add(int i)
+        {
+            if (_on[i]) return;
+            _on[i] = true;
+            Count++;
+        }
+
+        public void RemoveMax()
+        {
+            for (int i = _size - 1; i >= 0; i--)
+                if (_on[i]) { _on[i] = false; Count--; return; }
+        }
+    }
+
+    [ThreadStatic] private static Marks? _marks;
+
     public override bool Click(PointF at, HudView v)
     {
         foreach (var (car, row) in _hits)
@@ -961,8 +1207,10 @@ internal static class Strips
     {
         var f = v.Frame;
         var u = v.Units;
-        var items = new List<(string, string, Color?)>(fields.Count);
-        var ids = new List<string>(fields.Count);
+        var items = _items ??= new List<(string, string, Color?)>();
+        var ids = _ids ??= new List<string>();
+        items.Clear();
+        ids.Clear();
         int me = f.PlayerCarIdx;
         bool mine = (uint)me < TelemetryFrame.MaxCars;
         string missing = RaceFormat.Missing;
@@ -976,22 +1224,22 @@ internal static class Strips
                 case "lapsleft": items.Add(("LAPS LEFT", LapsLeft(v) ?? missing, null)); break;
                 case "pos": items.Add(("POS", mine && f.CarPosition[me] > 0 ? RaceFormat.Pos(f.CarPosition[me]) : missing, null)); break;
                 case "cpos":
-                    items.Add(((f.Session.Player?.ClassName is { Length: > 0 } cn ? cn : "CLASS").ToUpperInvariant(),
-                        mine && v.Race.StandingOf(me) is { ClassPosition: > 0 } s ? "P" + s.ClassPosition : missing, null));
+                    items.Add((p.LabelText(f.Session.Player?.ClassName is { Length: > 0 } cn ? cn : "CLASS"),
+                        mine && v.Race.StandingOf(me) is { ClassPosition: > 0 } s ? PooledText.Number("P", s.ClassPosition) : missing, null));
                     break;
                 case "leader":
                     var standing = mine ? v.Race.StandingOf(me) : null;
-                    items.Add(("LEADER", standing is not { } st ? missing : st.Position == 1 ? "You" : st.LapsDown > 0 ? $"+{st.LapsDown}L" : RaceFormat.Gap(st.GapToLeader), null));
+                    items.Add(("LEADER", standing is not { } st ? missing : st.Position == 1 ? "You" : st.LapsDown > 0 ? PooledText.Number("+", st.LapsDown, "L") : RaceFormat.Gap(st.GapToLeader), null));
                     break;
                 case "ahead":
                 case "behind":
                     var rows = FieldOrder.Relative(f, id == "ahead" ? 1 : 0, id == "behind" ? 1 : 0, profile: v.Race.Profile);
                     var near = rows.FirstOrDefault(x => !x.IsPlayer);
                     string arrow = id == "ahead" ? "▲" : "▼";
-                    items.Add(!near.IsPlayer && near.Gap is { } g && rows.Count > 1 ? (arrow, $"{RaceFormat.Abs(g)} {Short(f, near.CarIdx)}", null) : (arrow, missing, p.P.Faint));
+                    items.Add(!near.IsPlayer && near.Gap is { } g && rows.Count > 1 ? (arrow, PooledText.Concat(RaceFormat.Abs(g), " ", Short(f, near.CarIdx)), null) : (arrow, missing, p.P.Faint));
                     break;
                 case "lap":
-                    items.Add(("LAP", f.Lap is > 0 and var lap ? lap.ToString(CultureInfo.InvariantCulture) + (f.SessionLapsTotal is { } total && f.CurrentSession?.Laps is > 0 ? $" / {total}" : "") : missing, null));
+                    items.Add(("LAP", f.Lap is > 0 and var lap ? (f.SessionLapsTotal is { } total && f.CurrentSession?.Laps is > 0 ? PooledText.Number("", lap, " / ", total) : PooledText.Number("", lap)) : missing, null));
                     break;
                 case "last": items.Add(("LAST", f.LapLast is { } last ? RaceFormat.LapTime(last) : missing, null)); break;
                 case "best": items.Add(("BEST", f.LapBest is { } best ? RaceFormat.LapTime(best) : missing, null)); break;
@@ -1001,54 +1249,69 @@ internal static class Strips
                         : ("Δ", missing, p.P.Faint));
                     break;
                 case "fastest":
-                    items.Add(FieldOrder.FastestLap(f) is { } fl ? ("FL", $"{RaceFormat.LapTime(fl.Time)} {Short(f, fl.Car)}", p.P.Fastest) : ("FL", missing, p.P.Faint));
+                    items.Add(FieldColumns.Fastest(f, null) is { } fl ? ("FL", PooledText.Concat(RaceFormat.LapTime(fl.Time), " ", Short(f, fl.Car)), p.P.Fastest) : ("FL", missing, p.P.Faint));
                     break;
                 case "classFastest":
-                    string classFl = (f.Session.Player?.ClassName is { Length: > 0 } pcn ? pcn.ToUpperInvariant() : "CLASS") + " FL";
-                    items.Add(f.Session.Player is { } pl && FieldOrder.FastestLap(f, pl.ClassId) is { } cfl ? (classFl, RaceFormat.LapTime(cfl.Time), p.P.Fastest) : (classFl, missing, p.P.Faint));
+                    string classFl = f.Session.Player?.ClassName is { Length: > 0 } pcn ? PooledText.Concat(p.LabelText(pcn), " FL") : "CLASS FL";
+                    items.Add(f.Session.Player is { } pl && FieldColumns.Fastest(f, pl.ClassId) is { } cfl ? (classFl, RaceFormat.LapTime(cfl.Time), p.P.Fastest) : (classFl, missing, p.P.Faint));
                     break;
-                case "fuel": items.Add(("FUEL", v.Race.Fuel is { } plan ? string.Create(CultureInfo.InvariantCulture, $"{plan.LapsOfFuel:0.0} LAPS") : missing, null)); break;
+                case "fuel": items.Add(("FUEL", v.Race.Fuel is { } plan ? PooledText.Number("", plan.LapsOfFuel, "0.0", CultureInfo.InvariantCulture, " LAPS") : missing, null)); break;
                 case "inc":
                     if (f.Incidents is { } inc)
                     {
                         bool close = f.Session.IncidentLimit is { } l && inc >= l - v.Race.Alerts.Threshold("incidents.limit");
-                        items.Add(("INC", $"{inc}x" + (f.Session.IncidentLimit is { } lim ? $" / {lim}x" : ""), close ? p.P.DangerText : null));
+                        items.Add(("INC", f.Session.IncidentLimit is { } lim ? PooledText.Number("", inc, "x / ", lim, "x") : PooledText.Number("", inc, "x"), close ? p.P.DangerText : null));
                     }
                     else items.Add(("INC", missing, p.P.Faint));
                     break;
-                case "sof": items.Add(("SOF", RaceFormat.IRating(StrengthOfField(f.Session, null)), null)); break;
+                case "sof": items.Add(("SOF", RaceFormat.IRating(StrengthOfFieldCached(f.Session, null)), null)); break;
                 case "csof":
-                    items.Add(((f.Session.Player?.ClassName is { Length: > 0 } scn ? scn.ToUpperInvariant() + " " : "") + "SOF",
-                        f.Session.Player is { } sp ? RaceFormat.IRating(StrengthOfField(f.Session, sp.ClassId)) : missing, null));
+                    items.Add((f.Session.Player?.ClassName is { Length: > 0 } scn ? PooledText.Concat(p.LabelText(scn), " SOF") : "SOF",
+                        f.Session.Player is { } sp ? RaceFormat.IRating(StrengthOfFieldCached(f.Session, sp.ClassId)) : missing, null));
                     break;
                 case "cars":
                     int all = 0, same = 0, myClass = f.Session.Player?.ClassId ?? int.MinValue;
                     foreach (var dr in f.Session.Drivers)
                         if (dr.Races) { all++; if (dr.ClassId == myClass) same++; }
-                    items.Add(("CARS", all == 0 ? missing : f.Session.NumCarClasses > 1 && same > 0 ? $"{same} / {all}" : all.ToString(CultureInfo.InvariantCulture), null));
+                    items.Add(("CARS", all == 0 ? missing : f.Session.NumCarClasses > 1 && same > 0 ? PooledText.Number("", same, " / ", all) : all.ToString(CultureInfo.InvariantCulture), null));
                     break;
                 case "air": items.Add(("AIR", f.AirTemp is { } air ? RaceFormat.Temp(air, u) : missing, null)); break;
                 case "track": items.Add(("TRACK", f.TrackTemp is { } tt ? RaceFormat.Temp(tt, u) : missing, null)); break;
                 case "wind":
                     double? to = f.WindDir is { } from ? from + Math.PI : null;
-                    items.Add(("WIND", f.WindSpeed is { } ws ? $"{RaceFormat.SpeedValue(ws, u):0} {RaceFormat.SpeedUnit(u)} {RaceFormat.Compass(to)}" : missing, null));
+                    items.Add(("WIND", f.WindSpeed is { } ws ? PooledText.Concat(PooledText.Number("", RaceFormat.SpeedValue(ws, u), "0", CultureInfo.CurrentCulture, " "), RaceFormat.SpeedUnit(u), PooledText.Concat(" ", RaceFormat.Compass(to))) : missing, null));
                     break;
-                case "humidity": items.Add(("HUMIDITY", f.Humidity is { } h ? $"{h * 100:0}%" : missing, null)); break;
+                case "humidity": items.Add(("HUMIDITY", f.Humidity is { } h ? PooledText.Number("", h * 100, "0", CultureInfo.CurrentCulture, "%") : missing, null)); break;
                 case "wetness": items.Add(("SURFACE", f.TrackWetness is { } w and > 0 ? RaceFormat.Wetness(w) : missing, f.TrackWetness is > 1 ? p.P.WarnText : null)); break;
                 case "clock": items.Add(("", RaceFormat.TimeOfDay(DateTime.Now), null)); break;
-                case "bias": items.Add(("BB", f.BrakeBias is { } bb ? string.Create(CultureInfo.InvariantCulture, $"{bb:0.0}%") : missing, null)); break;
+                case "bias": items.Add(("BB", f.BrakeBias is { } bb ? PooledText.Number("", bb, "0.0", CultureInfo.InvariantCulture, "%") : missing, null)); break;
                 case "trackname": items.Add(("", f.Session.TrackDisplayName is { Length: > 0 } tn ? tn : f.Session.TrackName is { Length: > 0 } tn2 ? tn2 : missing, null)); break;
                 case "fuellevel": items.Add(("FUEL", f.Fuel is { } inTank ? RaceFormat.Fuel(inTank, u) : missing, null)); break;
-                case "rain": items.Add(("RAIN", f.Precipitation is { } pr ? $"{pr * 100:0}%" : missing, f.Precipitation is > 0 ? p.P.AccentText : null)); break;
+                case "rain": items.Add(("RAIN", f.Precipitation is { } pr ? PooledText.Number("", pr * 100, "0", CultureInfo.CurrentCulture, "%") : missing, f.Precipitation is > 0 ? p.P.AccentText : null)); break;
                 case "classpos":
                     int inClass = 0, myCls = f.Session.Player?.ClassId ?? int.MinValue;
                     foreach (var dr in f.Session.Drivers) if (dr.Races && dr.ClassId == myCls) inClass++;
-                    items.Add(("CLASS", mine && v.Race.StandingOf(me) is { ClassPosition: > 0 } cs ? $"P{cs.ClassPosition} / {inClass}" : missing, null));
+                    items.Add(("CLASS", mine && v.Race.StandingOf(me) is { ClassPosition: > 0 } cs ? PooledText.Number("P", cs.ClassPosition, " / ", inClass) : missing, null));
                     break;
             }
             if (items.Count > before) ids.Add(id);
         }
         p.Strip(r, items, key, ids);
+    }
+
+    [ThreadStatic] private static List<(string, string, Color?)>? _items;
+    [ThreadStatic] private static List<string>? _ids;
+    [ThreadStatic] private static SessionInfo? _sofSession;
+    [ThreadStatic] private static Dictionary<int, int?>? _sofs;
+
+    internal static int? StrengthOfFieldCached(SessionInfo session, int? classId)
+    {
+        if (classId == int.MinValue) return StrengthOfField(session, classId);
+        var known = _sofs ??= new Dictionary<int, int?>();
+        if (!ReferenceEquals(_sofSession, session)) { _sofSession = session; known.Clear(); }
+        int key = classId ?? int.MinValue;
+        if (!known.TryGetValue(key, out var sof)) known[key] = sof = StrengthOfField(session, classId);
+        return sof;
     }
 
     internal static int? StrengthOfField(SessionInfo session, int? classId)
@@ -1068,8 +1331,8 @@ internal static class Strips
     public static string Remaining(HudView v)
     {
         var f = v.Frame;
-        if (f.CurrentSession?.Laps is > 0 && f.SessionLapsRemain is { } laps) return laps <= 0 ? "Final lap" : RaceFormat.Count(laps, "lap") + " left";
-        if (f.SessionTimeRemain is { } t && f.CurrentSession?.TimeSeconds is not null) return RaceFormat.Clock(t) + " left";
+        if (f.CurrentSession?.Laps is > 0 && f.SessionLapsRemain is { } laps) return laps <= 0 ? "Final lap" : PooledText.Concat(RaceFormat.Count(laps, "lap"), " left");
+        if (f.SessionTimeRemain is { } t && f.CurrentSession?.TimeSeconds is not null) return PooledText.Concat(RaceFormat.Clock(t), " left");
         return f.SessionTime is { } el ? RaceFormat.Clock(el) : "";
     }
 
@@ -1085,9 +1348,17 @@ internal static class Strips
     {
         var f = v.Frame;
         if (f.CurrentSession?.Laps is > 0 && f.SessionLapsRemain is { } laps) return laps <= 0 ? "Final" : laps.ToString(CultureInfo.InvariantCulture);
-        return v.Race.LapsToGo(f) is { } togo ? RaceFormat.About(Math.Ceiling(togo).ToString(CultureInfo.InvariantCulture)) : null;
+        return v.Race.LapsToGo(f) is { } togo ? PooledText.Number("≈", Math.Ceiling(togo), "G", CultureInfo.InvariantCulture) : null;
     }
 
-    public static string Short(TelemetryFrame f, int car) =>
-        f.Session.ByCar.TryGetValue(car, out var d) ? (d.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? d.Name) : "";
+    [ThreadStatic] private static Dictionary<string, string>? _shortNames;
+
+    public static string Short(TelemetryFrame f, int car)
+    {
+        if (!f.Session.ByCar.TryGetValue(car, out var d)) return "";
+        var names = _shortNames ??= new Dictionary<string, string>(StringComparer.Ordinal);
+        if (names.TryGetValue(d.Name, out var known)) return known;
+        if (names.Count >= 1024) names.Clear();
+        return names[d.Name] = d.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? d.Name;
+    }
 }

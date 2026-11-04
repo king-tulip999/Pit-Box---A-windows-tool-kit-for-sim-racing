@@ -11,7 +11,7 @@ namespace PitBox.Grr.Views;
 internal sealed class GrrDashboardSection : StackPanel
 {
     private const string Consumer = "GRR League dashboard";
-    private const double TwoColumnsAt = 729, Gap = 13;
+    private const double TwoColumnsAt = 729, Gap = Ui.PanelSpacing;
     private const int TopRows = 10;
     private const int ShowAllUpTo = 25;
 
@@ -114,11 +114,10 @@ internal sealed class GrrDashboardSection : StackPanel
 
     private (string? League, object? Data, bool Busy, object? Theme, string? Driver, string Leagues) _built;
 
-    private (string? League, object? Data, bool Busy, object? Theme, string? Driver, string Leagues) Inputs()
-    {
-        var league = League;
-        return (league, league is null ? null : _app.Grr.Data(league), _app.Grr.Busy, PageTheme, Driver, string.Join("|", _app.Config.Grr.Leagues));
-    }
+    private (string? League, object? Data, bool Busy, object? Theme, string? Driver, string Leagues) Inputs() => InputsFor(League);
+
+    private (string? League, object? Data, bool Busy, object? Theme, string? Driver, string Leagues) InputsFor(string? league) =>
+        (league, league is null ? null : _app.Grr.Data(league), _app.Grr.Busy, PageTheme, Driver, string.Join("|", _app.Config.Grr.Leagues));
 
     public void OnHidden()
     {
@@ -131,6 +130,7 @@ internal sealed class GrrDashboardSection : StackPanel
 
     private void OnChanged()
     {
+        _kept.Clear();
         _shape = "";
         Build();
     }
@@ -165,28 +165,81 @@ internal sealed class GrrDashboardSection : StackPanel
 
     internal void Rebuild()
     {
+        _kept.Clear();
         _shape = "";
         Build();
+    }
+
+    private static readonly TimeSpan KeepFor = TimeSpan.FromMinutes(2);
+
+    private sealed record Kept(FrameworkElement Content, object Inputs, string Shape, bool FullSeason, DateTime At,
+        FrameworkElement? Standings, FrameworkElement? Results, FrameworkElement? Schedule, TextBlock? HeroClock, GrrRace? HeroRace, bool HeroLive);
+
+    private readonly Dictionary<string, Kept> _kept = new(StringComparer.OrdinalIgnoreCase);
+    private (string? EventKey, int Session, bool AllStandings, bool AllResults, bool FullSeason) _builtState;
+    private string _builtShape = "";
+    private DateTime _builtAt;
+
+    private object KeptInputs(string league) => (InputsFor(league), _app.Grr.ProblemOf(league));
+
+    private void Keep()
+    {
+        var now = DateTime.Now;
+        foreach (var old in _kept.Where(k => now - k.Value.At > KeepFor).Select(k => k.Key).ToList()) _kept.Remove(old);
+        if (_builtLeague.Length == 0 || _content.Content is not FrameworkElement content || _builtState is not (null, < 0, false, false, _)
+            || !_built.Equals(InputsFor(_builtLeague))) return;
+        _kept[_builtLeague] = new Kept(content, KeptInputs(_builtLeague), _builtShape, _builtState.FullSeason, _builtAt,
+            _standingsCard, _resultsCard, _scheduleCard, _heroClock, _heroRace, _heroLive);
+    }
+
+    private bool Reuse(string league, string shape)
+    {
+        if (!_kept.Remove(league, out var kept)) return false;
+        var now = DateTime.Now;
+        if (now - kept.At > KeepFor || kept.Shape != shape || kept.FullSeason != _fullSeason || !kept.Inputs.Equals(KeptInputs(league))) return false;
+        if (kept.HeroRace is { } race && (race.Start + GrrService.RaceLength <= now || race.Start <= now && !kept.HeroLive)) return false;
+        _standingsCard = kept.Standings;
+        _resultsCard = kept.Results;
+        _scheduleCard = kept.Schedule;
+        _heroClock = kept.HeroClock;
+        _heroRace = kept.HeroRace;
+        _heroLive = kept.HeroLive;
+        _builtState = (null, -1, false, false, kept.FullSeason);
+        _builtShape = kept.Shape;
+        _builtAt = kept.At;
+        _content.Content = kept.Content;
+        if (!_heroLive && _heroClock is not null && _heroRace is { } next) _heroClock.Text = GrrLeagues.Countdown(GrrLeagues.Until(next.Start, now));
+        return true;
     }
 
     private void Build()
     {
         if (!_held) return;
         using var scope = Ui.Scope(PageTheme);
+        var league = League;
+        bool switched = _builtLeague != (league ?? "");
+        if (switched)
+        {
+            Keep();
+            _eventKey = null; _session = -1; _allStandings = _allResults = false; _builtLeague = league ?? "";
+        }
         _built = Inputs();
         var shape = Shape();
-        var league = League;
-        if (_builtLeague != (league ?? "")) { _eventKey = null; _session = -1; _allStandings = _allResults = false; _builtLeague = league ?? ""; }
         _shape = shape;
         _heroClock = null;
         _heroRace = null;
         _leaguePicker.Content = LeagueTabs ? LeaguePicker(league) : null;
+        if (Tools is not null) Tools.Visibility = league is null ? Visibility.Collapsed : Visibility.Visible;
         UpdateFreshness();
         if (league is null)
         {
             _content.Content = NoLeague();
             return;
         }
+        if (switched && Reuse(league, shape)) return;
+        _builtState = (_eventKey, _session, _allStandings, _allResults, _fullSeason);
+        _builtShape = shape;
+        _builtAt = DateTime.Now;
 
         var grr = _app.Grr;
         var data = grr.Data(league);
@@ -194,11 +247,11 @@ internal sealed class GrrDashboardSection : StackPanel
         FrameworkElement next, driver, standings, results;
         if (data is null)
         {
-            next = Card("Next race", "I.Flag", Empty(grr));
-            driver = Card("Driver profile", null, GrrParts.Placeholder(140, 90));
-            standings = Card("Championship", "I.Trophy", grr.Busy ? GrrParts.Placeholder(220, 260, 240, 260) : Note("Shows once the league has been read."));
-            results = Card("Results", "I.FileText", grr.Busy ? GrrParts.Placeholder(200, 240, 220) : Note("Shows once the league has been read."));
-            if (!grr.Busy) driver = Card("Driver profile", null, Note("Shows once the league has been read."));
+            next = Card("Next race", Empty(grr));
+            driver = Card("Driver profile", GrrParts.Placeholder(140, 90));
+            standings = Card("Championship", grr.Busy ? GrrParts.Placeholder(220, 260, 240, 260) : Note("Shows once the league has been read."));
+            results = Card("Results", grr.Busy ? GrrParts.Placeholder(200, 240, 220) : Note("Shows once the league has been read."));
+            if (!grr.Busy) driver = Card("Driver profile", Note("Shows once the league has been read."));
         }
         else
         {
@@ -213,24 +266,24 @@ internal sealed class GrrDashboardSection : StackPanel
 
         if (TwoColumns)
         {
-            var top = Pair(next, driver, NextShare, 1 - NextShare);
-            var bottom = Pair(standings, results, 0.5, 0.5);
+            var top = Pair(next, driver);
+            var bottom = Pair(standings, results);
             bottom.Margin = new Thickness(0, Gap, 0, 0);
             _content.Content = new StackPanel { Children = { top, bottom } };
         }
         else _content.Content = Column(next, driver, standings, results);
     }
 
-    private const double NextShare = 0.62;
+    private const double NextShare = 0.5;
 
-    private static Grid Pair(FrameworkElement left, FrameworkElement right, double leftShare, double rightShare)
+    private static Grid Pair(FrameworkElement left, FrameworkElement right)
     {
         var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(leftShare, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(NextShare, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Gap) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(rightShare, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1 - NextShare, GridUnitType.Star) });
         left.Margin = right.Margin = new Thickness(0);
-        left.VerticalAlignment = right.VerticalAlignment = VerticalAlignment.Top;
+        left.VerticalAlignment = right.VerticalAlignment = VerticalAlignment.Stretch;
         grid.Children.Add(left);
         Grid.SetColumn(right, 2);
         grid.Children.Add(right);
@@ -303,9 +356,9 @@ internal sealed class GrrDashboardSection : StackPanel
         _freshness.ToolTip = tip;
     }
 
-    private static Tile Card(string title, string? icon, UIElement body, params FrameworkElement[] tools) => Card(title, icon, body, null, 0, tools);
+    private static Tile Card(string title, UIElement body, params FrameworkElement[] tools) => Card(title, body, null, 0, tools);
 
-    private static Tile Card(string title, string? icon, UIElement body, string? place, int shape, params FrameworkElement[] tools)
+    private static Tile Card(string title, UIElement body, string? place, int shape, params FrameworkElement[] tools)
     {
         var head = new DockPanel { Margin = new Thickness(0, 0, 0, 11), LastChildFill = true };
         var toolRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
@@ -317,8 +370,6 @@ internal sealed class GrrDashboardSection : StackPanel
         DockPanel.SetDock(toolRow, Dock.Right);
         head.Children.Add(toolRow);
         var name = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        if (icon is not null)
-            name.Children.Add(new Icon { Data = Ui.Res<Geometry>(icon), Width = 13, Height = 13, Foreground = Ui.Res<Brush>("AccentText"), Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center });
         name.Children.Add(Ui.Text(title, "H3"));
         head.Children.Add(name);
         var stack = new StackPanel();
@@ -327,12 +378,12 @@ internal sealed class GrrDashboardSection : StackPanel
         if (place is null) return new Tile { Style = Ui.Res<Style>("Card"), Child = stack };
         stack.Margin = new Thickness(CardPadding);
         var backdrop = new Grid { ClipToBounds = true };
-        backdrop.Children.Add(new Backdrop(shape, place, place + "Wash"));
+        backdrop.Children.Add(new Backdrop(shape, place, place + "Wash") { Opacity = BackdropStrength });
         backdrop.Children.Add(stack);
         return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Child = backdrop, ClipToBounds = true };
     }
 
-    private const double CardPadding = 15;
+    private const double CardPadding = 15, BackdropStrength = 0.4;
 
     private static TextBlock Note(string text) => GrrParts.Wrapped(text);
 
@@ -350,7 +401,7 @@ internal sealed class GrrDashboardSection : StackPanel
 
     private Button Toggle(string label, Action flip)
     {
-        var b = new Button { Content = label, Style = Ui.Res<Style>("GhostButton"), Margin = new Thickness(0, 0, 5, 5) };
+        var b = new Button { Content = label, Style = Ui.Res<Style>("GhostButton"), Margin = new Thickness(0, 0, Ui.ButtonGap, Ui.ButtonGap) };
         b.Click += (_, _) => { flip(); _shape = ""; Build(); };
         return b;
     }
@@ -377,7 +428,7 @@ internal sealed class GrrDashboardSection : StackPanel
         var schedule = Schedule(data, now, strip: TwoColumns);
         schedule.Margin = new Thickness(0, 15, 0, 0);
         body.Children.Add(schedule);
-        return Card("Next race", "I.Flag", body, RaceLook.Key(null), 1);
+        return Card("Next race", body, RaceLook.Key(null), 1);
     }
 
     private Tile DriverCard(GrrLeagueData data)
@@ -391,7 +442,7 @@ internal sealed class GrrDashboardSection : StackPanel
             add.HorizontalAlignment = HorizontalAlignment.Left;
             add.Margin = new Thickness(0, 8, 0, 0);
             body.Children.Add(add);
-            return Card("Driver profile", null, body);
+            return Card("Driver profile", body);
         }
         var mine = data.StandingOf(driver);
         string tier = RaceLook.Key(mine?.Row.Rank);
@@ -431,7 +482,7 @@ internal sealed class GrrDashboardSection : StackPanel
             }
         }
         body.Children.Add(Footer(GrrParts.Link("Driver history", GrrLeagues.DriverUrl, GrrParts.DriverHistoryTip(driver), () => GrrParts.OpenDriverHistory(driver))));
-        return Card("Driver profile", null, body, tier, 3);
+        return Card("Driver profile", body, tier, 3);
     }
 
     private static StackPanel Stat(string label, string value, string? note = null, bool big = false) =>
@@ -460,7 +511,7 @@ internal sealed class GrrDashboardSection : StackPanel
     private Tile StandingsCard(GrrLeagueData data)
     {
         if (data.Standings is null || data.Standings.Count == 0)
-            return Card("Championship", "I.Trophy", Note(data.Standings is null ? "Couldn't read the standings from the league's feed." : "No standings posted yet."),
+            return Card("Championship", Note(data.Standings is null ? "Couldn't read the standings from the league's feed." : "No standings posted yet."),
                 GrrParts.Link("Standings", LeagueInfo.Url(LeagueInfo.StandingsPage)));
         var keys = data.StandingKeys.ToList();
         var picked = _app.Config.Grr.DashboardClass;
@@ -472,7 +523,7 @@ internal sealed class GrrDashboardSection : StackPanel
             new("Pts", 62, r => GrrParts.Points(r.Points), 1),
             new("Gap", 62, r => leader is null || r == leader ? "Leader" : leader.Points == r.Points ? "Tied" : "+" + GrrParts.Points(leader.Points - r.Points), 2, Tip: "Points behind the leader"),
             new("Wins", 50, r => r.Wins?.ToString(), 2),
-            new("Pod", 50, r => r.Podiums?.ToString(), 2, Tip: "Podiums"),
+            new("Podiums", 66, r => r.Podiums?.ToString(), 2),
             new("Top 5", 54, r => r.Top5?.ToString(), 2),
             new("Top 10", 58, r => r.Top10?.ToString(), 3),
             new("Poles", 52, r => r.Poles?.ToString(), 3),
@@ -505,7 +556,7 @@ internal sealed class GrrDashboardSection : StackPanel
             }, "grrclass");
             tools.Add(classes);
         }
-        return Card("Championship", "I.Trophy", body, tools.ToArray());
+        return Card("Championship", body, tools.ToArray());
     }
 
     private static string? Second(string? car, string? team)
@@ -571,7 +622,6 @@ internal sealed class GrrDashboardSection : StackPanel
         Grid.SetColumnSpan(rule, span);
         Cell(rule, 0, 0);
 
-        var hover = Ui.Res<Brush>("Hover");
         for (int i = 0; i < rows.Count; i++)
         {
             int r = i + 1;
@@ -585,11 +635,7 @@ internal sealed class GrrDashboardSection : StackPanel
             }
             bool me = mine(row);
             var back = new Border { Background = me ? Ui.Res<Brush>("AccentSoft") : Brushes.Transparent, CornerRadius = ThemeManager.Round(4) };
-            if (!me)
-            {
-                back.MouseEnter += (_, _) => back.Background = hover;
-                back.MouseLeave += (_, _) => back.Background = Brushes.Transparent;
-            }
+            if (!me) Ui.HoverHighlight(back);
             Grid.SetColumnSpan(back, span);
             Cell(back, r, 0);
             if (i < rows.Count - 1 && !me && !(rows[i + 1] is { } below && mine(below)))
@@ -648,7 +694,7 @@ internal sealed class GrrDashboardSection : StackPanel
         var link = GrrParts.Link("Latest results", LeagueInfo.Url(LeagueInfo.ResultsPage), "The latest race's results on the GRR website");
         var events = (data.Events ?? Array.Empty<GrrEvent>()).Where(e => e.Sessions.Any(s => s.Rows.Count > 0)).Reverse().ToList();
         if (events.Count == 0)
-            return Card("Results", "I.FileText", Note(data.Events is null ? "Couldn't read the results from the league's feed." : "No results posted yet this season."), link);
+            return Card("Results", Note(data.Events is null ? "Couldn't read the results from the league's feed." : "No results posted yet this season."), link);
 
         var ev = events.FirstOrDefault(e => Key(e) == _eventKey) ?? events[0];
         var round = data.RoundFor(ev);
@@ -676,7 +722,7 @@ internal sealed class GrrDashboardSection : StackPanel
         int si = _session >= 0 ? Math.Clamp(_session, 0, sessions.Count - 1) : MySession(data, sessions);
         if (sessions.Count > 1)
         {
-            var tabs = Ui.Segmented(sessions.Select(s => s.Label).ToList(), si, i =>
+            var tabs = Ui.Segmented(sessions.Select(s => data.ClassNamed(s.Label) ?? Services.TrayService.SentenceCase(s.Label)).ToList(), si, i =>
             {
                 _session = i;
                 _allResults = false;
@@ -734,7 +780,7 @@ internal sealed class GrrDashboardSection : StackPanel
         if (more || _allResults) footer.Add(Toggle(_allResults ? $"Show top {TopRows}" : $"Show all {rows.Count}", () => _allResults = !_allResults));
         footer.Add(link);
         body.Children.Add(Footer(footer.ToArray()));
-        return Card("Results", "I.FileText", body, picker);
+        return Card("Results", body, picker);
 
         FrameworkElement? Marks(GrrResult r)
         {
@@ -787,7 +833,7 @@ internal sealed class GrrDashboardSection : StackPanel
             var r = rounds[i];
             bool past = r.Start + GrrService.RaceLength <= now;
             var mark = i == next ? GrrParts.TimelineMark.Next : past ? GrrParts.TimelineMark.Done : GrrParts.TimelineMark.Later;
-            var eyebrow = (r.Number is { } n ? $"Round {n}" : "Round") + (r.Format is { } f ? " · " + f : "") + (i == next ? (r.Start <= now ? " · racing now" : " · next") : "");
+            var eyebrow = (r.Number is { } n ? $"Round {n}" : "Round") + (r.Format is { } f ? " · " + f : "");
             FrameworkElement? right = null;
             Action? click = null;
             object? tipContent = null;
@@ -871,7 +917,8 @@ internal sealed class GrrDashboardSection : StackPanel
         stack.Children.Add(new TextBlock
         {
             Text = track, FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>(mark == GrrParts.TimelineMark.Done ? "TextMuted" : "Text"),
-            TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, MaxHeight = 31, Margin = new Thickness(0, 2, 0, 0), ToolTip = track,
+            TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, LineHeight = 15, LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
+            MaxHeight = 30, Margin = new Thickness(0, 2, 0, 0), ToolTip = track,
         });
         stack.Children.Add(GrrParts.Caption(when, 2));
         if (info is not null)

@@ -61,6 +61,7 @@ internal sealed record HudWidgetDef(string Kind, string Name, string Description
     public bool? HideWhenEmpty { get; init; }
     public Editors.HudEditorDef? Editor { get; init; }
     public Func<HudOptions, SizeF>? Natural { get; init; }
+    public bool FixedSize { get; init; }
     public int? Background { get; init; }
 
     private Editors.HudEditorDef? _plain;

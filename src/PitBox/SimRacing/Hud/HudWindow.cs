@@ -7,7 +7,7 @@ namespace PitBox.SimRacing.Hud;
 
 internal sealed class HudWindow : OverlayWindow
 {
-    private enum Drag { None, Move, Right, Bottom, Corner }
+    private enum Drag { None, Move, Corner }
 
     private Drag _drag;
     private Point _start;
@@ -37,12 +37,8 @@ internal sealed class HudWindow : OverlayWindow
     private Drag ZoneAt(Point p)
     {
         if (Locked) return Drag.None;
-        float w = Rect.Width, h = Rect.Height, g = Grip;
-        bool right = p.X >= w - g * 0.5f, bottom = p.Y >= h - g * 0.5f;
-        if (p.X >= w - g && p.Y >= h - g) return Drag.Corner;
-        if (right) return Drag.Right;
-        if (bottom) return Drag.Bottom;
-        return Drag.Move;
+        float w = Rect.Width, h = Rect.Height, g = Grip * 1.4f;
+        return p.X >= w - g && p.Y >= h - g ? Drag.Corner : Drag.Move;
     }
 
     protected override void OnMouseDown(MouseEventArgs e)
@@ -70,7 +66,7 @@ internal sealed class HudWindow : OverlayWindow
         {
             Cursor = Locked ? Cursors.No : ZoneAt(e.Location) switch
             {
-                Drag.Corner => Cursors.SizeNWSE, Drag.Right => Cursors.SizeWE, Drag.Bottom => Cursors.SizeNS, _ => Cursors.Default,
+                Drag.Corner => Cursors.SizeNWSE, _ => Cursors.Default,
             };
             return;
         }
@@ -80,8 +76,6 @@ internal sealed class HudWindow : OverlayWindow
         var proposed = _drag switch
         {
             Drag.Move => new RectangleF(r.X + dx, r.Y + dy, r.Width, r.Height),
-            Drag.Right => new RectangleF(r.X, r.Y, r.Width + dx, r.Height),
-            Drag.Bottom => new RectangleF(r.X, r.Y, r.Width, r.Height + dy),
             _ => new RectangleF(r.X, r.Y, r.Width + dx, r.Height + dy),
         };
         Dragging?.Invoke(this, proposed, _drag != Drag.Move);

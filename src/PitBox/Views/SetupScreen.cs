@@ -17,22 +17,16 @@ internal sealed class SetupScreen : UserControl
     private readonly Action _done;
     private readonly ScrollViewer _scroll = new() { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false };
     private Grid _columns = new();
-    private FrameworkElement? _brand, _title, _left, _right;
+    private FrameworkElement? _brand, _title, _left, _right, _finish;
     private ResourceDictionary? _text;
     private StartupState? _startup;
     private bool _wide = true;
     private ContentControl? _goals, _tools;
     private readonly HashSet<string> _picked = new(StringComparer.Ordinal);
 
-    private const double TwoColumnsAt = 875, ContentWidth = 1440, HeaderGap = 16;
+    private const double TwoColumnsAt = 875, ContentWidth = 1440, HeaderGap = 16, LookHeight = 46;
 
-    private static int LookColumns => Math.Clamp(Themes.All.Count, 2, 5);
-
-    private static double LookHeight => LookColumns > 4 ? 56 : 46;
-
-    private const double MaxLookHeight = 56, MaxLookWidth = 5 * 92;
-
-    private static double LookWidth => LookColumns * (LookColumns switch { > 4 => 92, > 3 => 108, _ => 134 });
+    private static int LookColumns => ThemePicker.Balanced(most: 4);
 
     public SetupScreen(AppServices app, bool firstRun, Action done)
     {
@@ -83,14 +77,12 @@ internal sealed class SetupScreen : UserControl
 
     private void RefreshLook() => Dispatcher.BeginInvoke(new Action(() =>
     {
-        if (_title is null || !_columns.Children.Contains(_title)) return;
+        if (_right is not Grid right || right.Children.Count < 2) return;
         using var scope = Ui.Scope(_text);
-        int row = Grid.GetRow(_title), column = Grid.GetColumn(_title);
-        _columns.Children.Remove(_title);
-        _title = Title();
-        Grid.SetRow(_title, row);
-        Grid.SetColumn(_title, column);
-        _columns.Children.Add(_title);
+        right.Children.RemoveAt(1);
+        var look = Look();
+        Grid.SetRow(look, 1);
+        right.Children.Add(look);
     }));
 
     private void Build()
@@ -102,11 +94,13 @@ internal sealed class SetupScreen : UserControl
         _title = Title();
         _left = Left();
         _right = Right();
+        _finish = Finish();
         _columns = new Grid { MaxWidth = ContentWidth, Margin = new Thickness(39, 28, 39, 28), VerticalAlignment = VerticalAlignment.Center };
         _columns.Children.Add(_brand);
         _columns.Children.Add(_title);
         _columns.Children.Add(_left);
         _columns.Children.Add(_right);
+        _columns.Children.Add(_finish);
         _scroll.Content = _columns;
         Arrange(force: true);
     }
@@ -125,7 +119,7 @@ internal sealed class SetupScreen : UserControl
 
     private void Arrange(bool force = false)
     {
-        if (_brand is null || _title is null || _left is null || _right is null) return;
+        if (_brand is null || _title is null || _left is null || _right is null || _finish is null) return;
         bool wide = ActualWidth <= 0 || ActualWidth >= TwoColumnsAt;
         if (!force && wide == _wide) return;
         _wide = wide;
@@ -136,16 +130,17 @@ internal sealed class SetupScreen : UserControl
             _columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3.4, GridUnitType.Star), MinWidth = 292, MaxWidth = 430 });
             _columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(32) });
             _columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(6, GridUnitType.Star) });
-            _columns.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            _columns.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            for (int i = 0; i < 3; i++)
+                _columns.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             Place(_brand, 0, 0);
             Place(_title, 0, 2);
             Place(_left, 1, 0);
             Place(_right, 1, 2);
+            Place(_finish, 2, 2);
         }
         else
         {
-            var stacked = new[] { _brand, _title, _left, _right };
+            var stacked = new[] { _brand, _title, _left, _right, _finish };
             for (int i = 0; i < stacked.Length; i++)
             {
                 _columns.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -164,70 +159,56 @@ internal sealed class SetupScreen : UserControl
     {
         var word = new TextBlock { Foreground = Ui.Res<Brush>("Heading") };
         Ui.FitWordmark(word, 62);
-        var lockup = new Border { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(16, 6, 16, 10), Child = word };
+        return new Border { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 6, 16, HeaderGap), Child = word };
+    }
 
+    private FrameworkElement Finish()
+    {
         string label = _firstRun ? "Get started" : "Done";
         var strip = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
-        var arrow = Compact(new TextBlock { Text = "\u2192", FontSize = 17, Foreground = Ui.Res<Brush>("OnAccent"), Margin = new Thickness(8, 0, 0, 0) });
-        strip.Children.Add(Compact(new TextBlock { Text = label, FontSize = 16, Foreground = Ui.Res<Brush>("OnAccent") }));
-        strip.Children.Add(arrow);
-        var bar = new Border { Padding = new Thickness(16, 6, 16, 6), Child = strip, Background = Ui.Res<Brush>("Accent") };
-
-        var face = new Border { BorderThickness = Hairline.Edges(), Child = bar };
-        var template = new ControlTemplate(typeof(Button)) { VisualTree = new FrameworkElementFactory(typeof(ContentPresenter)) };
+        strip.Children.Add(Compact(new TextBlock { Text = label, FontSize = 15.5 }));
+        strip.Children.Add(new Icon { Data = Ui.Res<Geometry>("I.ArrowRight"), Width = 15, Height = 15, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
         var finish = new Button
         {
-            Template = template, Content = face, IsDefault = true, Cursor = System.Windows.Input.Cursors.Hand,
-            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Style = Ui.Res<Style>("PrimaryButton"), Content = strip, IsDefault = true, MinWidth = 200,
+            HorizontalAlignment = HorizontalAlignment.Right, Padding = new Thickness(16, 6, 16, 6), Margin = new Thickness(0, Ui.PanelSpacing, 0, 0),
         };
         System.Windows.Automation.AutomationProperties.SetName(finish, label);
-        void Paint()
-        {
-            bool hot = finish.IsMouseOver || finish.IsKeyboardFocused;
-            face.BorderBrush = hot ? Ui.Res<Brush>("Accent") : Brushes.Transparent;
-            bar.Background = Ui.Res<Brush>(finish.IsPressed ? "AccentPressed" : hot ? "AccentHover" : "Accent");
-        }
-        Paint();
-        finish.MouseEnter += (_, _) => Paint();
-        finish.MouseLeave += (_, _) => Paint();
-        finish.GotKeyboardFocus += (_, _) => Paint();
-        finish.LostKeyboardFocus += (_, _) => Paint();
-        finish.PreviewMouseLeftButtonDown += (_, _) => Dispatcher.BeginInvoke(new Action(Paint));
-        finish.PreviewMouseLeftButtonUp += (_, _) => Dispatcher.BeginInvoke(new Action(Paint));
         finish.Click += (_, _) => _done();
-        return new StackPanel { VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, HeaderGap), Children = { lockup, finish } };
+        return finish;
     }
 
     private FrameworkElement Title()
     {
-        var row = new Grid { VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, HeaderGap) };
-        row.ColumnDefinitions.Add(new ColumnDefinition());
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(MaxLookWidth + 16) });
-        var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Bottom };
+        var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 6, 0, HeaderGap) };
         stack.Children.Add(new TextBlock { Text = _firstRun ? "Welcome" : "Setup", Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(2, 0, 0, 4) });
-        stack.Children.Add(new TextBlock { Text = "Set up your workspace", Style = Ui.Res<Style>("H1"), FontSize = 28, TextWrapping = TextWrapping.Wrap });
-        row.Children.Add(stack);
-        var look = new StackPanel { VerticalAlignment = VerticalAlignment.Bottom, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(16, 0, 0, 0) };
-        look.Children.Add(new TextBlock { Text = "Look", Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(2, 0, 0, 6) });
+        var heading = new TextBlock { Text = "Set up your workspace", Style = Ui.Res<Style>("H1"), TextWrapping = TextWrapping.Wrap, LineStackingStrategy = LineStackingStrategy.BlockLineHeight };
+        heading.LineHeight = Math.Round(heading.FontSize * 1.1);
+        stack.Children.Add(heading);
+        return stack;
+    }
+
+    private FrameworkElement Look()
+    {
         var picker = new ThemePicker(_app.Config.Ui.Theme, PickTheme, columns: LookColumns, height: LookHeight, oled: set => { _app.UseOledColors(set); PickTheme(AppTheme.Custom); },
                 usePick: (set, name) => { _app.UsePick(set, name); PickTheme(set.Id); })
-            { Margin = new Thickness(0, 0, -8, -8), Width = LookWidth, VerticalAlignment = VerticalAlignment.Bottom };
-        look.Children.Add(new Grid { Height = MaxLookHeight, Children = { picker } });
-        Grid.SetColumn(look, 1);
-        row.Children.Add(look);
-        return row;
+            { Margin = new Thickness(0, 0, -8, -8) };
+        var look = Section("Look", null, picker);
+        look.Margin = new Thickness(0);
+        return look;
     }
 
     private FrameworkElement Left()
     {
-        var stack = new DockPanel();
-        var start = Section("Start", "Everything here can be changed later in Settings.", StartOptions(), inline: true);
-        DockPanel.SetDock(start, Dock.Top);
-        stack.Children.Add(start);
+        var stack = new Grid();
+        stack.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        stack.RowDefinitions.Add(new RowDefinition());
         _goals = new ContentControl { Focusable = false, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch };
-        var goals = Section("What do you want Pit-Box for?", "Pick one or more.", _goals);
-        goals.Margin = new Thickness(0);
-        stack.Children.Add(goals);
+        stack.Children.Add(Section("What do you want Pit-Box for?", null, _goals));
+        var start = Section("Start", "Everything here can be changed later in Settings.", StartOptions(), inline: true);
+        start.Margin = new Thickness(0);
+        Grid.SetRow(start, 1);
+        stack.Children.Add(start);
         return stack;
     }
 
@@ -253,7 +234,7 @@ internal sealed class SetupScreen : UserControl
             DockPanel.SetDock(action, Dock.Right);
             head.Children.Add(action);
         }
-        var heading = Compact(new TextBlock { Text = title, Style = Ui.Res<Style>("H2"), FontSize = 19, VerticalAlignment = VerticalAlignment.Center });
+        var heading = Compact(new TextBlock { Text = title, Style = Ui.Res<Style>("H2"), VerticalAlignment = VerticalAlignment.Center });
         DockPanel.SetDock(heading, Dock.Left);
         head.Children.Add(heading);
         if (inline && text is not null)
@@ -271,16 +252,22 @@ internal sealed class SetupScreen : UserControl
             stack.Children.Add(caption);
         }
         stack.Children.Add(body);
-        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(16, 13, 16, 13), Margin = new Thickness(0, 0, 0, 13), Child = stack };
+        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(16, 13, 16, 13), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Child = stack };
     }
 
     private FrameworkElement Right()
     {
         _tools = new ContentControl { Focusable = false, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch };
         var tools = Section("Tools", "A tool that's off has no page, keybind or background work.", _tools, ToolChooser.BulkButtons(_app, ByHand));
-        tools.Margin = new Thickness(0);
         Fill();
-        return tools;
+        var stack = new Grid();
+        stack.RowDefinitions.Add(new RowDefinition());
+        stack.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        stack.Children.Add(tools);
+        var look = Look();
+        Grid.SetRow(look, 1);
+        stack.Children.Add(look);
+        return stack;
     }
 
     private void Fill()
@@ -294,33 +281,25 @@ internal sealed class SetupScreen : UserControl
 
     private FrameworkElement Goals()
     {
+        var picked = SetupGoals.All.Where(g => _picked.Contains(g.Id)).Select(g => "“" + g.Title + "”").ToList();
+        string state = picked.Count == 0 ? "Picking one ticks its tools; each tool can still be changed."
+            : "Tools ticked for " + string.Join(" and ", picked) + ".";
+        var dock = new DockPanel();
+        var line = new TextBlock { Text = state, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10) };
+        DockPanel.SetDock(line, Dock.Top);
+        dock.Children.Add(line);
         var grid = new System.Windows.Controls.Primitives.UniformGrid { Columns = 2, Margin = new Thickness(0, 0, -7, -7) };
         foreach (var goal in SetupGoals.All)
             grid.Children.Add(GoalCard(goal.Id, goal.Title, goal.Caption));
-        return grid;
+        dock.Children.Add(grid);
+        return dock;
     }
 
-    private Button GoalCard(string id, string title, string caption)
+    private CheckBox GoalCard(string id, string title, string caption)
     {
-        bool on = _picked.Contains(id);
-        var face = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 4, 0) };
-        face.Children.Add(TextFit.TipWhenTrimmed(Compact(new TextBlock { Text = title, Style = Ui.Res<Style>("H3"), FontSize = 17, TextTrimming = TextTrimming.CharacterEllipsis, TextAlignment = TextAlignment.Center })));
-        face.Children.Add(new Border { Width = 30, Height = 3, Margin = new Thickness(0, 4, 0, 5), HorizontalAlignment = HorizontalAlignment.Center, Background = Ui.Res<Brush>(GoalColors.GetValueOrDefault(id, "LineStrong")) });
-        face.Children.Add(new TextBlock { Text = caption, Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.Normal, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center });
-        var button = new Button
-        {
-            Style = Ui.Res<Style>("Btn"), Height = double.NaN, Margin = new Thickness(0, 0, 7, 7), Padding = new Thickness(12, 8, 12, 8),
-            VerticalAlignment = VerticalAlignment.Stretch, HorizontalAlignment = HorizontalAlignment.Stretch,
-            HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch,
-            Background = Ui.Res<Brush>(on ? "AccentSoft" : "SurfaceAlt"), BorderBrush = Ui.Res<Brush>("Line"),
-            BorderThickness = Hairline.Edges(), Content = face, Cursor = System.Windows.Input.Cursors.Hand,
-        };
-        button.MouseEnter += (_, _) => button.BorderBrush = Ui.Res<Brush>("LineStrong");
-        button.MouseLeave += (_, _) => button.BorderBrush = Ui.Res<Brush>("Line");
-        System.Windows.Automation.AutomationProperties.SetName(button, title);
-        System.Windows.Automation.AutomationProperties.SetItemStatus(button, on ? "Selected" : "Not selected");
-        button.Click += (_, _) => Pick(id);
-        return button;
+        var card = ToggleCards.Card(title, caption, _picked.Contains(id), _ => Pick(id));
+        card.Margin = new Thickness(0, 0, 7, 7);
+        return card;
     }
 
     private void Pick(string id)
@@ -341,11 +320,6 @@ internal sealed class SetupScreen : UserControl
         SimRacingPlugin.PanelsChanged(_app);
     }
 
-    private static readonly Dictionary<string, string> GoalColors = new()
-    {
-        ["overlays"] = "Coral", ["racing"] = "Slate", ["pc"] = "Sage", ["everything"] = "Apricot",
-    };
-
     private void ByHand()
     {
         _picked.Clear();
@@ -355,17 +329,17 @@ internal sealed class SetupScreen : UserControl
     private FrameworkElement StartOptions()
     {
         var u = _app.Config.Ui;
-        var row = new System.Windows.Controls.Primitives.UniformGrid { Columns = 3, Margin = new Thickness(0, 0, -6, 0) };
-        Add(ToolChooser.Choice("Auto start", _app.Demo ? "Not in demo mode." : "Starts at sign-in.",
-            _startup?.Enabled == true, !_app.Demo && _startup is not null, "Accent", on => _ = SetStartupAsync(on)));
-        Add(ToolChooser.Choice("Start hidden", "Opens in the tray.", u.StartMinimized, true, "Accent", on => { u.StartMinimized = on; _app.Save(); }));
-        Add(ToolChooser.Choice("Close to tray", "X hides to the tray.", u.CloseToTray, true, "Accent", on => { u.CloseToTray = on; _app.Save(); }));
-        return row;
+        var rows = new StackPanel();
+        Option("Start with Windows", _app.Demo ? "Not in demo mode." : "Pit-Box opens when you sign in.", _startup?.Enabled == true, !_app.Demo && _startup is not null, on => _ = SetStartupAsync(on));
+        Option("Start in background", "Opens in the tray.", u.StartMinimized, true, on => { u.StartMinimized = on; _app.Save(); });
+        Option("Close in background", "The close button hides Pit-Box to the tray.", u.CloseToTray, true, on => { u.CloseToTray = on; _app.Save(); });
+        return rows;
 
-        void Add(Border option)
+        void Option(string title, string caption, bool on, bool enabled, Action<bool> changed)
         {
-            option.Margin = new Thickness(0, 0, 6, 0);
-            row.Children.Add(option);
+            var tile = ToolChooser.Choice(title, caption, on, enabled, changed);
+            tile.Margin = new Thickness(0, rows.Children.Count == 0 ? 0 : 6, 0, 0);
+            rows.Children.Add(tile);
         }
     }
 

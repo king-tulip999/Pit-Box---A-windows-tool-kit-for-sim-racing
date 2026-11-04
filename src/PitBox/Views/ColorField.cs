@@ -15,7 +15,7 @@ internal static class ColorField
         var chip = Hairline.Frame(new Border { Width = 18, Height = 15, CornerRadius = ThemeManager.Round(3), BorderBrush = Ui.Res<Brush>("LineStrong") });
         var swatch = new Button
         {
-            Width = 28, Height = 24, MinHeight = 0, Padding = new Thickness(0), Margin = new Thickness(0, 0, 6, 0), ToolTip = "Pick a color", Style = Ui.Res<Style>("Btn"),
+            Width = 28, Height = 28, Padding = new Thickness(0), Margin = Ui.AfterButton, ToolTip = "Pick a color", Style = Ui.Res<Style>("Btn"),
             Content = chip,
         };
         var box = new TextBox { Text = get(), MinWidth = boxWidth, MaxLength = 7, FontFamily = Ui.Res<FontFamily>("MonoFont"), VerticalAlignment = VerticalAlignment.Center, ToolTip = help };

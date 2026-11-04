@@ -52,45 +52,90 @@ internal static class FieldOrder
         return Math.Max(0, f.CarLap[car] - 1) + pct;
     }
 
+    [ThreadStatic] private static List<(int Car, double Dist)>? _ahead, _behind;
+
+    private static readonly Comparison<(int Car, double Dist)> Nearest = (a, b) => a.Dist.CompareTo(b.Dist) is var c && c != 0 ? c : a.Car.CompareTo(b.Car);
+    private static readonly Comparison<(int Car, double Dist)> NearestBehind = (a, b) => b.Dist.CompareTo(a.Dist) is var c && c != 0 ? c : a.Car.CompareTo(b.Car);
+
     public static List<RelativeRow> Relative(TelemetryFrame f, int ahead, int behind, bool hidePits = false, Func<int, bool>? include = null, EstProfile? profile = null)
     {
-        var rows = new List<RelativeRow>();
+        var rows = new List<RelativeRow>(Math.Max(0, ahead) + Math.Max(0, behind) + 1);
         int player = f.PlayerCarIdx;
         if ((uint)player >= TelemetryFrame.MaxCars || f.CarLapDistPct[player] < 0) return rows;
         double pp = f.CarLapDistPct[player];
         double playerDist = Distance(f, player) ?? 0;
-        var others = new List<(int Car, double Dist)>();
+        var front = _ahead ??= new List<(int Car, double Dist)>();
+        var back = _behind ??= new List<(int Car, double Dist)>();
+        front.Clear();
+        back.Clear();
         for (int i = 0; i < TelemetryFrame.MaxCars; i++)
         {
             if (i == player || !f.CarActive(i) || f.CarLapDistPct[i] < 0) continue;
             if (hidePits && f.CarOnPitRoad[i]) continue;
             if (include is not null && !include(i)) continue;
-            others.Add((i, Wrap(f.CarLapDistPct[i], pp)));
+            double dist = Wrap(f.CarLapDistPct[i], pp);
+            if (dist > 0) front.Add((i, dist));
+            else if (dist <= 0) back.Add((i, dist));
         }
         int LapDiff(int car, double dist) => Distance(f, car) is { } d ? (int)Math.Round(d - playerDist - dist) : 0;
-        foreach (var (car, dist) in others.Where(o => o.Dist > 0).OrderBy(o => o.Dist).Take(Math.Max(0, ahead)).Reverse())
+        int takeAhead = Math.Min(Math.Max(0, ahead), front.Count);
+        if (takeAhead > 0) front.Sort(Nearest);
+        for (int k = takeAhead - 1; k >= 0; k--)
+        {
+            var (car, dist) = front[k];
             rows.Add(new RelativeRow(car, GapSeconds(f, player, car, profile), dist, LapDiff(car, dist), false));
+        }
         rows.Add(new RelativeRow(player, 0, 0, 0, true));
-        foreach (var (car, dist) in others.Where(o => o.Dist <= 0).OrderByDescending(o => o.Dist).Take(Math.Max(0, behind)))
+        int takeBehind = Math.Min(Math.Max(0, behind), back.Count);
+        if (takeBehind > 0) back.Sort(NearestBehind);
+        for (int k = 0; k < takeBehind; k++)
+        {
+            var (car, dist) = back[k];
             rows.Add(new RelativeRow(car, GapSeconds(f, player, car, profile), dist, LapDiff(car, dist), false));
+        }
         return rows;
     }
 
+    private sealed class StandingsScratch
+    {
+        public readonly List<int> Ordered = new(TelemetryFrame.MaxCars);
+        public readonly int[] Position = new int[TelemetryFrame.MaxCars];
+        public readonly double[] Distance = new double[TelemetryFrame.MaxCars], Best = new double[TelemetryFrame.MaxCars];
+        public readonly int[] ClassPos = new int[TelemetryFrame.MaxCars];
+        public readonly Dictionary<int, int> ClassCount = new(), ClassLeader = new(), PrevInClass = new();
+        public readonly Comparison<int> Order;
+
+        public StandingsScratch() => Order = (a, b) =>
+        {
+            int c = Position[a].CompareTo(Position[b]);
+            if (c != 0) return c;
+            c = Distance[b].CompareTo(Distance[a]);
+            if (c != 0) return c;
+            c = Best[a].CompareTo(Best[b]);
+            return c != 0 ? c : a.CompareTo(b);
+        };
+    }
+
+    [ThreadStatic] private static StandingsScratch? _standings;
+
     public static List<StandingRow> Standings(TelemetryFrame f, bool race)
     {
-        var cars = new List<int>();
+        var x = _standings ??= new StandingsScratch();
+        var ordered = x.Ordered;
+        ordered.Clear();
         for (int i = 0; i < TelemetryFrame.MaxCars; i++)
-            if (f.CarActive(i) || f.CarPosition[i] > 0 && f.Session.ByCar.TryGetValue(i, out var d) && d.Races) cars.Add(i);
+            if (f.CarActive(i) || f.CarPosition[i] > 0 && f.Session.ByCar.TryGetValue(i, out var d) && d.Races)
+            {
+                ordered.Add(i);
+                x.Position[i] = f.CarPosition[i] > 0 ? f.CarPosition[i] : int.MaxValue;
+                x.Distance[i] = race ? Distance(f, i) ?? -1 : 0;
+                x.Best[i] = !race && f.CarBestLap[i] > 0 ? f.CarBestLap[i] : double.MaxValue;
+            }
+        ordered.Sort(x.Order);
 
-        int Key(int car) => f.CarPosition[car] > 0 ? f.CarPosition[car] : int.MaxValue;
-        var ordered = cars.OrderBy(Key)
-            .ThenByDescending(c => race ? Distance(f, c) ?? -1 : 0)
-            .ThenBy(c => !race && f.CarBestLap[c] > 0 ? f.CarBestLap[c] : double.MaxValue)
-            .ThenBy(c => c)
-            .ToList();
-
-        var classCount = new Dictionary<int, int>();
-        var classPos = new Dictionary<int, int>();
+        var classCount = x.ClassCount;
+        var classPos = x.ClassPos;
+        classCount.Clear();
         foreach (var car in ordered)
         {
             int cls = ClassOf(f, car);
@@ -99,11 +144,13 @@ internal static class FieldOrder
         }
 
         int? leader = ordered.Count > 0 ? ordered[0] : null;
-        var classLeader = new Dictionary<int, int>();
+        var classLeader = x.ClassLeader;
+        classLeader.Clear();
         foreach (var car in ordered) classLeader.TryAdd(ClassOf(f, car), car);
 
         var rows = new List<StandingRow>(ordered.Count);
-        var prevInClass = new Dictionary<int, int>();
+        var prevInClass = x.PrevInClass;
+        prevInClass.Clear();
         int? prev = null;
         foreach (var car in ordered)
         {

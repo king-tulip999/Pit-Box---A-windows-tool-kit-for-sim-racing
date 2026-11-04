@@ -19,7 +19,7 @@ namespace PitBox.Views.Pages;
 internal sealed partial class RaceHudWidgets
 {
     private static readonly string[] SessionKinds = { "Practice", "Qualify", "Race", "TimeTrial" };
-    private const string LayoutTab = "display", ContentTab = "content", VisibilityTab = "visibility", PositionTab = "position";
+    private const string LayoutTab = "display", ContentTab = "content";
 
     private readonly AppServices _app;
     private readonly IHudEditorHost _section;
@@ -36,7 +36,7 @@ internal sealed partial class RaceHudWidgets
     private bool _dragging;
     private readonly Dictionary<string, string> _fitSignatures = new(StringComparer.OrdinalIgnoreCase);
     private readonly HudPainter _trialPainter = new() { Items = new(), Overflow = new() };
-    private const double NavScrollGutter = 14;
+    private const double NavScrollGutter = 14, NavWidth = 214;
     private int _trialRun;
     private Border? _previewWell;
     private TextBlock? _previewNote;
@@ -56,7 +56,7 @@ internal sealed partial class RaceHudWidgets
         _section = section;
         _inPage = inPage;
         var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(206) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(NavWidth) });
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         if (_inPage)
         {
@@ -68,7 +68,7 @@ internal sealed partial class RaceHudWidgets
             Grid.SetColumn(right, 1);
             grid.Children.Add(right);
             Sticky.Install(nav, grid, () => true, gap: 11);
-            Root = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Margin = new Thickness(0, 0, 0, 10), Child = grid };
+            Root = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Child = grid };
         }
         else
         {
@@ -162,6 +162,7 @@ internal sealed partial class RaceHudWidgets
 
     internal void ShowTab(string? kind, string tab = LayoutTab)
     {
+        if (tab != ContentTab) tab = LayoutTab;
         _general = kind is null;
         if (kind is not null) _selected = Layout?.Widgets.FirstOrDefault(w => w.Kind == kind)?.Id ?? _selected;
         _tab = tab;
@@ -180,12 +181,6 @@ internal sealed partial class RaceHudWidgets
         var def = HudCatalog.Find(kind);
         ShowTab(kind, def?.EditorDef.GroupOf(settingId)?.Tab == HudTab.Content ? ContentTab : LayoutTab);
         _list.Dispatcher.BeginInvoke(() => Highlight(settingId), System.Windows.Threading.DispatcherPriority.ContextIdle);
-    }
-
-    internal void OpenPicker(string kind, string key)
-    {
-        ShowTab(kind, ContentTab);
-        _list.Dispatcher.BeginInvoke(() => { if (_context?.Pickers.TryGetValue(key, out var picker) == true) picker.ShowAdd(key); }, System.Windows.Threading.DispatcherPriority.ContextIdle);
     }
 
     public void Select(string kind)
@@ -269,19 +264,36 @@ internal sealed partial class RaceHudWidgets
         string group = "hudnav" + GetHashCode();
         RadioButton Item(string text, bool on, HudWidgetConfig? widget, Action pick)
         {
-            var row = new DockPanel { LastChildFill = true };
+            RadioButton b;
             if (widget is { } w)
             {
-                var shown = Ui.Switch(w.Enabled, v => { w.Enabled = v; Changed(); Fill(); });
-                shown.ToolTip = w.Enabled ? "Shown: switch off to hide this widget" : "Hidden: switch on to show this widget";
-                shown.Margin = new Thickness(8, 0, 0, 0);
-                shown.VerticalAlignment = VerticalAlignment.Center;
-                System.Windows.Automation.AutomationProperties.SetName(shown, "Show " + text);
-                DockPanel.SetDock(shown, Dock.Right);
-                row.Children.Add(shown);
+                var row = new DockPanel { LastChildFill = true };
+                var eye = Ui.IconButton(w.Enabled ? "I.Eye" : "I.EyeOff", w.Enabled ? "Shown: click to hide this widget" : "Hidden: click to show this widget",
+                    () => { w.Enabled = !w.Enabled; Changed(); Fill(); });
+                eye.Width = 34;
+                eye.VerticalAlignment = VerticalAlignment.Stretch;
+                eye.SetResourceReference(Control.ForegroundProperty, w.Enabled ? "Heading" : "TextMuted");
+                System.Windows.Automation.AutomationProperties.SetName(eye, "Show " + text);
+                System.Windows.Automation.AutomationProperties.SetItemStatus(eye, w.Enabled ? "On" : "Off");
+                var edge = Hairline.Frame(new Border { Child = eye }, Sides.Left);
+                edge.SetResourceReference(Border.BorderBrushProperty, "Line");
+                DockPanel.SetDock(edge, Dock.Right);
+                row.Children.Add(edge);
+                var name = ToggleCards.RowTitle(text);
+                name.TextWrapping = TextWrapping.NoWrap;
+                name.TextTrimming = TextTrimming.CharacterEllipsis;
+                TextFit.TipWhenTrimmed(name);
+                name.Opacity = w.Enabled ? 1 : ToggleCards.OffOpacity;
+                var face = new StackPanel { Margin = new Thickness(10, 7, 8, 7), VerticalAlignment = VerticalAlignment.Center, Children = { name } };
+                row.Children.Add(face);
+                b = new RadioButton { Style = Ui.Res<Style>("NavCard"), GroupName = group, IsChecked = on, Content = row };
             }
-            row.Children.Add(new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center });
-            var b = new RadioButton { Style = Ui.Res<Style>("NavItem"), GroupName = group, IsChecked = on, Content = row, HorizontalContentAlignment = HorizontalAlignment.Stretch, Height = double.NaN, MinHeight = 28 };
+            else
+            {
+                var row = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
+                b = new RadioButton { Style = Ui.Res<Style>("NavItem"), GroupName = group, IsChecked = on, Content = row, HorizontalContentAlignment = HorizontalAlignment.Stretch, Height = double.NaN, MinHeight = 28 };
+            }
+            System.Windows.Automation.AutomationProperties.SetName(b, text);
             b.Checked += (_, _) => { if (!_navQuiet) pick(); };
             NavItem(b, widget?.Id ?? "", on);
             return b;
@@ -310,30 +322,40 @@ internal sealed partial class RaceHudWidgets
         else if (_general || widgets.FirstOrDefault(x => x.Id == _selected) is not { } picked)
         {
             body.Children.Add(TitleCard("Overlay settings", "For every widget in every layout.", null));
-            body.Children.Add(RaceHudSection.HudSettings(_app, Changed, Fill, null));
+            var general = RaceHudSection.HudSettings(_app, Changed, Fill, null);
+            general.Children.Insert(Math.Min(1, general.Children.Count), RaceHudSection.BrowserSources(_app, Changed));
+            body.Children.Add(general);
         }
         else
         {
             var def = HudCatalog.Find(picked.Kind);
             var remove = RemoveButton(picked);
-            var title = TitleCard(NameOf(picked), def?.Description ?? "This widget was made by a newer version of Pit-Box. It's kept, but not drawn.", remove, def?.Limits);
-            if (_inPage) _pickedCard = title;
+            string about = string.Join("\n\n", new[] { def?.Description, def?.Limits }.OfType<string>());
+            var title = def is null
+                ? TitleCard(NameOf(picked), "This widget was made by a newer version of Pit-Box. It's kept, but not drawn.", remove)
+                : WidgetTitle(NameOf(picked), about, remove);
+            _pickedCard = title;
             body.Children.Add(title);
-            if (def is not null && _inPage) body.Children.Add(PreviewBeside(picked, def));
-            else if (def is not null) body.Children.Add(Settings(picked, def));
+            if (def is not null) body.Children.Add(PreviewBeside(picked, def));
         }
         _list.Content = body;
         RiseIn(body);
         EndNav();
         if (_preview is not null && Selected() is { } shown2)
         {
-            DrawPreview(shown2);
+            if (_previewWell is { ActualWidth: > 40 }) DrawPreview(shown2);
             ShowPreviewHidden(shown2);
         }
         if (_reveal is { } reveal)
         {
             _reveal = null;
-            _list.Dispatcher.BeginInvoke(() => Flash(reveal), System.Windows.Threading.DispatcherPriority.ContextIdle);
+            var item = _revealItem;
+            _revealItem = null;
+            _list.Dispatcher.BeginInvoke(() =>
+            {
+                if (item is { } it && PickedRow(it.Key, it.Id) is { } row) FlashBox(row);
+                else Flash(reveal);
+            }, System.Windows.Threading.DispatcherPriority.ContextIdle);
         }
     }
 
@@ -371,31 +393,43 @@ internal sealed partial class RaceHudWidgets
         previewColumn.Children.Add(new DockPanel { Margin = new Thickness(0, 3, 0, 6), Children = { title, hint } });
         previewColumn.Children.Add(PreviewBlock(w));
         var tabs = Settings(w, def);
-        var body = new Grid();
-        body.ColumnDefinitions.Add(new ColumnDefinition());
-        body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0) });
-        body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        body.Children.Add(previewColumn);
-        body.Children.Add(tabs);
+        var panels = WidgetPanels(w, def);
+        panels.Margin = new Thickness(0, Ui.PanelSpacing, 0, 0);
+        var top = new Grid();
+        top.ColumnDefinitions.Add(new ColumnDefinition());
+        top.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0) });
+        top.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        top.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        top.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        top.Children.Add(previewColumn);
+        top.Children.Add(tabs);
+        top.Children.Add(panels);
         bool? side = null;
         void Place()
         {
-            bool now = body.ActualWidth >= SideBySideMin;
+            bool now = top.ActualWidth >= SideBySideMin;
             if (now == side) return;
             side = now;
-            body.ColumnDefinitions[0].Width = new GridLength(now ? SettingsShare : 1, GridUnitType.Star);
-            body.ColumnDefinitions[1].Width = now ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+            top.ColumnDefinitions[0].Width = new GridLength(now ? SettingsShare : 1, GridUnitType.Star);
+            top.ColumnDefinitions[1].Width = now ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
             Grid.SetColumn(previewColumn, now ? 1 : 0);
             Grid.SetRow(tabs, now ? 0 : 1);
-            Grid.SetRowSpan(previewColumn, now ? 2 : 1);
+            Grid.SetRow(panels, now ? 1 : 2);
+            Grid.SetRowSpan(previewColumn, now ? 3 : 1);
             previewColumn.Margin = new Thickness(now ? Ui.PanelSpacing : 0, 0, 0, 0);
             tabs.Margin = new Thickness(0, now ? 0 : 16, 0, 0);
+            if (_previewWell is not null) DrawPreview(w);
         }
         Place();
-        body.SizeChanged += (_, _) => Place();
-        Sticky.Install(previewColumn, body, () => PageOf(body) is { } page && previewColumn.ActualHeight < page.ViewportHeight * (side == true ? 0.9 : 0.45))();
-        return body;
+        top.SizeChanged += (_, _) => Place();
+        Sticky.Install(previewColumn, top, () => side == true && PageOf(top) is { } page && previewColumn.ActualHeight < page.ViewportHeight * 0.95)();
+        return top;
+    }
+
+    private double PreviewHeightLimit()
+    {
+        if (PageOf(_previewWell) is not { ViewportHeight: > 200 } page) return PreviewMaxHeight;
+        return Math.Max(PreviewMaxHeight, page.ViewportHeight - PreviewChrome);
     }
 
     private FrameworkElement PreviewBlock(HudWidgetConfig w)
@@ -422,28 +456,68 @@ internal sealed partial class RaceHudWidgets
         return previewStack;
     }
 
-    private static string Anchor(HudAnchor a) => a switch
-    {
-        HudAnchor.TopLeft => "top left", HudAnchor.Top => "top", HudAnchor.TopRight => "top right", HudAnchor.Left => "left", HudAnchor.Center => "center",
-        HudAnchor.Right => "right", HudAnchor.BottomLeft => "bottom left", HudAnchor.Bottom => "bottom", _ => "bottom right",
-    };
-
     private const double ComboWidth = 194;
 
-    private List<FrameworkElement> PlacementRows(HudWidgetConfig w, HudWidgetDef def)
+    private const double PanelMinWidth = 330;
+
+    private FrameworkElement WidgetPanels(HudWidgetConfig w, HudWidgetDef def)
     {
-        var rows = new List<FrameworkElement>();
-        var monitors = HudHost.MonitorChoices().Select(m => new Choice(m.Id, m.Label)).ToList();
-        rows.Add(SettingRows.Row("Monitor", null, false, Ui.Combo(monitors, w.Monitor, c => { w.Monitor = c.Id!; Changed(); }, ComboWidth)));
-        NumberBox Num(double value, double min, double max, Action<double> set)
+        static Tile Card(string title, IEnumerable<FrameworkElement> rows)
         {
-            var b = new NumberBox(value, "px", 52) { Minimum = min, Maximum = max, Step = 4, WidthFor = (-HudWidgetConfig.MaxSize, HudWidgetConfig.MaxSize) };
-            b.ValueChanged += v => { Host?.RecordUndo(); set(v); w.Clamp(); Changed(); };
-            return b;
+            var box = new SettingGroup(title, true, null, foldable: false);
+            foreach (var r in rows) box.Add(r);
+            return new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(10, 2, 12, 6), Child = box };
         }
-        rows.Add(SettingRows.Row("Size", null, false, Pair(Num(w.W, def.MinW, HudWidgetConfig.MaxSize, v => w.W = v), "Width", Num(w.H, def.MinH, HudWidgetConfig.MaxSize, v => w.H = v), "Height")));
-        rows.Add(SettingRows.Row("Position", $"Measured from the {Anchor(w.Anchor)} of the monitor. Dragging it with Arrange on screen sets these for you.", false,
-            Pair(Num(w.X, -HudWidgetConfig.MaxSize, HudWidgetConfig.MaxSize, v => w.X = v), "Across", Num(w.Y, -HudWidgetConfig.MaxSize, HudWidgetConfig.MaxSize, v => w.Y = v), "Down")));
+
+        var when = new List<FrameworkElement>();
+        if (def.HideWhenEmpty is { } hideByDefault)
+            when.Add(SettingRows.Row("Only when needed", def.Kind == "alerts" ? "Hidden until an alert comes up." : "Hidden until a car of another class is near.", true,
+                Ui.Switch(w.OnlyWhenNeeded ?? hideByDefault, v => { w.OnlyWhenNeeded = v; Changed(); })));
+        when.Add(SettingRows.Row("Only while driving", "Hidden in the garage and while you're out of the car.", true, Ui.Switch(w.OnlyOnTrack, v => { w.OnlyOnTrack = v; Changed(); })));
+        when.Add(SettingRows.Row("Hide in replays", null, true, Ui.Switch(w.HideInReplay, v => { w.HideInReplay = v; Changed(); })));
+        var sessions = SettingRows.Toggles(SessionKinds.Select(k => (k, SessionLabel(k), (string?)null)).ToList(),
+            kind => w.Sessions.Contains(kind, StringComparer.OrdinalIgnoreCase),
+            (kind, on) =>
+            {
+                w.Sessions.RemoveAll(s => string.Equals(s, kind, StringComparison.OrdinalIgnoreCase));
+                if (on) w.Sessions.Add(kind);
+                Changed();
+            });
+        when.Add(SettingRows.Row("Only in", "None ticked = every session.", true, sessions));
+        if (Layout is { } owner) when.Add(SettingRows.Row("Keybind", null, true, KeybindBox(owner, w)));
+
+        var look = new List<FrameworkElement>();
+        look.Add(SettingRows.Row("Opacity", null, true, Ui.SliderWithValue(20, 100, w.Opacity, "{0:0}%", v => { w.Opacity = (int)v; Changed(); }, 110, 5)));
+        var background = Ui.SliderWithValue(0, 100, w.Background ?? S.Appearance.Background, "{0:0}%", v => { w.Background = (int)v; Changed(); if (_preview is not null) DrawPreview(w); }, 110, 5);
+        var backgroundRow = SettingRows.Row("Background", null, true, background);
+        backgroundRow.Visibility = w.Background is not null ? Visibility.Visible : Visibility.Collapsed;
+        var own = Ui.Switch(w.Background is not null, on =>
+        {
+            w.Background = on ? S.Appearance.Background : null;
+            backgroundRow.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+            Changed();
+            if (_preview is not null) DrawPreview(w);
+        });
+        look.Add(SettingRows.Row("Own background", "The panel behind the text only; off, it follows the overlay's Background.", true, own));
+        look.Add(backgroundRow);
+        var rates = new[] { 0, 1, 2, 5, 10, 15, 20, 30, 60 }.Select(r => new Choice(r.ToString(), r == 0 ? def.MovingHz > 0 ? $"Default ({def.DefaultHz} per second, {def.MovingHz} while it moves)" : $"Default ({def.DefaultHz} per second)" : $"{r} per second"));
+        look.Add(SettingRows.Row("Redraw", null, true, Ui.Combo(rates, w.UpdateHz.ToString(), c => { w.UpdateHz = int.Parse(c.Id!); Changed(); }, ComboWidth)));
+
+        var place = new List<FrameworkElement>();
+        var monitors = HudHost.MonitorChoices().Select(m => new Choice(m.Id, m.Label)).ToList();
+        place.Add(SettingRows.Row("Monitor", null, true, Ui.Combo(monitors, w.Monitor, c => { w.Monitor = c.Id!; Changed(); }, ComboWidth)));
+        place.Add(SettingRows.Row("Locked", "Can't be dragged while arranging on screen.", true, Ui.Switch(w.Locked, v => { w.Locked = v; Changed(); })));
+        var scaleText = new TextBlock { Text = $"{w.Scale * 100:0}%", Style = Ui.Res<Style>("Body"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+        var resetScale = Ui.LabeledButton("I.Undo", "Reset to 100%", () =>
+        {
+            Host?.RecordUndo();
+            w.Scale = 1;
+            Changed();
+            Fill();
+        }, "GhostButton");
+        resetScale.Visibility = Math.Abs(w.Scale - 1) > 0.001 ? Visibility.Visible : Visibility.Collapsed;
+        place.Add(SettingRows.Row("Scale", "Drag the widget's corner while arranging on screen to scale it.", true,
+            new StackPanel { Orientation = Orientation.Horizontal, Children = { scaleText, resetScale } }));
         var home = Ui.LabeledButton("I.Target", "Bring back to the middle", () =>
         {
             Host?.RecordUndo();
@@ -456,53 +530,78 @@ internal sealed partial class RaceHudWidgets
             Fill();
         }, "GhostButton");
         home.ToolTip = "Puts this widget in the middle of the main display, e.g. when it's off screen or behind something";
-        rows.Add(SettingRows.Row("", null, false, home));
+        home.HorizontalAlignment = HorizontalAlignment.Left;
+        home.Margin = new Thickness(0, 4, 0, 4);
+        place.Add(home);
+
+        var web = Card("Browser source", BrowserSourceRows(w));
+        if (_inPage) Ui.Anchor(web, RaceHudSection.WebAnchor);
+
+        var panels = new MasonryPanel { MinColumnWidth = PanelMinWidth, MaxColumns = 4, Gap = 14 };
+        panels.Children.Add(Card("When shown", when));
+        panels.Children.Add(web);
+        panels.Children.Add(Card("Panel and redraw", look));
+        panels.Children.Add(Card("Placement", place));
+        return new StackPanel { Children = { panels, ActionsRow(w) } };
+    }
+
+    private List<FrameworkElement> BrowserSourceRows(HudWidgetConfig w)
+    {
+        var url = TextFit.TipWhenTrimmed(new TextBlock { Style = Ui.Res<Style>("Body"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) });
+        var copy = Ui.LabeledButton("I.Copy", "Copy URL", () =>
+        {
+            if (Host?.WebPort is not { } live) return;
+            string link = SimRacing.Hud.Web.HudWebServer.Url(live, w.Kind);
+            try
+            {
+                Clipboard.SetText(link);
+                _app.Notify("URL copied", link, NoticeKind.Success);
+            }
+            catch (System.Runtime.InteropServices.ExternalException) { }
+        });
+        ToolTipService.SetShowOnDisabled(copy, true);
+        DockPanel.SetDock(copy, Dock.Right);
+        var urlRow = new DockPanel { LastChildFill = true, Margin = new Thickness(0, 4, 0, 4), Children = { copy, url } };
+        bool running = Host?.WebPort is not null;
+        url.Text = SimRacing.Hud.Web.HudWebServer.Url(Host?.WebPort ?? S.WebPort, w.Kind);
+        url.SetResourceReference(TextBlock.ForegroundProperty, running ? "Heading" : "TextFaint");
+        copy.IsEnabled = running;
+        copy.ToolTip = running ? "This widget as a web page on this PC only, for a wheel screen or streaming software. It follows these options and stays blank outside a session."
+            : S.WebOverlays ? "Not running: see Overlay settings" : "Off: turn on Browser sources in Overlay settings";
+        var rows = new List<FrameworkElement> { urlRow };
+        if (!running)
+        {
+            var off = Ui.LabeledButton("I.Settings", "Overlay settings", () => _section.ShowSettings(), "GhostButton");
+            off.HorizontalAlignment = HorizontalAlignment.Left;
+            off.Margin = new Thickness(0, 2, 0, 4);
+            rows.Add(new TextBlock { Text = S.WebOverlays ? "Not running." : "Browser sources are off.", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 0, 0, 4) });
+            rows.Add(off);
+        }
         return rows;
     }
 
-    private List<FrameworkElement> BehaviourRows(HudWidgetConfig w, HudWidgetDef def)
+    private HotkeyBox KeybindBox(HudLayout layout, HudWidgetConfig w)
     {
-        var rows = new List<FrameworkElement>();
-        if (def.HideWhenEmpty is { } hideByDefault)
-            rows.Add(SettingRows.Row("Only when needed", def.Kind == "alerts" ? "Hidden until an alert comes up." : "Hidden until a car of another class is near.", false,
-                Ui.Switch(w.OnlyWhenNeeded ?? hideByDefault, v => { w.OnlyWhenNeeded = v; Changed(); })));
-        rows.Add(SettingRows.Row("Only while driving", "Hidden in the garage and while you're out of the car.", false, Ui.Switch(w.OnlyOnTrack, v => { w.OnlyOnTrack = v; Changed(); })));
-        rows.Add(SettingRows.Row("Locked", "Can't be dragged while arranging on screen.", false, Ui.Switch(w.Locked, v => { w.Locked = v; Changed(); })));
-        rows.Add(SettingRows.Row("Hide in replays", "Off: it shows while you watch a replay too.", false, Ui.Switch(w.HideInReplay, v => { w.HideInReplay = v; Changed(); })));
-        rows.Add(SettingRows.Row("Opacity", "The whole widget, text included.", false, Ui.SliderWithValue(20, 100, w.Opacity, "{0:0}%", v => { w.Opacity = (int)v; Changed(); }, 146, 5)));
-        var background = Ui.SliderWithValue(0, 100, w.Background ?? S.Appearance.Background, "{0:0}%", v => { w.Background = (int)v; Changed(); if (_preview is not null) DrawPreview(w); }, 146, 5);
-        background.IsEnabled = w.Background is not null;
-        var own = Ui.Switch(w.Background is not null, on =>
+        var box = new HotkeyBox { Width = ComboWidth, ToolTip = "Works in any program" };
+        box.SetHotkey(w.Hotkey);
+        box.HotkeyChanged += hk =>
         {
-            w.Background = on ? S.Appearance.Background : null;
-            background.IsEnabled = on;
-            Changed();
-            if (_preview is not null) DrawPreview(w);
-        });
-        own.ToolTip = "Off: the overlay's Background (Overlay settings)";
-        var bgRow = new StackPanel { Orientation = Orientation.Horizontal };
-        own.Margin = new Thickness(0, 0, 10, 0);
-        own.VerticalAlignment = VerticalAlignment.Center;
-        bgRow.Children.Add(own);
-        bgRow.Children.Add(background);
-        rows.Add(SettingRows.Row("Own background", "The panel behind the text only; switched off it follows the overlay's Background.", false, bgRow));
-        var rates = new[] { 0, 1, 2, 5, 10, 15, 20, 30, 60 }.Select(r => new Choice(r.ToString(), r == 0 ? def.MovingHz > 0 ? $"Default ({def.DefaultHz} per second, {def.MovingHz} while it moves)" : $"Default ({def.DefaultHz} per second)" : $"{r} per second"));
-        rows.Add(SettingRows.Row("Redraw", null, false, Ui.Combo(rates, w.UpdateHz.ToString(), c => { w.UpdateHz = int.Parse(c.Id!); Changed(); }, ComboWidth)));
-        var sessions = SettingRows.Toggles(SessionKinds.Select(k => (k, SessionLabel(k), (string?)null)).ToList(),
-            kind => w.Sessions.Contains(kind, StringComparer.OrdinalIgnoreCase),
-            (kind, on) =>
+            if (_app.Hotkeys.Clash(hk, SimRacingPlugin.WidgetHotkeyId(layout, w)) is { } clash)
             {
-                w.Sessions.RemoveAll(s => string.Equals(s, kind, StringComparison.OrdinalIgnoreCase));
-                if (on) w.Sessions.Add(kind);
-                Changed();
-            });
-        rows.Add(SettingRows.Row("Only in", "None ticked = every session.", true, sessions));
-        return rows;
+                _app.Notify("Keybind not changed", clash, NoticeKind.Warning, important: true);
+                box.SetHotkey(w.Hotkey);
+                return;
+            }
+            w.Hotkey = string.IsNullOrWhiteSpace(hk) ? null : hk;
+            _app.Save();
+            _app.Hotkeys.RegisterAll();
+        };
+        return box;
     }
 
     private FrameworkElement ActionsRow(HudWidgetConfig w)
     {
-        var actions = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
+        var actions = new WrapPanel { Margin = new Thickness(0, 12, 0, 0) };
         var dup = Ui.LabeledButton("I.Copy", "Duplicate", () =>
         {
             var copy = w.Copy();
@@ -513,7 +612,7 @@ internal sealed partial class RaceHudWidgets
             Changed();
             Fill();
         });
-        dup.Margin = new Thickness(0, 0, 6, 0);
+        dup.Margin = Ui.AfterButton;
         actions.Children.Add(dup);
         var reset = Ui.LabeledButton("I.Undo", "Default options", () =>
         {
@@ -529,26 +628,29 @@ internal sealed partial class RaceHudWidgets
             }));
         });
         reset.ToolTip = "Puts this widget's display options back as they were when it was added (place and size stay)";
-        reset.Margin = new Thickness(0, 0, 6, 0);
+        reset.Margin = Ui.AfterButton;
         actions.Children.Add(reset);
-        int? port = Host?.WebPort;
-        var copyUrl = Ui.LabeledButton("I.Copy", "Copy URL", () =>
-        {
-            if (Host?.WebPort is not { } live) return;
-            string url = SimRacing.Hud.Web.HudWebServer.Url(live, w.Kind);
-            try
-            {
-                Clipboard.SetText(url);
-                _app.Notify("URL copied", url, NoticeKind.Success);
-            }
-            catch (System.Runtime.InteropServices.ExternalException) { }
-        });
-        copyUrl.IsEnabled = port is not null;
-        copyUrl.ToolTip = port is null ? "Turn on Browser sources in the overlay's Settings tab" : "This widget as a browser source; it follows these options";
-        ToolTipService.SetShowOnDisabled(copyUrl, true);
-        copyUrl.Margin = new Thickness(0, 0, 6, 0);
-        actions.Children.Add(copyUrl);
         return actions;
+    }
+
+    private static FrameworkElement WidgetTitle(string title, string about, FrameworkElement remove)
+    {
+        var grid = new Grid { Margin = new Thickness(3, 0, 0, 12) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var name = TextFit.TipWhenTrimmed(new TextBlock { Text = title, Style = Ui.Res<Style>("H2"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
+        var head = new TrimRow { VerticalAlignment = VerticalAlignment.Center, Children = { name } };
+        if (about.Length > 0)
+        {
+            var tip = HelpTip.For(about, title);
+            tip.VerticalAlignment = VerticalAlignment.Center;
+            head.Children.Add(tip);
+        }
+        grid.Children.Add(head);
+        remove.VerticalAlignment = VerticalAlignment.Center;
+        Grid.SetColumn(remove, 1);
+        grid.Children.Add(remove);
+        return grid;
     }
 
     private static FrameworkElement TitleCard(string title, string text, FrameworkElement? toggle, string? more = null)
@@ -580,17 +682,15 @@ internal sealed partial class RaceHudWidgets
     {
         var names = new List<(string Id, string Title)> { (LayoutTab, "Look") };
         if (editor.Has(HudTab.Content)) names.Add((ContentTab, editor.ContentTitle));
-        names.Add((VisibilityTab, "When shown"));
-        names.Add((PositionTab, "Placement"));
         var row = new WrapPanel();
         foreach (var (id, title) in names)
         {
             bool on = id == _tab;
-            var text = new TextBlock { Text = title, FontSize = 11.5 };
+            var text = new TextBlock { Text = title, FontSize = 13 };
             text.SetResourceReference(TextBlock.ForegroundProperty, on ? "Heading" : "TextMuted");
             if (on) text.FontWeight = FontWeights.SemiBold;
-            var underline = new Border { Height = 2, Margin = new Thickness(0, 6, 0, 0) };
-            if (on) underline.SetResourceReference(Border.BackgroundProperty, "AccentText");
+            var underline = new Border { Height = 2, Margin = new Thickness(0, 7, 0, 0) };
+            if (on) underline.SetResourceReference(Border.BackgroundProperty, "Accent");
             var stack = new StackPanel { Children = { text, underline } };
             var tabId = id;
             var b = new Button { Style = Ui.Res<Style>("QuietButton"), Content = stack, Padding = new Thickness(11, 6, 11, 0), MinHeight = 0, Height = double.NaN };
@@ -599,34 +699,19 @@ internal sealed partial class RaceHudWidgets
             row.Children.Add(b);
         }
         var line = Hairline.Rule(new Border());
-        line.SetResourceReference(Border.BackgroundProperty, "Line");
+        line.SetResourceReference(Border.BackgroundProperty, "LineStrong");
         return new StackPanel { Margin = new Thickness(0, 2, 0, 10), Children = { row, line } };
     }
 
     private FrameworkElement TabBody(HudWidgetConfig w, HudWidgetDef def, HudEditorDef editor)
     {
         var stack = new StackPanel { Margin = new Thickness(3, 0, 3, 0) };
-        void Heading(string text) => stack.Children.Add(new Border { Margin = new Thickness(0, 5, 0, 6), Child = new TextBlock { Text = text, Style = Ui.Res<Style>("H3") } });
-        switch (_tab)
-        {
-            case VisibilityTab:
-                Heading("When shown");
-                foreach (var row in BehaviourRows(w, def)) stack.Children.Add(row);
-                return stack;
-            case PositionTab:
-                Heading("Position and size");
-                foreach (var row in PlacementRows(w, def)) stack.Children.Add(row);
-                var divider = Hairline.Rule(new Border { Margin = new Thickness(0, 11, 0, 0) });
-                divider.SetResourceReference(Border.BackgroundProperty, "Line");
-                stack.Children.Add(divider);
-                stack.Children.Add(ActionsRow(w));
-                return stack;
-        }
         var tab = _tab == ContentTab ? HudTab.Content : HudTab.Layout;
         _context = new HudSettingContext
         {
             Def = def, W = w, Frame = _section.Preview.Race.Frame, KnownClasses = S.KnownClasses,
             Set = values => SetValues(w, def, values), Rebuild = Fill, Pictures = (id, choices) => Pictures(w, def, id, choices),
+            HoverItem = (key, id) => HoverPickedItem(def, key, id),
         };
         _presetDots.Clear();
         _groupCards.Clear();
@@ -685,53 +770,15 @@ internal sealed partial class RaceHudWidgets
 
     private void SetValues(HudWidgetConfig w, HudWidgetDef def, IReadOnlyDictionary<string, string?> values)
     {
-        var naturalBefore = def.Natural?.Invoke(new HudOptions(def, w));
-        var overflowBefore = Host is { } host ? Overflows(host, w) : null;
         foreach (var (key, value) in values)
         {
             if (def.Option(key) is not { } o) continue;
-            if (o == HudFlags.BannerOption && value is not null)
-            {
-                var (l0, t0, r0, b0) = HudFlags.Room(new HudOptions(def, w).Choice(o.Key));
-                var (l1, t1, r1, b1) = HudFlags.Room(value);
-                w.W = Math.Max(1, w.W + l1 + r1 - l0 - r0);
-                w.H = Math.Max(1, w.H + t1 + b1 - t0 - b0);
-            }
             if (value is null || value == o.Default) w.Options.Remove(key); else w.Options[key] = value;
         }
-        if (naturalBefore is { } before && def.Natural!(new HudOptions(def, w)) is var after && after != before && before.Height > 0)
-        {
-            double factor = w.H / before.Height;
-            w.W = Math.Clamp(Math.Round(after.Width * factor), Math.Max(def.MinW, HudWidgetConfig.MinSize), HudWidgetConfig.MaxSize);
-            w.H = Math.Clamp(Math.Round(after.Height * factor), Math.Max(def.MinH, HudWidgetConfig.MinSize), HudWidgetConfig.MaxSize);
-        }
-        if (overflowBefore is not null) GrowToFit(w, overflowBefore);
         Changed();
         if (_preview is not null) DrawPreview(w);
         RefreshVisibility();
         ShowPresetState(w, def);
-    }
-
-    private HashSet<(string Key, string Id)> Overflows(HudHost host, HudWidgetConfig w)
-    {
-        host.MeasurePreview(w, _section.Preview.Race, _trialPainter);
-        return _trialPainter.Overflow!.ToHashSet();
-    }
-
-    private void GrowToFit(HudWidgetConfig w, HashSet<(string Key, string Id)> before)
-    {
-        if (Host is not { } host) return;
-        bool FitsAt(double width, double height)
-        {
-            var (oldW, oldH) = (w.W, w.H);
-            (w.W, w.H) = (width, height);
-            try { return Overflows(host, w).IsSubsetOf(before); }
-            finally { (w.W, w.H) = (oldW, oldH); }
-        }
-        if (FitsAt(w.W, w.H)) return;
-        double tall = FitSearch.Limit(w.H), wide = FitSearch.Limit(w.W);
-        if (FitsAt(w.W, tall)) w.H = FitSearch.Smallest(w.H, tall, h => FitsAt(w.W, h));
-        else if (FitsAt(wide, w.H)) w.W = FitSearch.Smallest(w.W, wide, x => FitsAt(x, w.H));
     }
 
     private void Reveal(HudWidgetDef def, string settingId)
@@ -743,10 +790,43 @@ internal sealed partial class RaceHudWidgets
         Fill();
     }
 
+    private (string Key, string Id)? _revealItem;
+
+    private Border? PickedRow(string key, string id) => _context?.Pickers.TryGetValue(key, out var picker) == true ? picker.RowFor(key, id) : null;
+
+    private void RevealItem(HudWidgetDef def, string settingId, string key, string id)
+    {
+        var tab = def.EditorDef.GroupOf(settingId)?.Tab == HudTab.Content ? ContentTab : LayoutTab;
+        if (tab == _tab && PickedRow(key, id) is { } row)
+        {
+            FlashBox(row);
+            return;
+        }
+        _revealItem = (key, id);
+        Reveal(def, settingId);
+    }
+
+    private void HoverPickedItem(HudWidgetDef def, string key, string? id)
+    {
+        if (def.EditorDef.SettingForKey(key) is not { } setting) return;
+        Highlight(setting.Id, id is null ? null : (key, id));
+    }
+
+    private void LinkPickers((string Key, string Id)? item)
+    {
+        if (_context is null) return;
+        foreach (var picker in _context.Pickers.Values.Distinct()) picker.ShowLinked(item?.Key, item?.Id);
+    }
+
     private void Flash(string settingId)
     {
         var row = _rows.FirstOrDefault(r => string.Equals(r.Setting.Id, settingId, StringComparison.OrdinalIgnoreCase)).Row;
-        if (row is not Border { IsLoaded: true, IsVisible: true } box) return;
+        if (row is Border box) FlashBox(box);
+    }
+
+    private void FlashBox(Border box)
+    {
+        if (!box.IsLoaded || !box.IsVisible) return;
         if (PageOf(box) is { } page)
         {
             double top = box.TransformToVisual(page).Transform(new Point(0, 0)).Y;
@@ -765,18 +845,6 @@ internal sealed partial class RaceHudWidgets
 
     private static string SessionLabel(string kind) => kind switch { "Qualify" => "Qualifying", "TimeTrial" => "Time trial", _ => kind };
 
-    private static FrameworkElement Pair(NumberBox a, string labelA, NumberBox b, string labelB)
-    {
-        var row = new StackPanel { Orientation = Orientation.Horizontal };
-        foreach (var (control, label) in new[] { (a, labelA), (b, labelB) })
-        {
-            control.ShowCaption(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 0, 0, 2) });
-            control.Margin = new Thickness(0, 0, 13, 2);
-            row.Children.Add(control);
-        }
-        return row;
-    }
-
     private Button RemoveButton(HudWidgetConfig w)
     {
         var remove = Ui.IconButton("I.Trash", "Remove this widget from the layout", async () =>
@@ -785,6 +853,7 @@ internal sealed partial class RaceHudWidgets
             Layout?.Widgets.Remove(w);
             if (_selected == w.Id) _selected = null;
             Changed();
+            if (w.Hotkey is not null) _app.Hotkeys.RegisterAll();
             Fill();
         }, "QuietIconButton");
         remove.VerticalAlignment = VerticalAlignment.Center;
@@ -794,7 +863,7 @@ internal sealed partial class RaceHudWidgets
 
     private const double MaxPreviewScale = 1.5;
 
-    private const double PreviewMaxHeight = 460;
+    private const double PreviewMaxHeight = 460, PreviewChrome = 150;
 
     private void DrawPreview(HudWidgetConfig w)
     {
@@ -804,8 +873,9 @@ internal sealed partial class RaceHudWidgets
         try
         {
             double room = _previewWell is { ActualWidth: > 40 } well ? well.ActualWidth - well.Padding.Left - well.Padding.Right - 2 : 560;
-            double byHeight = PreviewMaxHeight / Math.Max(1, w.H);
-            double fit = Math.Min(room / Math.Max(1, w.W), byHeight);
+            var laid = host.SizeOf(w, race);
+            double byHeight = PreviewHeightLimit() / Math.Max(1, laid.Height);
+            double fit = Math.Min(room / Math.Max(1, laid.Width), byHeight);
             float scale = (float)Math.Clamp(fit, 0.2, MaxPreviewScale);
             AlignPreview();
             double k = _previewPixels;
@@ -986,7 +1056,7 @@ internal sealed partial class RaceHudWidgets
             foreach (var group in (_painter.Items ?? new()).Where(i => names.Contains(i.Key)).GroupBy(i => i.Key))
                 boxes.Add(group.Select(i => i.Box).Aggregate(System.Drawing.RectangleF.Union));
         }
-        if (boxes.Count > 0)
+        if (boxes.Count > 0 || _hoverItem is not null)
         {
             _highlightBoxes.Clear();
             _highlightBoxes.AddRange(boxes);
@@ -1033,6 +1103,7 @@ internal sealed partial class RaceHudWidgets
                 var item = ItemAt(at);
                 host.Cursor = hover is null ? null : item is not null ? Cursors.SizeAll : Cursors.Hand;
                 Highlight(hover, hover is null ? null : item);
+                LinkPickers(hover is null ? null : item);
                 return;
             }
             if (!_dragging && (at - press.From).Length < 4) return;
@@ -1040,12 +1111,19 @@ internal sealed partial class RaceHudWidgets
             {
                 _liftedLook = Lift(press.Key, press.Id);
                 Highlight(null);
+                LinkPickers(null);
             }
             _dragging = true;
             Reorder(w, press.Key, press.Id, at);
             ShowDrag(press.Key, press.Id, at);
         };
-        host.MouseLeave += (_, _) => { _lastHover = null; if (_press is null) Highlight(null); };
+        host.MouseLeave += (_, _) =>
+        {
+            _lastHover = null;
+            if (_press is not null) return;
+            Highlight(null);
+            LinkPickers(null);
+        };
         host.MouseLeftButtonDown += (_, e) =>
         {
             var at = e.GetPosition(host);
@@ -1076,7 +1154,7 @@ internal sealed partial class RaceHudWidgets
             _press = null;
             EndDrag(host);
             if (dragged) Commit(w, press.Key);
-            else if (editor?.SettingForRegion(press.Key) is { } id && HudCatalog.Find(w.Kind) is { } def) Reveal(def, id);
+            else if (editor?.SettingForRegion(press.Key) is { } id && HudCatalog.Find(w.Kind) is { } def) RevealItem(def, id, press.Key, press.Id);
         };
         host.LostMouseCapture += (_, _) =>
         {
@@ -1179,31 +1257,17 @@ internal sealed partial class RaceHudWidgets
     public void DrawEveryKind()
     {
         if (Host is not { } host) return;
-        var look = S.Appearance;
-        var colors = look.Colors;
-        string? root = ScreenshotRunner.Folder is { } folder ? System.IO.Path.Combine(folder, "hud-widgets") : null;
-        try
+        string? dir = ScreenshotRunner.Folder is { } folder ? System.IO.Path.Combine(folder, "hud-widgets") : null;
+        if (dir is not null) System.IO.Directory.CreateDirectory(dir);
+        foreach (var def in HudCatalog.All)
         {
-            foreach (var pick in Enum.GetValues<HudColors>())
-            {
-                look.Colors = pick;
-                string? dir = root is null ? null : System.IO.Path.Combine(root, pick.ToString());
-                if (dir is not null) System.IO.Directory.CreateDirectory(dir);
-                foreach (var def in HudCatalog.All)
-                {
-                    var config = new HudWidgetConfig { Id = "check-" + def.Kind, Kind = def.Kind, W = def.W, H = def.H };
-                    using (var a = host.RenderPreview(config, _section.Preview.Race, _painter, 1))
-                        if (dir is not null) a.Save(System.IO.Path.Combine(dir, def.Kind + ".png"));
-                    config.W = def.MinW;
-                    config.H = def.MinH;
-                    using (var b = host.RenderPreview(config, _section.Preview.Race, _painter, 1))
-                        if (dir is not null) b.Save(System.IO.Path.Combine(dir, def.Kind + "-min.png"));
-                }
-            }
-        }
-        finally
-        {
-            look.Colors = colors;
+            var config = new HudWidgetConfig { Id = "check-" + def.Kind, Kind = def.Kind, W = def.W, H = def.H };
+            using (var a = host.RenderPreview(config, _section.Preview.Race, _painter, 1))
+                if (dir is not null) a.Save(System.IO.Path.Combine(dir, def.Kind + ".png"));
+            config.W = def.MinW;
+            config.H = def.MinH;
+            using (var b = host.RenderPreview(config, _section.Preview.Race, _painter, 1))
+                if (dir is not null) b.Save(System.IO.Path.Combine(dir, def.Kind + "-min.png"));
         }
     }
 

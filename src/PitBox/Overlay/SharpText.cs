@@ -12,19 +12,28 @@ internal enum TextAlign { Left, Center, Right }
 
 internal sealed class SharpText : IDisposable
 {
-    private readonly record struct Run(string Text, float Size, int Weight, Color Color, RectangleF Box, TextAlign Align);
+    private readonly record struct Run(string Text, float Size, int Weight, Color Color, RectangleF Box, TextAlign Align, bool Crisp);
+
+    private readonly record struct LayoutKey(string Text, float Size, int Weight, TextAlign Align, float Width, float Height);
 
     private static ID2D1Factory? _d2d;
     private static IDWriteFactory? _dwrite;
-    private static IDWriteRenderingParams? _rendering;
+    private static IDWriteRenderingParams? _rendering, _crisp;
     private static IDWriteFontCollection? _fonts;
     private static bool _failed;
     private static readonly Dictionary<(float, int, TextAlign), IDWriteTextFormat> Formats = new();
     private static readonly Dictionary<(string, float, int), float> Widths = new();
+    private static readonly Dictionary<(string, float, int), InkBox> Inks = new();
+
+    public readonly record struct InkBox(float Left, float Right, float Top, float Bottom, float Baseline);
 
     private readonly List<Run> _runs = new();
+    private readonly Dictionary<LayoutKey, (IDWriteTextLayout Layout, int Frame)> _layouts = new();
+    private readonly List<LayoutKey> _unused = new();
+    private int _frame;
     private ID2D1DCRenderTarget? _target;
     private ID2D1SolidColorBrush? _brush;
+    private bool _crispApplied;
 
     public static bool Available => Factories();
 
@@ -37,6 +46,7 @@ internal sealed class SharpText : IDisposable
             _d2d = D2D1.D2D1CreateFactory<ID2D1Factory>(Vortice.Direct2D1.FactoryType.SingleThreaded);
             _dwrite = DWrite.DWriteCreateFactory<IDWriteFactory>(Vortice.DirectWrite.FactoryType.Shared);
             _rendering = _dwrite.CreateCustomRenderingParams(1.8f, 1f, 0f, PixelGeometry.Flat, RenderingMode.NaturalSymmetric);
+            _crisp = _dwrite.CreateCustomRenderingParams(1.8f, 1f, 0f, PixelGeometry.Flat, RenderingMode.Natural);
             _fonts = OverlayFonts.Collection(_dwrite);
             return true;
         }
@@ -71,13 +81,27 @@ internal sealed class SharpText : IDisposable
         return Widths[key] = layout.Metrics.WidthIncludingTrailingWhitespace;
     }
 
+    public static InkBox? Ink(string text, float size, int weight)
+    {
+        if (text.Length == 0 || !Factories()) return null;
+        var key = (text, MathF.Round(size * 4) / 4, weight);
+        if (Inks.TryGetValue(key, out var known)) return known;
+        if (Inks.Count >= 512) Inks.Clear();
+        const float Room = 4096;
+        using var layout = _dwrite!.CreateTextLayout(text, Format(key.Item2, weight, TextAlign.Left), Room, Room);
+        var over = layout.OverhangMetrics;
+        var lines = new LineMetrics[1];
+        layout.GetLineMetrics(lines, out _);
+        return Inks[key] = new InkBox(-over.Left, Room + over.Right, -over.Top, Room + over.Bottom, lines[0].Baseline);
+    }
+
     public void Clear() => _runs.Clear();
 
     public const int Regular = 400, Semibold = 600, Bold = 700;
 
-    public void Add(string text, float size, int weight, Color color, RectangleF box, TextAlign align)
+    public void Add(string text, float size, int weight, Color color, RectangleF box, TextAlign align, bool crisp = false)
     {
-        if (text.Length > 0 && color.A > 0 && box.Width > 0) _runs.Add(new Run(text, size, weight, color, box, align));
+        if (text.Length > 0 && color.A > 0 && box.Width > 0) _runs.Add(new Run(text, size, weight, color, box, align, crisp));
     }
 
     public bool Render(IntPtr dc, Size size)
@@ -92,16 +116,24 @@ internal sealed class SharpText : IDisposable
                 _target = _d2d!.CreateDCRenderTarget(props);
                 _target.TextAntialiasMode = Vortice.Direct2D1.TextAntialiasMode.Grayscale;
                 _target.TextRenderingParams = _rendering;
+                _crispApplied = false;
                 _brush = _target.CreateSolidColorBrush(new Color4(1f, 1f, 1f, 1f));
             }
             GdiFlush();
             _target.BindDC(dc, new Vortice.RawRect(0, 0, size.Width, size.Height));
             _target.BeginDraw();
+            _frame++;
             foreach (var r in _runs)
             {
+                if (r.Crisp != _crispApplied)
+                {
+                    _target.TextRenderingParams = r.Crisp ? _crisp : _rendering;
+                    _crispApplied = r.Crisp;
+                }
                 float a = r.Color.A / 255f;
                 _brush!.Color = new Color4(r.Color.R / 255f, r.Color.G / 255f, r.Color.B / 255f, a);
-                _target.DrawText(r.Text, Format(r.Size, r.Weight, r.Align), new Rect(r.Box.X, r.Box.Y, r.Box.Width, r.Box.Height), _brush);
+                float left = r.Box.X, top = r.Box.Y, right = left + r.Box.Width, bottom = top + r.Box.Height;
+                _target.DrawTextLayout(new System.Numerics.Vector2(left, top), Layout(r, right - left, bottom - top), _brush);
             }
             _target.EndDraw();
             GdiFlush();
@@ -116,7 +148,35 @@ internal sealed class SharpText : IDisposable
         finally
         {
             _runs.Clear();
+            DropUnused();
         }
+    }
+
+    private IDWriteTextLayout Layout(in Run r, float width, float height)
+    {
+        var key = new LayoutKey(r.Text, MathF.Round(r.Size * 4) / 4, r.Weight, r.Align, width, height);
+        if (_layouts.TryGetValue(key, out var known))
+        {
+            if (known.Frame != _frame) _layouts[key] = (known.Layout, _frame);
+            return known.Layout;
+        }
+        var layout = _dwrite!.CreateTextLayout(r.Text, Format(r.Size, r.Weight, r.Align), width, height);
+        _layouts[key] = (layout, _frame);
+        return layout;
+    }
+
+    private void DropUnused()
+    {
+        if (_layouts.Count == 0) return;
+        _unused.Clear();
+        foreach (var (key, entry) in _layouts)
+            if (entry.Frame != _frame) _unused.Add(key);
+        foreach (var key in _unused)
+        {
+            _layouts[key].Layout.Dispose();
+            _layouts.Remove(key);
+        }
+        _unused.Clear();
     }
 
     private void DisposeTarget()
@@ -127,7 +187,12 @@ internal sealed class SharpText : IDisposable
         _target = null;
     }
 
-    public void Dispose() => DisposeTarget();
+    public void Dispose()
+    {
+        DisposeTarget();
+        foreach (var entry in _layouts.Values) entry.Layout.Dispose();
+        _layouts.Clear();
+    }
 
     [System.Runtime.InteropServices.DllImport("gdi32.dll")] private static extern bool GdiFlush();
 }

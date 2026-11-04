@@ -14,6 +14,16 @@ public partial class App : Application
 
     internal static bool ExitRequested { get; private set; }
 
+    public App()
+    {
+        if (Environment.GetCommandLineArgs().Skip(1).All(a => EarlyReadArgs.Contains(a, StringComparer.OrdinalIgnoreCase)))
+            ConfigStore.ReadEarly();
+        else
+            ConfigStore.WarmEarly();
+    }
+
+    private static readonly string[] EarlyReadArgs = { "--minimized", "--updated", "--update-failed" };
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -75,8 +85,8 @@ public partial class App : Application
         Views.MenuFollow.Install();
         Views.Motion.InstallPress();
         Views.Ui.InstallDropDownWheel();
+        Controls.SliderFace.InstallDragAnywhere();
         Theme.TipPlacement.Install();
-        Views.Motion.InstallSwitches();
         Views.TextBalance.Install();
 
         string? screenshotDir = ArgValue(e.Args, "--screenshots");
@@ -90,6 +100,7 @@ public partial class App : Application
         Motion.FollowFocus = screenshotDir is null && showcaseDir is null && perfFile is null && monkeyDir is null && controlsDir is null;
         bool demo = screenshotDir is not null || showcaseDir is not null || perfFile is not null || monkeyDir is not null || controlsDir is not null || e.Args.Contains("--demo", StringComparer.OrdinalIgnoreCase);
         bool fresh = e.Args.Contains("--fresh", StringComparer.OrdinalIgnoreCase);
+        bool withTray = screenshotDir is null && showcaseDir is null && perfFile is null && controlsDir is null;
         if (demo && ArgValue(e.Args, "--culture") is { } cultureName)
         {
             var culture = System.Globalization.CultureInfo.GetCultureInfo(cultureName);
@@ -153,6 +164,7 @@ public partial class App : Application
             config.Ui.Animations = false;
         }
         PerfProbe.Mark("config");
+        if (!(config.Ui.StartMinimized && withTray)) TopographyBackdrop.Preload();
         Grr.GrrResources.Install();
         if (Plugins.PluginStates.IsEnabled(config.Plugins, Grr.GrrPlugin.PluginId, Grr.GrrPlugin.OnByDefault))
             Theme.Themes.Register(Grr.GrrTheme.Spec);
@@ -166,7 +178,7 @@ public partial class App : Application
 
         _services = new AppServices(demo, config);
         PerfProbe.Mark("services");
-        _services.Start(withTray: screenshotDir is null && showcaseDir is null && perfFile is null && controlsDir is null);
+        _services.Start(withTray);
         PerfProbe.Mark("started");
 
         var window = new MainWindow(_services);

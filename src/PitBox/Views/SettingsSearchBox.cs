@@ -81,7 +81,7 @@ internal sealed class SettingsSearchBox : Grid
                 CornerRadius = ThemeManager.Round(8),
                 Padding = new Thickness(8, 6, 8, 6),
                 Cursor = Cursors.Hand,
-                Background = i == _selected ? Ui.Res<Brush>("AccentSoft") : Brushes.Transparent,
+                Background = i == _selected ? Ui.Res<Brush>("Selected") : Brushes.Transparent,
                 Child = text,
             };
             row.MouseLeftButtonUp += (_, _) => Open(entry);

@@ -64,6 +64,10 @@ internal sealed class SessionInfo
     public bool TeamRacing { get; init; }
     public int NumCarClasses { get; init; } = 1;
 
+    private bool? _proAm;
+
+    public bool HasProAm => _proAm ??= PitBox.SimRacing.Race.ProAm.Active(this);
+
     public IReadOnlyList<SessionEntry> Sessions { get; init; } = Array.Empty<SessionEntry>();
     public IReadOnlyList<DriverEntry> Drivers { get; init; } = Array.Empty<DriverEntry>();
     public IReadOnlyList<SectorEntry> Sectors { get; init; } = Array.Empty<SectorEntry>();

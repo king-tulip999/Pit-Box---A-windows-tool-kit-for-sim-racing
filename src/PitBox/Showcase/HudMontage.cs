@@ -56,7 +56,6 @@ internal sealed partial class HudMontage : IDisposable
 
     public void Warm()
     {
-        _settings.Appearance.Colors = HudColors.Default;
         for (double t = -1500; t <= 0; t += 0.25) Feed(t);
         Thread.Sleep(300);
         Feed(0.25);

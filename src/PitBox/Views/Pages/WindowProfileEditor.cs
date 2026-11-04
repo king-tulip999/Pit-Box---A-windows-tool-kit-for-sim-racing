@@ -19,6 +19,7 @@ internal sealed class WindowProfileEditor
     private readonly TextBox _process = new() { Tag = "e.g. RRRE64.exe" };
     private readonly HotkeyBox _hotkey = new();
     private readonly TextBlock _shared = Ui.FieldHint("", LabelWidth);
+    private readonly TextBlock _offScreen = Ui.FieldHint("", LabelWidth);
     private readonly TextBlock _error = new() { Visibility = Visibility.Collapsed };
     private readonly NumberBox _width, _height, _x, _y, _delay;
     private readonly CheckBox _keepSize = new() { Content = "Keep the size the program sets" };
@@ -91,6 +92,7 @@ internal sealed class WindowProfileEditor
         _height = new NumberBox(profile.Height ?? screen.Height, "px", 68) { Minimum = 100, Maximum = 32000 };
         _x = new NumberBox(profile.X, "px", 68) { Minimum = -32000, Maximum = 32000 };
         _y = new NumberBox(profile.Y, "px", 68) { Minimum = -32000, Maximum = 32000 };
+        ToggleCards.FromBox(_keepSize);
         _keepSize.IsChecked = profile.Width is null;
         _keepSize.ToolTip = "Only move the window; leave its size as the program sets it";
         _keepSize.Click += (_, _) => SizeChanged();
@@ -100,11 +102,17 @@ internal sealed class WindowProfileEditor
         stack.Children.Add(Ui.FieldRow("Position", Pair("X", _x, "Y", _y), LabelWidth,
             "Desktop pixels: 0, 0 is the main display's top left, so screens to its left are negative."));
         stack.Children.Add(new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(6), Margin = new Thickness(LabelWidth, 6, 0, 4), MinWidth = Ui.FieldWidth, HorizontalAlignment = HorizontalAlignment.Stretch, Child = _preview });
+        _offScreen.Foreground = Ui.Res<System.Windows.Media.Brush>("WarnDeep");
+        _offScreen.Margin = new Thickness(LabelWidth, 2, 0, 6);
+        stack.Children.Add(_offScreen);
 
         stack.Children.Add(Ui.EditorSection("Window"));
         _borders = new CheckBox { Content = "Remove borders", IsChecked = profile.RemoveBorders, ToolTip = "Strips the frame and title bar. Only for games without a borderless option of their own." };
-        _titleBar = new CheckBox { Content = "Hide the title bar of Store / Xbox games", IsChecked = profile.HideTitleBar, Margin = new Thickness(0, 8, 0, 0),
+        _titleBar = new CheckBox { Content = "Hide the title bar of Store / Xbox games", IsChecked = profile.HideTitleBar, Margin = new Thickness(0, 6, 0, 0),
             ToolTip = "Needs Remove borders. For Store / Xbox app games (e.g. Forza Horizon 4) that keep a title bar after removing borders: pushes it above the screen. Does nothing for other programs." };
+        ToggleCards.FromBox(_borders);
+        ToggleCards.FromBox(_titleBar);
+        ToolTipService.SetShowOnDisabled(_titleBar, true);
         _borders.Click += (_, _) => _titleBar.IsEnabled = _borders.IsChecked == true;
         _titleBar.IsEnabled = profile.RemoveBorders;
         var look = new StackPanel();
@@ -113,7 +121,7 @@ internal sealed class WindowProfileEditor
         stack.Children.Add(Ui.FieldRow("Style", look, LabelWidth));
 
         stack.Children.Add(Ui.EditorSection("Applying"));
-        _auto = new CheckBox { Content = "When the program starts", IsChecked = profile.Auto };
+        _auto = ToggleCards.FromBox(new CheckBox { Content = "When the program starts", IsChecked = profile.Auto });
         _delay = new NumberBox(profile.DelayMs / 1000.0, Units.S, 78) { Minimum = 0, Maximum = WindowProfileSettings.MaxDelayMs / 1000.0, Step = 0.5, Decimals = 1 };
         _delay.ToolTip = "Needs When the program starts. For about 35 s after that, Pit-Box moves the window back if the game resizes it.";
         _auto.Click += (_, _) => _delay.IsEnabled = _auto.IsChecked == true;
@@ -202,6 +210,29 @@ internal sealed class WindowProfileEditor
         _width.IsEnabled = _height.IsEnabled = !keep;
         _preview.SetTiles(_monitors.OrderBy(m => m.X).Select(m => new LayoutTile(m.X, m.Y, m.Width, m.Height, m.Number > 0 ? m.Number.ToString() : m.Name, $"{m.Width}×{m.Height}", m.Primary)).ToList());
         _preview.SetTarget(keep ? null : new Rect(_x.Value, _y.Value, _width.Value, _height.Value));
+        string? off = keep || _monitors.Count == 0 || WindowPresets.Covers(Screens(), (int)_x.Value, (int)_y.Value, (int)_width.Value, (int)_height.Value) ? null
+            : FitsProfile((int)_x.Value, (int)_y.Value, (int)_width.Value, (int)_height.Value) is { } fits
+                ? $"Part of the window is off the displays that are on now. It fits your “{fits}” display profile."
+                : "Part of the window is off every display.";
+        _offScreen.Text = off ?? "";
+        _offScreen.Visibility = off is null ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private string? FitsProfile(int x, int y, int width, int height)
+    {
+        foreach (var profile in _app.Config.Displays.Profiles)
+        {
+            if (profile.Layout is null || profile.Name.Length == 0) continue;
+            List<ScreenArea> screens;
+            try
+            {
+                screens = _app.Displays.Describe(profile.Layout).Where(m => m.Width > 0 && m.Height > 0)
+                    .Select(m => new ScreenArea(m.Name, m.X, m.Y, m.Width, m.Height, m.Primary)).ToList();
+            }
+            catch { continue; }
+            if (screens.Count > 0 && WindowPresets.Covers(screens, x, y, width, height)) return profile.Name;
+        }
+        return null;
     }
 
     private static StackPanel Pair(string first, FrameworkElement a, string second, FrameworkElement b)

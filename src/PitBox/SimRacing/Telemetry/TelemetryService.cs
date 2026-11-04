@@ -250,8 +250,8 @@ internal sealed class TelemetryService : IDisposable
                 frame.Tick = tick;
                 frame.Sequence = ++_sequence;
                 frame.ReadAt = lastData;
-                Observe(frame);
                 _frames.Publish();
+                Observe(frame);
                 Count(ref framesThisSecond, ref second);
                 SetStatus(SimStatus.Connected);
             }
@@ -287,8 +287,8 @@ internal sealed class TelemetryService : IDisposable
         f.Status = status;
         f.Sequence = ++_sequence;
         f.ReadAt = Stopwatch.GetTimestamp();
-        Observe(f);
         _frames.Publish();
+        Observe(f);
         Volatile.Write(ref _fps, 0);
         SetStatus(status);
     }

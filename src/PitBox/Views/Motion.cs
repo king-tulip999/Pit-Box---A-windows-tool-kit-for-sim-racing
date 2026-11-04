@@ -2,7 +2,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using PitBox.Controls;
 using PitBox.Services;
 
 namespace PitBox.Views;
@@ -88,6 +87,8 @@ internal static class Motion
     public const double SwapDistance = 12;
 
     public static readonly IEasingFunction Ease = Frozen(new CubicEase { EasingMode = EasingMode.EaseOut });
+
+    public static readonly IEasingFunction Smooth = Frozen(new SineEase { EasingMode = EasingMode.EaseInOut });
 
     internal static IEasingFunction Frozen(EasingFunctionBase ease)
     {
@@ -198,21 +199,6 @@ internal static class Motion
             new System.Windows.Input.MouseEventHandler((s, _) => Squeeze((FrameworkElement)s, false)), handledEventsToo: true);
     }
 
-    public static void InstallSwitches()
-    {
-        var slide = new RoutedEventHandler((s, _) => SlideKnob((CheckBox)s));
-        EventManager.RegisterClassHandler(typeof(CheckBox), System.Windows.Controls.Primitives.ToggleButton.CheckedEvent, slide);
-        EventManager.RegisterClassHandler(typeof(CheckBox), System.Windows.Controls.Primitives.ToggleButton.UncheckedEvent, slide);
-    }
-
-    private static void SlideKnob(CheckBox box)
-    {
-        if (!box.IsLoaded || !Enabled || box.Template?.FindName("Knob", box) is not FrameworkElement knob || knob.RenderTransform is not TranslateTransform move) return;
-        bool on = box.IsChecked == true;
-        move.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(on ? 0 : KnobOffset.Travel, on ? KnobOffset.Travel : 0, TimeSpan.FromMilliseconds(180))
-            { EasingFunction = Ease, FillBehavior = FillBehavior.Stop });
-    }
-
     private static bool Innermost(object button, object source)
     {
         for (var d = source as DependencyObject; d is not null; d = d is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d))
@@ -257,7 +243,7 @@ internal static class Motion
 
     public const double BarStep = 0.015;
 
-    public static void To(DependencyObject target, DependencyProperty property, double to, double durationMs = 450, double glideFrom = 1e-3)
+    public static void To(DependencyObject target, DependencyProperty property, double to, double durationMs = 450, double glideFrom = 1e-3, IEasingFunction? ease = null)
     {
         if (target is not IAnimatable animatable)
             return;
@@ -276,7 +262,7 @@ internal static class Motion
             }
             return;
         }
-        animatable.BeginAnimation(property, new DoubleAnimation(to, TimeSpan.FromMilliseconds(durationMs)) { EasingFunction = Ease });
+        animatable.BeginAnimation(property, new DoubleAnimation(to, TimeSpan.FromMilliseconds(durationMs)) { EasingFunction = ease ?? Ease });
     }
 }
 

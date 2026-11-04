@@ -147,7 +147,7 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
         {
             header.Children.Add(AutoApplySwitch());
             var newGroup = Ui.LabeledButton("I.Folder", "New group", () => _ = EditGroupAsync(new WindowGroup(), isNew: true), "GhostButton");
-            newGroup.Margin = new Thickness(0, 0, 6, 0);
+            newGroup.Margin = Ui.AfterButton;
             var create = Ui.LabeledButton("I.Plus", "New profile", () => _ = EditAsync(new WindowProfile(), isNew: true), "PrimaryButton");
             int n = S.Profiles.Count;
             left.Children.Add(Ui.SectionHeader("Your profiles", RaceFormatCount(n) + (S.Layout.Count > 1 ? " · drag to arrange" : ""), newGroup, create));
@@ -182,7 +182,7 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
             _map.WindowClicked += OnMapClicked;
         }
         else if (_map.Parent is Panel holder) holder.Children.Remove(_map);
-        _map.SetScreens(_layouts.FirstOrDefault(l => l.Name == _mapLayout).Screens ?? _screens);
+        _map.SetScreens(MapScreens());
         var stack = new StackPanel();
         if (_layouts.Count > 0)
         {
@@ -196,9 +196,18 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
             picker.Margin = new Thickness(0, 0, 0, 13);
             stack.Children.Add(picker);
         }
+        else
+        {
+            var hint = Ui.Text("Each profile's window shows here. Point at an open window in the list to see where it is.", "Caption");
+            hint.TextWrapping = TextWrapping.Wrap;
+            hint.Margin = new Thickness(0, 0, 0, 10);
+            stack.Children.Add(hint);
+        }
         stack.Children.Add(_map);
         return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(13), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Child = stack };
     }
+
+    private List<LayoutTile> MapScreens() => _layouts.FirstOrDefault(l => l.Name == _mapLayout).Screens ?? _screens;
 
     private void ShowLayout(string? name)
     {
@@ -250,8 +259,10 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
     {
         if (_map is null) return;
         var items = new List<MapWindow>();
+        var shown = Areas(MapScreens());
         foreach (var p in S.Profiles)
-            if (p.Width is { } w && p.Height is { } h) items.Add(new MapWindow(p.Id, new Rect(p.X, p.Y, w, h), p.Label, false));
+            if (p.Width is { } w && p.Height is { } h && (WindowPresets.Covers(shown, p.X, p.Y, w, h) || (_mapLayout is null && FitOf(p) is null)))
+                items.Add(new MapWindow(p.Id, new Rect(p.X, p.Y, w, h), p.Label, false));
         foreach (var open in _open)
         {
             var area = new Rect(open.X, open.Y, open.Width, open.Height);
@@ -324,7 +335,7 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
         TextCase.Verbatim(title);
         names.Children.Add(title);
         var detail = TextFit.TipWhenTrimmed(new TextBlock { Style = Ui.Res<Style>("Caption"), TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap, Margin = new Thickness(0, 2, 0, 0) });
-        detail.Text = $"{w.Width}×{w.Height}{Where(new Rect(w.X, w.Y, w.Width, w.Height))} at {w.X}, {w.Y}";
+        detail.Text = $"{w.Width}×{w.Height}{Where(new Rect(w.X, w.Y, w.Width, w.Height))}";
         row.ToolTip = w.Title;
         TextCase.Verbatim(detail);
         names.Children.Add(detail);
@@ -385,17 +396,8 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
     private Tile ProfileCard(WindowProfile p)
     {
         var row = ProfileRow(p);
-        row.Margin = new Thickness(15, 10, 15, 10);
-        var body = new Grid { ClipToBounds = true };
-        if (Running(p))
-        {
-            var fade = new Border { IsHitTestVisible = false, BorderThickness = new Thickness(4, 0, 0, 0) };
-            fade.SetResourceReference(Border.BackgroundProperty, "Place4Fade");
-            fade.SetResourceReference(Border.BorderBrushProperty, "Place4");
-            body.Children.Add(fade);
-        }
-        body.Children.Add(row);
-        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Child = body, ClipToBounds = true, Cursor = System.Windows.Input.Cursors.Hand, ToolTip = "Click to edit, drag to arrange" };
+        row.Margin = new Thickness(15, 10, ApplyInset - 1, 10);
+        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Child = row, ClipToBounds = true, Cursor = System.Windows.Input.Cursors.Hand, ToolTip = "Click to edit, drag to arrange" };
     }
 
     private Grid ProfileRow(WindowProfile p)
@@ -405,7 +407,7 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(new ColumnDefinition());
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var badge = Ui.Badge("I.AppWindow", running ? "AccentSoft" : "SurfaceAlt", running ? "AccentText" : "TextMuted", 32, 0, 16);
+        var badge = Ui.Badge("I.AppWindow", "SurfaceAlt", "TextMuted", 32, 0, 16);
         badge.VerticalAlignment = VerticalAlignment.Center;
         row.Children.Add(badge);
 
@@ -413,78 +415,68 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
         var title = new TrimRow();
         title.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = p.Name, Style = Ui.Res<Style>("H3"), FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) }));
         names.Children.Add(title);
-        var line = new TrimRow { Margin = new Thickness(0, 2, 0, 0) };
-        var detail = TextFit.TipWhenTrimmed(new TextBlock { Style = Ui.Res<Style>("Caption"), TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap });
+        var detail = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) };
         detail.Inlines.Add(new System.Windows.Documents.Run(p.ProcessName.Length > 0 ? p.ProcessName : "No program picked") { FontWeight = FontWeights.SemiBold });
         detail.Inlines.Add(new System.Windows.Documents.Run("   " + Summary(p)));
         TextCase.Verbatim(detail);
-        line.Children.Add(detail);
-        names.Children.Add(line);
-        if (running)
+        names.Children.Add(detail);
+        if (running) title.Children.Add(TitleChip(Ui.Chip("Running", "SageSoft", "SageDeep")));
+        if (p.Hotkey is not null) title.Children.Add(TitleChip(Ui.Chip(Hotkeys.Hotkey.Display(p.Hotkey))));
+        if (FitOf(p) is { } fit)
         {
-            var chip = new Grid { Margin = new Thickness(0, 2, 5, 2), VerticalAlignment = VerticalAlignment.Center };
-            chip.Children.Add(new Slant("SageSoft", 0.14, 0, 1, 0, 0.86, 1, 0, 1));
-            var chipText = RaceParts.Big("Running", 12.5, "SageDeep", italic: false, heavy: false);
-            chipText.Margin = new Thickness(11, 1, 11, 2);
-            chip.Children.Add(chipText);
-            title.Children.Add(chip);
+            var layout = TitleChip(Ui.Chip(fit.Name));
+            layout.ToolTip = fit.Name == _mapLayout ? $"Only fits your “{fit.Name}” display profile" : $"Only fits your “{fit.Name}” display profile; click to show it on the map";
+            layout.Cursor = System.Windows.Input.Cursors.Hand;
+            layout.MouseLeftButtonUp += (_, e) => { e.Handled = true; ShowLayout(fit.Name); };
+            PanelGrid.SetNoDrag(layout, true);
+            title.Children.Add(layout);
         }
         Grid.SetColumn(names, 1);
         row.Children.Add(names);
 
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         var apply = Ui.LabeledButton("I.Zap", "Apply", () => { _map?.Pulse(p.Id); _ = _app.WindowProfiles.ApplyAsync(p); });
         apply.ToolTip = running ? "Move the window now" + Keys(p.Hotkey) : p.ProcessName.Length == 0 ? "No program picked" : $"{p.ProcessName} isn't running";
-        actions.Children.Add(apply);
-        var edit = Ui.LabeledButton("I.Pencil", "Edit", () => _ = EditAsync(p, isNew: false), "GhostButton");
-        edit.Margin = new Thickness(6, 0, 0, 0);
-        actions.Children.Add(edit);
-        if (FitOf(p) is { } fit && fit.Name != _mapLayout)
-        {
-            var show = Ui.LabeledButton("I.Monitor", fit.Name, () => ShowLayout(fit.Name), "GhostButton");
-            show.ToolTip = $"Show the “{fit.Name}” layout on the map";
-            show.Margin = new Thickness(0, 0, 6, 0);
-            actions.Children.Insert(0, show);
-        }
-        Grid.SetColumn(actions, 2);
-        row.Children.Add(actions);
+        apply.VerticalAlignment = VerticalAlignment.Center;
+        Grid.SetColumn(apply, 2);
+        row.Children.Add(apply);
         HighlightOnHover(row, p.Id);
         return row;
     }
 
+    private static Border TitleChip(Border chip)
+    {
+        chip.Margin = new Thickness(0, 2, 5, 2);
+        chip.VerticalAlignment = VerticalAlignment.Center;
+        return chip;
+    }
+
     private string Summary(WindowProfile p)
     {
-        var fit = FitOf(p);
+        var screens = FitOf(p) is { } layout ? layout.Screens : _screens;
         var parts = new List<string>
         {
             p.Width is { } w && p.Height is { } h
-                ? fit is { } layout ? $"{w}×{h}{Where(new Rect(p.X, p.Y, w, h), layout.Screens)} in “{layout.Name}” at {p.X}, {p.Y}" : $"{w}×{h}{Where(new Rect(p.X, p.Y, w, h))} at {p.X}, {p.Y}"
-                : $"keeps its size{Where(new Rect(p.X, p.Y, 1, 1))}, at {p.X}, {p.Y}",
+                ? $"{w}×{h}{Where(new Rect(p.X, p.Y, w, h), screens)}"
+                : $"keeps its size{Where(new Rect(p.X, p.Y, 1, 1), screens)}",
         };
-        if (StyleOf(p) is { } style) parts.Add(style);
-        if (p.Hotkey is not null) parts.Add(Hotkeys.Hotkey.Display(p.Hotkey));
+        if (p.RemoveBorders) parts.Add("borders removed");
+        if (p.HideTitleBar) parts.Add("title bar hidden");
         parts.Add(ApplyingOf(p));
         return string.Join(" · ", parts);
     }
 
     private string Where(Rect window, IReadOnlyList<LayoutTile>? screens = null)
     {
-        var hit = (screens ?? _screens).Where(s => s.Label.Length > 0 && Rect.Intersect(new Rect(s.X, s.Y, s.Width, s.Height), window) is { IsEmpty: false, Width: > 0, Height: > 0 }).ToList();
-        return hit.Count switch
-        {
-            1 => $" on display {hit[0].Label}",
-            > 1 => $" across {SimRacing.Race.RaceFormat.Count(hit.Count, "display")}",
-            _ => "",
-        };
+        var hit = (screens ?? _screens).Where(s => s.Label.Length > 0 && Rect.Intersect(new Rect(s.X, s.Y, s.Width, s.Height), window) is { IsEmpty: false, Width: > 0, Height: > 0 })
+            .OrderBy(s => s.Y).ThenBy(s => s.X).ToList();
+        if (hit.Count == 0) return $" at {window.X}, {window.Y}";
+        var first = hit.OrderBy(s => s.X).ThenBy(s => s.Y).First();
+        string at = $"display {first.Label} at {window.X - first.X}, {window.Y - first.Y}";
+        if (hit.Count == 1) return " on " + at;
+        var union = hit.Select(s => new Rect(s.X, s.Y, s.Width, s.Height)).Aggregate(Rect.Union);
+        string across = $" across {SimRacing.Race.RaceFormat.Count(hit.Count, "display")}";
+        return union == window ? across : $"{across} from {at}";
     }
-
-    private static string? StyleOf(WindowProfile p) => (p.RemoveBorders, p.HideTitleBar) switch
-    {
-        (true, true) => "borders removed, title bar hidden",
-        (true, false) => "borders removed",
-        (false, true) => "title bar hidden",
-        _ => null,
-    };
 
     private string ApplyingOf(WindowProfile p) =>
         !p.Auto ? "by hand"
@@ -501,7 +493,7 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
         head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         head.ColumnDefinitions.Add(new ColumnDefinition());
         head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var badge = Ui.Badge("I.Folder", "AccentSoft", "AccentText", 32, 0, 16);
+        var badge = Ui.Badge("I.Folder", "IconWell", "IconInk", 32, 0, 16);
         badge.VerticalAlignment = VerticalAlignment.Center;
         head.Children.Add(badge);
         var text = new StackPanel { Margin = new Thickness(11, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
@@ -518,17 +510,11 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
         text.Children.Add(Ui.Text(members.Count == 0 ? "Empty: pick this group in a profile's editor" : $"Group · {RaceFormatCount(members.Count)}", "Caption"));
         Grid.SetColumn(text, 1);
         head.Children.Add(text);
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, ApplyInset - GroupPad - 1, 0) };
         var apply = Ui.LabeledButton("I.Zap", "Apply all", () => _ = _app.WindowProfiles.ApplyGroupAsync(g));
         apply.ToolTip = "Move every program in the group that's running" + Keys(g.Hotkey);
         apply.IsEnabled = members.Count > 0;
         actions.Children.Add(apply);
-        var add = Ui.LabeledButton("I.Plus", "Add profile", () => _ = EditAsync(new WindowProfile { GroupId = g.Id }, isNew: true), "SoftButton");
-        add.Margin = new Thickness(6, 0, 0, 0);
-        actions.Children.Add(add);
-        var edit = Ui.LabeledButton("I.Pencil", "Edit", () => _ = EditGroupAsync(g, isNew: false), "GhostButton");
-        edit.Margin = new Thickness(6, 0, 0, 0);
-        actions.Children.Add(edit);
         Grid.SetColumn(actions, 2);
         head.Children.Add(actions);
         stack.Children.Add(head);
@@ -539,23 +525,18 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
             foreach (var m in members)
             {
                 var member = m;
-                var tile = new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(11, 8, 11, 8), Child = ProfileRow(member), ToolTip = "Drag to arrange within the group" };
-                tile.MouseLeftButtonUp += (_, e) => { if (e.OriginalSource is not DependencyObject d || !InButton(d)) _ = EditAsync(member, isNew: false); };
+                var tile = new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(11, 8, ApplyInset - GroupPad - 2, 8), Child = ProfileRow(member), ToolTip = "Click to edit, drag to arrange within the group" };
+                tile.MouseLeftButtonUp += (_, e) => { if (!e.Handled && (e.OriginalSource is not DependencyObject d || !PanelGrid.IsControl(d, tile))) _ = EditAsync(member, isNew: false); };
                 list.Children.Add(tile);
             }
             list.Moved += (from, to) => { S.MoveWithinGroup(g, from, to); _app.Save(); };
             PanelGrid.SetNoDrag(list, true);
             stack.Children.Add(list);
         }
-        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(13, 10, 13, 11), Child = stack, Cursor = System.Windows.Input.Cursors.Hand, ToolTip = "Click to edit the group, drag to arrange" };
+        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(GroupPad, 10, GroupPad, 11), Child = stack, Cursor = System.Windows.Input.Cursors.Hand, ToolTip = "Click to edit the group, drag to arrange" };
     }
 
-    private static bool InButton(DependencyObject d)
-    {
-        for (var e = d; e is not null; e = System.Windows.Media.VisualTreeHelper.GetParent(e) ?? LogicalTreeHelper.GetParent(e))
-            if (e is System.Windows.Controls.Primitives.ButtonBase) return true;
-        return false;
-    }
+    private const double GroupPad = 13, ApplyInset = 26;
 
     private static string RaceFormatCount(int n) => SimRacing.Race.RaceFormat.Count(n, "profile");
 

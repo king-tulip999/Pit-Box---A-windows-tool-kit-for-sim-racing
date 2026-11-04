@@ -22,7 +22,7 @@ internal sealed class TelemetryFilesCard : ContentControl
         _app = app;
         _window = window;
         _stats = stats;
-        Content = StatsSections.Section("Telemetry files", "I.Folder", null, null, _body);
+        Content = StatsSections.Section("Telemetry files", null, null, _body);
         Ui.Anchor(this, "stats.telemetry");
         _body.Children.Add(Ui.Text("Reading your telemetry folder…", "Caption"));
         _ = LoadAsync();

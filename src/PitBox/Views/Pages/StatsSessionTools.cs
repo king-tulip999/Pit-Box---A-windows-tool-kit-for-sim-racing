@@ -62,7 +62,9 @@ internal static class StatsSessionTools
         optimal.SetResourceReference(TextBlock.ForegroundProperty, "AccentText");
         optimal.ToolTip = "Optimal: your best sectors put together";
         Cell(table, totalRow, 1, optimal, true);
+        Cell(table, totalRow, 2, Number(SimRacing.Race.RaceFormat.Missing, "Caption"), true);
         Cell(table, totalRow, 3, Number(StatFormat.LapTime(lines.Sum(l => l.Average))), true);
+        Cell(table, totalRow, 4, Number(SimRacing.Race.RaceFormat.Missing, "Caption"), true);
         Cell(table, totalRow, 5, Number(LapReplayView.Signed(lines.Sum(l => l.Lost), "0.000")), true);
 
         string note = worst is { } w
@@ -72,7 +74,7 @@ internal static class StatsSessionTools
         var hint = new TextBlock { Text = note, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8) };
         body.Children.Add(hint);
         body.Children.Add(new ScrollViewer { HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, Content = table });
-        var card = StatsSections.Section("Sectors", "I.Flag", SimRacing.Race.RaceFormat.Count(lines[0].Laps, "clean lap"), null, body);
+        var card = StatsSections.Section("Sectors", SimRacing.Race.RaceFormat.Count(lines[0].Laps, "clean lap"), null, body);
         card.ToolTip = "Spread = how much the sector varies lap to lap; left on the table = the average less your best";
         return card;
     }

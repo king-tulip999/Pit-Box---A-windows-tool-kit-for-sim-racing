@@ -19,6 +19,10 @@ internal sealed class HudPalette
     public Color Good, GoodText, GoodSoft, Warn, WarnText, WarnSoft, Danger, DangerText, DangerSoft, Gold, Slate, Plum, Silver, Bronze;
     public bool Dark;
     public Color Player, PlayerText;
+    public Color? Highlight, HighlightEdge;
+    public bool SoftBands;
+    public Color RowTint => Highlight ?? Player;
+    public Color PickTint => Highlight ?? Accent;
     public Color Lapping = Color.FromArgb(0xF8, 0x71, 0x71), Lapped = Color.FromArgb(0x60, 0xA5, 0xFA);
     public Color Fastest = Color.FromArgb(0xB0, 0x6B, 0xFF);
     public Color ThrottleInput = Hex(0x3DDC84), BrakeInput = Hex(0xFF3B4E), ClutchInput = Hex(0x4C9AFF), SteerInput = Hex(0xC9D1DE), AbsInput = Hex(0xFFB020);
@@ -39,60 +43,21 @@ internal sealed class HudPalette
 
     public static readonly Color CatFur = Color.FromArgb(0xD9, 0xDC, 0xE6), CatInk = Color.FromArgb(0x0A, 0x0D, 0x16), CatHeadset = Color.FromArgb(0x2B, 0x33, 0x48), CatPink = Color.FromArgb(0xF2, 0x8C, 0xA0);
 
-    public static HudPalette Of(HudAppearance look) => look.Colors == HudColors.Custom ? Custom(look.Custom) : Default;
-
-    private static readonly Dictionary<string, HudPalette> CustomCache = new();
-
-    public static HudPalette Custom(HudCustomColors c)
-    {
-        string key = string.Join("|", c.All().Select(e => e.Get()));
-        lock (CustomCache)
-        {
-            if (CustomCache.TryGetValue(key, out var cached)) return cached;
-            var d = new HudCustomColors();
-            Color Hex(string v, string fallback)
-            {
-                try { return ColorTranslator.FromHtml(v); }
-                catch (Exception) { return ColorTranslator.FromHtml(fallback); }
-            }
-            Color bg = Hex(c.Background, d.Background), surface = Hex(c.Surface, d.Surface), text = Hex(c.Text, d.Text), muted = Hex(c.Muted, d.Muted),
-                accent = Hex(c.Accent, d.Accent), good = Hex(c.Good, d.Good), warn = Hex(c.Warn, d.Warn), danger = Hex(c.Danger, d.Danger),
-                heading = Hex(c.Heading, d.Heading), lines = Hex(c.Lines, d.Lines);
-            bool dark = Luminance(bg) < 0.35;
-            Color Readable(Color colour) => Mix(colour, text, Math.Abs(Luminance(colour) - Luminance(surface)) < 0.25 ? 0.45 : 0.15);
-            var p = new HudPalette
-            {
-                Dark = dark,
-                Bg = bg, Surface = surface, SurfaceAlt = Mix(surface, bg, 0.5), Text = text, Heading = heading,
-                Muted = muted, Faint = Mix(muted, bg, 0.3), Line = Mix(surface, lines, 0.6), LineStrong = lines,
-                Accent = accent, AccentText = Readable(accent), AccentSoft = Mix(surface, accent, 0.22), OnAccent = On(accent),
-                Good = good, GoodText = Readable(good), GoodSoft = Mix(surface, good, 0.2), Warn = warn, WarnText = Readable(warn), WarnSoft = Mix(surface, warn, 0.2),
-                Danger = danger, DangerText = Readable(danger), DangerSoft = Mix(surface, danger, 0.2), Gold = warn, Slate = muted, Plum = Mix(accent, muted, 0.5), Silver = Mix(muted, text, 0.5), Bronze = Mix(warn, danger, 0.35),
-                Player = Hex(c.YourRow, d.YourRow), PlayerText = Hex(c.YourRowText, d.YourRowText),
-                Lapping = Hex(c.Lapping, d.Lapping), Lapped = Hex(c.Lapped, d.Lapped), Fastest = Hex(c.FastestLap, d.FastestLap),
-                ThrottleInput = good, BrakeInput = danger, ClutchInput = Hex(c.Lapped, d.Lapped), SteerInput = Mix(muted, text, 0.6), AbsInput = warn,
-                InputTrack = Mix(surface, lines, 0.45), TraceBack = Mix(surface, bg, 0.5), InputTicks = lines, RedZone = Mix(surface, danger, 0.3),
-                MapTrack = Hex(c.MapTrack, d.MapTrack), MapEdge = Hex(c.MapEdge, d.MapEdge), MapPit = Hex(c.MapPit, d.MapPit), MapCars = Hex(c.MapCars, d.MapCars),
-            };
-            CustomCache[key] = p;
-            return p;
-        }
-    }
+    public static HudPalette Of(HudAppearance look) => Default;
 
     public static HudPalette Default { get; } = new HudPalette
     {
         Dark = true,
-        Bg = Hex(0x0A0D16), Surface = Hex(0x151B2B), SurfaceAlt = Hex(0x1B2336), Text = Hex(0xE9ECF5), Heading = Hex(0xFFFFFF),
-        Muted = Hex(0x8A93AB), Faint = Hex(0x5B6480), Line = Hex(0x232A3D), LineStrong = Hex(0x2B3348),
-        Accent = Hex(0xDB156B), AccentText = Hex(0xEC5D9A), AccentSoft = Hex(0x3A1630), OnAccent = Color.White,
-        Good = Hex(0x3DD68C), GoodText = Hex(0x6BE3A8), GoodSoft = Hex(0x15402F), Warn = Hex(0xF5B53D), WarnText = Hex(0xF5C66B), WarnSoft = Hex(0x4A3A16),
-        Danger = Hex(0xE5484D), DangerText = Hex(0xF2777A), DangerSoft = Hex(0x4A1A22), Gold = Hex(0xFACC15), Slate = Hex(0x64748B), Plum = Hex(0xA855F7), Silver = Hex(0xC9CED6), Bronze = Hex(0xD99A63),
-        Player = Hex(0xDB156B), PlayerText = Hex(0xFFFFFF),
+        Bg = Hex(0x1E1E1E), Surface = Hex(0x2A2A2A), SurfaceAlt = Hex(0x303030), Text = Hex(0xE2E2E2), Heading = Hex(0xF5F5F5),
+        Muted = Hex(0x9A9A9A), Faint = Hex(0x767676), Line = Hex(0x333333), LineStrong = Hex(0x3C3C3C),
+        Accent = Hex(0xDB156B), AccentText = Hex(0xF5559A), AccentSoft = Hex(0x3A3A3A), OnAccent = Color.White,
+        Good = Hex(0x7FC48E), GoodText = Hex(0x9ED4A8), GoodSoft = Hex(0x24352A), Warn = Hex(0xE8B04A), WarnText = Hex(0xF2CC80), WarnSoft = Hex(0x3A3020),
+        Danger = Hex(0xE5484D), DangerText = Hex(0xF07C7F), DangerSoft = Hex(0x42201F), Gold = Hex(0xFACC15), Slate = Hex(0x7A7A7A), Plum = Hex(0xA855F7), Silver = Hex(0xC9CED6), Bronze = Hex(0xD99A63),
+        Player = Hex(0xDB156B), PlayerText = Hex(0xFFFFFF), Highlight = Hex(0x6A6A6A), HighlightEdge = Hex(0xDB156B), SoftBands = true,
+        InputTrack = Hex(0x2A2A2A), TraceBack = Hex(0x171717), InputTicks = Hex(0x444444), RedZone = Hex(0x4A1E22),
     };
 
     private static Color Hex(int rgb) => Color.FromArgb(255, (rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
-
-    private static double Luminance(Color c) => 0.2126 * Lin(c.R) + 0.7152 * Lin(c.G) + 0.0722 * Lin(c.B);
 
     public static Color Mix(Color a, Color b, double t) => Color.FromArgb(
         (int)Math.Round(a.A + (b.A - a.A) * t), (int)Math.Round(a.R + (b.R - a.R) * t), (int)Math.Round(a.G + (b.G - a.G) * t), (int)Math.Round(a.B + (b.B - a.B) * t));
@@ -144,27 +109,45 @@ internal sealed class HudPainter : IDisposable
 
     public void Region(string id, RectangleF box) => Regions?.Add((id, new RectangleF(box.X + _inset.X, box.Y + _inset.Y, box.Width, box.Height)));
 
-    private PointF _inset;
-    private RectangleF _outer;
+    private PointF _inset, _far;
+    private SizeF _layout;
+    private readonly Stack<(PointF Inset, PointF Far, RectangleF Outer, PointF Step)> _insets = new();
 
     public void Inset(float left, float top, float right, float bottom)
     {
+        _insets.Push((_inset, _far, Bounds, new PointF(left, top)));
         if (left == 0 && top == 0 && right == 0 && bottom == 0) return;
         G.TranslateTransform(left, top);
-        _inset = new PointF(left, top);
-        _outer = Bounds;
+        _inset = new PointF(_inset.X + left, _inset.Y + top);
+        _far = new PointF(_far.X + right, _far.Y + bottom);
         Bounds = new RectangleF(0, 0, Bounds.Width - left - right, Bounds.Height - top - bottom);
     }
 
     public RectangleF EndInset()
     {
-        if (_inset != PointF.Empty)
-        {
-            G.TranslateTransform(-_inset.X, -_inset.Y);
-            Bounds = _outer;
-        }
-        _inset = PointF.Empty;
+        if (_insets.Count == 0) return Bounds;
+        var (inset, far, outer, step) = _insets.Pop();
+        if (step != PointF.Empty) G.TranslateTransform(-step.X, -step.Y);
+        _inset = inset;
+        _far = far;
+        Bounds = outer;
         return Bounds;
+    }
+
+    public SizeF? Needed { get; private set; }
+
+    public bool Spilled { get; private set; }
+
+    public float MinWidth { get; private set; }
+
+    public void NeedBelow(RectangleF area, float content) => Need(Bounds.Width, area.Y + content + Math.Max(0, Bounds.Bottom - area.Bottom));
+
+    public void NeedWidth(float width) => MinWidth = Math.Max(MinWidth, MathF.Ceiling(width + _inset.X + _far.X));
+
+    public void Need(float width, float height)
+    {
+        var abs = new SizeF(MathF.Ceiling(width + _inset.X + _far.X), MathF.Ceiling(height + _inset.Y + _far.Y));
+        Needed = Needed is { } had ? new SizeF(Math.Max(had.Width, abs.Width), Math.Max(had.Height, abs.Height)) : abs;
     }
 
     public bool IsPreview { get; set; }
@@ -198,7 +181,13 @@ internal sealed class HudPainter : IDisposable
         g.TextContrast = 0;
         g.ScaleTransform(scale, scale);
         Bounds = new RectangleF(0, 0, layoutSize.Width, layoutSize.Height);
+        _layout = layoutSize;
         _inset = PointF.Empty;
+        _far = PointF.Empty;
+        _insets.Clear();
+        Needed = null;
+        Spilled = false;
+        MinWidth = 0;
         Items?.Clear();
         _panels.Clear();
         _sharp.Clear();
@@ -211,6 +200,8 @@ internal sealed class HudPainter : IDisposable
     public int? Background { get; set; }
 
     public float Snap(float v) => MathF.Round(v * _scale) / _scale;
+
+    public float PixelScale => _scale;
 
     public RectangleF Snap(RectangleF r)
     {
@@ -225,11 +216,15 @@ internal sealed class HudPainter : IDisposable
         return (w % 2 == 1 ? MathF.Floor(d) + 0.5f : MathF.Round(d)) / _scale;
     }
 
+    private readonly Dictionary<Font, Font> _boldOf = new(ReferenceEqualityComparer.Instance);
+
     public Font BoldOf(Font font)
     {
+        if (_boldOf.TryGetValue(font, out var known)) return known;
+        var bold = font;
         foreach (var (key, value) in _fonts)
-            if (ReferenceEquals(value, font)) return key.Item1 > 0 ? Font(key.Item1, true) : font;
-        return font;
+            if (ReferenceEquals(value, font)) { bold = key.Item1 > 0 ? Font(key.Item1, true) : font; break; }
+        return _boldOf[font] = bold;
     }
 
     public Font Font(float px, bool bold)
@@ -326,6 +321,7 @@ internal sealed class HudPainter : IDisposable
         if (text.Length == 0) return;
         float lh = TextHeight(font);
         float top = v switch { VAlign.Center => box.Y + (box.Height - lh) / 2, VAlign.Bottom => box.Bottom - lh, _ => box.Y };
+        if (top + _inset.Y < -0.5f || top + lh * 0.8f + _inset.Y > _layout.Height + 0.5f) Spilled = true;
         if (SharpText.Available && _fontSpecs.TryGetValue(font, out var spec))
         {
             float x = h == HAlign.Left ? Snap(box.X) : box.X, right = h == HAlign.Right ? Snap(box.Right) : box.Right;
@@ -459,6 +455,42 @@ internal sealed class HudPainter : IDisposable
         G.TranslateTransform(-r.X, -r.Y);
     }
 
+    private readonly Dictionary<(int, int, float), LinearGradientBrush> _gradients = new();
+
+    public void Gradient(RectangleF r, Color from, Color to)
+    {
+        if (r.Width <= 0 || r.Height <= 0) return;
+        var key = (from.ToArgb(), to.ToArgb(), MathF.Round(r.Width, 1));
+        if (!_gradients.TryGetValue(key, out var brush))
+        {
+            if (_gradients.Count >= 64) { foreach (var x in _gradients.Values) x.Dispose(); _gradients.Clear(); }
+            brush = _gradients[key] = new LinearGradientBrush(new PointF(0, 0), new PointF(key.Item3, 0), from, to) { WrapMode = WrapMode.TileFlipX };
+        }
+        G.TranslateTransform(r.X, r.Y);
+        G.FillRectangle(brush, 0, 0, r.Width, r.Height);
+        G.TranslateTransform(-r.X, -r.Y);
+    }
+
+    public void CenteredCaps(string text, Font font, Color color, RectangleF box)
+    {
+        if (text.Length == 0 || box.Width <= 0) return;
+        if (SharpText.Available && _fontSpecs.TryGetValue(font, out var spec))
+        {
+            float size = spec.Size * _scale;
+            int weight = spec.Bold ? SharpText.Semibold : SharpText.Regular;
+            if (SharpText.Ink(text, size, weight) is { } ink)
+            {
+                float bx = (box.X + _inset.X) * _scale, by = (box.Y + _inset.Y) * _scale, bw = box.Width * _scale, bh = box.Height * _scale;
+                float left = MathF.Round(bx + (bw - (ink.Right - ink.Left)) / 2 - ink.Left);
+                float baseline = MathF.Round(by + (bh - (ink.Bottom - ink.Top)) / 2 - ink.Top + ink.Baseline);
+                var at = new RectangleF(left, baseline - ink.Baseline, ink.Right + 4, ink.Bottom + 2);
+                _sharp.Add(text, size, weight, color, at, TextAlign.Left, crisp: true);
+                return;
+            }
+        }
+        Text(text, font, color, box, HAlign.Center, VAlign.Center, false);
+    }
+
     public void Outline(RectangleF r, Color c, float width = 1, float radius = 0)
     {
         r = RectangleF.FromLTRB(SnapLine(r.Left, width), SnapLine(r.Top, width), SnapLine(r.Right, width), SnapLine(r.Bottom, width));
@@ -566,11 +598,18 @@ internal sealed class HudPainter : IDisposable
         Text(LabelText(label), Label, LabelColor, new RectangleF(r.X, r.Y + vh, r.Width, lh), align, VAlign.Top);
     }
 
+    private readonly Dictionary<string, (string Number, string Unit)?> _numberParts = new(StringComparer.Ordinal);
+
     public void Number(string value, Font font, Color color, RectangleF box, HAlign align = HAlign.Left, VAlign valign = VAlign.Center)
     {
-        int cut = UnitStart(value);
-        if (cut < 0) { Text(value, font, color, box, align, valign, false); return; }
-        Number(value[..cut].TrimEnd(), value[cut..].Trim(), font, color, box, align, valign);
+        if (!_numberParts.TryGetValue(value, out var parts))
+        {
+            if (_numberParts.Count >= 512) _numberParts.Clear();
+            int cut = UnitStart(value);
+            _numberParts[value] = parts = cut < 0 ? null : (value[..cut].TrimEnd(), value[cut..].Trim());
+        }
+        if (parts is not { } split) { Text(value, font, color, box, align, valign, false); return; }
+        Number(split.Number, split.Unit, font, color, box, align, valign);
     }
 
     public void Number(string number, string unit, Font font, Color color, RectangleF box, HAlign align = HAlign.Left, VAlign valign = VAlign.Center)
@@ -631,6 +670,9 @@ internal sealed class HudPainter : IDisposable
         for (int i = 0; i < items.Count; i++)
             widths[i] = (items[i].Label.Length > 0 ? Measure(Caps(items[i].Label), labelFont) + 4 : 0) + Measure(items[i].Value, valueFont);
         var (shown, gap) = FitStrip(widths, inner.Width, 14 * Density);
+        float natural = 16 * Density + 14 * Density * (items.Count - 1);
+        foreach (float w in widths) natural += w + 4 * Density;
+        NeedWidth(r.X + natural);
         float x = inner.X;
         for (int i = 0; i < shown; i++)
         {
@@ -792,6 +834,7 @@ internal sealed class HudPainter : IDisposable
         foreach (var f in _fonts.Values) f.Dispose();
         _fonts.Clear();
         _fontSpecs.Clear();
+        _boldOf.Clear();
         _lineHeights.Clear();
         _textHeights.Clear();
         _ascents.Clear();
@@ -867,6 +910,7 @@ internal sealed class HudPainter : IDisposable
         foreach (var f in _formats) f?.Dispose();
         _dashed?.Dispose();
         foreach (var s in _shapes.Values) s.Dispose();
+        foreach (var g in _gradients.Values) g.Dispose();
         _measure.Dispose();
         _measureBitmap.Dispose();
         _sharp.Dispose();

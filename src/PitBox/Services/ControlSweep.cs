@@ -25,7 +25,7 @@ internal static class ControlSweep
     private static readonly string[] StyleKeys =
     {
         "PrimaryButton", "SoftButton", "SelectedButton", "GhostButton", "DangerButton", "DangerConfirmButton", "IconButton",
-        "QuietButton", "QuietIconButton", "CaptionButton", "CloseCaptionButton", "ThemeLogoButton", "Btn", "NavItem", "Switch", "Segment", "PageTab",
+        "QuietButton", "QuietIconButton", "CaptionButton", "CloseCaptionButton", "ThemeLogoButton", "Btn", "NavItem", "NavCard", "Switch", "ToggleCard", "Segment", "PageTab",
     };
 
     private static readonly string[] ButtonRoles = { "PrimaryButton", "SoftButton", "SelectedButton", "GhostButton", "DangerButton", "DangerConfirmButton", "IconButton", "Btn", "implicit" };
@@ -382,7 +382,7 @@ internal static class ControlSweep
             case RadioButton rb when StyleOf(rb) == "PageTab": return "tab";
             case RadioButton rb when StyleOf(rb) == "Segment": return "segment";
             case RadioButton: return "radio";
-            case CheckBox cb when StyleOf(cb) == "Switch": return "switch";
+            case CheckBox cb when StyleOf(cb) is "Switch" or "ToggleCard": return "switch";
             case CheckBox: return "checkbox";
             case ToggleButton: return "toggle";
             case ButtonBase b: return OwnText(b).Length == 0 ? "icon button" : "button";

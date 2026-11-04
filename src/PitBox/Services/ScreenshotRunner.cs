@@ -73,6 +73,28 @@ internal static class ScreenshotRunner
             }
             n++;
         }
+        try
+        {
+            var app = AppServices.Current;
+            if (app?.Plugins.All.FirstOrDefault(p => p.Id == Grr.GrrPlugin.PluginId) is { } grr)
+            {
+                app.Plugins.SetEnabled(grr, true);
+                await Task.Delay(800);
+                app.SetTheme(Grr.GrrTheme.Id);
+                await Task.Delay(1200);
+                Capture(window, Path.Combine(folder, $"{n}-Grr.png"));
+                if (window.FindName("SetupContent") is System.Windows.Controls.ContentControl { Content: System.Windows.Controls.UserControl { Content: System.Windows.Controls.ScrollViewer sv } })
+                {
+                    sv.ScrollToEnd();
+                    await Task.Delay(500);
+                    Capture(window, Path.Combine(folder, $"{n}z-Grr-bottom.png"));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            RecordError(ex);
+        }
     }
 
     private static async Task CaptureSetupAsync(MainWindow window, string folder)

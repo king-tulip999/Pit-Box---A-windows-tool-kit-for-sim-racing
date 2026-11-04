@@ -21,24 +21,53 @@ internal sealed class FovSection : StackPanel
     private string? _iracingFolder;
     private double? _iracingFov;
 
-    public void OnShown()
+    private int _iracingReads;
+
+    public void OnShown() => _ = ReadIracingInBackground();
+
+    private async Task ReadIracingInBackground()
     {
-        var (folder, fov) = (_iracingFolder, _iracingFov);
-        ReadIracing();
-        if (folder != _iracingFolder || fov != _iracingFov) Recalculate();
+        int read = ++_iracingReads;
+        var (folder, fov) = await Task.Run(IracingNow);
+        if (read != _iracingReads || folder == _iracingFolder && fov == _iracingFov) return;
+        (_iracingFolder, _iracingFov) = (folder, fov);
+        Recalculate();
+    }
+
+    private const long WarmForMs = 15000;
+
+    private static (Task<(string? Folder, double? Fov)> Read, long At)? _warm;
+
+    internal static void Warm()
+    {
+        if (_warm is null) _warm = (Task.Run(IracingNow), Environment.TickCount64);
     }
 
     private void ReadIracing()
     {
+        _iracingReads++;
+        if (_warm is { } warm)
+        {
+            _warm = null;
+            if (Environment.TickCount64 - warm.At < WarmForMs)
+            {
+                (_iracingFolder, _iracingFov) = warm.Read.GetAwaiter().GetResult();
+                return;
+            }
+        }
+        (_iracingFolder, _iracingFov) = IracingNow();
+    }
+
+    private static (string? Folder, double? Fov) IracingNow()
+    {
         try
         {
-            _iracingFolder = FovExchange.IracingFolder();
-            _iracingFov = _iracingFolder is null ? null : FovExchange.CurrentIracingFov(_iracingFolder);
+            var folder = FovExchange.IracingFolder();
+            return (folder, folder is null ? null : FovExchange.CurrentIracingFov(folder));
         }
         catch
         {
-            _iracingFolder = null;
-            _iracingFov = null;
+            return (null, null);
         }
     }
     private readonly StackPanel _inputs = new(), _numbers = new(), _compare = new(), _measure = new(), _warnings = new();
@@ -84,7 +113,7 @@ internal sealed class FovSection : StackPanel
         _window = window;
         BuildTools();
 
-        foreach (var w in new[] { new GridLength(324), new GridLength(13), new GridLength(1, GridUnitType.Star), new GridLength(13), new GridLength(202) })
+        foreach (var w in new[] { new GridLength(324), new GridLength(Ui.PanelSpacing), new GridLength(1, GridUnitType.Star), new GridLength(Ui.PanelSpacing), new GridLength(202) })
             _top.ColumnDefinitions.Add(new ColumnDefinition { Width = w });
         for (int i = 0; i < 3; i++) _top.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         var inputsCard = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(15, 11, 15, 11), Child = _inputs };
@@ -92,7 +121,7 @@ internal sealed class FovSection : StackPanel
         left.Children.Add(inputsCard);
         _top.Children.Add(left);
         var diagramStack = new DockPanel();
-        var diagramHead = Heading("Top-down view", "I.Target");
+        var diagramHead = Heading("Top-down view");
         DockPanel.SetDock(diagramHead, Dock.Top);
         diagramStack.Children.Add(diagramHead);
         DockPanel.SetDock(_warnings, Dock.Bottom);
@@ -105,19 +134,19 @@ internal sealed class FovSection : StackPanel
         _top.Children.Add(_numbers);
         Children.Add(_top);
 
-        foreach (var w in new[] { new GridLength(1, GridUnitType.Star), new GridLength(13), new GridLength(1.25, GridUnitType.Star) })
+        foreach (var w in new[] { new GridLength(1, GridUnitType.Star), new GridLength(Ui.PanelSpacing), new GridLength(1.25, GridUnitType.Star) })
             _bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = w });
         _bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         _bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        _bottom.Margin = new Thickness(0, 13, 0, 0);
+        _bottom.Margin = new Thickness(0, Ui.PanelSpacing, 0, 0);
         var iracingCard = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(15, 11, 15, 13), Child = _iracing, VerticalAlignment = VerticalAlignment.Top };
         Ui.Anchor(iracingCard, "simracing.fov.iracing");
         _bottom.Children.Add(iracingCard);
         var right = new StackPanel();
-        _compareCard = Card("Compare setups", "I.Layers", _compare);
+        _compareCard = Card("Compare setups", _compare);
         Ui.Anchor(_compareCard, "simracing.compare");
         right.Children.Add(_compareCard);
-        _measureCard = Card("Measure your rig", "I.Ruler", _measure);
+        _measureCard = Card("Measure your rig", _measure);
         ((Tile)_measureCard).Padding = new Thickness(13, 10, 13, 10);
         Grid.SetColumn(right, 2);
         _bottom.Children.Add(right);
@@ -151,26 +180,26 @@ internal sealed class FovSection : StackPanel
         _bottomWide = bottomWide;
         var cols = _top.ColumnDefinitions;
         cols[0].Width = mode == 2 ? new GridLength(324) : mode == 1 ? new GridLength(308) : new GridLength(1, GridUnitType.Star);
-        cols[1].Width = new GridLength(mode > 0 ? 13 : 0);
+        cols[1].Width = new GridLength(mode > 0 ? Ui.PanelSpacing : 0);
         cols[2].Width = mode > 0 ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
-        cols[3].Width = new GridLength(mode == 2 ? 13 : 0);
+        cols[3].Width = new GridLength(mode == 2 ? Ui.PanelSpacing : 0);
         cols[4].Width = mode == 2 ? new GridLength(202) : new GridLength(0);
         var diagram = (FrameworkElement)_top.Children[1];
         Grid.SetColumn(diagram, mode > 0 ? 2 : 0);
         Grid.SetRow(diagram, mode > 0 ? 0 : 2);
-        diagram.Margin = new Thickness(0, mode > 0 ? 0 : 13, 0, 0);
+        diagram.Margin = new Thickness(0, mode > 0 ? 0 : Ui.PanelSpacing, 0, 0);
         Grid.SetColumn(_numbers, mode == 2 ? 4 : 0);
         Grid.SetColumnSpan(_numbers, mode == 1 ? 3 : 1);
         Grid.SetRow(_numbers, mode == 2 ? 0 : 1);
-        _numbers.Margin = new Thickness(0, mode == 2 ? 0 : 13, 0, 0);
+        _numbers.Margin = new Thickness(0, mode == 2 ? 0 : Ui.PanelSpacing, 0, 0);
 
         var b = _bottom.ColumnDefinitions;
-        b[1].Width = new GridLength(bottomWide ? 13 : 0);
+        b[1].Width = new GridLength(bottomWide ? Ui.PanelSpacing : 0);
         b[2].Width = bottomWide ? new GridLength(1.25, GridUnitType.Star) : new GridLength(0);
         var right = (FrameworkElement)_bottom.Children[1];
         Grid.SetColumn(right, bottomWide ? 2 : 0);
         Grid.SetRow(right, bottomWide ? 0 : 1);
-        right.Margin = new Thickness(0, bottomWide ? 0 : 13, 0, 0);
+        right.Margin = new Thickness(0, bottomWide ? 0 : Ui.PanelSpacing, 0, 0);
         ArrangeTools();
         if (numbersMoved) Recalculate();
     }
@@ -404,19 +433,18 @@ internal sealed class FovSection : StackPanel
         };
         _inputs.Children.Add(Row("Resolution", resRow, "Native resolution: sets the aspect ratio (when “From resolution”) and pixels per degree."));
 
-        var curve = new StackPanel { Orientation = Orientation.Horizontal };
-        var radiusPart = new StackPanel { Orientation = Orientation.Horizontal, Visibility = screen.Curved ? Visibility.Visible : Visibility.Collapsed };
+        var radiusPart = new StackPanel { Orientation = Orientation.Horizontal };
+        Grid? radiusRow = null;
         var curved = Ui.Switch(screen.Curved, v =>
         {
             Change(() => screen.Curved = v);
-            radiusPart.Visibility = v ? Visibility.Visible : Visibility.Collapsed;
-            if (v) Motion.FadeIn(radiusPart, 180);
+            if (radiusRow is null) return;
+            radiusRow.Visibility = v ? Visibility.Visible : Visibility.Collapsed;
+            if (v) Motion.FadeIn(radiusRow, 180);
         });
         System.Windows.Automation.AutomationProperties.SetName(curved, "Curved");
-        curve.Children.Add(curved);
-        curve.Children.Add(radiusPart);
         {
-            var radius = new ComboBox { Width = 78, Margin = new Thickness(8, 0, 0, 0) };
+            var radius = new ComboBox { Width = 78 };
             foreach (var r in Radii) radius.Items.Add($"{r}R");
             radius.Items.Add("Other");
             int index = Array.IndexOf(Radii, (int)screen.RadiusMm);
@@ -436,7 +464,10 @@ internal sealed class FovSection : StackPanel
             radiusPart.Children.Add(radius);
             radiusPart.Children.Add(custom);
         }
-        _inputs.Children.Add(Row("Curved", curve, "The “R” rating on the box: 1500R means the curve is part of a circle with a 1.5 m radius. Smaller = more curved. You sit inside the curve."));
+        _inputs.Children.Add(Row("Curved", curved, "The “R” rating on the box: 1500R means the curve is part of a circle with a 1.5 m radius. Smaller = more curved. You sit inside the curve."));
+        radiusRow = Row("Radius", radiusPart, null);
+        radiusRow.Visibility = screen.Curved ? Visibility.Visible : Visibility.Collapsed;
+        _inputs.Children.Add(radiusRow);
     }
 
     private void Recalculate()
@@ -488,7 +519,7 @@ internal sealed class FovSection : StackPanel
     private void FillIracing(FovResult r)
     {
         _iracing.Children.Clear();
-        _iracing.Children.Add(Heading("iRacing settings", "I.Wheel"));
+        _iracing.Children.Add(Heading("iRacing settings"));
         var folder = _iracingFolder;
         double target = FovExchange.IracingFov(r);
         string status = folder is null
@@ -528,7 +559,7 @@ internal sealed class FovSection : StackPanel
             buttons.Children.Add(b);
             return b;
         }
-        B("I.Folder", "Import from iRacing", ImportFromIracingFolder, "SoftButton", "Read rendererDX11Monitor.ini in Documents\\iRacing").IsEnabled = folder is not null;
+        B("I.Folder", "Import from iRacing", ImportFromIracingFolder, "GhostButton", "Read rendererDX11Monitor.ini in Documents\\iRacing").IsEnabled = folder is not null;
         B("I.Folder", "Import a file…", ImportFromFile, "GhostButton", "Read a rendererDX11Monitor.ini you saved somewhere else");
         B("I.Save", "Save copies…", ExportCopies, "GhostButton", "Updated app.ini and rendererDX11Monitor.ini plus _backup copies, in a folder you pick").IsEnabled = folder is not null;
         write.VerticalAlignment = VerticalAlignment.Top;
@@ -566,7 +597,7 @@ internal sealed class FovSection : StackPanel
             Cell(head, i);
         }
 
-        void AddRow(FovSetup setup, FovResult r, Brush color, Action remove, Action? edit)
+        void AddRow(FovSetup setup, FovResult r, Brush color, Action? remove, Action? edit)
         {
             row++;
             table.RowDefinitions.Add(new RowDefinition());
@@ -574,7 +605,7 @@ internal sealed class FovSection : StackPanel
             var band = new Tile
             {
                 Background = idle, CornerRadius = ThemeManager.Round(8), Margin = new Thickness(-8, 3, 0, 3),
-                BorderThickness = Hairline.Edges(), BorderBrush = Ui.Res<Brush>(edit is null ? "Accent" : "LineStrong"),
+                BorderThickness = edit is null ? new Thickness(3, 0, 0, 0) : Hairline.Edges(), BorderBrush = Ui.Res<Brush>(edit is null ? "Accent" : "LineStrong"),
                 Cursor = edit is null ? null : System.Windows.Input.Cursors.Hand,
                 ToolTip = edit is null ? "The setup you're editing" : "Click to edit this setup (the one you're editing now joins the comparison)",
             };
@@ -603,10 +634,10 @@ internal sealed class FovSection : StackPanel
             Cell(T($"{r.PixelsPerDegree:0.0}"), 5);
             for (int c = firstCell; c < table.Children.Count; c++) table.Children[c].IsHitTestVisible = false;
             Cell(ColorButton(setup, color), 0);
-            var bin = Ui.IconButton("I.Trash", edit is not null ? "Delete this setup"
-                : S.Compare.Count > 0 ? "Delete this setup (the next one in the list becomes the one you edit)" : "Delete this setup (back to a default rig)", remove);
+            if (remove is null) return;
+            var bin = Ui.IconButton("I.Trash", S.Compare.Count > 0 ? "Delete this setup (the next one in the list becomes the one you edit)" : "Delete this setup (back to a default rig)", remove);
             bin.HorizontalAlignment = HorizontalAlignment.Right;
-            bin.Margin = new Thickness(0, 0, 6, 0);
+            bin.Margin = Ui.AfterButton;
             Cell(bin, 6);
         }
 
@@ -620,13 +651,7 @@ internal sealed class FovSection : StackPanel
             if (i >= others.Count) continue;
             var setup = S.Compare[i];
             int slot = i;
-            AddRow(setup, others[i], CompareBrush(setup), async () =>
-            {
-                if (!await _window.Confirm($"Delete “{setup.Name}”?", "It's removed from the comparison and from your saved setups.", "Delete", danger: true)) return;
-                S.RemoveCompare(slot);
-                _app.Save();
-                Recalculate();
-            }, () => MakeActive(slot));
+            AddRow(setup, others[i], CompareBrush(setup), null, () => MakeActive(slot));
         }
         _compare.Children.Add(table);
 
@@ -643,7 +668,7 @@ internal sealed class FovSection : StackPanel
         {
             Text = S.Compare.Count == 0
                 ? "Add setups to see them in the top-down view in their own color, with their numbers next to yours. Tip: compare a copy of your rig, then change your rig."
-                : $"Drawn in the top-down view in their color. Click a row to edit that setup. Up to {SimRacingSettings.MaxCompare}.",
+                : $"Drawn in the top-down view in their color. Click a row to edit or delete that setup. Up to {SimRacingSettings.MaxCompare}.",
             Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 5, 0, 0),
         });
     }
@@ -893,7 +918,7 @@ internal sealed class FovSection : StackPanel
 
     private static Button Menu(string icon, string label, (string Text, Action? Run)[] items)
     {
-        var button = Ui.LabeledButton(icon, label, () => { }, "SoftButton");
+        var button = Ui.LabeledButton(icon, label, () => { });
         var menu = new ContextMenu { PlacementTarget = button, Placement = PlacementMode.Bottom };
         Ui.DropBelow(menu);
         foreach (var (text, run) in items)
@@ -911,6 +936,11 @@ internal sealed class FovSection : StackPanel
     {
         var grid = new Grid { Margin = new Thickness(0, 3, 0, 3) };
         Ui.NameFor(control, label);
+        if (ToggleCards.IsSwitch(control))
+        {
+            grid.Children.Add(ToggleCards.Row((CheckBox)control, ToggleCards.RowTitle(label), help));
+            return grid;
+        }
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         var name = new TextBlock { Foreground = Ui.Res<Brush>("TextMuted"), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 6, 0), Background = Brushes.Transparent, ToolTip = help };
@@ -926,22 +956,17 @@ internal sealed class FovSection : StackPanel
 
     private static TextBlock Section(string title) => new() { Text = title, Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 10, 0, 2) };
 
-    private static StackPanel Heading(string title, string icon)
+    private static StackPanel Heading(string title)
     {
         var head = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
-        head.Children.Add(new Tile
-        {
-            Style = Ui.Res<Style>("IconBadge"), Width = 23, Height = 23, CornerRadius = ThemeManager.Round(8),
-            Child = new Icon { Data = Ui.Res<Geometry>(icon), Width = 12, Height = 12 },
-        });
-        head.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("H3"), Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
+        head.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("H3"), VerticalAlignment = VerticalAlignment.Center });
         return head;
     }
 
-    private static Tile Card(string title, string icon, UIElement body)
+    private static Tile Card(string title, UIElement body)
     {
         var stack = new StackPanel();
-        stack.Children.Add(Heading(title, icon));
+        stack.Children.Add(Heading(title));
         stack.Children.Add(body);
         return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(15, 11, 15, 11), Child = stack };
     }

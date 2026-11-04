@@ -43,12 +43,13 @@ internal static class SettingsIndex
         new("Reset a fan to default", "The reset button on a fan's card: its name, limits and mode in every preset back to default.", "Fans", "fans", "fans.fans", "reset default defaults restore clear fan settings one single"),
 
         new("Browser sources", "Every iRacing Overlay widget as a local web page, with a URL to copy.", "Sim Racing Tools", "simracing", "simracing.hud.web", "browser source web page url wheel screen dash streaming port overlay"),
-        new("iRacing Overlay", "In-game widgets from iRacing's live telemetry: Relative, Standings, fuel, delta, alerts and more.", "Sim Racing Tools", "simracing", "simracing.hud.panel", "hud race hud overlay relative standings leaderboard fuel strategy out lap delta lap timing flags telemetry iracing widgets"),
-        new("iRacing Overlay layouts", "Layouts of widgets that switch by session, car, class or track; arrange them on screen.", "Sim Racing Tools", "simracing", Pages.RaceHudSection.LayoutsAnchor, "hud layout race qualifying practice endurance multiclass arrange move resize snap grid rules auto switch"),
+        new("iRacing Overlay", "In-game widgets from iRacing's live telemetry: Relative, Standings, fuel, delta, alerts and more.", "Sim Racing Tools", "simracing", "simracing.hud.panel", "hud race hud overlay relative standings leaderboard fuel strategy out lap delta lap timing flags telemetry iracing widgets widget keybind show hide"),
+        new("iRacing Overlay layouts", "Layouts of widgets that switch by session, car, class or track; arrange them on screen.", "Sim Racing Tools", "simracing", Pages.RaceHudSection.LayoutsAnchor, "hud layout race qualifying practice endurance multiclass arrange move resize scale snap grid rules auto switch"),
         new("iRacing Overlay alerts", "Fuel, pit speed, traffic, flags, incidents and best-lap alerts in groups you can fold and arrange, with thresholds and cooldowns.", "Sim Racing Tools", "simracing", Pages.RaceHudSection.AlertsAnchor, "alerts notifications fuel low pit limiter speeding blue flag yellow incident limit personal best groups arrange"),
-        new("iRacing Overlay colors", "The overlay's look: Default, your own colors or an app theme's (teams, custom color sets), background, corners; its keybinds.", "Sim Racing Tools", "simracing", Pages.RaceHudSection.SettingsAnchor, "hud theme team teams f1 wec imsa nascar indycar rally gt world challenge nls custom colors colors look appearance background corners outline keybinds hotkeys hud settings"),
+        new("iRacing Overlay look", "Background, corners and outline of the overlay; its keybinds.", "Sim Racing Tools", "simracing", Pages.RaceHudSection.SettingsAnchor, "hud look appearance background transparency corners outline keybinds hotkeys hud settings"),
         new("Fuel formulas", "How the overlay works out fuel per lap, laps to go, fuel to the flag, stops and the pit window, with the numbers now.", "Sim Racing Tools", "simracing", Pages.RaceHudSection.FuelAnchor, "fuel formula calculation per lap laps to go stops pit window estimate maths math"),
         new("Bass shakers", "Engine, gear shifts, ABS, kerbs and road, and the rev limiter through a tactile transducer on a sound output.", "Sim Racing Tools", "simracing", "simracing.shakers", "bass shaker tactile transducer rumble haptic vibration seat pedals abs kerbs engine sound output"),
+        new("Bass shakers: supported games", "Effects from the telemetry of Assetto Corsa, Assetto Corsa Competizione, Assetto Corsa EVO, rFactor 2, Le Mans Ultimate, Automobilista 2, RaceRoom, F1, Forza, DiRT Rally, EA SPORTS WRC, BeamNG and more.", "Sim Racing Tools", "simracing", "simracing.shakers.supported", "bass shaker supported games telemetry udp port assetto corsa evo acc competizione rfactor le mans ultimate lmu automobilista ams2 project cars raceroom f1 forza horizon motorsport dirt rally wrc beamng outgauge live for speed lfs"),
         new("Bass shakers in other games", "Game audio low rumble to the shakers for games without effects, or in iRacing instead of the effects.", "Sim Racing Tools", "simracing", "simracing.shakers.games", "bass shaker game audio beamng assetto corsa evo rumble loopback speakers other games"),
         new("FOV calculator", "Field of view for single or triple screens.", "Sim Racing Tools", "simracing", "simracing.fov", "fov triple angle curved bezel"),
         new("Compare FOV setups", "Overlay other screen setups on your rig: top-down view and numbers side by side; switch which one you're editing.", "Sim Racing Tools", "simracing", "simracing.compare", "compare triple 27 32 fov setups active edit"),
@@ -64,7 +65,7 @@ internal static class SettingsIndex
         new("Start with Windows", "Start Pit-Box when you sign in.", "Settings", "settings", "settings.startup", "startup boot login autostart background"),
         new("Start in background", "Start in the tray instead of opening the window.", "Settings", "settings", "settings.startup", "minimized tray hidden open background"),
         new("Application settings", "Startup and window behavior in one place: start with Windows, start in background, close to tray, keep on top, notifications, quit.", "Settings", "settings", "settings.app", "application startup window behavior behavior"),
-        new("Window behavior", "Close to tray, keep on top, notifications, quit (Application settings).", "Settings", "settings", "settings.window", "tray minimize notifications toast close background quit"),
+        new("Window behavior", "Close in background, keep on top, notifications, quit (Application settings).", "Settings", "settings", "settings.window", "tray minimize notifications toast close background quit"),
         new("Sensor update rate", "Fast, Balanced, Low or a custom interval: how often sensors are read for every page.", "Settings", "settings", "settings.sensorrate", "performance polling refresh interval rate hardware sensors fast balanced low custom ms cpu usage resource"),
         new("Lighter drawing while iRacing runs", "Draw the window without the graphics card and pause animations while the sim runs.", "Settings", "settings", "settings.light", "performance game racing lag slow stutter gpu software rendering animations iracing"),
         new("Background usage", "Standard or Reduced: read sensors less often while the window is in the tray or minimized.", "Settings", "settings", "settings.background", "performance resource usage background reduced standard minimized tray battery cpu"),
@@ -188,8 +189,20 @@ internal sealed class HighlightAdorner : Adorner
             return;
         var adorner = new HighlightAdorner(target);
         layer.Add(adorner);
-        var fade = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(900)) { BeginTime = TimeSpan.FromMilliseconds(1400) };
-        fade.Completed += (_, _) => layer.Remove(adorner);
+        bool removed = false;
+        DependencyPropertyChangedEventHandler? hidden = null;
+        void Remove()
+        {
+            if (removed) return;
+            removed = true;
+            target.IsVisibleChanged -= hidden;
+            adorner.BeginAnimation(OpacityProperty, null);
+            layer.Remove(adorner);
+        }
+        hidden = (_, e) => { if (e.NewValue is false) Remove(); };
+        target.IsVisibleChanged += hidden;
+        var fade = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(700)) { BeginTime = TimeSpan.FromMilliseconds(1200) };
+        fade.Completed += (_, _) => Remove();
         adorner.BeginAnimation(OpacityProperty, fade);
     }
 }

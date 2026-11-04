@@ -10,7 +10,7 @@ namespace PitBox.Views.Pages;
 internal sealed partial class RaceHudWidgets
 {
     private const double SideBySideMin = 860, SettingsShare = 1.05, GroupMinWidth = 440;
-    private const double PictureMaxW = 80, PictureMaxH = 34, PicturePadX = 3, PicturePadY = 5, PictureMinScale = 0.45, PictureFade = 18;
+    private const double PictureMaxW = 104, PictureMaxH = 34, PicturePadX = 3, PicturePadY = 5, PictureMinScale = 0.45, PictureFade = 18;
     private const int PictureCache = 64;
 
     private readonly Dictionary<string, UIElement> _presetDots = new(StringComparer.OrdinalIgnoreCase);

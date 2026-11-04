@@ -14,13 +14,14 @@ internal sealed class OverlayPlacementMap : Grid
 {
     internal readonly record struct Screen(string Id, Rect Bounds, bool Primary, int Number);
 
-    private const double MapHeight = 150, Gap = 6, Inset = 6, MiniWidth = 40, MiniHeight = 20;
+    private const double MapHeight = 120, Gap = 6, Inset = 6, MiniWidth = 40, MiniHeight = 20;
 
     private readonly Func<OverlayLayout> _layout;
     private readonly Action _changed;
     private readonly List<Screen> _screens;
     private readonly Canvas _canvas = new() { Height = MapHeight, ClipToBounds = true };
     private readonly List<Border> _monitors = new();
+    private readonly List<Border> _slots = new();
     private readonly Border _mini;
     private readonly Border _hover;
     private List<Rect> _boxes = new();
@@ -35,8 +36,6 @@ internal sealed class OverlayPlacementMap : Grid
         RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        var tip = new TextBlock { Text = "Click a corner of a monitor to move the overlay there.", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8) };
-        Children.Add(tip);
         SetRow(_canvas, 1);
         Children.Add(_canvas);
         _note = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0), Visibility = Visibility.Collapsed };
@@ -67,6 +66,13 @@ internal sealed class OverlayPlacementMap : Grid
             monitor.Child = face;
             _monitors.Add(monitor);
             _canvas.Children.Add(monitor);
+            for (int i = 0; i < 4; i++)
+            {
+                var slot = Hairline.Frame(new Border { Width = MiniWidth, Height = MiniHeight, IsHitTestVisible = false });
+                slot.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
+                _slots.Add(slot);
+                _canvas.Children.Add(slot);
+            }
         }
 
         var lines = new StackPanel { Margin = new Thickness(4, 4, 4, 0) };
@@ -200,6 +206,14 @@ internal sealed class OverlayPlacementMap : Grid
             monitor.Width = boxes[i].Width;
             monitor.Height = boxes[i].Height;
             monitor.SetResourceReference(Border.BorderBrushProperty, _screens[i] == chosen ? "Accent" : "LineStrong");
+            var corners = new[] { OverlayCorner.TopLeft, OverlayCorner.TopRight, OverlayCorner.BottomLeft, OverlayCorner.BottomRight };
+            for (int k = 0; k < corners.Length; k++)
+            {
+                var slot = _slots[i * 4 + k];
+                var at = CornerOf(boxes[i], corners[k]);
+                Canvas.SetLeft(slot, at.X);
+                Canvas.SetTop(slot, at.Y);
+            }
         }
 
         bool missing = layout.Monitor != "primary" && !_screens.Any(s => string.Equals(s.Id, layout.Monitor, StringComparison.OrdinalIgnoreCase));

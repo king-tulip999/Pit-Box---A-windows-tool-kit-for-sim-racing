@@ -37,7 +37,7 @@ public sealed class CustomThemeSettings
 public sealed class ThemeColors
 {
     public string Background { get; set; } = "#000000";
-    public string Edges { get; set; } = "#4A6A78";
+    public string Edges { get; set; } = "#587683";
     public string Text { get; set; } = "#E6F6FA";
     public string Accent { get; set; } = "#00B4D8";
     public string Highlight { get; set; } = "#90E0EF";

@@ -19,7 +19,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
     private readonly AppServices _app;
     private readonly MainWindow _window;
     private readonly PanelStack _body;
-    private readonly MasonryPanel _sections = new() { MinColumnWidth = 356, MaxColumns = 3, ColumnOf = SectionColumn };
+    private readonly MasonryPanel _sections = new() { MinColumnWidth = 356, MaxColumns = 3, Gap = Ui.PanelSpacing, ColumnOf = SectionColumn };
 
     private static readonly int[] ThreeColumns = { 0, 1, 2, 2, 1, 2 }, TwoColumns = { 0, 1, 1, 0, 1, 0 };
 
@@ -248,37 +248,23 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
 
         if (_startupState?.PointsElsewhere == true)
         {
-            var row = Notice("ApricotSoft", "ApricotDeep", "I.Alert",
-                $"The startup entry points to a different copy of Pit-Box ({_startupState.Command}), so it won't start this one.");
-            var repair = Ui.LabeledButton("I.Wand", "Repair", () => SetStartup(true), "SoftButton");
-            Grid.SetColumn(repair, 2);
-            row.Children.Add(repair);
-            startup.Children.Add(row);
+            startup.Children.Add(WithAction(Ui.Notice("Apricot", "I.Alert", null,
+                $"The startup entry points to a different copy of Pit-Box ({_startupState.Command}), so it won't start this one."),
+                Ui.LabeledButton("I.Wand", "Repair", () => SetStartup(true))));
         }
         else if (_startupState?.Exposed == true)
         {
-            var row = Notice("ApricotSoft", "ApricotDeep", "I.Alert",
-                "Other programs can change the folder Pit-Box starts from, so they could get administrator rights through this startup entry. Moving it to Program Files closes that gap.");
-            var move = Ui.LabeledButton("I.Folder", "Move to Program Files", MoveToProgramFiles, "SoftButton");
+            var move = Ui.LabeledButton("I.Folder", "Move to Program Files", MoveToProgramFiles);
             move.IsEnabled = !_startupBusy;
-            Grid.SetColumn(move, 2);
-            row.Children.Add(move);
-            startup.Children.Add(row);
+            startup.Children.Add(WithAction(Ui.Notice("Apricot", "I.Alert", null,
+                "Other programs can change the folder Pit-Box starts from, so they could get administrator rights through this startup entry. Moving it to Program Files closes that gap."), move));
         }
         if (_startupError is not null)
         {
             var banner = Ui.DangerBanner("Windows didn't let Pit-Box change its startup task",
                 $"{_startupError}\n" +
                 $"To add it by hand: Task Scheduler → Create Task → tick “Run with highest privileges”, add an “At log on” trigger and the action “{Environment.ProcessPath}” with the argument --minimized.");
-            banner.Margin = new Thickness(0, 3, 0, 6);
-            var row = (Grid)banner.Child;
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var open = Ui.LabeledButton("I.External", "Open Task Scheduler", () => Ui.OpenUrl("taskschd.msc"), "SoftButton");
-            open.VerticalAlignment = VerticalAlignment.Center;
-            open.Margin = new Thickness(10, 0, 0, 0);
-            Grid.SetColumn(open, 2);
-            row.Children.Add(open);
-            startup.Children.Add(banner);
+            startup.Children.Add(WithAction(banner, Ui.LabeledButton("I.External", "Open Task Scheduler", () => Ui.OpenUrl("taskschd.msc"))));
         }
 
         startup.Children.Add(Ui.Divider());
@@ -394,7 +380,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         var look = Section("Appearance", "settings.look");
         look.Children.Add(new TextBlock { Text = "Theme", Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 8, 0, 0) });
         look.Children.Add(new Border { Height = 8 });
-        look.Children.Add(new ThemePicker(U.Theme, _app.SetTheme, columns: 3, height: 52, oled: _app.UseOledColors, usePick: _app.UsePick) { Margin = new Thickness(0, 0, -8, 3) });
+        look.Children.Add(new ThemePicker(U.Theme, _app.SetTheme, columns: ThemePicker.Balanced(), height: 52, oled: _app.UseOledColors, usePick: _app.UsePick) { Margin = new Thickness(0, 0, -8, 3) });
         look.Children.Add(Ui.Divider());
         var custom = new CustomThemeSection(_app);
         Ui.Anchor(custom, "settings.customcolors");
@@ -430,8 +416,9 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         })).ToList());
         _rateNote = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) };
         FillRateNote();
-        var rateRow = RowWithNote("Sensor update rate", _rateNote, rate,
+        var rateRow = RowWithNote("Sensor update rate", _rateNote, new Border(),
             $"How often temperatures, loads, clocks and fan speeds are read for every page. Fan control still checks its curves and the failsafe at least every {PerformanceSettings.FanLoopMs / 1000} {Units.S}, and the overlay uses its own rate while it's showing. Applies at once.");
+        ControlBelow(rateRow, rate);
         Ui.Anchor(rateRow, "settings.sensorrate");
         section.Children.Add(rateRow);
 
@@ -453,9 +440,10 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
                 "Standard: the same rate whether the window is open or not.",
                 $"Reduced: while the window is in the tray or minimized, sensors are read every {PerformanceSettings.ReducedHiddenMs / 1000} {Units.S} at most.",
             });
-        var backgroundRow = Ui.SettingRow("Background usage", "Fewer sensor reads while the window is hidden.", background,
+        var backgroundRow = Ui.SettingRow("Background usage", "Fewer sensor reads while the window is hidden.", new Border(),
             new Ui.SettingDefault(() => _app.Config.Performance.Background == BackgroundUsage.Reduced, () => { _app.SetPerformance(_app.Config.Performance.Rate, background: BackgroundUsage.Reduced); Build(); }, "Reduced"),
             $"Reduced reads sensors at most every {PerformanceSettings.ReducedHiddenMs / 1000} s while the window is in the tray or minimized (pages already pause then). Fan control, the overlays, keybinds and window profiles keep working as normal.");
+        ControlBelow(backgroundRow, background);
         Ui.Anchor(backgroundRow, "settings.background");
         section.Children.Add(backgroundRow);
 
@@ -473,6 +461,17 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         if (_rateNote is null) return;
         int ms = _app.Config.Performance.IntervalMs;
         _rateNote.Text = $"Sensors are read every {PerformanceSettings.Describe(ms)}.";
+    }
+
+    private static void ControlBelow(Grid row, FrameworkElement control)
+    {
+        control.HorizontalAlignment = HorizontalAlignment.Left;
+        control.VerticalAlignment = VerticalAlignment.Top;
+        control.Margin = new Thickness(0, 8, 0, 0);
+        Grid.SetRow(control, 1);
+        Grid.SetColumn(control, 0);
+        Grid.SetColumnSpan(control, 3);
+        row.Children.Add(control);
     }
 
     private static Grid RowWithNote(string title, TextBlock note, UIElement control, string? more = null)
@@ -616,7 +615,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         var transfer = new StackPanel { Orientation = Orientation.Horizontal };
         var export = Ui.LabeledButton("I.Save", "Export…", () => ExportSettings());
         export.ToolTip = "Saves every setting (theme, window profiles, fan curves and presets, overlay, keybinds, plugins, layouts…) to a file";
-        export.Margin = new Thickness(0, 0, 6, 0);
+        export.Margin = Ui.AfterButton;
         transfer.Children.Add(export);
         var import = Ui.LabeledButton("I.Download", "Import…", () => _ = ImportSettingsAsync());
         import.ToolTip = "Loads settings from an exported file (shows what's in it first; Pit-Box then restarts)";
@@ -795,7 +794,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         about.Children.Add(text);
         var project = Ui.LabeledButton("I.External", "Project page", () => Ui.OpenUrl(UpdateService.ProjectPage), "GhostButton");
         var changelog = Ui.LabeledButton("I.FileText", "Changelog", () => ChangelogDialog.Show(_window, _app.Updates, null, justUpdated: false), "GhostButton");
-        changelog.Margin = new Thickness(0, 0, 6, 0);
+        changelog.Margin = Ui.AfterButton;
         var links = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         links.Children.Add(changelog);
         links.Children.Add(project);
@@ -846,7 +845,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         {
             UpdateState.NotConfigured => "Update checks aren't set up in this build.",
             UpdateState.Checking => "Checking…",
-            UpdateState.UpToDate => $"You have the latest version ({UpdateService.Tag(u.Installed)}).",
+            UpdateState.UpToDate => $"Up to date ({UpdateService.Tag(u.Installed)}).",
             UpdateState.Available or UpdateState.Downloading => "A newer version is ready (above).",
             UpdateState.Failed => $"The last check didn't work: {u.Error}",
             _ => _app.Config.Updates.LastCheckUtc is { } last ? $"Last checked {Dates.ShortTime(last.ToLocalTime())}." : "Not checked yet.",
@@ -999,33 +998,23 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         App.RelaunchAfterExit("");
     }
 
-    private static Grid Notice(string soft, string deep, string icon, string text)
+    private static Tile WithAction(Tile notice, Button action)
     {
-        var grid = new Grid { Margin = new Thickness(0, 3, 0, 6) };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        grid.ColumnDefinitions.Add(new ColumnDefinition());
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var badge = Ui.Badge(icon, soft, deep, 22.5, 6.5, 12);
-        badge.VerticalAlignment = VerticalAlignment.Top;
-        grid.Children.Add(badge);
-        var t = new TextBlock { Text = text, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(8, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
-        Grid.SetColumn(t, 1);
-        grid.Children.Add(t);
-        return grid;
+        notice.Margin = new Thickness(0, 3, 0, 6);
+        var row = (Grid)notice.Child;
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        action.VerticalAlignment = VerticalAlignment.Center;
+        action.Margin = new Thickness(10, 0, 0, 0);
+        Grid.SetColumn(action, 2);
+        row.Children.Add(action);
+        return notice;
     }
 
     private StackPanel Section(string title, string? anchor = null)
     {
-        var stack = new StackPanel { Margin = new Thickness(15, 10, 15, 15) };
-        var head = new StackPanel { Orientation = Orientation.Horizontal };
-        head.Children.Add(RaceParts.Big(title, 20, "Heading", italic: false, heavy: false));
-        var band = new Grid();
-        band.Children.Add(new Slant("Place4Wash", 0, 0, 0.78, 0, 0.7, 1, 0, 1));
-        band.Children.Add(new Slant("Place4Band", 0.78, 0, 0.8, 0, 0.72, 1, 0.7, 1));
-        head.Margin = new Thickness(15, 9, 15, 9);
-        band.Children.Add(head);
-        var outer = new StackPanel { Children = { band, stack } };
-        var card = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Child = outer, ClipToBounds = true };
+        var stack = new StackPanel();
+        var outer = new StackPanel { Children = { Ui.SectionHeader(title, null), stack } };
+        var card = new Tile { Style = Ui.Res<Style>("Card"), Child = outer };
         if (anchor is not null)
             Ui.Anchor(card, anchor);
         _sections.Children.Add(card);
@@ -1065,12 +1054,12 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         _pawnIoOpen = true;
         try
         {
-            var stack = new StackPanel { MaxWidth = 373, HorizontalAlignment = HorizontalAlignment.Left };
+            var stack = new StackPanel();
             void Para(string text) => stack.Children.Add(new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0) });
             Para("CPU temperatures and motherboard fans (case, CPU and pump headers) are read and controlled through PawnIO, a small free driver.");
             Para("It replaces WinRing0, the older driver Windows Defender now flags as unsafe, and is installed for the whole PC.");
             Para("Without it everything else still works: GPU temperatures and fans, frame rate, displays, window profiles and the overlays.");
-            var hide = new CheckBox { Content = "Don't show this again", IsChecked = U.HidePawnIoPrompt, Margin = new Thickness(0, 13, 0, 0) };
+            var hide = ToggleCards.FromBox(new CheckBox { Content = "Don't show this again", IsChecked = U.HidePawnIoPrompt, Margin = new Thickness(0, 13, 0, 0) });
             stack.Children.Add(hide);
             var card = Ui.Dialog(_window, "Install the PawnIO driver?", "It isn't installed on this PC.", stack,
                 Ui.DialogButtons(_window, "Install", () => true), null, 437);

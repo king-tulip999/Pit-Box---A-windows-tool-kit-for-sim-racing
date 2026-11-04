@@ -69,7 +69,7 @@ internal sealed class Sidebar : Border, IFrameStep
         SetResourceReference(BackgroundProperty, "SidebarBg");
         SetResourceReference(BorderBrushProperty, "Line");
         SetResourceReference(CornerRadiusProperty, "R.Card");
-        _glider.SetResourceReference(BackgroundProperty, "AccentSoft");
+        _glider.SetResourceReference(BackgroundProperty, "Selected");
         _glider.RenderTransform = _glide;
         _track.Children.Add(_glider);
         _track.Children.Add(_pages);
@@ -421,7 +421,7 @@ internal sealed class Sidebar : Border, IFrameStep
         bool filled = row.Selected && !row.HasChild && !row.Arriving;
         row.Bar.Visibility = row.Sub && row.Selected ? Visibility.Visible : Visibility.Hidden;
         row.Dash?.SetResourceReference(BackgroundProperty, row.Selected ? "Accent" : "LineStrong");
-        if (filled) row.Box.SetResourceReference(BackgroundProperty, "AccentSoft");
+        if (filled) row.Box.SetResourceReference(BackgroundProperty, "Selected");
         else if (row.Hover) row.Box.SetResourceReference(BackgroundProperty, "Hover");
         else row.Box.Background = Brushes.Transparent;
         string tone = row.Selected || row.Hover ? "Heading" : "TextMuted";

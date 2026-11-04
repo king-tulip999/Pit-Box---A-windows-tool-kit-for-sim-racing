@@ -44,6 +44,7 @@ internal sealed class TrafficWidget : HudWidget
         int me = f.PlayerCarIdx;
         bool blue = f.Flags.HasFlag(RaceFlags.Blue);
         var area = p.Header("Traffic", blue ? "BLUE FLAG" : null, blue ? HudPalette.FlagBlue : null);
+        p.NeedBelow(area, p.LineHeight(p.Body) * 1.4f * p.Density * v.Options.Int("max"));
         if ((uint)me >= TelemetryFrame.MaxCars) return;
         bool same = v.Options.Bool("sameClass");
         double? myLap = FieldOrder.LapTimeOf(f, me);

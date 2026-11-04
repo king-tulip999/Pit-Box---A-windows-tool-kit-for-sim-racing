@@ -21,7 +21,11 @@ internal static class HudSheet
         {
             Directory.CreateDirectory(folder);
             if (frames) RenderFrames(folder);
-            else Render(folder);
+            else
+            {
+                Render(folder);
+                Time(folder);
+            }
         }
         catch (Exception ex)
         {
@@ -48,10 +52,8 @@ internal static class HudSheet
         frame.Sequence = ++seq;
         race.Update(frame);
         using var painter = new HudPainter();
-        foreach (var colors in Enum.GetValues<HudColors>())
+        foreach (var name in new[] { "Default" })
         {
-            string name = colors.ToString();
-            settings.Appearance.Colors = colors;
             var palette = HudPalette.Of(settings.Appearance);
             string dir = Path.Combine(folder, name);
             Directory.CreateDirectory(dir);
@@ -125,6 +127,74 @@ internal static class HudSheet
                 }
                 surface.Bitmap!.Save(path);
             }
+        }
+    }
+
+    private const int TimedFrames = 600, WarmFrames = 60;
+
+    private static void Time(string folder)
+    {
+        var settings = new RaceHudSettings();
+        var race = new RaceState(() => settings) { MapLoader = SimRacing.TrackMaps.TrackMapLibrary.ForRace };
+        var demo = new DemoTelemetry();
+        var frame = new TelemetryFrame();
+        long seq = 0;
+        double t = -1500;
+        for (; t <= 0; t += 0.25) Step();
+        var palette = HudPalette.Of(settings.Appearance);
+        var lines = new List<string>();
+        var clock = new System.Diagnostics.Stopwatch();
+        double totalDraw = 0, totalUpdate = 0;
+        long totalBytes = 0;
+        using var painter = new HudPainter();
+        using var surface = new PitBox.Overlay.DibSurface();
+        foreach (var def in HudCatalog.All)
+        {
+            var config = new HudWidgetConfig { Id = "time-" + def.Kind, Kind = def.Kind, W = def.W, H = def.H };
+            var options = new HudOptions(def, config);
+            var widget = def.Create();
+            var size = new Size((int)Math.Round(def.W), (int)Math.Round(def.H));
+            double draw = 0, update = 0;
+            long bytes = 0;
+            for (int i = 0; i < WarmFrames + TimedFrames; i++)
+            {
+                bool timed = i >= WarmFrames;
+                long before = GC.GetAllocatedBytesForCurrentThread();
+                clock.Restart();
+                t += 1.0 / FrameRate;
+                Step();
+                double updated = clock.Elapsed.TotalMilliseconds;
+                var g = surface.Ensure(size);
+                painter.Simulated = true;
+                painter.MarkSimulated = false;
+                painter.Begin(g, 1, new SizeF((float)def.W, (float)def.H), palette, settings.Appearance);
+                widget.Draw(painter, new HudView { Frame = race.Frame, Race = race, Settings = settings, Config = config, Options = options, Def = def });
+                painter.FinishPanels();
+                painter.End(surface.Dc, surface.Size);
+                double drawn = clock.Elapsed.TotalMilliseconds - updated;
+                long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+                if (!timed) continue;
+                draw += drawn;
+                update += updated;
+                bytes += allocated;
+            }
+            totalDraw += draw;
+            totalUpdate += update;
+            totalBytes += bytes;
+            lines.Add(string.Format(System.Globalization.CultureInfo.InvariantCulture, "hud_{0}_draw_ms {1:0.000}", def.Kind, draw / TimedFrames));
+            lines.Add(string.Format(System.Globalization.CultureInfo.InvariantCulture, "hud_{0}_alloc_kb {1:0.0}", def.Kind, bytes / 1024.0 / TimedFrames));
+        }
+        int count = HudCatalog.All.Count();
+        lines.Insert(0, string.Format(System.Globalization.CultureInfo.InvariantCulture, "hud_race_update_ms {0:0.000}", totalUpdate / (TimedFrames * count)));
+        lines.Insert(1, string.Format(System.Globalization.CultureInfo.InvariantCulture, "hud_draw_mean_ms {0:0.000}", totalDraw / (TimedFrames * count)));
+        lines.Insert(2, string.Format(System.Globalization.CultureInfo.InvariantCulture, "hud_alloc_mean_kb {0:0.0}", totalBytes / 1024.0 / (TimedFrames * count)));
+        File.WriteAllLines(Path.Combine(folder, "timing.txt"), lines);
+
+        void Step()
+        {
+            demo.Fill(frame, t);
+            frame.Sequence = ++seq;
+            race.Update(frame);
         }
     }
 

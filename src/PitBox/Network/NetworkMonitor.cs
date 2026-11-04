@@ -36,6 +36,7 @@ internal sealed class NetworkMonitor : IDisposable
     private long _nextPing;
     private volatile bool _pinging;
     private double? _lastPing;
+    private Ping? _pinger;
 
     public NetworkMonitor(NetworkSettings settings)
     {
@@ -67,6 +68,7 @@ internal sealed class NetworkMonitor : IDisposable
 
     public void Release(string consumer)
     {
+        Ping? pinger;
         lock (_gate)
         {
             if (!_consumers.Remove(consumer) || _consumers.Count > 0)
@@ -78,7 +80,10 @@ internal sealed class NetworkMonitor : IDisposable
             _lastPing = null;
             _dirty = true;
             Latest = null;
+            pinger = _pinger;
+            _pinger = null;
         }
+        pinger?.Dispose();
     }
 
     public (IReadOnlyList<double?> Down, IReadOnlyList<double?> Up, IReadOnlyList<double?> Ping) History()
@@ -205,7 +210,8 @@ internal sealed class NetworkMonitor : IDisposable
         double? ms = null;
         try
         {
-            using var ping = new Ping();
+            Ping ping;
+            lock (_gate) ping = _pinger ??= new Ping();
             var reply = await ping.SendPingAsync(_settings.PingHost, 1000);
             ok = reply.Status == IPStatus.Success;
             if (ok) ms = reply.RoundtripTime;
@@ -264,6 +270,8 @@ internal sealed class NetworkMonitor : IDisposable
             _generation++;
             _timer?.Dispose();
             _timer = null;
+            _pinger?.Dispose();
+            _pinger = null;
         }
         if (Interlocked.Exchange(ref _subscribed, 0) == 1)
         {

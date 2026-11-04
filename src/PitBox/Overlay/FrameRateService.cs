@@ -189,12 +189,15 @@ internal sealed class FrameRateService : IDisposable
             return _processes.TryGetValue(processId, out var process) ? process.FrameTimes(count) : Array.Empty<double>();
     }
 
+    private static double[]? _sampleTimes;
+
     public static double[] SampleFrameTimes(int count)
     {
+        if (_sampleTimes is { } known && known.Length == count) return known;
         var result = new double[count];
         for (int i = 0; i < count; i++)
             result[i] = 6.9 + 0.5 * Math.Sin(i * 0.37) + 0.3 * Math.Sin(i * 1.7) + (i % 47 == 13 ? 6 : 0) + (i % 89 == 40 ? 3.5 : 0);
-        return result;
+        return _sampleTimes = result;
     }
 
     public void Reset()

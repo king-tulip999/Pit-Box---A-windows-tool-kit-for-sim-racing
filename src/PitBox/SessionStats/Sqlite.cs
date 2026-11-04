@@ -7,7 +7,9 @@ internal sealed class SqliteDb : IDisposable
     private const int Ok = 0, Row = 100, Done = 101;
     private const int OpenReadWrite = 0x2, OpenCreate = 0x4, OpenFullMutex = 0x10000;
     private static readonly IntPtr Transient = new(-1);
+    private const int MaxCached = 128;
     private IntPtr _db;
+    private readonly Dictionary<string, IntPtr> _statements = new(StringComparer.Ordinal);
 
     public object Gate { get; } = new();
 
@@ -46,13 +48,13 @@ internal sealed class SqliteDb : IDisposable
     {
         lock (Gate)
         {
-            var stmt = Prepare(sql, args);
+            var stmt = Prepare(sql, args, out bool reuse);
             try
             {
                 if (sqlite3_step(stmt) is not (Done or Row)) throw Error(sql);
                 return sqlite3_changes(_db);
             }
-            finally { sqlite3_finalize(stmt); }
+            finally { Finish(sql, stmt, reuse); }
         }
     }
 
@@ -70,7 +72,7 @@ internal sealed class SqliteDb : IDisposable
         lock (Gate)
         {
             var rows = new List<object?[]>();
-            var stmt = Prepare(sql, args);
+            var stmt = Prepare(sql, args, out bool reuse);
             try
             {
                 int columns = sqlite3_column_count(stmt);
@@ -93,7 +95,7 @@ internal sealed class SqliteDb : IDisposable
                 }
                 return rows;
             }
-            finally { sqlite3_finalize(stmt); }
+            finally { Finish(sql, stmt, reuse); }
         }
     }
 
@@ -125,10 +127,17 @@ internal sealed class SqliteDb : IDisposable
         }
     }
 
-    private IntPtr Prepare(string sql, object?[] args)
+    private static bool Reusable(string sql) =>
+        string.IsInterned(sql) is not null && !sql.StartsWith("PRAGMA", StringComparison.OrdinalIgnoreCase);
+
+    private IntPtr Prepare(string sql, object?[] args, out bool reuse)
     {
         if (_db == IntPtr.Zero) throw new ObjectDisposedException(nameof(SqliteDb));
-        if (sqlite3_prepare16_v2(_db, sql, -1, out var stmt, IntPtr.Zero) != Ok) throw Error(sql);
+        reuse = Reusable(sql);
+        if (!reuse || !_statements.Remove(sql, out var stmt))
+        {
+            if (sqlite3_prepare16_v2(_db, sql, -1, out stmt, IntPtr.Zero) != Ok) throw Error(sql);
+        }
         for (int i = 0; i < args.Length; i++)
         {
             int at = i + 1, rc = args[i] switch
@@ -143,9 +152,25 @@ internal sealed class SqliteDb : IDisposable
                 byte[] b => sqlite3_bind_blob(stmt, at, b, b.Length, Transient),
                 _ => sqlite3_bind_text16(stmt, at, Convert.ToString(args[i], System.Globalization.CultureInfo.InvariantCulture) ?? "", -1, Transient),
             };
-            if (rc != Ok) { sqlite3_finalize(stmt); throw Error(sql); }
+            if (rc != Ok)
+            {
+                var error = Error(sql);
+                Finish(sql, stmt, reuse);
+                throw error;
+            }
         }
         return stmt;
+    }
+
+    private void Finish(string sql, IntPtr stmt, bool reuse)
+    {
+        if (reuse && _db != IntPtr.Zero && _statements.Count < MaxCached && !_statements.ContainsKey(sql))
+        {
+            sqlite3_reset(stmt);
+            sqlite3_clear_bindings(stmt);
+            _statements[sql] = stmt;
+        }
+        else sqlite3_finalize(stmt);
     }
 
     private InvalidOperationException Error(string sql) =>
@@ -156,6 +181,8 @@ internal sealed class SqliteDb : IDisposable
         lock (Gate)
         {
             if (_db == IntPtr.Zero) return;
+            foreach (var stmt in _statements.Values) sqlite3_finalize(stmt);
+            _statements.Clear();
             sqlite3_close_v2(_db);
             _db = IntPtr.Zero;
         }
@@ -177,6 +204,8 @@ internal sealed class SqliteDb : IDisposable
 
     [DllImport(Lib, ExactSpelling = true)] private static extern int sqlite3_step(IntPtr stmt);
     [DllImport(Lib, ExactSpelling = true)] private static extern int sqlite3_finalize(IntPtr stmt);
+    [DllImport(Lib, ExactSpelling = true)] private static extern int sqlite3_reset(IntPtr stmt);
+    [DllImport(Lib, ExactSpelling = true)] private static extern int sqlite3_clear_bindings(IntPtr stmt);
     [DllImport(Lib, ExactSpelling = true)] private static extern int sqlite3_changes(IntPtr db);
     [DllImport(Lib, ExactSpelling = true)] private static extern long sqlite3_last_insert_rowid(IntPtr db);
     [DllImport(Lib, ExactSpelling = true)] private static extern int sqlite3_bind_null(IntPtr stmt, int index);

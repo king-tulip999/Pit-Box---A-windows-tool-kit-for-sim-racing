@@ -1028,12 +1028,12 @@ public sealed class NavIcon : Viewbox
                 var streak = new LineGeometry(new Point(0, y), new Point(0, y));
                 var path = DrawLive(streak, stroke: 1.2);
                 path.Opacity = 0;
-                Animate(streak, LineGeometry.StartPointProperty, SampledPoints(u => new Point(Math.Clamp(Left(u), 0, 24), row), 216));
-                Animate(streak, LineGeometry.EndPointProperty, SampledPoints(u => new Point(Math.Clamp(Left(u) + 3.2, 0, 24), row), 216));
+                Animate(streak, LineGeometry.StartPointProperty, SampledPoints(u => new Point(Math.Clamp(Left(u), 1.5, 22.5), row), 216));
+                Animate(streak, LineGeometry.EndPointProperty, SampledPoints(u => new Point(Math.Clamp(Left(u) + 3.2, 1.5, 22.5), row), 216));
                 Animate(path, UIElement.OpacityProperty, Sampled(0, u =>
                 {
                     double x = Left(u);
-                    return x < 0.3 || x > 23.7 ? 0 : 0.75 * Eased(u * Period, rush);
+                    return x < 1.5 || x > 22.5 ? 0 : 0.75 * Eased(u * Period, rush);
                 }, 216));
             }
         var slide = new TranslateTransform();

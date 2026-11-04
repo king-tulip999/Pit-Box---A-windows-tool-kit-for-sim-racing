@@ -1,7 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using PitBox.Controls;
 using PitBox.SessionStats;
 using PitBox.Theme;
 
@@ -31,12 +30,25 @@ internal static class StatsAchievements
         var badges = new StatGrid { MinTileWidth = 150, Gap = 0, RowGap = 13 };
         foreach (var state in data.Achievements) badges.Children.Add(Badge(state));
 
-        var card = StatsSections.Section("Streaks and achievements", "I.Trophy", "Milestones earned from your sessions", null,
+        var card = StatsSections.Section("Streaks and achievements", null, null,
             StatsSections.Stack(
                 StatsSections.Chart("Streaks", "Official and unofficial races, all time", streaks),
                 StatsSections.Chart("Achievements", $"All time · {earned} of {SessionStats.Achievements.TierCount} earned", badges)));
         Ui.Anchor(card, "stats.achievements");
         return card;
+    }
+
+    private static FrameworkElement Bar(double fraction, string brush)
+    {
+        double done = Math.Clamp(fraction, 0, 1);
+        var bar = new Grid { Height = 3, Margin = new Thickness(0, 7, 12, 0) };
+        bar.SetResourceReference(Panel.BackgroundProperty, "MeterTrack");
+        bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(done, GridUnitType.Star) });
+        bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1 - done, GridUnitType.Star) });
+        var fill = new Border();
+        fill.SetResourceReference(Border.BackgroundProperty, brush);
+        bar.Children.Add(fill);
+        return bar;
     }
 
     private static FrameworkElement Badge(AchievementState state)
@@ -59,7 +71,7 @@ internal static class StatsAchievements
         string detail = state.Value is null ? "No data" : all ? $"All {family.Tiers.Length} earned" : "Next " + SessionStats.Achievements.Target(family, state.Next!.Value);
         var line = new TextBlock { Text = detail, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 2, 0, 0), TextWrapping = TextWrapping.Wrap };
         line.SetResourceReference(TextBlock.ForegroundProperty, all ? gold : "TextFaint");
-        var meter = new Meter { Value = state.Fraction, Fill = Ui.Res<Brush>(all ? gold : "Accent"), Margin = new Thickness(0, 5, 12, 0) };
+        var meter = Bar(state.Fraction, all ? gold : "Accent");
         var stack = new StackPanel { Children = { pips, value, label, line, meter } };
         string tiers = string.Join(", ", family.Tiers.Select(t => SessionStats.Achievements.Format(family, t)));
         var cell = Hairline.Frame(new Border { Padding = new Thickness(11, 2, 10, 2), Child = stack, ToolTip = $"{family.Name}: {tiers}" }, Sides.Left);

@@ -13,11 +13,10 @@ public enum HudDensity { Compact, Standard, Expanded }
 
 public enum HudAnchor { TopLeft, Top, TopRight, Left, Center, Right, BottomLeft, Bottom, BottomRight }
 
-public enum HudColors { Default, Custom }
 
 public sealed class RaceHudSettings
 {
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     public int Version { get; set; }
 
@@ -187,7 +186,7 @@ public sealed class RaceHudSettings
             Layouts.AddRange(defaults());
             Rules.AddRange(defaultRules());
         }
-        bool before2 = Version < 2;
+        bool before2 = Version < 2, before3 = Version < 3;
         Version = CurrentVersion;
         Appearance ??= new();
         if (WebPort is < MinWebPort or > MaxWebPort) WebPort = DefaultWebPort;
@@ -208,6 +207,7 @@ public sealed class RaceHudSettings
                 SideBannerToTop(w);
                 OldInputStyles(w);
                 if (before2) ShowClassesInsteadOfHiding(w);
+                if (before3) ScaleFromNaturalSize(w);
                 w.Clamp();
             }
         }
@@ -246,6 +246,13 @@ public sealed class RaceHudSettings
 
     internal void ShowClassesInsteadOfHiding(HudWidgetConfig w) =>
         SimRacing.Hud.Editors.HudClassFilter.Migrate(w, (KnownClasses ?? new()).Concat(SimRacing.Race.SessionNames.Classes));
+
+    internal static void ScaleFromNaturalSize(HudWidgetConfig w)
+    {
+        if (SimRacing.Hud.HudCatalog.Find(w.Kind) is not { Natural: { } natural } def || w.Options is null) return;
+        var size = natural(new SimRacing.Hud.HudOptions(def, w));
+        if (size.Height > 0 && double.IsFinite(w.H)) w.Scale = w.H / size.Height;
+    }
 
     internal static void OldInputStyles(HudWidgetConfig w)
     {
@@ -316,6 +323,10 @@ public sealed class HudWidgetConfig
     public double W { get; set; } = 300;
     public double H { get; set; } = 200;
 
+    public const double MinScale = 0.5, MaxScale = 3;
+
+    public double Scale { get; set; } = 1;
+
     public bool Locked { get; set; }
 
     public int Opacity { get; set; } = 100;
@@ -332,6 +343,8 @@ public sealed class HudWidgetConfig
 
     public int? Background { get; set; }
 
+    public string? Hotkey { get; set; }
+
     public Dictionary<string, string> Options { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     public static string NewId(string kind) => $"{(string.IsNullOrEmpty(kind) ? "widget" : kind)}-{Guid.NewGuid().ToString("N")[..6]}";
@@ -342,10 +355,12 @@ public sealed class HudWidgetConfig
         H = double.IsFinite(H) ? Math.Clamp(H, MinSize, MaxSize) : 200;
         X = double.IsFinite(X) ? Math.Clamp(X, -MaxSize, MaxSize) : 0;
         Y = double.IsFinite(Y) ? Math.Clamp(Y, -MaxSize, MaxSize) : 0;
+        Scale = double.IsFinite(Scale) && Scale > 0 ? Math.Round(Math.Clamp(Scale, MinScale, MaxScale), 3) : 1;
         Opacity = Math.Clamp(Opacity, 20, 100);
         if (Background is { } bg) Background = Math.Clamp(bg, 0, 100);
         UpdateHz = Math.Clamp(UpdateHz, 0, 60);
         Monitor = string.IsNullOrWhiteSpace(Monitor) ? "primary" : Monitor;
+        if (string.IsNullOrWhiteSpace(Hotkey)) Hotkey = null;
         Sessions = (Sessions ?? new()).Where(s => !string.IsNullOrWhiteSpace(s)).Select(RaceHudSettings.SessionKind).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var options = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (k, v) in Options ?? new()) if (k is not null && v is not null) options[k] = v;
@@ -355,6 +370,7 @@ public sealed class HudWidgetConfig
     public HudWidgetConfig Copy()
     {
         var copy = (HudWidgetConfig)MemberwiseClone();
+        copy.Hotkey = null;
         copy.Sessions = new List<string>(Sessions);
         copy.Options = new Dictionary<string, string>(Options, StringComparer.OrdinalIgnoreCase);
         return copy;
@@ -426,10 +442,6 @@ public sealed class HudLayoutRule
 
 public sealed class HudAppearance
 {
-    public HudColors Colors { get; set; } = HudColors.Default;
-
-    public HudCustomColors Custom { get; set; } = new();
-
     public int Background { get; set; } = 75;
 
     public int FontScale { get; set; } = 100;
@@ -444,8 +456,6 @@ public sealed class HudAppearance
 
     public void Clamp()
     {
-        Custom ??= new();
-        Custom.Clean();
         Background = Math.Clamp(Background, 0, 100);
         FontScale = 100;
         Density = HudDensity.Compact;
@@ -493,58 +503,3 @@ public sealed class HudAlertSetting
     public double? Threshold { get; set; }
     public double? Duration { get; set; }
 }
-
-public sealed class HudCustomColors
-{
-    public string Background { get; set; } = "#0A0D16";
-    public string Surface { get; set; } = "#151B2B";
-    public string Text { get; set; } = "#E9ECF5";
-    public string Heading { get; set; } = "#FFFFFF";
-    public string Muted { get; set; } = "#8A93AB";
-    public string Lines { get; set; } = "#2B3348";
-    public string Accent { get; set; } = "#DB156B";
-    public string YourRow { get; set; } = "#DB156B";
-    public string YourRowText { get; set; } = "#FFFFFF";
-    public string Good { get; set; } = "#3DD68C";
-    public string Warn { get; set; } = "#F5B53D";
-    public string Danger { get; set; } = "#E5484D";
-    public string FastestLap { get; set; } = "#B06BFF";
-    public string Lapping { get; set; } = "#F87171";
-    public string Lapped { get; set; } = "#60A5FA";
-    public string MapTrack { get; set; } = "#535A68";
-    public string MapEdge { get; set; } = "#8B919C";
-    public string MapPit { get; set; } = "#3C4353";
-    public string MapCars { get; set; } = "#CFD4DA";
-
-    public IEnumerable<(string Id, Func<string> Get, Action<string> Set)> All()
-    {
-        yield return (nameof(Background), () => Background, v => Background = v);
-        yield return (nameof(Surface), () => Surface, v => Surface = v);
-        yield return (nameof(Text), () => Text, v => Text = v);
-        yield return (nameof(Heading), () => Heading, v => Heading = v);
-        yield return (nameof(Muted), () => Muted, v => Muted = v);
-        yield return (nameof(Lines), () => Lines, v => Lines = v);
-        yield return (nameof(Accent), () => Accent, v => Accent = v);
-        yield return (nameof(YourRow), () => YourRow, v => YourRow = v);
-        yield return (nameof(YourRowText), () => YourRowText, v => YourRowText = v);
-        yield return (nameof(Good), () => Good, v => Good = v);
-        yield return (nameof(Warn), () => Warn, v => Warn = v);
-        yield return (nameof(Danger), () => Danger, v => Danger = v);
-        yield return (nameof(FastestLap), () => FastestLap, v => FastestLap = v);
-        yield return (nameof(Lapping), () => Lapping, v => Lapping = v);
-        yield return (nameof(Lapped), () => Lapped, v => Lapped = v);
-        yield return (nameof(MapTrack), () => MapTrack, v => MapTrack = v);
-        yield return (nameof(MapEdge), () => MapEdge, v => MapEdge = v);
-        yield return (nameof(MapPit), () => MapPit, v => MapPit = v);
-        yield return (nameof(MapCars), () => MapCars, v => MapCars = v);
-    }
-
-    public void Clean()
-    {
-        var defaults = new HudCustomColors().All().ToDictionary(e => e.Id, e => e.Get());
-        static bool Valid(string? v) => v is { Length: 7 } && v[0] == '#' && v.Skip(1).All(Uri.IsHexDigit);
-        foreach (var (id, get, set) in All())
-            set(Valid(get()) ? get().ToUpperInvariant() : defaults[id]);
-    }
-}
-

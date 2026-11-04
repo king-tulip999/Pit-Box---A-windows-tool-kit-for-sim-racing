@@ -129,7 +129,7 @@
    "section": "User Options",
    "name": "Interface",
    "use": "occasional",
-   "why": "UI opacity and width on wide screens, focus behaviour, particle threads."
+   "why": "UI opacity and width on wide screens, focus behavior, particle threads."
   },
   {
    "file": "renderer",
@@ -314,7 +314,7 @@
    "section": "Replay",
    "name": "Replay",
    "use": "occasional",
-   "why": "Replay saving, spooling to disk and playback behaviour."
+   "why": "Replay saving, spooling to disk and playback behavior."
   },
   {
    "file": "app.ini",
@@ -448,7 +448,7 @@
    "section": "Task",
    "name": "Thread priority",
    "use": "rare",
-   "why": "Windows thread priority behaviour; leave alone."
+   "why": "Windows thread priority behavior; leave alone."
   },
   {
    "file": "core.ini",
@@ -799,7 +799,7 @@
    "section": "Graphics Options",
    "key": "ReplayRenderModes",
    "label": "Replay render modes",
-   "help": "Adds replay-only filters such as greyscale, sepia and 8-bit. Uses extra GPU and memory.",
+   "help": "Adds replay-only filters such as grayscale, sepia and 8-bit. Uses extra GPU and memory.",
    "type": "bool",
    "source": "research",
    "tier": "more",
@@ -1568,7 +1568,7 @@
     {
      "value": 2,
      "label": "Foveated quad view",
-     "tip": "Sharp centre, lower-res edges. RTX 2000+ and OpenXR."
+     "tip": "Sharp center, lower-res edges. RTX 2000+ and OpenXR."
     }
    ],
    "source": "research",
@@ -2436,7 +2436,9 @@
    "key": "SessionUITransparency",
    "label": "Session UI opacity",
    "help": "Opacity of the session screen UI. 0 is transparent, 1 is solid.",
-   "type": "num",
+   "type": "range",
+   "min": 0,
+   "max": 1,
    "step": 0.05,
    "source": "research",
    "tier": "more",
@@ -2666,7 +2668,7 @@
    "file": "renderer",
    "section": "Display",
    "key": "windowedMaximized",
-   "label": "Start maximised",
+   "label": "Start maximized",
    "help": "Fills one screen and ignores the width and height. Keep off for a window across triples.",
    "type": "num",
    "source": "research",
@@ -2703,8 +2705,8 @@
     },
     {
      "value": 1,
-     "label": "Centre",
-     "tip": "Centres the window on the screen."
+     "label": "Center",
+     "tip": "Centers the window on the screen."
     },
     {
      "value": 2,
@@ -2767,7 +2769,7 @@
     },
     {
      "value": 1,
-     "label": "Centred",
+     "label": "Centered",
      "tip": "Native pixels, black borders round the image."
     },
     {
@@ -2791,7 +2793,7 @@
     {
      "value": 0,
      "label": "SDR",
-     "tip": "Standard 8-bit colour."
+     "tip": "Standard 8-bit color."
     },
     {
      "value": 1,
@@ -2799,7 +2801,7 @@
      "tip": "HDR10 at 32-bit depth, HDR16F at 64-bit."
     }
    ],
-   "caution": "Colours can look blown out if the sim drops out of full screen.",
+   "caution": "Colors can look blown out if the sim drops out of full screen.",
    "source": "research",
    "tier": "more",
    "group": "Display output"
@@ -2830,7 +2832,7 @@
    "file": "renderer",
    "section": "Display",
    "key": "fullScreenDepth",
-   "label": "Colour depth",
+   "label": "Color depth",
    "help": "Bits per pixel. 32 is standard; 64 with HDR output selects HDR16F.",
    "type": "num",
    "source": "research",
@@ -3032,7 +3034,7 @@
    "file": "renderer",
    "section": "MonitorSetup",
    "key": "ViewingDist",
-   "label": "Eyes to centre screen",
+   "label": "Eyes to center screen",
    "help": "Measured straight ahead.",
    "type": "num",
    "min": 300,
@@ -3425,7 +3427,7 @@
    "section": "Replay Graphics",
    "key": "ReplayRenderModes",
    "label": "Replay render modes",
-   "help": "Adds visual filters such as greyscale or sepia to the replay timeline.",
+   "help": "Adds visual filters such as grayscale or sepia to the replay timeline.",
    "type": "bool",
    "source": "research",
    "tier": "more",
@@ -4205,7 +4207,7 @@
    "section": "Adaptive",
    "key": "highContrastCursor",
    "label": "High-contrast cursor",
-   "help": "Larger mouse cursor in a more contrasting colour.",
+   "help": "Larger mouse cursor in a more contrasting color.",
    "type": "bool",
    "source": "research",
    "tier": "more"
@@ -4225,7 +4227,7 @@
    "section": "Adaptive",
    "key": "raceLineWidth",
    "label": "Racing line width",
-   "help": "Width of the racing line, in metres (0.1 to 2). Wider is easier to see.",
+   "help": "Width of the racing line, in meters (0.1 to 2). Wider is easier to see.",
    "type": "num",
    "step": 0.05,
    "source": "research",
@@ -5412,7 +5414,7 @@
    "type": "bool",
    "source": "research",
    "tier": "more",
-   "group": "Behaviour"
+   "group": "Behavior"
   },
   {
    "file": "app.ini",
@@ -5423,7 +5425,7 @@
    "type": "bool",
    "source": "research",
    "tier": "more",
-   "group": "Behaviour"
+   "group": "Behavior"
   },
   {
    "file": "app.ini",
@@ -5540,7 +5542,7 @@
    "step": 0.05,
    "source": "reason",
    "tier": "more",
-   "group": "Behaviour"
+   "group": "Behavior"
   },
   {
    "file": "app.ini",
@@ -5692,7 +5694,7 @@
    "section": "Drive Screen",
    "key": "dashBoxEnabled",
    "label": "Dash box",
-   "help": "Shows the Dash box with colour-coded RPM and temperatures. D key in the car.",
+   "help": "Shows the Dash box with color-coded RPM and temperatures. D key in the car.",
    "type": "bool",
    "source": "research",
    "tier": "more"
@@ -5758,8 +5760,8 @@
    "file": "app.ini",
    "section": "External_Displays",
    "key": "colorLEDHotKeysByType",
-   "label": "Colour hotkeys by type",
-   "help": "Colours keyboard hotkey lights by function. Off uses one colour for all.",
+   "label": "Color hotkeys by type",
+   "help": "Colors keyboard hotkey lights by function. Off uses one color for all.",
    "type": "bool",
    "source": "research",
    "tier": "more"
@@ -5779,7 +5781,7 @@
    "section": "External_Displays",
    "key": "enableLEDFlags",
    "label": "Flag lighting",
-   "help": "Flashes flag colours on RGB keyboard and device backlights.",
+   "help": "Flashes flag colors on RGB keyboard and device backlights.",
    "type": "bool",
    "source": "research",
    "tier": "more"
@@ -5959,8 +5961,8 @@
    "file": "app.ini",
    "section": "Force Feedback",
    "key": "disableAutoCenter",
-   "label": "Disable auto-centre",
-   "help": "Turns off the wheel driver's auto-centre spring so it doesn't fight iRacing's FFB. Keep on.",
+   "label": "Disable auto-center",
+   "help": "Turns off the wheel driver's auto-center spring so it doesn't fight iRacing's FFB. Keep on.",
    "type": "bool",
    "source": "reason",
    "tier": "expert",
@@ -7463,7 +7465,7 @@
    "section": "SPCC",
    "key": "carLowHiPadding",
    "label": "Clear margin",
-   "help": "Metres of gap, front and back, before a car alongside is called clear. Higher calls clear later.",
+   "help": "Meters of gap, front and back, before a car alongside is called clear. Higher calls clear later.",
    "type": "num",
    "step": 0.05,
    "std": 0.25,
@@ -8289,58 +8291,58 @@
    "file": "app.ini",
    "section": "TouchDrive",
    "key": "touchCenterOnFirstTouchX",
-   "label": "Centre steering on touch",
-   "help": "Your first touch sets the steering centre, instead of a fixed spot.",
+   "label": "Center steering on touch",
+   "help": "Your first touch sets the steering center, instead of a fixed spot.",
    "type": "bool",
    "source": "reason",
    "tier": "more",
-   "group": "Centre control"
+   "group": "Center control"
   },
   {
    "file": "app.ini",
    "section": "TouchDrive",
    "key": "touchCenterOnFirstTouchY",
-   "label": "Centre pedals on touch",
+   "label": "Center pedals on touch",
    "help": "Your first touch sets the gas/brake neutral point, instead of a fixed spot.",
    "type": "bool",
    "source": "reason",
    "tier": "more",
-   "group": "Centre control"
+   "group": "Center control"
   },
   {
    "file": "app.ini",
    "section": "TouchDrive",
    "key": "touchComboHeight",
    "label": "Combo zone height",
-   "help": "Height of the centre steer-and-pedal zone, as a share of screen width (1 = 100%).",
+   "help": "Height of the center steer-and-pedal zone, as a share of screen width (1 = 100%).",
    "type": "num",
    "step": 0.05,
    "source": "reason",
    "tier": "more",
-   "group": "Centre control"
+   "group": "Center control"
   },
   {
    "file": "app.ini",
    "section": "TouchDrive",
    "key": "touchComboUseSingleCursor",
    "label": "Single combo cursor",
-   "help": "Uses one cursor for both steering and pedals on the centre combo control.",
+   "help": "Uses one cursor for both steering and pedals on the center combo control.",
    "type": "bool",
    "source": "reason",
    "tier": "more",
-   "group": "Centre control"
+   "group": "Center control"
   },
   {
    "file": "app.ini",
    "section": "TouchDrive",
    "key": "touchComboWidth",
    "label": "Combo zone width",
-   "help": "Width of the centre steer-and-pedal zone, as a share of screen width (1 = 100%).",
+   "help": "Width of the center steer-and-pedal zone, as a share of screen width (1 = 100%).",
    "type": "num",
    "step": 0.05,
    "source": "reason",
    "tier": "more",
-   "group": "Centre control"
+   "group": "Center control"
   },
   {
    "file": "app.ini",
@@ -8773,7 +8775,7 @@
    "section": "View",
    "key": "cockpitLookDeadZone",
    "label": "Look dead zone",
-   "help": "Dead zone for an analogue look axis, 0 to 1. 0 is none.",
+   "help": "Dead zone for an analog look axis, 0 to 1. 0 is none.",
    "type": "num",
    "step": 0.05,
    "source": "reason",
@@ -8808,7 +8810,7 @@
    "section": "View",
    "key": "cockpitLookSmoothingTime",
    "label": "Look smoothing",
-   "help": "Smoothing time for an analogue look axis, in seconds.",
+   "help": "Smoothing time for an analog look axis, in seconds.",
    "type": "num",
    "step": 0.05,
    "source": "reason",
@@ -8942,7 +8944,7 @@
    "section": "XXX Dev Use Only",
    "key": "dbgTextBG",
    "label": "Debug text background",
-   "help": "Background colour of debug text, as r,g,b[,a]. Developer use.",
+   "help": "Background color of debug text, as r,g,b[,a]. Developer use.",
    "type": "text",
    "source": "reason",
    "tier": "expert",
@@ -8952,8 +8954,8 @@
    "file": "app.ini",
    "section": "XXX Dev Use Only",
    "key": "dbgTextFG",
-   "label": "Debug text colour",
-   "help": "Colour of debug text, as r,g,b[,a]. Developer use.",
+   "label": "Debug text color",
+   "help": "Color of debug text, as r,g,b[,a]. Developer use.",
    "type": "text",
    "source": "reason",
    "tier": "expert",

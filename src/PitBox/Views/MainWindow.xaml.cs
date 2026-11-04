@@ -712,7 +712,7 @@ public partial class MainWindow : Window
     internal Border FanQuitCard(Action<int> picked, out Button keep)
     {
         var card = DialogCard("Fan control is on",
-            "Pit-Box is driving your fans. Keep them on your curves after it closes, or hand them back to the BIOS / graphics driver?", out var buttons);
+            "Pit-Box is driving your fans. Keep them on your curves after it closes, or hand them back to the BIOS / graphics driver?", out var buttons, width: 500);
         var cancel = new Button { Content = "Cancel", Margin = Ui.AfterButton, IsCancel = true };
         var stop = new Button { Content = "Give fans back and quit", Style = (Style)FindResource("GhostButton"), Margin = Ui.AfterButton };
         keep = new Button { Content = "Keep my curves and quit", Style = (Style)FindResource("PrimaryButton"), IsDefault = true };
@@ -724,7 +724,6 @@ public partial class MainWindow : Window
         buttons.Children.Add(cancel);
         buttons.Children.Add(stop);
         buttons.Children.Add(keep);
-        card.Width = 500;
         return card;
     }
 
@@ -944,15 +943,7 @@ public partial class MainWindow : Window
             Child = grid,
             Cursor = Cursors.Hand,
         };
-        if (kind == NoticeKind.Error)
-        {
-            toast.Background = (Brush)FindResource("DangerSoft");
-            toast.BorderBrush = (Brush)FindResource("Danger");
-            toast.BorderThickness = new Thickness(1.5);
-            var heading = (TextBlock)text.Children[0];
-            heading.Foreground = (Brush)FindResource("DangerDeep");
-            heading.FontWeight = FontWeights.Bold;
-        }
+        if (kind == NoticeKind.Error) Ui.Danger(toast, (TextBlock)text.Children[0], icon: false);
         bool stays = kind == NoticeKind.Error;
         var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(kind == NoticeKind.Warning || action is not null ? 8 : 4) };
         timer.Tick += (_, _) => { timer.Stop(); Dismiss(toast); };
@@ -1154,11 +1145,9 @@ public partial class MainWindow : Window
 
     internal async Task<string?> Prompt(string title, string message, string initial, Func<string, string?> validate, int maxLength = Ui.NameLength)
     {
-        var card = DialogCard(title, message, out var buttons);
-        var box = new TextBox { Text = maxLength > 0 && initial.Length > maxLength ? initial[..maxLength].TrimEnd() : initial, MaxLength = maxLength, Margin = new Thickness(0, 11, 0, 0) };
-        var error = new TextBlock { Foreground = (Brush)FindResource("Danger"), FontSize = 12, Margin = new Thickness(0, 5, 0, 0), Visibility = Visibility.Collapsed };
-        ((StackPanel)card.Child).Children.Insert(2, box);
-        ((StackPanel)card.Child).Children.Insert(3, error);
+        var box = new TextBox { Text = maxLength > 0 && initial.Length > maxLength ? initial[..maxLength].TrimEnd() : initial, MaxLength = maxLength, Margin = new Thickness(0, 3, 0, 0) };
+        var error = new TextBlock { FontSize = 12, Visibility = Visibility.Collapsed };
+        var card = DialogCard(title, message, out var buttons, box, error);
 
         var cancel = new Button { Content = "Cancel", Margin = Ui.AfterButton };
         var ok = new Button { Content = "Save", Style = (Style)FindResource("PrimaryButton"), IsDefault = true };
@@ -1182,19 +1171,9 @@ public partial class MainWindow : Window
         return await task ? box.Text.Trim() : null;
     }
 
-    internal Border DialogCard(string title, string message, out WrapPanel buttons)
+    internal Border DialogCard(string title, string message, out StackPanel buttons, UIElement? content = null, TextBlock? error = null, double width = 356)
     {
-        var stack = new StackPanel();
-        stack.Children.Add(new TextBlock { Text = title, Style = (Style)FindResource("H2") });
-        stack.Children.Add(new TextBlock { Text = message, Style = (Style)FindResource("Muted"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, Ui.DialogTitleGap, 0, 0) });
-        buttons = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, Ui.DialogFooterGap, 0, 0) };
-        stack.Children.Add(buttons);
-        return new Tile
-        {
-            Style = (Style)FindResource("LiftedCard"),
-            Width = 356,
-            Padding = Ui.DialogPadding,
-            Child = stack,
-        };
+        buttons = new StackPanel();
+        return Ui.Dialog(this, title, message, content ?? new Border(), buttons, error, width);
     }
 }

@@ -202,11 +202,12 @@ public sealed class ArrangementCanvas : Canvas
             {
                 CornerRadius = ThemeManager.Round(6),
                 Background = ThemeManager.Brush("Accent", Brushes.SlateBlue),
-                Padding = new Thickness(5, 1, 5, 2),
+                Height = 24,
+                Padding = new Thickness(7, 0, 7, 0),
                 Margin = new Thickness(5),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Top,
-                Child = new TextBlock { Text = "Main", FontSize = 11, Foreground = ThemeManager.Brush("OnAccent", Brushes.Black), FontWeight = FontWeights.SemiBold },
+                Child = new TextBlock { Text = "Main", FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center, Foreground = ThemeManager.Brush("OnAccent", Brushes.Black), FontWeight = FontWeights.SemiBold },
             });
         }
     }
@@ -217,7 +218,7 @@ public sealed class ArrangementCanvas : Canvas
         border.Background = ThemeManager.Brush(selected ? "AccentSoft" : "TileRaised", Brushes.White);
         border.BorderBrush = ThemeManager.Brush(selected ? "Accent" : "LineStrong", Brushes.Gray);
         border.BorderThickness = new Thickness(selected ? 2 : 1.5);
-        TextElement.SetForeground(border, ThemeManager.Brush(selected ? "AccentText" : "Text", Brushes.Black));
+        TextElement.SetForeground(border, ThemeManager.Brush(selected ? "Heading" : "Text", Brushes.Black));
         Panel.SetZIndex(border, selected ? 2 : 1);
     }
 

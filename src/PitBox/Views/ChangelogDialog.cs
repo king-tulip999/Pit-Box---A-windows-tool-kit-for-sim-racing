@@ -23,7 +23,7 @@ internal static class ChangelogDialog
         string page = UpdateService.ReleasesPage;
         var buttons = new StackPanel();
         var github = Ui.LabeledButton("I.ChevronRight", "Open on GitHub", () => Ui.OpenUrl(page));
-        github.Margin = new Thickness(0, 0, 6, 0);
+        github.Margin = Ui.AfterButton;
         var close = new Button { Content = "Close", Style = Ui.Res<Style>("PrimaryButton"), IsDefault = true };
         close.Click += (_, _) => window.CloseModal(false);
         buttons.Children.Add(github);

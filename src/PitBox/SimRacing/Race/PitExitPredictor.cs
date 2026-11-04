@@ -48,7 +48,7 @@ internal sealed class PitExitPrediction
 internal sealed class PitExitPredictor
 {
     const int Bins = 256;
-    const double TrafficWindow = 1.5;
+    internal const double TrafficWindow = 1.5;
     const double StillStep = 0.19, StillPct = 5e-7;
 
     const double FallbackLane = 25, FallbackTyreTime = 10, FallbackOppStop = 20;

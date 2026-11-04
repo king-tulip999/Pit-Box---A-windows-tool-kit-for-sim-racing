@@ -11,6 +11,14 @@ internal struct ShakerLevels
     public double Road;
 }
 
+internal struct ShakerInput
+{
+    public bool Driving;
+    public double? Rpm, Throttle, VertAccel, Time, IdleRpm, Redline;
+    public int? Gear;
+    public bool Abs, Limiter;
+}
+
 internal sealed class ShakerFeed
 {
     public const double RoadFullScale = 10.1;
@@ -32,6 +40,9 @@ internal sealed class ShakerFeed
     public ShakerLevels Update(TelemetryFrame f) =>
         Update(f.Driving, f.Rpm, f.Throttle, f.Gear, f.AbsActive == true, (f.Warnings & EngineWarnings.RevLimiter) != 0,
             f.RawValue("VertAccel"), f.SessionTime, f.Session.IdleRpm, f.Session.RedlineRpm);
+
+    public ShakerLevels Update(in ShakerInput i) =>
+        Update(i.Driving, i.Rpm, i.Throttle, i.Gear, i.Abs, i.Limiter, i.VertAccel, i.Time, i.IdleRpm, i.Redline);
 
     internal ShakerLevels Update(bool driving, double? rpm, double? throttle, int? gear, bool abs, bool limiterFlag, double? vertAccel, double? time, double? idleRpm, double? redline)
     {

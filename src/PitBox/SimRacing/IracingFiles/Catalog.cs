@@ -22,7 +22,7 @@ internal sealed class SettingsCatalog
 
     public static SettingsCatalog Embedded => EmbeddedCatalog.Value;
 
-    private static T Load<T>(string name)
+    internal static T Load<T>(string name)
     {
         var asm = typeof(SettingsCatalog).Assembly;
         var resource = asm.GetManifestResourceNames().First(n => n.EndsWith(name, StringComparison.OrdinalIgnoreCase));

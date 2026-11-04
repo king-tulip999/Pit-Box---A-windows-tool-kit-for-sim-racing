@@ -256,7 +256,7 @@ public sealed class CurveEditor : FrameworkElement
         double px = Hairline.ScaleOf(this);
         var gridPen = Hairline.Pen(_grid, px);
         var axisPen = Hairline.Pen(_axis, px);
-        for (int pct = 0; pct <= 100; pct += ReadOnly ? 50 : 20)
+        for (int pct = 0; pct <= 100; pct += 20)
         {
             double y = Hairline.Snap(ToScreen(MinTemp, pct).Y, px);
             dc.DrawLine(pct == 0 ? axisPen : gridPen, new Point(plot.Left, y), new Point(plot.Right, y));
@@ -267,7 +267,7 @@ public sealed class CurveEditor : FrameworkElement
         {
             double x = Hairline.Snap(ToScreen(t, 0).X, px);
             dc.DrawLine(t == 20 ? axisPen : gridPen, new Point(x, plot.Top), new Point(x, plot.Bottom));
-            var text = Text($"{t}°", 10.5, label, dpi);
+            var text = Text($"{t} °C", 10.5, label, dpi);
             dc.DrawText(text, new Point(x - text.Width / 2, plot.Bottom + 5));
         }
 

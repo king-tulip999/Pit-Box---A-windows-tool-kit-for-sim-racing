@@ -92,7 +92,7 @@ internal sealed class CompanionAppSection : Tile
         var actions = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
         var visit = Ui.LabeledButton("I.External", spec.Host, () => Ui.OpenUrl(spec.Site), "GhostButton");
         visit.ToolTip = $"Open {spec.Site}";
-        visit.Margin = new Thickness(0, 0, 6, 0);
+        visit.Margin = Ui.AfterButton;
         actions.Children.Add(visit);
         if (status == CompanionStatus.NotInstalled)
         {
@@ -107,7 +107,7 @@ internal sealed class CompanionAppSection : Tile
         else
         {
             var check = Ui.IconButton("I.Refresh", "Check again", app.Refresh);
-            check.Margin = new Thickness(0, 0, 6, 0);
+            check.Margin = Ui.AfterButton;
             actions.Children.Add(check);
             bool running = status == CompanionStatus.Running;
             var launch = Ui.LabeledButton(running ? "I.Check" : "I.Play", running ? "Running" : $"Launch {spec.Name}", () =>
@@ -136,26 +136,43 @@ internal sealed class CompanionAppSection : Tile
         _stack.Children.Add(info);
         _stack.Children.Add(actions);
 
-        _stack.Children.Add(Hairline.Rule(new Border { Background = Ui.Res<System.Windows.Media.Brush>("Line"), Margin = new Thickness(0, 11, 0, 3) }));
-        _stack.Children.Add(Ui.SettingRow("Start with Pit-Box", "When Pit-Box starts (skipped if it's already running).",
-            Ui.Switch(s.LaunchWithPitBox, v => { s.LaunchWithPitBox = v; _app.Save(); })));
-        _stack.Children.Add(Ui.SettingRow("Start with iRacing", "When iRacing starts (skipped if it's already running).",
-            Ui.Switch(s.LaunchWithIracing, v => { s.LaunchWithIracing = v; _app.Save(); app.UpdateWatch(); })));
+        var cards = new System.Windows.Controls.Primitives.UniformGrid { Rows = 1, Margin = new Thickness(-3, 8, -3, 0) };
+        void Card(CheckBox card)
+        {
+            CardTop.Align(card);
+            card.Margin = new Thickness(3);
+            cards.Children.Add(card);
+        }
+        Card(ToggleCards.Card("Start with Pit-Box", "When Pit-Box starts (skipped if it's already running).",
+            s.LaunchWithPitBox, v => { s.LaunchWithPitBox = v; _app.Save(); }));
+        Card(ToggleCards.Card("Start with iRacing", "When iRacing starts (skipped if it's already running).",
+            s.LaunchWithIracing, v => { s.LaunchWithIracing = v; _app.Save(); app.UpdateWatch(); }));
         if (spec == CompanionApp.TradingPaints)
         {
             var sim = _app.Config.SimRacing;
-            _stack.Children.Add(Ui.SettingRow("Car pictures in your paint", "Drawn by iRacing while it's open; a new paint shows once iRacing has run.",
-                Ui.Switch(sim.PaintedCarPictures, v =>
+            Card(ToggleCards.Card("Car pictures in your paint", "Drawn by iRacing while it's open; a new paint shows once iRacing has run.",
+                sim.PaintedCarPictures, v =>
                 {
                     sim.PaintedCarPictures = v;
                     _app.Save();
                     if (_app.Plugins.Find(PluginIds.SimRacing) is SimRacingPlugin plugin) plugin.Liveries?.SetActive(LiveryPictures.On(_app));
-                })));
+                }));
         }
+        _stack.Children.Add(cards);
         _stack.Children.Add(new TextBlock
         {
             Text = $"Pit-Box starts {spec.Program} the normal way and never changes or updates it. It keeps running after Pit-Box quits.",
             Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 5, 0, 0),
         });
+    }
+}
+
+internal static class CardTop
+{
+    public static CheckBox Align(CheckBox card)
+    {
+        if (card.Content is not StackPanel body) return card;
+        body.VerticalAlignment = VerticalAlignment.Top;
+        return card;
     }
 }

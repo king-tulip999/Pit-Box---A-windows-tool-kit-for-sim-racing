@@ -141,8 +141,8 @@ internal static class ThemeManager
 
     internal static (Color Tint, Color Mid, Color Text) NavSelection(IReadOnlyDictionary<string, Color> p)
     {
-        var tint = p["AccentSoft"];
-        var mid = Mix(p["Bg"], p["Accent"], 0.11);
+        var tint = p["Selected"];
+        var mid = p["Selected"];
         bool Reads(Color c) => Contrast(c, tint) >= 4.5 && Contrast(c, mid) >= 4.5;
         for (int step = 0; step <= 20; step++)
         {

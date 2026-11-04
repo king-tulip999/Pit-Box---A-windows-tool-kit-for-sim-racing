@@ -29,8 +29,6 @@ internal sealed record ThemeSpec
     public double Radius { get; init; }
     public double PanelOpacity { get; init; } = 0.85;
     public double SidebarOpacity { get; init; } = 0.6;
-    public System.Windows.Media.Color? BackdropBg { get; init; }
-    public System.Windows.Media.Color? BackdropLine { get; init; }
     public double SwitchRadius { get; init; } = 11;
     public double KnobRadius { get; init; } = 8;
     public double ChipRadius { get; init; }
@@ -63,7 +61,6 @@ internal static class Themes
         Id = AppTheme.Dark, Name = "The Pits", Dark = true, Colors = Palettes.Dark,
         CardEdge = Hairline, LogoEdge = new(0),
         StepsClimb = false, Outline = "ScrollThumbBrushDrag",
-        BackdropBg = Palettes.Hex("#0A0D16"), BackdropLine = Palettes.Hex("#171925"),
     };
 
     public static readonly ThemeSpec Custom = new()

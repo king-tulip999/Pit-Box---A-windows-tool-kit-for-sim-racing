@@ -103,6 +103,7 @@ internal sealed class StorageView : ContentControl
             long bytes = chosen.Sum(f => f.Length);
             button.Content = Ui.IconLabel("I.Trash", chosen.Count == 0 ? "Nothing to clear" : $"Move {SimRacing.Race.RaceFormat.Count(chosen.Count, "file")} to the Recycle Bin ({StorageCleanup.Size(bytes)})");
             button.IsEnabled = chosen.Count > 0 && !_app.Demo;
+            button.Style = Ui.Res<Style>(chosen.Count > 0 ? "DangerButton" : "GhostButton");
         }
         var age = Ui.Combo(StorageCleanup.AgeChoices.Select(d => new Choice(d.ToString(), d >= 365 ? "1 year" : $"{d} days")), days.ToString(), c =>
         {

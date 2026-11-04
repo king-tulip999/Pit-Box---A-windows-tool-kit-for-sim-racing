@@ -150,7 +150,13 @@ internal sealed class Workspace
         }
     }
 
-    private static string DemoValue(SettingDef s) => s.Default is { } d ? Setting.Format(d) : s.Type switch
+    private static readonly Lazy<Dictionary<string, string>> MeasuredDemoValues = new(() =>
+        new Dictionary<string, string>(SettingsCatalog.Load<Dictionary<string, string>>("demo-values.json"), StringComparer.OrdinalIgnoreCase));
+
+    private static string DemoValue(SettingDef s) =>
+        s.Default is { } d ? Setting.Format(d)
+        : MeasuredDemoValues.Value.TryGetValue(s.File + "|" + s.Section + "|" + s.Key, out var measured) ? measured
+        : s.Type switch
     {
         "bool" => "1",
         "enum" => Setting.Format(s.Options?.FirstOrDefault()?.Value ?? 0),

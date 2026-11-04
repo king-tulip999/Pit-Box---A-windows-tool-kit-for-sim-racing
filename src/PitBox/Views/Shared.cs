@@ -24,12 +24,8 @@ internal static class ProfileLayout
         Dictionary<string, int> numbers;
         try { numbers = app.Displays.GetMonitors().Where(m => m.Number > 0).ToDictionary(m => m.Key, m => m.Number); }
         catch { numbers = new Dictionary<string, int>(); }
-        int next = numbers.Count == 0 ? 1 : numbers.Values.Max() + 1;
         return app.Displays.Describe(snapshot).OrderBy(m => m.X).Select(m =>
-        {
-            int n = numbers.TryGetValue(m.Key, out int known) ? known : next++;
-            return new LayoutTile(m.X, m.Y, m.Width, m.Height, n.ToString(), $"{m.Width}×{m.Height} · {m.Hz} {Units.Hz}", m.Primary);
-        }).ToList();
+            new LayoutTile(m.X, m.Y, m.Width, m.Height, numbers.TryGetValue(m.Key, out int n) ? n.ToString() : m.Name, $"{m.Width}×{m.Height} · {m.Hz} {Units.Hz}", m.Primary)).ToList();
     }
 }
 
@@ -59,7 +55,7 @@ internal static class IdentifyDisplays
                 CornerRadius = ThemeManager.Round(26),
                 Background = (Brush)Application.Current.FindResource("Surface"),
                 BorderBrush = (Brush)Application.Current.FindResource(monitor.Primary ? "Accent" : "Line"),
-                BorderThickness = new Thickness(monitor.Primary ? 2 : 1),
+                BorderThickness = monitor.Primary ? new Thickness(2) : Hairline.Edges(),
                 Child = new StackPanel
                 {
                     VerticalAlignment = VerticalAlignment.Center,
@@ -219,6 +215,7 @@ internal sealed class Collapsible : StackPanel
         Motion.Pressable(bar);
         AutomationProperties.SetName(bar, title);
         bar.Focusable = true;
+        bar.FocusVisualStyle = Ui.Res<Style>("FocusRing");
         bar.KeyDown += (_, e) =>
         {
             if (e.Key is not (System.Windows.Input.Key.Enter or System.Windows.Input.Key.Space) || e.OriginalSource != bar) return;
@@ -452,11 +449,56 @@ internal static class Ui
         return box;
     }
 
+    public static TextBox Search(TextBox box)
+    {
+        box.Style = Res<Style>("SearchBox");
+        box.ApplyTemplate();
+        if (box.Template.FindName("Clear", box) is Button clear) clear.Click += (_, _) => { box.Clear(); box.Focus(); };
+        box.PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key != Key.Escape || box.Text.Length == 0) return;
+            box.Clear();
+            e.Handled = true;
+        };
+        return box;
+    }
+
+    public static T PendingBar<T>(T bar) where T : Border
+    {
+        bar.Style = Res<Style>("Card");
+        bar.Padding = new Thickness(11, 8, 10, 8);
+        bar.SetResourceReference(Border.BorderBrushProperty, "Apricot");
+        return bar;
+    }
+
+    public static Icon FoldChevron(bool open)
+    {
+        var chevron = new Icon { Width = 12, Height = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
+        chevron.SetResourceReference(Control.ForegroundProperty, "TextMuted");
+        SetFold(chevron, open);
+        return chevron;
+    }
+
+    public static void SetFold(Icon chevron, bool open) => chevron.Data = Res<Geometry>(open ? "I.ChevronDown" : "I.ChevronRight");
+
+    public static DockPanel MenuFace(UIElement text, UIElement? lead = null)
+    {
+        var chevron = new Icon { Data = Res<Geometry>("I.ChevronDown"), Width = 11, Height = 11, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        chevron.SetResourceReference(Control.ForegroundProperty, "TextMuted");
+        DockPanel.SetDock(chevron, Dock.Right);
+        var row = new DockPanel { LastChildFill = true, Children = { chevron } };
+        if (lead is not null)
+        {
+            DockPanel.SetDock(lead, Dock.Left);
+            row.Children.Add(lead);
+        }
+        row.Children.Add(text);
+        return row;
+    }
+
     public static TextBlock EditorSection(string title)
     {
-        var block = new TextBlock { Text = title, Style = Res<Style>("H3"), FontSize = 13, Margin = new Thickness(0, 19, 0, 6) };
-        block.SetResourceReference(TextBlock.ForegroundProperty, "EyebrowText");
-        return block;
+        return new TextBlock { Text = title, Style = Res<Style>("Eyebrow"), Margin = new Thickness(0, 19, 0, 6) };
     }
 
     public const double FieldWidth = 356;
@@ -533,7 +575,7 @@ internal static class Ui
 
     public static Border RemovableChip(string text, Action remove)
     {
-        var panel = new StackPanel { Orientation = Orientation.Horizontal };
+        var panel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         panel.Children.Add(new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center });
         var x = new Button { Style = Res<Style>("QuietButton"), Padding = new Thickness(2), Margin = new Thickness(5, -2, -3, -2), ToolTip = "Remove",
             Content = new Icon { Data = Res<Geometry>("I.X"), Width = 9, Height = 9 } };
@@ -546,7 +588,9 @@ internal static class Ui
     public static Border Dialog(MainWindow window, string title, string subtitle, UIElement content, StackPanel buttons, TextBlock? error = null, double width = 518, FrameworkElement? leftAction = null)
     {
         var stack = new StackPanel();
-        stack.Children.Add(Text(title, "H2"));
+        var heading = Text(title, "H2");
+        heading.TextWrapping = TextWrapping.Wrap;
+        stack.Children.Add(heading);
         if (subtitle.Length > 0)
             stack.Children.Add(new TextBlock { Text = subtitle, Style = Res<Style>("Muted"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, DialogTitleGap, 0, 8) });
         else stack.Children.Add(new Border { Height = 8 });
@@ -707,11 +751,11 @@ internal static class Ui
     public static StackPanel PageSwitch(string label, CheckBox toggle, string? help = null)
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
-        row.Children.Add(new TextBlock { Text = label, Style = Res<Style>("Body"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
-        if (help is not null) row.Children.Add(HudSettings.HelpTip.For(help, label));
-        toggle.VerticalAlignment = VerticalAlignment.Center;
-        toggle.Margin = new Thickness(10, 0, 0, 0);
+        var heading = ToggleCards.RowTitle(label);
+        if (help is not null) AddInfo(heading, help);
         AutomationProperties.SetName(toggle, label);
+        ToggleCards.Row(toggle, heading, null);
+        toggle.VerticalAlignment = VerticalAlignment.Center;
         row.Children.Add(toggle);
         return row;
     }
@@ -802,11 +846,7 @@ internal static class Ui
         content.Children.Add(new Icon { Data = Res<Geometry>("I.Tune"), Width = 13, Height = 13, VerticalAlignment = VerticalAlignment.Center });
         content.Children.Add(new TextBlock { Text = ThemeManager.Case("Panels"), Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
         content.Children.Add(new Icon { Data = Res<Geometry>("I.ChevronDown"), Width = 8, Height = 8, Margin = new Thickness(4, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
-        var button = new Button
-        {
-            Style = Res<Style>("QuietButton"), Height = 23, Padding = new Thickness(8, 0, 7, 0),
-            VerticalAlignment = VerticalAlignment.Center, Content = content, ToolTip = tooltip,
-        };
+        var button = new Button { Style = Res<Style>("GhostButton"), VerticalAlignment = VerticalAlignment.Center, Content = content, ToolTip = tooltip };
         System.Windows.Automation.AutomationProperties.SetName(button, "Panels");
         Anchor(button, anchor);
         button.Click += (_, _) => openMenu(button);
@@ -815,19 +855,12 @@ internal static class Ui
         buttons.Children.Add(button);
         if (collapseAll is not null)
         {
-            var divider = Hairline.Rule(new Border { Margin = new Thickness(2, 3, 2, 3) }, Orientation.Vertical);
-            divider.SetResourceReference(Border.BackgroundProperty, "Line");
-            buttons.Children.Add(divider);
-            collapseAll.Style = Res<Style>("QuietButton");
-            collapseAll.Height = 23;
-            collapseAll.Padding = new Thickness(8, 0, 8, 0);
+            collapseAll.Style = Res<Style>("GhostButton");
+            collapseAll.Margin = new Thickness(ButtonGap, 0, 0, 0);
             collapseAll.VerticalAlignment = VerticalAlignment.Center;
             buttons.Children.Add(collapseAll);
         }
-        var tools = Hairline.Frame(new Tile { Padding = new Thickness(2), Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, CornerRadius = ThemeManager.Round(8), Child = buttons });
-        tools.SetResourceReference(Border.BackgroundProperty, "SurfaceAlt");
-        tools.SetResourceReference(Border.BorderBrushProperty, "BtnOutline");
-        return tools;
+        return new Tile { Margin = new Thickness(ButtonGap, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Child = buttons };
     }
 
     public static Tile Badge(string icon, string soft, string deep, double size, double radius, double iconSize)
@@ -859,7 +892,7 @@ internal static class Ui
 
     public static Border Chip(string text, string? soft = null, string? deep = null)
     {
-        var chip = new Tile { Style = Res<Style>("Chip"), Child = TextFit.TipWhenTrimmed(new TextBlock { Text = ThemeManager.Case(text), TextTrimming = TextTrimming.CharacterEllipsis }) };
+        var chip = new Tile { Style = Res<Style>("Chip"), Child = TextFit.TipWhenTrimmed(new TextBlock { Text = ThemeManager.Case(text), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center }) };
         if (soft is not null) { chip.Background = Res<Brush>(soft); chip.BorderBrush = Res<Brush>(ChipEdge(soft)); }
         if (deep is not null) ((TextBlock)chip.Child).Foreground = Res<Brush>(deep);
         if (soft == "DangerSoft") Danger(chip, (TextBlock)chip.Child, 9);
@@ -872,7 +905,7 @@ internal static class Ui
         return Application.Current.TryFindResource(family) is Brush ? family : soft;
     }
 
-    public static void Danger(Border tile, TextBlock text, double iconSize = 11)
+    public static void Danger(Border tile, TextBlock text, double iconSize = 11, bool icon = true)
     {
         tile.Background = Res<Brush>("DangerSoft");
         tile.BorderBrush = Res<Brush>("Danger");
@@ -880,8 +913,9 @@ internal static class Ui
         Tile.SetChamfer(tile, true);
         text.Foreground = Res<Brush>("DangerDeep");
         text.FontWeight = FontWeights.Bold;
-        var icon = new Icon { Data = Res<Geometry>("I.Alert"), Width = iconSize, Height = iconSize, Foreground = Res<Brush>("Danger"), Margin = new Thickness(0, 0, 4, 0) };
-        text.Inlines.InsertBefore(text.Inlines.FirstInline, new InlineUIContainer(icon) { BaselineAlignment = BaselineAlignment.Center });
+        if (!icon) return;
+        var alert = new Icon { Data = Res<Geometry>("I.Alert"), Width = iconSize, Height = iconSize, Foreground = Res<Brush>("Danger"), Margin = new Thickness(0, 0, 4, 0) };
+        text.Inlines.InsertBefore(text.Inlines.FirstInline, new InlineUIContainer(alert) { BaselineAlignment = BaselineAlignment.Center });
     }
 
     public static Tile DangerBanner(string title, string? detail = null) => Notice("Danger", "I.Alert", title, detail);
@@ -1007,6 +1041,7 @@ internal static class Ui
 
     public static Grid SettingRow(string title, string? description, UIElement control, SettingDefault? fallback = null, string? more = null)
     {
+        if (ToggleCards.IsSwitch(control)) return SwitchRow(title, description, (CheckBox)control, fallback, more);
         var grid = new SettingRowGrid { Margin = new Thickness(0, 8, 0, 8) };
         NameFor(control, title);
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3000, GridUnitType.Star), MaxWidth = SettingLabelMax });
@@ -1076,11 +1111,27 @@ internal static class Ui
         return grid;
     }
 
+    private static SettingRowGrid SwitchRow(string title, string? description, CheckBox toggle, SettingDefault? fallback, string? more)
+    {
+        var grid = new SettingRowGrid { Margin = new Thickness(0, 8, 0, 8) };
+        NameFor(toggle, title);
+        var heading = ToggleCards.RowTitle(title);
+        if (more is not null) AddInfo(heading, more);
+        FrameworkElement head = heading;
+        FrameworkElement? reset = null;
+        if (fallback is not null)
+        {
+            head = Marked(heading, out var dot);
+            reset = WithReset(grid, new Border(), dot, fallback) as FrameworkElement;
+        }
+        ToggleCards.Row(toggle, head, description, trailing: reset);
+        grid.Children.Add(toggle);
+        return grid;
+    }
+
     public static TextBlock SubHeader(string text, bool first = false)
     {
-        var head = new TextBlock { Text = text, Style = Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, first ? 3 : 13, 0, 2) };
-        head.SetResourceReference(TextBlock.ForegroundProperty, "EyebrowText");
-        return head;
+        return new TextBlock { Text = text, Style = Res<Style>("Eyebrow"), Margin = new Thickness(0, first ? 3 : 13, 0, 2) };
     }
 
     public static System.Windows.Shapes.Ellipse ChangedDot()
@@ -1192,6 +1243,13 @@ internal static class Ui
         row.MouseLeave += (_, _) => row.Background = Brushes.Transparent;
     }
 
+    public static void HoverHighlight(Panel row)
+    {
+        row.Background = Brushes.Transparent;
+        row.MouseEnter += (_, _) => row.SetResourceReference(Panel.BackgroundProperty, "Hover");
+        row.MouseLeave += (_, _) => row.Background = Brushes.Transparent;
+    }
+
     private static double LongestWord(TextBlock tb)
     {
         double longest = 0;
@@ -1243,17 +1301,15 @@ internal static class Ui
 
     public static StackPanel SliderWithValue(double min, double max, double value, Func<double, string> format, Action<double> changed, double width = 146, double step = 1)
     {
-        var label = new TextBlock { Width = 42, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Foreground = Res<Brush>("TextMuted"), FontSize = 12 };
-        var slider = new Slider { Minimum = min, Maximum = max, Value = value, Width = width, IsSnapToTickEnabled = true, TickFrequency = step, SmallChange = step, LargeChange = step * 5 };
-        label.Text = format(value);
+        var slider = new Slider { Minimum = min, Maximum = max, Value = value, Width = width + 42, IsSnapToTickEnabled = true, TickFrequency = step, SmallChange = step, LargeChange = step * 5 };
+        SliderFace.SetText(slider, format(value));
         slider.ValueChanged += (_, e) =>
         {
-            label.Text = format(e.NewValue);
+            SliderFace.SetText(slider, format(e.NewValue));
             changed(e.NewValue);
         };
         var panel = new StackPanel { Orientation = Orientation.Horizontal };
         panel.Children.Add(slider);
-        panel.Children.Add(label);
         return panel;
     }
 

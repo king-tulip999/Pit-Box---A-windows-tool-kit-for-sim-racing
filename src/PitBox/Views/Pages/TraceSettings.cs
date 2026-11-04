@@ -74,7 +74,7 @@ internal static class TraceSettings
                 {
                     popup.IsOpen = false;
                     if (!await window.Confirm($"Remove {SimRacing.Race.RaceFormat.Count(drop, "lap trace")}?",
-                            "They no longer fit what you chose to keep, so their lines and inputs are deleted now. Lap times and stats stay.",
+                            "They no longer fit what you chose to keep, so their lines and inputs are removed now. Lap times and stats stay.",
                             "Remove", danger: true))
                     {
                         reverting = true;
@@ -95,8 +95,9 @@ internal static class TraceSettings
             void OnSettle(object? sender, EventArgs e) { _settle!.Stop(); _settle.Tick -= OnSettle; stats.RetentionChanged(); }
         }
 
-        body.Children.Add(Ui.Text("Lap traces", "H3"));
-        body.Children.Add(new TextBlock { Text = "Every lap's line and inputs, recorded while you drive or read from iRacing's telemetry files, for lap analysis.", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 8) });
+        var heading = Ui.Text("Lap traces", "H3");
+        heading.Margin = new Thickness(0, 0, 0, 8);
+        body.Children.Add(heading);
         var usage = new TextBlock { Text = "Working out the space used…", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) };
 
         static void Show(ComboBox box, int value) =>
@@ -172,8 +173,14 @@ internal static class TraceSettings
 
     private static FrameworkElement Row(string label, FrameworkElement control, string? help)
     {
-        var row = new DockPanel { Margin = new Thickness(0, 0, 0, 8), ToolTip = help };
         Ui.NameFor(control, label);
+        if (ToggleCards.IsSwitch(control))
+        {
+            var card = ToggleCards.Row((CheckBox)control, ToggleCards.RowTitle(label), help);
+            card.Margin = new Thickness(0, 0, 0, 6);
+            return card;
+        }
+        var row = new DockPanel { Margin = new Thickness(0, 0, 0, 8), ToolTip = help };
         control.VerticalAlignment = VerticalAlignment.Center;
         DockPanel.SetDock(control, Dock.Right);
         row.Children.Add(control);

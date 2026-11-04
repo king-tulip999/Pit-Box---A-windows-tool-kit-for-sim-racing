@@ -25,7 +25,8 @@ internal static class FuelEditor
                     new("Stops", "add", "stops", "window"),
                 }) { ShowIf = Has("parts", "figures") },
                 new PickerSetting("cols", NoCategories) { ShowIf = Has("parts", "table") },
-                new PickerSetting("rows", NoCategories) { ShowIf = Has("parts", "table") }),
+                new PickerSetting("rows", NoCategories) { ShowIf = Has("parts", "table") },
+                O("exitLook") with { ShowIf = o => Has("parts", "pitexit")(o) || Has("parts", "undercut")(o) }),
         },
         Regions = new Dictionary<string, string> { ["title"] = "title" },
         Presets = new HudPreset[]

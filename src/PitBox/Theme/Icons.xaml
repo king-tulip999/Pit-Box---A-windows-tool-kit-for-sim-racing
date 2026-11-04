@@ -54,6 +54,8 @@
     <Geometry x:Key="I.ChevronDown">M6 9l6 6 6-6</Geometry>
     <Geometry x:Key="I.ChevronUp">M6 15l6-6 6 6</Geometry>
     <Geometry x:Key="I.ArrowRight">M5 12h14M13 6l6 6-6 6</Geometry>
+    <Geometry x:Key="I.ArrowUp">M12 20V4M6 10l6-6 6 6</Geometry>
+    <Geometry x:Key="I.Needle">M12 3l4 9h-8z</Geometry>
     <Geometry x:Key="I.TrendingUp">M3 17l6-6 4 4 8-8M14 7h7v7</Geometry>
     <Geometry x:Key="I.ChevronsDown">M7 6l5 5 5-5M7 13l5 5 5-5</Geometry>
     <Geometry x:Key="I.ChevronsUp">M7 11l5-5 5 5M7 18l5-5 5 5</Geometry>

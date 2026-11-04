@@ -7,6 +7,7 @@ using PitBox.Plugins;
 using PitBox.Plugins.BuiltIn;
 using PitBox.Services;
 using PitBox.SimRacing.Shakers;
+using PitBox.SimRacing.Shakers.Games;
 using PitBox.SimRacing.Telemetry;
 using PitBox.Theme;
 
@@ -19,6 +20,11 @@ internal sealed class ShakersSection : Tile
     private readonly ContentControl _status = new();
     private ShakerHost? _subscribed;
     private List<AudioDevice>? _devices;
+    private string _builtFor = "";
+    private long _listedAt = long.MinValue / 2;
+    private int _listing;
+    private const int FreshListMs = 2000;
+    private bool _gamesOpen;
 
     public ShakersSection(AppServices app)
     {
@@ -40,9 +46,22 @@ internal sealed class ShakersSection : Tile
             _app.Telemetry.StatusChanged += OnStatus;
             _subscribed = host;
         }
-        _devices = null;
+        if (Signature() != _builtFor) Build();
+        else ShowStatus();
+        if (!_app.Demo && Environment.TickCount64 - _listedAt > FreshListMs) _ = ListDevices();
+    }
+
+    private async Task ListDevices()
+    {
+        int listing = ++_listing;
+        _listedAt = Environment.TickCount64;
+        var devices = await Task.Run(SafeList);
+        if (listing != _listing || _devices is not null && devices.SequenceEqual(_devices)) return;
+        _devices = devices;
         Build();
     }
+
+    private string Signature() => System.Text.Json.JsonSerializer.Serialize(S, ConfigStore.JsonOptions);
 
     public void OnHidden()
     {
@@ -56,6 +75,7 @@ internal sealed class ShakersSection : Tile
 
     private void Changed()
     {
+        _builtFor = Signature();
         _app.Save();
         Host?.SettingsChanged();
     }
@@ -63,11 +83,16 @@ internal sealed class ShakersSection : Tile
     private void Build()
     {
         _stack.Children.Clear();
-        _devices ??= _app.Demo ? new List<AudioDevice>() : SafeList();
+        _builtFor = Signature();
+        if (_devices is null)
+        {
+            _devices = _app.Demo ? new List<AudioDevice>() : SafeList();
+            _listedAt = Environment.TickCount64;
+        }
         _stack.Children.Add(_status);
         ShowStatus();
 
-        var outputs = Group("Output", first: true);
+        var outputs = Group("Output", first: true, columns: 2);
         var choices = new List<Choice> { new(null, "Choose an output…") };
         choices.AddRange(_devices.Select(d => new Choice(d.Id, d.Name)));
         if (S.DeviceId is { } id && _devices.All(d => d.Id != id)) choices.Add(new Choice(id, $"{S.DeviceName ?? "Saved output"} (not connected)"));
@@ -88,27 +113,55 @@ internal sealed class ShakersSection : Tile
         outputs.Children.Add(Ui.SettingRow("Volume", null, Ui.SliderWithValue(0, 100, S.Volume, "{0:0}%", v => { S.Volume = (int)v; Changed(); }, 120)));
 
         var sources = Group("Sources");
-        var modes = new[] { ShakerIracing.Effects, ShakerIracing.GameAudio, ShakerIracing.Off };
-        sources.Children.Add(Ui.SettingRow("In iRacing", "Off leaves the shakers to iRacing's own bass shaker output.",
-            Ui.Segmented(new[] { "Effects", "Game audio", "Off" }, Array.IndexOf(modes, S.InIracing), i =>
+        var modes = new[] { ShakerMode.Effects, ShakerMode.GameAudio, ShakerMode.Off };
+        sources.Children.Add(Ui.SettingRow("In supported games", "iRacing and the games below. Off leaves the shakers to a game's own bass shaker output.",
+            Ui.Segmented(new[] { "Effects", "Game audio", "Off" }, Array.IndexOf(modes, S.Mode), i =>
             {
-                S.InIracing = modes[i];
+                S.Mode = modes[i];
                 Changed();
                 Dispatcher.BeginInvoke(Build);
             }, "shaker-iracing")));
-        var games = Ui.SettingRow("Other games", "The low rumble from a listed game's own sound while it runs. Music, chat and other programs aren't used.",
+        if (S.Mode != ShakerMode.Off) sources.Children.Add(SupportedGames());
+        var gamesBox = GamesBox();
+        gamesBox.MaxWidth = double.PositiveInfinity;
+        gamesBox.HorizontalAlignment = HorizontalAlignment.Stretch;
+        gamesBox.Margin = new Thickness(0, 6, 0, 0);
+        Ui.NameFor(gamesBox, "Games");
+        var gameList = new StackPanel
+        {
+            Margin = new Thickness(0, 8, 0, 8),
+            Children =
+            {
+                new TextBlock { Text = "Games", Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold },
+                new TextBlock { Text = "Program names, separated by commas.", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) },
+                gamesBox,
+            },
+        };
+        var audioRows = AddGameAudio();
+        void ShowUsed()
+        {
+            Use(gameList, S.OtherGames);
+            foreach (var row in audioRows) Use(row, S.OtherGames || S.Mode == ShakerMode.GameAudio);
+        }
+        static void Use(FrameworkElement row, bool on)
+        {
+            row.IsEnabled = on;
+            row.Opacity = on ? 1 : 0.45;
+        }
+        var games = Ui.SettingRow("Other games", "The low rumble from a listed game's own sound while it runs, also for a supported game that sends no telemetry. Music, chat and other programs aren't used.",
             Ui.Switch(S.OtherGames, v =>
             {
                 S.OtherGames = v;
                 Changed();
-                Dispatcher.BeginInvoke(Build);
+                ShowUsed();
             }));
         Ui.Anchor(games, "simracing.shakers.games");
         sources.Children.Add(games);
-        if (S.OtherGames) sources.Children.Add(Ui.SettingRow("Games", "Program names, separated by commas.", GamesBox()));
-        if (S.OtherGames || S.InIracing == ShakerIracing.GameAudio) AddGameAudio(sources);
+        sources.Children.Add(gameList);
+        foreach (var row in audioRows) sources.Children.Add(row);
+        ShowUsed();
 
-        if (S.InIracing != ShakerIracing.Effects) return;
+        if (S.Mode != ShakerMode.Effects) return;
         _stack.Children.Add(Ui.SubHeader("Effects"));
         var effects = new EvenGrid { MinItemWidth = EffectMin, ColumnSteps = new[] { 1, 3, 5 }, ColumnGap = 8, RowGap = 8, Margin = new Thickness(0, 4, 0, 0) };
         effects.Children.Add(EffectTile(ShakerEffect.Engine, "Engine", "A hum that rises from idle to the red line and grows with the throttle.", S.Engine));
@@ -136,21 +189,74 @@ internal sealed class ShakersSection : Tile
 
     private const double EffectMin = 200;
 
-    private SettingsFlow Group(string title, bool first = false)
+    private StackPanel SupportedGames()
+    {
+        var panel = new StackPanel { Margin = new Thickness(0, 4, 0, 4) };
+        var list = new StackPanel { Visibility = _gamesOpen ? Visibility.Visible : Visibility.Collapsed, Margin = new Thickness(3, 3, 0, 0) };
+        var chevron = Ui.FoldChevron(_gamesOpen);
+        var label = new StackPanel { Orientation = Orientation.Horizontal };
+        label.Children.Add(chevron);
+        var count = new TextBlock { VerticalAlignment = VerticalAlignment.Center };
+        void Count() => count.Text = $"Supported games ({ShakerGames.All.Count(g => S.GameOn(g.Id))} of {ShakerGames.All.Count} on)";
+        Count();
+        label.Children.Add(count);
+        var toggle = new Button { Style = Ui.Res<Style>("QuietButton"), Content = label, HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(5, 3, 6, 3) };
+        ClickGuard.SetAllowRepeat(toggle, true);
+        toggle.Click += (_, _) =>
+        {
+            _gamesOpen = list.Visibility != Visibility.Visible;
+            list.Visibility = _gamesOpen ? Visibility.Visible : Visibility.Collapsed;
+            Ui.SetFold(chevron, _gamesOpen);
+        };
+        Ui.Anchor(toggle, "simracing.shakers.supported");
+        var flow = new SettingsFlow();
+        foreach (var game in ShakerGames.All)
+        {
+            FrameworkElement? portRow = null;
+            if (game.UsesPort)
+            {
+                var port = new NumberBox(S.Port(game.Id, game.Port), "", 64) { Minimum = ShakerSettings.MinPort, Maximum = ShakerSettings.MaxPort };
+                port.ValueChanged += v =>
+                {
+                    int p = (int)v;
+                    if (p == game.Port) S.Ports.Remove(game.Id);
+                    else S.Ports[game.Id] = p;
+                    Changed();
+                };
+                portRow = Ui.SettingRow($"{game.Name} port", null, port);
+                portRow.Margin = new Thickness(24, 0, 0, 4);
+                portRow.Visibility = S.GameOn(game.Id) ? Visibility.Visible : Visibility.Collapsed;
+            }
+            flow.Children.Add(Ui.SettingRow(game.Name, game.Setup, Ui.Switch(S.GameOn(game.Id), v =>
+            {
+                S.SetGameOn(game.Id, v);
+                if (portRow is not null) portRow.Visibility = v ? Visibility.Visible : Visibility.Collapsed;
+                Count();
+                Changed();
+            })));
+            if (portRow is not null) flow.Children.Add(portRow);
+        }
+        list.Children.Add(flow);
+        panel.Children.Add(toggle);
+        panel.Children.Add(list);
+        return panel;
+    }
+
+    private SettingsFlow Group(string title, bool first = false, int columns = 3)
     {
         _stack.Children.Add(Ui.SubHeader(title, first));
-        var flow = new SettingsFlow();
+        var flow = new SettingsFlow { MaxColumns = columns };
         _stack.Children.Add(flow);
         return flow;
     }
 
-    private void AddGameAudio(Panel group)
-    {
-        group.Children.Add(Ui.SettingRow("Game audio strength", null,
-            Ui.SliderWithValue(0, 100, S.GameAudioStrength, v => v <= 0 ? "Off" : $"{v:0}%", v => { S.GameAudioStrength = (int)v; Changed(); }, 120)));
-        group.Children.Add(Ui.SettingRow("Rumble below", "Only game sound below this pitch reaches the shakers.",
-            Ui.SliderWithValue(ShakerSettings.MinCutoffHz, ShakerSettings.MaxHz, S.GameAudioCutoffHz, v => $"{v:0} {Units.Hz}", v => { S.GameAudioCutoffHz = (int)v; Changed(); }, 120)));
-    }
+    private FrameworkElement[] AddGameAudio() =>
+    [
+        Ui.SettingRow("Game audio strength", null,
+            Ui.SliderWithValue(0, 100, S.GameAudioStrength, v => v <= 0 ? "Off" : $"{v:0}%", v => { S.GameAudioStrength = (int)v; Changed(); }, 120)),
+        Ui.SettingRow("Rumble below", "Only game sound below this pitch reaches the shakers.",
+            Ui.SliderWithValue(ShakerSettings.MinCutoffHz, ShakerSettings.MaxHz, S.GameAudioCutoffHz, v => $"{v:0} {Units.Hz}", v => { S.GameAudioCutoffHz = (int)v; Changed(); }, 120)),
+    ];
 
     private TextBox GamesBox()
     {
@@ -179,20 +285,16 @@ internal sealed class ShakersSection : Tile
         name.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
         head.Children.Add(name);
 
-        var value = new TextBlock { Text = Shown(x.Strength), Width = 42, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center, FontSize = 12 };
-        value.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
-        System.Windows.Documents.Typography.SetNumeralAlignment(value, FontNumeralAlignment.Tabular);
         var slider = new Slider { Minimum = 0, Maximum = 100, Value = x.Strength, IsSnapToTickEnabled = true, TickFrequency = 1, SmallChange = 1, LargeChange = 5, VerticalAlignment = VerticalAlignment.Center };
         System.Windows.Automation.AutomationProperties.SetName(slider, title);
+        SliderFace.SetText(slider, Shown(x.Strength));
         slider.ValueChanged += (_, e) =>
         {
-            value.Text = Shown(e.NewValue);
+            SliderFace.SetText(slider, Shown(e.NewValue));
             x.Strength = (int)e.NewValue;
             Changed();
         };
         var strength = new DockPanel { Margin = new Thickness(0, 10, 0, 0) };
-        DockPanel.SetDock(value, Dock.Right);
-        strength.Children.Add(value);
         strength.Children.Add(slider);
 
         var body = new DockPanel();
@@ -215,7 +317,9 @@ internal sealed class ShakersSection : Tile
             : host?.Problem is { } problem ? ($"Can't play: {problem}", "WarnSoft", "Warn")
             : S.DeviceId is null ? ("Choose an output to start", "ApricotSoft", "ApricotDeep")
             : host?.Playing == true && host.Source == ShakerSource.GameAudio ? ($"Playing game audio from “{host.Game}”", "SageSoft", "SageDeep")
-            : host?.Playing == true ? ("Playing iRacing effects", "SageSoft", "SageDeep")
+            : host?.Playing == true && host.Game is { } playing ? ($"Playing effects for “{playing}”", "SageSoft", "SageDeep")
+            : host?.Playing == true ? ("Playing effects", "SageSoft", "SageDeep")
+            : host?.WaitingFor is { } waiting ? ($"“{waiting.Name}” is running but sends no telemetry", "ApricotSoft", "ApricotDeep")
             : (Waiting(), "SlateSoft", "SlateDeep");
         var chip = Ui.Chip(text, soft, deep);
         chip.HorizontalAlignment = HorizontalAlignment.Left;
@@ -223,11 +327,10 @@ internal sealed class ShakersSection : Tile
         _status.Content = chip;
     }
 
-    private string Waiting() => (S.InIracing != ShakerIracing.Off, S.OtherGames) switch
+    private string Waiting() => (S.Mode != ShakerMode.Off, S.OtherGames) switch
     {
-        (true, true) => "Waiting for iRacing or a game",
-        (true, false) => "Waiting for iRacing",
-        (false, true) => "Waiting for a game",
+        (true, _) => "Waiting for a game",
+        (false, true) => "Waiting for a listed game",
         _ => "Off in every game",
     };
 

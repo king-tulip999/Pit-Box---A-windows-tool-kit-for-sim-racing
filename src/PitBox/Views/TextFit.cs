@@ -51,7 +51,10 @@ internal static class TextFit
     {
         tb.SetValue(TrimTipProperty, true);
         tb.SizeChanged += (_, _) => Update(tb);
-        tb.Loaded += (_, _) => Update(tb);
+        tb.Loaded += (_, _) =>
+        {
+            if (!CheckedAsIs(tb)) Update(tb);
+        };
         tb.ToolTipOpening += (_, e) =>
         {
             if (!Update(tb)) e.Handled = true;
@@ -61,8 +64,18 @@ internal static class TextFit
 
     public static bool HasTrimTip(DependencyObject d) => (bool)d.GetValue(TrimTipProperty);
 
+    private sealed record TrimCheck(double Width, double Height, string Text, double FontSize);
+
+    private static readonly DependencyProperty TrimCheckedProperty =
+        DependencyProperty.RegisterAttached("TrimChecked", typeof(TrimCheck), typeof(TextFit), new PropertyMetadata(null));
+
+    private static bool CheckedAsIs(TextBlock tb) =>
+        tb.GetValue(TrimCheckedProperty) is TrimCheck seen
+        && seen.Width == tb.ActualWidth && seen.Height == tb.ActualHeight && seen.FontSize == tb.FontSize && string.Equals(seen.Text, tb.Text, StringComparison.Ordinal);
+
     private static bool Update(TextBlock tb)
     {
+        tb.SetValue(TrimCheckedProperty, new TrimCheck(tb.ActualWidth, tb.ActualHeight, tb.Text, tb.FontSize));
         if (IsTrimmed(tb))
         {
             if (tb.ToolTip is not ToolTip { Content: string shown } || shown != tb.Text) tb.ToolTip = TextCase.VerbatimTip(tb.Text);

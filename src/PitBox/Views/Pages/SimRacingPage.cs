@@ -18,7 +18,7 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
     private readonly AppServices _app;
     private readonly MainWindow _window;
     private readonly StackPanel _body = new() { Margin = new Thickness(23, 0, 23, 23) };
-    private readonly FovSection _fov;
+    private FovSection? _fov;
     private IracingControllerSection? _controller;
     private CompanionAppSection? _tradingPaints, _garage61;
     private readonly System.Windows.Controls.Primitives.UniformGrid _companions = new() { Columns = 1, VerticalAlignment = VerticalAlignment.Top };
@@ -28,6 +28,8 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
     private readonly ScrollViewer _scroll;
     private readonly SectionView _view;
     private bool _shown;
+    private ContentFrame _frame = null!;
+    private const double SetupsWidth = 1680;
 
     public event Action? SectionsChanged;
 
@@ -35,7 +37,7 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
     {
         _app = app;
         _window = window;
-        var scroll = _scroll = new ScrollViewer { Style = Ui.Res<Style>("PageScroll"), Content = Ui.PageFrame(_body), Focusable = false };
+        var scroll = _scroll = new ScrollViewer { Style = Ui.Res<Style>("PageScroll"), Content = _frame = Ui.PageFrame(_body), Focusable = false };
         Ui.ChainWheel(scroll);
         Content = scroll;
         _view = new SectionView(() => _scroll);
@@ -46,9 +48,8 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
         _body.Children.Add(heading);
         _body.Children.Add(_view.Content);
 
-        _fov = new FovSection(app, window);
         _view.Add(Def("fov", "The correct field of view for your seat and screens, so speed, distance and apexes look real.",
-            () => _fov, "simracing.fov", () => _fov.OnShown()));
+            () => _fov ??= new FovSection(app, window), "simracing.fov", () => _fov?.OnShown()));
         _view.Add(Def("iracing", "Every iRacing setting with a plain-language description, a health check and backups.",
             () => _controller = new IracingControllerSection(_app, _window), "simracing.iracing",
             () => _controller?.OnShown()));
@@ -65,6 +66,9 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
             BuildCompanions, "simracing.companions",
             ShowCompanions, HideCompanions));
 
+        var visible = Visible();
+        if (visible.Contains("iracing")) IracingControllerSection.Preload(app);
+        if (visible.Contains("fov")) FovSection.Warm();
         Layout(animate: false);
     }
 
@@ -199,13 +203,17 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
             : Saved is { } saved && visible.Contains(saved, StringComparer.OrdinalIgnoreCase) ? visible.First(v => string.Equals(v, saved, StringComparison.OrdinalIgnoreCase))
             : visible.FirstOrDefault();
         _view.Show(want, animate && _shown);
+        FitFrame();
         SectionsChanged?.Invoke();
     }
+
+    private void FitFrame() => _frame.DesignWidth = _view.Current == "setups" ? SetupsWidth : Ui.PageWidth;
 
     public void ShowSection(string id)
     {
         if (!Visible().Contains(id, StringComparer.OrdinalIgnoreCase) || string.Equals(_view.Current, id, StringComparison.OrdinalIgnoreCase)) return;
         _view.Show(Visible().First(v => string.Equals(v, id, StringComparison.OrdinalIgnoreCase)), _shown);
+        FitFrame();
         _app.Config.Ui.PageSections[PageKey] = _view.Current!;
         _app.Save();
         SectionsChanged?.Invoke();
@@ -266,6 +274,15 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
         _shown = true;
         _view.SetActive(true);
         _view.BuildLater(Visible());
+        Motion.AfterPageSettles(Dispatcher, WarmSections);
+    }
+
+    private void WarmSections()
+    {
+        if (!_shown) return;
+        var visible = Visible();
+        if (_hud is null && visible.Contains("hud")) PreviewSource.Warm(() => _app.Config.SimRacing.Hud);
+        if (_controller is null && visible.Contains("iracing")) IracingControllerSection.Preload(_app);
     }
 
     public void OnHidden()
@@ -352,7 +369,7 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
         });
         yield return ("menus-closed", () => { if (dropdown is not null) dropdown.IsDropDownOpen = false; return Task.CompletedTask; });
         Only("fov");
-        foreach (var state in _fov.ScreenshotStates())
+        foreach (var state in _fov?.ScreenshotStates() ?? Enumerable.Empty<(string, Func<Task>)>())
             yield return state;
         Only("setups");
         foreach (var state in _setups?.ScreenshotStates() ?? Enumerable.Empty<(string, Func<Task>)>())
