@@ -59,7 +59,7 @@ internal static class HudTable
             var c = columns[i];
             natural[i] = c.Flex
                 ? (c.Template.Length > 0 ? p.Measure(c.Template, font) : 0) + (c.ProTag is not null ? ProTagWidth(p) + 6 : 0)
-                : Math.Max(p.Measure(c.Template, IsPosition(c) ? bold : font), p.Measure(c.Header, p.Tiny)) + 2;
+                : Math.Max(p.Measure(c.Template, IsPosition(c) ? bold : font), p.Measure(c.Header, p.Tiny)) + 2 + (c.ProTag is not null ? ProTagWidth(p) + 6 : 0);
             flex[i] = c.Flex;
             position[i] = IsPosition(c);
             keep[i] = c.Id == "gap";
@@ -82,7 +82,7 @@ internal static class HudTable
             var c = columns[i];
             sum += c.Flex
                 ? Math.Max(60, (c.Template.Length > 0 ? p.Measure(c.Template, font) : 0) + (c.ProTag is not null ? ProTagWidth(p) + 6 : 0))
-                : Math.Max(p.Measure(c.Template, IsPosition(c) ? bold : font), p.Measure(c.Header, p.Tiny)) + 2;
+                : Math.Max(p.Measure(c.Template, IsPosition(c) ? bold : font), p.Measure(c.Header, p.Tiny)) + 2 + (c.ProTag is not null ? ProTagWidth(p) + 6 : 0);
             if (i > 0) sum += Gap;
         }
         return MathF.Ceiling(sum);
@@ -135,7 +135,8 @@ internal static class HudTable
         int start = 0;
         if (cols.Count > 0 && IsPosition(cols[0].Col))
         {
-            p.Text(cols[0].Col.Header, p.Tiny, p.P.Faint, new RectangleF(x, row.Y, cols[0].Width + BlockPad, row.Height), HAlign.Center, VAlign.Center);
+            float tagRoom = cols[0].Col.ProTag is not null ? ProTagWidth(p) + 6 : 0;
+            p.Text(cols[0].Col.Header, p.Tiny, p.P.Faint, new RectangleF(x, row.Y, cols[0].Width - tagRoom + BlockPad, row.Height), HAlign.Center, VAlign.Center);
             x += cols[0].Width + BlockPad;
             start = 1;
         }
@@ -143,7 +144,8 @@ internal static class HudTable
         for (int i = start; i < cols.Count; i++)
         {
             var (col, w) = cols[i];
-            p.Text(col.Header, p.Tiny, p.P.Faint, new RectangleF(x, row.Y, w, row.Height), col.Align, VAlign.Center);
+            float headW = !col.Flex && col.ProTag is not null ? Math.Max(0, w - ProTagWidth(p) - 6) : w;
+            p.Text(col.Header, p.Tiny, p.P.Faint, new RectangleF(x, row.Y, headW, row.Height), col.Align, VAlign.Center);
             x += w + Gap;
         }
     }
@@ -170,12 +172,14 @@ internal static class HudTable
         if (cols.Count > 0 && IsPosition(cols[0].Col))
         {
             var (pc, pw) = cols[0];
-            var block = new RectangleF(row.X, row.Y, pw + BlockPad, row.Height);
+            float tagRoom = pc.ProTag is not null ? ProTagWidth(p) + 6 : 0;
+            var block = new RectangleF(row.X, row.Y, pw - tagRoom + BlockPad, row.Height);
             var cell = pc.Value(car);
             Color? bg = cell.Pill ?? (emphasis == 1 && style.PositionBlock ? pal.Player : null);
             if (bg is { } b) p.Fill(block, dim ? HudPalette.Alpha(b, 150) : b);
             p.Text(cell.Text, bold, bg is { } on ? HudPalette.On(on) : Shade(pal.Heading), block, HAlign.Center, VAlign.Center, false);
-            x = block.Right;
+            if (tagRoom > 0) ProTag(p, pc, car, new RectangleF(block.Right + 6, row.Y, tagRoom - 6, row.Height), dim);
+            x = block.Right + tagRoom;
             start = 1;
         }
         x += StripeLead;
@@ -186,10 +190,11 @@ internal static class HudTable
             var box = new RectangleF(x, row.Y, w, row.Height);
             if (col.Draw is { } draw) { draw(p, car, box, dim); x += w + Gap; continue; }
             var cell = col.Value(car);
+            if (!col.Flex) box = ProTag(p, col, car, box, dim);
             if (cell.Pill is { } pill && cell.Text.Length > 0)
             {
-                float pw = Math.Min(w, p.Measure(cell.Text, p.SmallBold) + 8);
-                float px = col.Align == HAlign.Right ? box.Right - pw : col.Align == HAlign.Center ? box.X + (w - pw) / 2 : box.X;
+                float pw = Math.Min(box.Width, p.Measure(cell.Text, p.SmallBold) + 8);
+                float px = col.Align == HAlign.Right ? box.Right - pw : col.Align == HAlign.Center ? box.X + (box.Width - pw) / 2 : box.X;
                 p.Pill(new RectangleF(px, row.Y + row.Height * 0.16f, pw, row.Height * 0.68f), cell.Text, dim ? HudPalette.Alpha(pill, 150) : pill, p.SmallBold);
                 x += w + Gap;
                 continue;
@@ -221,21 +226,28 @@ internal static class HudTable
                     Stopwatch(p, outside, fastFore);
                 }
             }
-            if (col.ProTag?.Invoke(car) is { } pro && box.Width > ProTagWidth(p) + 40)
-            {
-                float tw = ProTagWidth(p), th = Math.Min(row.Height - 4, p.LineHeight(p.Tiny) + 5);
-                var tag = new RectangleF(box.Right - tw, row.Y + (row.Height - th) / 2, tw, th);
-                var fill = pro ? pal.Accent : HudPalette.Alpha(Color.White, 26);
-                p.Fill(tag, dim ? HudPalette.Alpha(fill, 150) : fill, 2);
-                p.Text(pro ? "PRO" : "AM", p.Tiny, pro ? HudPalette.On(pal.Accent) : HudPalette.Alpha(Color.White, dim ? 150 : 255), tag, HAlign.Center, VAlign.Center, false);
-                box = new RectangleF(box.X, box.Y, box.Width - tw - 6, box.Height);
-            }
+            if (col.Flex && box.Width > ProTagWidth(p) + 40) box = ProTag(p, col, car, box, dim);
             p.Text(cell.Text, cell.Bold ? bold : font, Shade(cell.Color), box, col.Align, VAlign.Center);
             x += w + Gap;
         }
     }
 
     private static float ProTagWidth(HudPainter p) => p.Measure("PRO", p.Tiny) + 10;
+
+    private static RectangleF ProTag(HudPainter p, Column col, int car, RectangleF box, bool dim)
+    {
+        if (col.ProTag is null) return box;
+        float tw = ProTagWidth(p);
+        var rest = new RectangleF(box.X, box.Y, Math.Max(0, box.Width - tw - 6), box.Height);
+        if (col.ProTag(car) is not { } pro) return rest;
+        var pal = p.P;
+        float th = Math.Min(box.Height - 4, p.LineHeight(p.Tiny) + 5);
+        var tag = new RectangleF(box.Right - tw, box.Y + (box.Height - th) / 2, tw, th);
+        var fill = pro ? pal.Accent : HudPalette.Alpha(Color.White, 26);
+        p.Fill(tag, dim ? HudPalette.Alpha(fill, 150) : fill, 2);
+        p.Text(pro ? "PRO" : "AM", p.Tiny, pro ? HudPalette.On(pal.Accent) : HudPalette.Alpha(Color.White, dim ? 150 : 255), tag, HAlign.Center, VAlign.Center, false);
+        return rest;
+    }
 
     private static void Stopwatch(HudPainter p, RectangleF tag, Color c)
     {
@@ -434,6 +446,8 @@ internal static class FieldColumns
         string times = Choice(TimeFormat);
         string Time(double? t) => RaceFormat.LapTime(t, times);
         bool proAm = ProAmOn(v);
+        bool tagBesideClassPos = proAm && v.Options.Columns("columns").Contains("cpos");
+        Func<int, bool?> proTag = car => D(car) is { } pd ? ProAm.IsPro(pd.Name) : null;
         switch (id)
         {
             case "pos":
@@ -445,7 +459,7 @@ internal static class FieldColumns
                     int cp = proAm ? ProAmPosition(v, car) : r.StandingOf(car)?.ClassPosition ?? f.CarClassPosition[car];
                     return new Cell(cp > 0 ? cp.ToString() : RaceFormat.Missing, Text(car),
                         Pill: f.CarSurface[car] == TrackSurface.OffTrack && f.CarActive(car) ? HudPalette.FlagYellow : null);
-                });
+                }) { ProTag = tagBesideClassPos ? proTag : null };
             case "change":
                 return new Column(id, "+/−", "▲00", HAlign.Right, car => r.PositionsGained(car) switch
                 {
@@ -466,7 +480,7 @@ internal static class FieldColumns
                 }, Flex: true)
                 {
                     Marks = v.Def.Option("marks") is not null && v.Options.Bool("marks") ? (car, list) => Marks(pal, f, car, list) : null,
-                    ProTag = proAm ? car => D(car) is { } pd ? ProAm.IsPro(pd.Name) : null : null,
+                    ProTag = proAm && !tagBesideClassPos ? proTag : null,
                 };
             case "team": return new Column(id, "TEAM", "Team Name Here", HAlign.Left, car => D(car) is { TeamName.Length: > 0 } d ? new Cell(d.TeamName, pal.Muted) : None);
             case "badge":
@@ -718,7 +732,7 @@ internal sealed class StandingsWidget : HudWidget
     private readonly List<StandingRow> _shown = new();
     private readonly List<List<StandingRow>> _single = new(), _blocks = new(), _grouped = new(), _freeBlocks = new();
     private readonly List<int> _blockClasses = new(), _blockOrder = new();
-    private readonly List<(double Order, int Min)> _blockKeys = new();
+    private readonly List<(double Order, int Min, int Tier)> _blockKeys = new();
     private Comparison<int>? _byBlockKey;
 
     private List<List<StandingRow>> Blocks(TelemetryFrame f, List<StandingRow> standings, bool fastestFirst, bool proAm)
@@ -749,8 +763,10 @@ internal sealed class StandingsWidget : HudWidget
             var rows = _grouped[i];
             double order = fastestFirst ? f.Session.ByCar.GetValueOrDefault(rows[0].CarIdx)?.ClassEstLapTime ?? double.MaxValue : 0;
             int min = int.MaxValue;
-            foreach (var s in rows) min = Math.Min(min, s.Position > 0 ? s.Position : 999);
-            _blockKeys.Add((order, min));
+            for (int j = 0; j < _grouped.Count; j++)
+                if (_blockClasses[j] >> 1 == _blockClasses[i] >> 1)
+                    foreach (var s in _grouped[j]) min = Math.Min(min, s.Position > 0 ? s.Position : 999);
+            _blockKeys.Add((order, min, _blockClasses[i] & 1));
             _blockOrder.Add(i);
         }
         _byBlockKey ??= (a, b) =>
@@ -758,6 +774,8 @@ internal sealed class StandingsWidget : HudWidget
             int c = _blockKeys[a].Order.CompareTo(_blockKeys[b].Order);
             if (c != 0) return c;
             c = _blockKeys[a].Min.CompareTo(_blockKeys[b].Min);
+            if (c != 0) return c;
+            c = _blockKeys[a].Tier.CompareTo(_blockKeys[b].Tier);
             return c != 0 ? c : a.CompareTo(b);
         };
         _blockOrder.Sort(_byBlockKey);

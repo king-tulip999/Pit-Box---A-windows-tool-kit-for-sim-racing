@@ -76,11 +76,11 @@ internal static class ToggleCards
             text.Children.Add(line);
         }
         if (below is not null) text.Children.Add(below);
-        bool alone = heading is null && below is null && string.IsNullOrEmpty(caption);
+        bool oneLine = below is null && string.IsNullOrEmpty(caption);
         var lamp = new Lamp
         {
-            VerticalAlignment = alone ? VerticalAlignment.Center : VerticalAlignment.Top,
-            Margin = new Thickness(0, alone ? 0 : 2, heading is null ? 0 : 9, 0),
+            VerticalAlignment = oneLine ? VerticalAlignment.Center : VerticalAlignment.Top,
+            Margin = new Thickness(0, oneLine ? 0 : 2, heading is null ? 0 : 9, 0),
         };
         var row = new DockPanel { LastChildFill = true, Background = Brushes.Transparent };
         DockPanel.SetDock(lamp, Dock.Left);

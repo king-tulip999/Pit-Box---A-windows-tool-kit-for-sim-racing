@@ -12,7 +12,7 @@ using PitBox.Theme;
 
 namespace PitBox.Views.Pages;
 
-internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
+internal sealed class OverlayPage : UserControl, IPage
 {
     private readonly AppServices _app;
     private readonly MainWindow _window;
@@ -36,7 +36,6 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
     private readonly Dictionary<OverlayMetric, (Grid Row, TextBlock Label)> _metricRows = new();
     private (Grid Row, TextBlock Label)? _litRow;
     private bool _glideNext, _growNext;
-    private readonly TextBlock _contrast = new() { TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed };
     private readonly Image _closeUp = new() { Stretch = Stretch.None, HorizontalAlignment = HorizontalAlignment.Left, SnapsToDevicePixels = true };
     private readonly Border _closeUpBox = new() { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 8, 0, 0) };
 
@@ -160,7 +159,6 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
     private void Changed()
     {
         _app.OverlaySettingsChanged();
-        UpdateContrast();
     }
 
     private void BuildFrame()
@@ -216,7 +214,6 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         BuildPosition();
         BuildMetrics();
         BuildGeneral();
-        UpdateContrast();
     }
 
     private readonly ContentControl _statusChip = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
@@ -521,7 +518,6 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         general.Children.Add(Anchored(Ui.SettingRow("Frame-time graph", null,
             Ui.Switch(L.ShowGraph, v => { L.ShowGraph = v; Changed(); RenderPreview(); }),
             D(() => L.ShowGraph == std.ShowGraph, () => L.ShowGraph = std.ShowGraph, std.ShowGraph ? "On" : "Off")), "overlay.graph"));
-        BuildColors(general);
         _left.Children.Add(Card(general));
     }
 
@@ -534,34 +530,6 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         position.Children.Add(Anchored(map, "overlay.position"));
         _position = position;
         _right.Children.Add(Card(position));
-    }
-
-    private void BuildColors(StackPanel colors)
-    {
-        colors.Children.Add(Anchored(Ui.SettingRow("Colors", null,
-            ThemeMenu.OverlayButton(
-                () => new ThemeMenu.Pick(L.Colors.IsApp, false, L.Colors.Theme ?? ThemeManager.Current.Id, L.ColorSet),
-                pick =>
-                {
-                    if (pick.FollowApp) { L.Colors = OverlayColorPreset.App; L.ColorSet = null; }
-                    else { L.Colors = OverlayLayout.For(pick.Theme); L.ColorSet = pick.Set; }
-                    Wiping(Changed);
-                    BuildSettings();
-                }, followApp: true, customLabel: null, minWidth: 162)), "overlay.colors"));
-
-        _contrast.Style = Ui.Res<Style>("Caption");
-        _contrast.Foreground = Ui.Res<Brush>("WarnDeep");
-        _contrast.Margin = new Thickness(0, 6, 0, 0);
-        colors.Children.Add(Detached(_contrast));
-    }
-
-    private void UpdateContrast()
-    {
-        var colors = OverlayPresets.For(L.Colors, L.Custom, L.ColorSet);
-        double ratio = Palettes.TryHex(colors.Text, out var text) && Palettes.TryHex(colors.Background, out var bg) ? ThemeManager.Contrast(text, bg) : double.NaN;
-        bool weak = ratio < 3 && L.BackgroundOpacity >= 40;
-        _contrast.Text = weak ? $"Text may be hard to read on this background (contrast {ratio:0.0}:1, 3:1 or more is easier on the eyes)." : "";
-        _contrast.Visibility = weak ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void BuildMetrics()
@@ -989,19 +957,5 @@ internal sealed class OverlayPage : UserControl, IPage, IScreenshotStates
         }
         PlacePreview();
         if (_lit.Group is not null) _motion.Spotlight(_lit.Group, _lit.Metric);
-    }
-
-    public IEnumerable<(string Name, Func<Task> Enter)> ScreenshotStates()
-    {
-        yield return ("compact-color-set", () =>
-        {
-            L.Style = OverlayStyle.Compact;
-            L.ShowGraph = true;
-            L.Colors = OverlayLayout.For(AppTheme.Custom);
-            L.ColorSet = "Synthwave";
-            Changed();
-            BuildSettings();
-            return Task.CompletedTask;
-        });
     }
 }

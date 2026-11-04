@@ -10,77 +10,7 @@ namespace PitBox.Views;
 
 internal static class ThemeMenu
 {
-    internal readonly record struct Pick(bool FollowApp, bool Custom, AppTheme Theme, string? Set);
-
     private static CustomThemeSettings? Oled => Services.AppServices.Current?.Config.Ui.OledCustom;
-
-    public static string Describe(Pick pick, string customLabel) =>
-        pick.FollowApp ? "Same as the app"
-        : pick.Custom ? customLabel
-        : pick.Theme == AppTheme.Custom && !string.IsNullOrEmpty(pick.Set)
-            ? $"{Themes.For(AppTheme.Custom).Name} · {(pick.Set == Themes.OledDefaultSet ? "Default" : pick.Set)}"
-            : Themes.ForSet(pick.Theme, pick.Set).Label;
-
-    public static Button OverlayButton(Func<Pick> current, Action<Pick> picked, bool followApp, string? customLabel, double minWidth = 162)
-    {
-        var text = TextFit.TipWhenTrimmed(new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
-        var dots = new ContentControl { Focusable = false, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center };
-        var row = Ui.MenuFace(text, dots);
-        var button = new Button { Style = Ui.Res<Style>("MenuButton"), Content = row, MinWidth = minWidth };
-        void Show()
-        {
-            var pick = current();
-            text.Text = Describe(pick, customLabel ?? "Custom colors");
-            dots.Content = pick.FollowApp || pick.Custom ? null : Dots(Themes.ForSet(pick.Theme, pick.Set));
-        }
-        Show();
-        button.Click += (_, _) =>
-        {
-            var pick = current();
-            var menu = new ContextMenu { PlacementTarget = button, Placement = PlacementMode.Bottom, MinWidth = Math.Max(220, button.ActualWidth) };
-            Ui.DropBelow(menu);
-            MenuItem Item(string header, ThemeSpec? spec, bool on, Pick choice)
-            {
-                var item = new MenuItem { Header = Header(header, spec), IsCheckable = false, IsChecked = on };
-                item.Click += (_, _) => { picked(choice); Show(); };
-                return item;
-            }
-            if (followApp)
-            {
-                menu.Items.Add(Item("Same as the app", null, pick.FollowApp, new Pick(true, false, pick.Theme, null)));
-                menu.Items.Add(new Separator());
-            }
-            foreach (var theme in Themes.All)
-            {
-                bool chosen = !pick.FollowApp && !pick.Custom && pick.Theme == theme.Id;
-                if (ThemeSets.For(theme.Id) is { } set)
-                {
-                    var sets = new MenuItem { Header = Header(theme.Name, theme), IsChecked = chosen };
-                    sets.Items.Add(Item($"As in the app ({theme.Label})", theme, chosen && string.IsNullOrEmpty(pick.Set), new Pick(false, false, theme.Id, null)));
-                    AddPicks(sets, set, name => chosen && string.Equals(pick.Set, name, StringComparison.OrdinalIgnoreCase), name => { picked(new Pick(false, false, set.Id, name)); Show(); });
-                    menu.Items.Add(sets);
-                    continue;
-                }
-                if (theme.Id != AppTheme.Custom)
-                {
-                    menu.Items.Add(Item(theme.Name, theme, chosen, new Pick(false, false, theme.Id, null)));
-                    continue;
-                }
-                var oled = new MenuItem { Header = Header(theme.Name, theme), IsChecked = chosen };
-                oled.Items.Add(Item($"As in the app ({theme.Name})", theme, chosen && string.IsNullOrEmpty(pick.Set), new Pick(false, false, theme.Id, null)));
-                oled.Items.Add(Item("Default", Themes.Custom, chosen && pick.Set == Themes.OledDefaultSet, new Pick(false, false, theme.Id, Themes.OledDefaultSet)));
-                AddSets(oled, set => chosen && pick.Set == set, set => { picked(new Pick(false, false, AppTheme.Custom, set)); Show(); });
-                menu.Items.Add(oled);
-            }
-            if (customLabel is not null)
-            {
-                menu.Items.Add(new Separator());
-                menu.Items.Add(Item(customLabel, null, pick.Custom, new Pick(false, true, pick.Theme, null)));
-            }
-            menu.IsOpen = true;
-        };
-        return button;
-    }
 
     public static void OpenOledMenu(FrameworkElement anchor, Action<string?> use)
     {

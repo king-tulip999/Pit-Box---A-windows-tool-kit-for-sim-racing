@@ -967,7 +967,8 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Slider">
-                    <c:Tile x:Name="Bd" Background="{DynamicResource TileRaised}" BorderBrush="{DynamicResource InputEdge}" BorderThickness="{DynamicResource HairlineEdge}" CornerRadius="{DynamicResource R.Input}" ClipToBounds="True">
+                    <Grid>
+                    <c:Tile Background="{DynamicResource TileRaised}" CornerRadius="{DynamicResource R.Input}" Padding="{DynamicResource HairlineEdge}" ClipToBounds="True" ClipChild="True" SnapsToDevicePixels="True">
                         <Grid ClipToBounds="True">
                             <Track x:Name="PART_Track" Margin="-6,0">
                                 <Track.DecreaseRepeatButton>
@@ -984,6 +985,8 @@
                                        Foreground="{DynamicResource Heading}" FontWeight="SemiBold" FontSize="12" IsHitTestVisible="False" Typography.NumeralAlignment="Tabular" />
                         </Grid>
                     </c:Tile>
+                    <c:Tile x:Name="Bd" BorderBrush="{DynamicResource InputEdge}" BorderThickness="{DynamicResource HairlineEdge}" CornerRadius="{DynamicResource R.Input}" EvenEdge="True" IsHitTestVisible="False" />
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource InputEdgeHover}" />

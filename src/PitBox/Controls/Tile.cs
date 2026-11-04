@@ -63,17 +63,41 @@ public class Tile : Border
             Math.Max(0, size.Height + whole.Top + whole.Bottom - padding.Top - padding.Bottom));
     }
 
+    public bool ClipChild { get; set; }
+
     protected override Size ArrangeOverride(Size finalSize)
     {
-        if (Child is not { } child || LayoutPadding() is not { } whole) return base.ArrangeOverride(finalSize);
+        if (Child is not { } child || LayoutPadding() is not { } whole)
+        {
+            var arranged = base.ArrangeOverride(finalSize);
+            ClipToInside();
+            return arranged;
+        }
         var dpi = VisualTreeHelper.GetDpi(this);
         var edge = Hairline.WholePixels(BorderThickness, dpi.DpiScaleX, dpi.DpiScaleY);
         double left = edge.Left + whole.Left, top = edge.Top + whole.Top;
         child.Arrange(new Rect(left, top,
             Math.Max(0, finalSize.Width - left - edge.Right - whole.Right),
             Math.Max(0, finalSize.Height - top - edge.Bottom - whole.Bottom)));
+        ClipToInside();
         return finalSize;
     }
+
+    private void ClipToInside()
+    {
+        if (!ClipChild || Child is not UIElement child) return;
+        var size = child.RenderSize;
+        double r = Math.Max(0, CornerRadius.TopLeft - Math.Max(BorderThickness.Left + Padding.Left, BorderThickness.Top + Padding.Top));
+        double cut = GetChamfer(this) ? Math.Max(0, ControlCut(ActualWidth, ActualHeight, ThemeManager.Current.ControlChamfer) - BorderThickness.Left * (Sqrt2 - 1)) : 0;
+        if (child.Clip is { } old && old.Bounds.Size == size && _clipKey == (r, cut)) return;
+        _clipKey = (r, cut);
+        var bounds = new Rect(size);
+        Geometry clip = cut > 0 ? Chamfered(bounds, cut) : new RectangleGeometry(bounds, r, r);
+        clip.Freeze();
+        child.Clip = clip;
+    }
+
+    private (double, double) _clipKey = (-1, -1);
 
     private Thickness? LayoutPadding()
     {
@@ -93,7 +117,34 @@ public class Tile : Border
             : GetChamfer(this) ? ControlCut(w, h, spec.ControlChamfer, GetOutset(this))
             : 0;
         if (cut > 0 || IsSquareWithEdge) DrawChamfered(dc, cut);
+        else if (EvenEdge && BorderBrush is not null) DrawRounded(dc);
         else base.OnRender(dc);
+    }
+
+    public bool EvenEdge { get; set; }
+
+    private (double W, double H, double R, Thickness Edge, Geometry Ring, Geometry Fill)? _rounded;
+
+    private void DrawRounded(DrawingContext dc)
+    {
+        double w = ActualWidth, h = ActualHeight;
+        if (w <= 0 || h <= 0) return;
+        var (e, _) = DeviceEdge(BorderThickness);
+        double r = Math.Min(CornerRadius.TopLeft, Math.Min(w, h) / 2);
+        if (_rounded is not { } cached || cached.W != w || cached.H != h || cached.R != r || cached.Edge != e)
+        {
+            var inner = new Rect(e.Left, e.Top, Math.Max(0, w - e.Left - e.Right), Math.Max(0, h - e.Top - e.Bottom));
+            var fill = new RectangleGeometry(inner, Math.Max(0, r - e.Left), Math.Max(0, r - e.Top));
+            var ring = new GeometryGroup { FillRule = FillRule.EvenOdd, Children = { new RectangleGeometry(new Rect(0, 0, w, h), r, r), fill } };
+            fill.Freeze();
+            ring.Freeze();
+            cached = (w, h, r, e, ring, fill);
+            _rounded = cached;
+        }
+        dc.PushGuidelineSet(new GuidelineSet(new[] { 0, e.Left, w - e.Right, w }, new[] { 0, e.Top, h - e.Bottom, h }));
+        if (Background is { } background) dc.DrawGeometry(background, null, cached.Fill);
+        dc.DrawGeometry(BorderBrush, null, cached.Ring);
+        dc.Pop();
     }
 
     private bool IsSquareWithEdge

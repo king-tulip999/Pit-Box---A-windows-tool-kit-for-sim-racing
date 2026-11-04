@@ -39,7 +39,6 @@ internal sealed class OverlayPlugin : Plugin
         new("Overlay text size", "Font size of the overlay.", "Performance Overlay", PluginIds.OverlayPage, "overlay.font", "font scale"),
         new("Overlay background opacity", "How see-through the overlay's background is.", "Performance Overlay", PluginIds.OverlayPage, "overlay.opacity", "transparency background opacity"),
         new("Overlay frame-time graph", "Small graph of recent frame times.", "Performance Overlay", PluginIds.OverlayPage, "overlay.graph", "frametime stutter graph"),
-        new("Overlay colors", "Same as the app, one of the app's themes, or your own colors.", "Performance Overlay", PluginIds.OverlayPage, "overlay.colors", "color color theme text accent warning critical"),
     };
 
     public override IEnumerable<PluginHotkey> Hotkeys(AppServices app)

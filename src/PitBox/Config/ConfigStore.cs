@@ -143,14 +143,7 @@ public static class ConfigStore
         config.Ui.OledCustom.Normalize();
         foreach (var themeSet in Theme.ThemeSets.All)
             themeSet.Set(config.Ui, themeSet.Known(themeSet.Get(config.Ui)));
-        foreach (var layout in config.Overlay.Layouts.Where(l => l.ColorSet is { } set && set != Theme.Themes.OledDefaultSet && Theme.CustomPalette.Preset(set) is null && !Theme.ThemeSets.Knows(set)))
-            layout.ColorSet = null;
-        if (config.Overlay.ColorsVersion < 1)
-        {
-            foreach (var layout in config.Overlay.Layouts.Where(l => l.Colors == OverlayLayout.For(config.Ui.Theme) && string.IsNullOrEmpty(l.ColorSet)))
-                layout.Colors = OverlayColorPreset.App;
-            config.Overlay.ColorsVersion = 1;
-        }
+        config.Overlay.ColorsVersion = 1;
         if (config.SimRacing.ColorVersion < 1)
         {
             config.SimRacing.Current ??= new();
