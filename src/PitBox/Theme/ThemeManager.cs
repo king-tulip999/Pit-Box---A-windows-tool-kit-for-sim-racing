@@ -82,8 +82,8 @@ internal static class ThemeManager
             res[key] = Round(r);
         res["R.Switch"] = new CornerRadius(spec.SwitchRadius);
         res["R.Knob"] = new CornerRadius(spec.KnobRadius);
-        res["R.Chip"] = new CornerRadius(spec.ChipRadius);
-        res["R.Control"] = res["R.Input"] = new CornerRadius(spec.ControlRadius);
+        res["R.Chip"] = Round(spec.ChipRadius);
+        res["R.Control"] = res["R.Input"] = Round(spec.ControlRadius);
 
         res["CardEdge"] = res["LineStrong"];
 

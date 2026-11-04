@@ -193,6 +193,7 @@ public class Tile : Border
     {
         double w = ActualWidth, h = ActualHeight;
         var (e, inset) = DeviceEdge(BorderThickness);
+        if (!EdgeShows) e = default;
         var key = (w, h, cut, e, inset);
         if (_outline is null || !_outline.Key.Equals(key))
             _outline = BuildOutline(key);
@@ -231,8 +232,10 @@ public class Tile : Border
         var device = Services.ScreenshotRunner.DrawsAt96 ? Matrix.Identity : target.TransformToDevice;
         double sx = Math.Abs(unit.X) * device.M11, sy = Math.Abs(unit.Y) * device.M22;
         if (sx < 0.01 || sy < 0.01) return (edge, default);
-        return (Hairline.Edge(edge, sx, sy), new Vector(0.5 / sx, 0.5 / sy));
+        return (Hairline.Edge(edge, sx, sy), default);
     }
+
+    private bool EdgeShows => BorderBrush is { } brush && !(brush is SolidColorBrush { Color.A: 0 } || brush.Opacity <= 0);
 
     private void OnSourceChanged(object sender, SourceChangedEventArgs e)
     {

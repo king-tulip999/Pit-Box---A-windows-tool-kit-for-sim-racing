@@ -817,7 +817,7 @@ internal sealed class KeybindsBoard : StackPanel
                 panel.Children.Add(plus);
             }
             var label = new TextBlock { Text = keys[i], FontWeight = FontWeights.SemiBold, FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
-            var cap = new Border { MinWidth = 30, Height = 24, Padding = new Thickness(8, 0, 8, 0), BorderThickness = new Thickness(1, 1, 1, 3), Child = label };
+            var cap = new Border { MinWidth = 30, Height = 24, Padding = new Thickness(8, 2, 8, 0), BorderThickness = new Thickness(1, 1, 1, 3), Child = label };
             cap.SetResourceReference(Border.BackgroundProperty, "SurfaceAlt");
             cap.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
             panel.Children.Add(cap);

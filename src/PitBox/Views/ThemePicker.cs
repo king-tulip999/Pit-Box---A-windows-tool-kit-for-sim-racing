@@ -79,12 +79,13 @@ internal sealed class ThemePicker : UniformGrid
                 Child = new Icon { Data = Ui.Res<Geometry>("I.Check"), Width = 9, Height = 9, StrokeThickness = 2.43, Foreground = Ui.Res<Brush>("OnAccent") },
             });
 
+        double ring = selected ? Hairline.Pixels(2, Hairline.Scale) : Hairline.Width;
         var button = new Button
         {
-            Style = Ui.Res<Style>("Btn"), Height = height, Margin = new Thickness(0, 0, 8, 8), Padding = new Thickness(4),
+            Style = Ui.Res<Style>("Btn"), Height = height, Margin = new Thickness(0, 0, 8, 8), Padding = new Thickness(4 + Hairline.Width - ring),
             HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch,
             Background = Of("Bg"), BorderBrush = selected ? Ui.Res<Brush>("Accent") : Ui.Res<Brush>("LineStrong"),
-            BorderThickness = selected ? new Thickness(2) : Hairline.Edges(), Content = face, ToolTip = theme.Label,
+            BorderThickness = new Thickness(ring), Content = face, ToolTip = theme.Label,
         };
         button.MouseEnter += (_, _) => button.BorderBrush = Ui.Res<Brush>("Accent");
         button.MouseLeave += (_, _) => button.BorderBrush = selected ? Ui.Res<Brush>("Accent") : Ui.Res<Brush>("LineStrong");

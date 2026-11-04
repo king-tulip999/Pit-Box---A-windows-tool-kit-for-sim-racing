@@ -601,12 +601,13 @@
         <Setter Property="Foreground" Value="{DynamicResource Text}" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
         <Setter Property="Padding" Value="12,9" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="CheckBox">
                     <c:Tile x:Name="Bd" Background="{DynamicResource SurfaceAlt}" BorderBrush="{DynamicResource Line}" BorderThickness="{DynamicResource HairlineEdge}"
                             Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
-                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center" />
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
                     </c:Tile>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
@@ -970,7 +971,7 @@
                     <Grid>
                     <c:Tile Background="{DynamicResource TileRaised}" CornerRadius="{DynamicResource R.Input}" Padding="{DynamicResource HairlineEdge}" ClipToBounds="True" ClipChild="True" SnapsToDevicePixels="True">
                         <Grid ClipToBounds="True">
-                            <Track x:Name="PART_Track" Margin="-6,0">
+                            <Track x:Name="PART_Track" Margin="-5,0">
                                 <Track.DecreaseRepeatButton>
                                     <RepeatButton Command="Slider.DecreaseLarge" Style="{StaticResource SliderFill}" />
                                 </Track.DecreaseRepeatButton>

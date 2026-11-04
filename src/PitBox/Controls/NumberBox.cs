@@ -10,7 +10,8 @@ namespace PitBox.Controls;
 internal sealed class NumberBox : Grid
 {
     private readonly TextBox _box = new() { TextAlignment = TextAlignment.Center, MinWidth = 52, VerticalContentAlignment = VerticalAlignment.Center };
-    private readonly TextBlock _unit = new() { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
+    private readonly TextBlock _unit = new() { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right, IsHitTestVisible = false };
+    private bool _unitFitted;
     private double _value;
     private bool _updating;
     private double? _typed, _outOfRange;
@@ -34,7 +35,6 @@ internal sealed class NumberBox : Grid
         ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         _box.MinWidth = width;
         ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
         var minus = StepButton("I.Minus", "Smaller", -1);
         var plus = StepButton("I.Plus", "Larger", +1);
@@ -44,8 +44,9 @@ internal sealed class NumberBox : Grid
         plus.Margin = new Thickness(5, 0, 0, 0);
         _unit.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
         Grid.SetColumn(_box, 1);
-        Grid.SetColumn(_unit, 2);
-        Grid.SetColumn(plus, 3);
+        Grid.SetColumn(_unit, 1);
+        Grid.SetColumn(plus, 2);
+        _box.IsEnabledChanged += (_, _) => _unit.Opacity = _box.IsEnabled ? 1 : 0.45;
         Children.Add(minus);
         Children.Add(_box);
         Children.Add(_unit);
@@ -54,6 +55,7 @@ internal sealed class NumberBox : Grid
         _value = value;
         Loaded += (_, _) =>
         {
+            FitUnitInside();
             FitToRange();
             ShowValue();
         };
@@ -178,6 +180,18 @@ internal sealed class NumberBox : Grid
     {
         int stepDecimals = step > 0 && step < 1e15 ? (decimal.GetBits((decimal)step)[3] >> 16) & 0xFF : 0;
         return Math.Round(value, Math.Clamp(Math.Max(decimals, stepDecimals), 0, 15), MidpointRounding.AwayFromZero);
+    }
+
+    private void FitUnitInside()
+    {
+        if (_unit.Visibility != Visibility.Visible || _unitFitted)
+            return;
+        _unitFitted = true;
+        var padding = _box.Padding;
+        _unit.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        double unitWidth = Math.Ceiling(_unit.DesiredSize.Width);
+        _unit.Margin = new Thickness(0, 0, padding.Right + _box.BorderThickness.Right, 0);
+        _box.Padding = new Thickness(padding.Left, padding.Top, padding.Right + unitWidth + 4, padding.Bottom);
     }
 
     private void FitToRange()

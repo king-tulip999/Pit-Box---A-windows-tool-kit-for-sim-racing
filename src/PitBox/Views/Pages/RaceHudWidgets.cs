@@ -284,7 +284,7 @@ internal sealed partial class RaceHudWidgets
                 name.TextTrimming = TextTrimming.CharacterEllipsis;
                 TextFit.TipWhenTrimmed(name);
                 name.Opacity = w.Enabled ? 1 : ToggleCards.OffOpacity;
-                var face = new StackPanel { Margin = new Thickness(10, 7, 8, 7), VerticalAlignment = VerticalAlignment.Center, Children = { name } };
+                var face = new StackPanel { Margin = new Thickness(10, 7, 5, 7), VerticalAlignment = VerticalAlignment.Center, Children = { name } };
                 row.Children.Add(face);
                 b = new RadioButton { Style = Ui.Res<Style>("NavCard"), GroupName = group, IsChecked = on, Content = row };
             }

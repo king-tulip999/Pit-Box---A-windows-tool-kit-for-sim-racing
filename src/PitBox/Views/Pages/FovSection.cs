@@ -376,11 +376,14 @@ internal sealed class FovSection : StackPanel
             if (screen.Aspect == "custom")
             {
                 var custom = new StackPanel { Orientation = Orientation.Horizontal };
-                var aw = new NumberBox(screen.CustomAspectW, ":", 44) { Minimum = 1, Maximum = 100, Step = 1, Decimals = 1 };
+                var aw = new NumberBox(screen.CustomAspectW, "", 44) { Minimum = 1, Maximum = 100, Step = 1, Decimals = 1 };
                 var ah = new NumberBox(screen.CustomAspectH, "", 44) { Minimum = 1, Maximum = 100, Step = 1, Decimals = 1 };
                 aw.ValueChanged += v => Change(() => screen.CustomAspectW = v);
                 ah.ValueChanged += v => Change(() => screen.CustomAspectH = v);
+                var colon = new TextBlock { Text = ":", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 6, 0) };
+                colon.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
                 custom.Children.Add(aw);
+                custom.Children.Add(colon);
                 custom.Children.Add(ah);
                 _inputs.Children.Add(Row("Aspect", custom, "Width : height of the picture."));
             }

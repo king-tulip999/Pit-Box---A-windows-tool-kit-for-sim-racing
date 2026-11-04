@@ -605,8 +605,8 @@ internal sealed class OverlayPage : UserControl, IPage
         count.Margin = new Thickness(7, 0, 0, 0);
         count.VerticalAlignment = VerticalAlignment.Center;
         var allLamp = new PitBox.Controls.Lamp();
-        var partly = new System.Windows.Shapes.Rectangle { Width = 7, Height = 2, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false, SnapsToDevicePixels = true, Visibility = Visibility.Collapsed };
-        partly.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "Accent");
+        var partly = new CenteredMark { Box = allLamp.Height, MarkWidth = 7, MarkHeight = 2, Visibility = Visibility.Collapsed };
+        partly.SetResourceReference(Border.BackgroundProperty, "Accent");
         bool several = entries.Count > 1;
         var title = new StackPanel { Orientation = Orientation.Horizontal, Children = { name, count } };
         var lampHost = new Grid { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0), Children = { allLamp, partly } };

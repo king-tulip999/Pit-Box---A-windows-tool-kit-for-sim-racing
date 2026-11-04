@@ -46,6 +46,7 @@ internal static class ToggleCards
         box.Padding = new Thickness(9, 5, 10, 5);
         box.HorizontalAlignment = HorizontalAlignment.Left;
         box.VerticalAlignment = VerticalAlignment.Center;
+        box.VerticalContentAlignment = VerticalAlignment.Center;
         return box;
     }
 
@@ -121,31 +122,37 @@ internal static class ToggleCards
 
     public static CheckBox Dress(CheckBox box, FrameworkElement heading, string? caption, FrameworkElement? below = null, Action<TextBlock>? captionText = null, FrameworkElement? trailing = null)
     {
-        var face = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        face.Children.Add(heading);
         bool tall = !string.IsNullOrEmpty(caption);
+        var top = new Grid();
+        top.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        top.ColumnDefinitions.Add(new ColumnDefinition());
+        top.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        top.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        top.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var lamp = new Lamp { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, tall ? 10 : 8, 0) };
+        top.Children.Add(lamp);
+        heading.VerticalAlignment = VerticalAlignment.Center;
+        Grid.SetColumn(heading, 1);
+        top.Children.Add(heading);
+        TextBlock? text = null;
         if (tall)
         {
-            var text = Caption(caption!, false);
+            text = Caption(caption!, false);
             text.Margin = new Thickness(0, 3, 0, 0);
             captionText?.Invoke(text);
-            face.Children.Add(text);
-        }
-        var lamp = new Lamp();
-        var top = WithLamp(lamp, face);
-        if (tall)
-        {
-            lamp.VerticalAlignment = VerticalAlignment.Center;
-            lamp.Margin = new Thickness(0, 0, 10, 0);
+            Grid.SetColumn(text, 1);
+            Grid.SetRow(text, 1);
+            top.Children.Add(text);
         }
         if (trailing is not null)
         {
             trailing.VerticalAlignment = VerticalAlignment.Top;
             trailing.Margin = new Thickness(8, 0, 0, 0);
-            DockPanel.SetDock(trailing, Dock.Right);
-            top.Children.Insert(1, trailing);
+            Grid.SetColumn(trailing, 2);
+            Grid.SetRowSpan(trailing, 2);
+            top.Children.Add(trailing);
         }
-        var body = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        var body = new StackPanel { VerticalAlignment = VerticalAlignment.Top };
         body.Children.Add(top);
         if (below is not null) body.Children.Add(below);
         box.Style = Ui.Res<Style>("ToggleCard");
@@ -153,13 +160,15 @@ internal static class ToggleCards
         box.HorizontalAlignment = HorizontalAlignment.Stretch;
         box.VerticalAlignment = VerticalAlignment.Stretch;
         box.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+        box.VerticalContentAlignment = VerticalAlignment.Top;
         if (heading is TextBlock { Text.Length: > 0 } title) Ui.NameFor(box, title.Text);
         box.MouseEnter += (_, _) => lamp.Hot = true;
         box.MouseLeave += (_, _) => lamp.Hot = false;
         Watch(box, on =>
         {
             lamp.On = on;
-            Fade(face, on ? 1 : OffOpacity, on ? Lamp.RiseMs : Lamp.FallMs);
+            Fade(heading, on ? 1 : OffOpacity, on ? Lamp.RiseMs : Lamp.FallMs);
+            if (text is not null) Fade(text, on ? 1 : OffOpacity, on ? Lamp.RiseMs : Lamp.FallMs);
         });
         return box;
     }
