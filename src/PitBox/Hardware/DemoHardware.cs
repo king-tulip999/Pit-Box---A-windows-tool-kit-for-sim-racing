@@ -51,9 +51,6 @@ internal sealed class DemoHardware
             VramTotalMb = 24_560,
             GpuFanRpm = (float)(stress ? 12_345 : 1650 + 120 * Wave(44, 2)),
             GpuFanPercent = (float)(48 + 4 * Wave(44, 2)),
-            DiskReadBps = (float)Math.Max(0, 2.5e6 + 2e6 * Wave(7)),
-            DiskWriteBps = (float)Math.Max(0, 6e5 + 5e5 * Wave(11, 1)),
-            DiskActivePercent = (float)(6 + 4 * Wave(7)),
             RamUsedGb = (float)(18.4 + 0.4 * Wave(60)),
             RamTotalGb = 31.9f,
         };

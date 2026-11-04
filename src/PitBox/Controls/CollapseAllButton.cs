@@ -2,7 +2,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using PitBox.Theme;
 using PitBox.Views;
 
 namespace PitBox.Controls;
@@ -54,7 +53,7 @@ internal sealed class CollapseAllButton : Button
             return;
         }
         _anyOpen = anyOpen;
-        _label.Text = ThemeManager.Case(anyOpen ? "Collapse all" : "Expand all");
+        _label.Text = anyOpen ? "Collapse all" : "Expand all";
         double angle = anyOpen ? 180 : 0;
         if (!animate || !Motion.Enabled)
         {

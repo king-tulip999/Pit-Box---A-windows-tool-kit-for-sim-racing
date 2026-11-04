@@ -116,11 +116,11 @@ internal static class PixelLint
 
     private static bool Cut(double over) => over > OffGrid && over <= MaxCut;
 
-    private static string Describe(FrameworkElement fe)
+    internal static string Describe(FrameworkElement fe, int depth = 4)
     {
         var path = new List<string>();
         DependencyObject? at = fe;
-        for (int i = 0; i < 4 && at is FrameworkElement e; i++, at = VisualTreeHelper.GetParent(e))
+        for (int i = 0; i < depth && at is FrameworkElement e; i++, at = VisualTreeHelper.GetParent(e))
             path.Add((e.Name.Length > 0 ? $"{e.GetType().Name}#{e.Name}" : e.GetType().Name));
         string text = FirstText(fe, 0) ?? (fe.TemplatedParent as FrameworkElement is { } owner ? FirstText(owner, 0) : null) ?? "";
         return string.Join(" < ", path) + (text.Length > 0 ? $" “{(text.Length > 30 ? text[..30] : text)}”" : "");

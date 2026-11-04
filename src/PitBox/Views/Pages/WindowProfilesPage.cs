@@ -147,7 +147,6 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
         {
             header.Children.Add(AutoApplySwitch());
             var newGroup = Ui.LabeledButton("I.Folder", "New group", () => _ = EditGroupAsync(new WindowGroup(), isNew: true), "GhostButton");
-            newGroup.Margin = Ui.AfterButton;
             var create = Ui.LabeledButton("I.Plus", "New profile", () => _ = EditAsync(new WindowProfile(), isNew: true), "PrimaryButton");
             int n = S.Profiles.Count;
             left.Children.Add(Ui.SectionHeader("Your profiles", RaceFormatCount(n) + (S.Layout.Count > 1 ? " · drag to arrange" : ""), newGroup, create));
@@ -159,12 +158,12 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
                 if (S.Groups.FirstOrDefault(g => WindowProfileSettings.KeyOf(g) == slot.Id) is { } group)
                 {
                     var g = group;
-                    grid.Add(new PanelDef(slot.Id, g.Name, _ => GroupCard(g)) { Order = order++, VeilClick = () => _ = EditGroupAsync(g, isNew: false) });
+                    grid.Add(new PanelDef(slot.Id, g.Name, () => GroupCard(g)) { Order = order++, VeilClick = () => _ = EditGroupAsync(g, isNew: false) });
                 }
                 else if (S.Profiles.FirstOrDefault(p => WindowProfileSettings.KeyOf(p) == slot.Id) is { } profile)
                 {
                     var p = profile;
-                    grid.Add(new PanelDef(slot.Id, p.Name, _ => ProfileCard(p)) { Order = order++, VeilClick = () => _ = EditAsync(p, isNew: false) });
+                    grid.Add(new PanelDef(slot.Id, p.Name, () => ProfileCard(p)) { Order = order++, VeilClick = () => _ = EditAsync(p, isNew: false) });
                 }
             }
             left.Children.Add(grid);

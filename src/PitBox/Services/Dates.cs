@@ -10,8 +10,6 @@ internal static class Dates
 
     public static string Time(DateTime t) => t.ToString("t", C);
 
-    public static string TimeWithSeconds(DateTime t) => t.ToString("T", C);
-
     public static string DateTime(DateTime t) => Date(t) + " · " + Time(t);
 
     public static string ShortPattern => C.DateTimeFormat.MonthDayPattern.Replace("MMMM", "MMM");

@@ -137,9 +137,10 @@ public sealed class ArrangementCanvas : Canvas
         foreach (var t in _tiles)
         {
             var v = _visuals[t.Key];
-            v.Width = Math.Max(20, t.Width * _scale - 4);
-            v.Height = Math.Max(16, t.Height * _scale - 4);
-            double left = _ox + (t.X - _minX) * _scale + 2, top = _oy + (t.Y - _minY) * _scale + 2;
+            double left = Math.Round(_ox + (t.X - _minX) * _scale + 2), top = Math.Round(_oy + (t.Y - _minY) * _scale + 2);
+            double right = Math.Round(_ox + (t.X - _minX + t.Width) * _scale - 2), bottom = Math.Round(_oy + (t.Y - _minY + t.Height) * _scale - 2);
+            v.Width = Math.Max(20, right - left);
+            v.Height = Math.Max(16, bottom - top);
             if (animate && Animate)
             {
                 double fromLeft = GetLeft(v), fromTop = GetTop(v);

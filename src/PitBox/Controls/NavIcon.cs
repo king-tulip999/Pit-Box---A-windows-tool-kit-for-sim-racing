@@ -40,10 +40,6 @@ public sealed class NavIcon : Viewbox
 
     private const double Stroke = 1.8;
 
-    public const string CarGlyph = "car:";
-
-    public static bool IsPicture(string? glyph) => glyph?.StartsWith(CarGlyph, StringComparison.Ordinal) == true;
-
     private readonly Canvas _canvas = new() { Width = 24, Height = 24 };
     private readonly List<(IAnimatable Target, DependencyProperty Property, double Wrap)> _targets = new();
     private readonly List<(IAnimatable Target, DependencyProperty Property, double Still, double Running)> _switches = new();
@@ -255,22 +251,12 @@ public sealed class NavIcon : Viewbox
         _switches.Clear();
         _timeline = null;
         _started = _stopped = null;
-        if (IsPicture(Glyph))
-        {
-            var image = new Image { Source = CarPictures.Of(Glyph![CarGlyph.Length..]), Stretch = Stretch.Uniform };
-            RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
-            Child = image;
-            Update();
-            return;
-        }
         Child = _canvas;
         switch (Glyph)
         {
-            case "I.Home": House(); break;
             case "I.Layers": Layers(); break;
             case "I.Monitor": Pong(); break;
             case "I.Zap": Lightning(); break;
-            case "I.HeartPulse": HeartPulse(); break;
             case "I.RaceOverlay": RaceOverlay(); break;
             case "I.Candles": Candles(); break;
             case "I.Compass": Compass(); break;
@@ -289,7 +275,6 @@ public sealed class NavIcon : Viewbox
             case "I.Checkered": Flag(); break;
             case "I.Palette": Palette(); break;
             case "I.Keyboard": Keyboard(); break;
-            case "I.Headset": Headset(); break;
             case { } key when key.StartsWith("F.", StringComparison.Ordinal): Draw(Res(key), fill: true); break;
             case { } key: Draw(Res(key)); break;
         }
@@ -376,7 +361,7 @@ public sealed class NavIcon : Viewbox
     {
         _period = TimeSpan.FromSeconds(seconds);
         _timeline = new ParallelTimeline { Duration = new Duration(_period), RepeatBehavior = RepeatBehavior.Forever };
-        Timeline.SetDesiredFrameRate(_timeline, Showcase.ShowcaseRunner.Active ? PcClass.FrameRate : PcClass.SoftwareRendering ? 20 : 30);
+        Timeline.SetDesiredFrameRate(_timeline, PcClass.SoftwareRendering ? 20 : 30);
     }
 
     private void Animate(IAnimatable target, DependencyProperty property, AnimationTimeline animation, double wrap = 0)
@@ -450,90 +435,6 @@ public sealed class NavIcon : Viewbox
     private DoubleAnimationUsingKeyFrames Over(Func<double, double> f) => Sampled(0, u => f(u * _period.TotalSeconds), 72);
 
     private PointAnimationUsingKeyFrames Over(Func<double, Point> f) => SampledPoints(u => f(u * _period.TotalSeconds), 72);
-
-    private void House()
-    {
-        const double Period = 3.0, Land = 0.46;
-        Loop(Period);
-        var squash = new ScaleTransform(1, 1, 12, 21);
-        var lift = new TranslateTransform();
-        var roofLag = new TranslateTransform();
-        var walls = new TransformGroup { Children = { squash, lift } };
-        var roof = new TransformGroup { Children = { squash, lift, roofLag } };
-
-        var glowShape = new EllipseGeometry(new Point(12, 11), 4.6, 4.6);
-        glowShape.Freeze();
-        var glow = Accent(glowShape, walls);
-        var fade = new RadialGradientBrush();
-        fade.GradientStops.Add(new GradientStop(Color.FromArgb(150, 0, 0, 0), 0));
-        fade.GradientStops.Add(new GradientStop(Color.FromArgb(90, 0, 0, 0), 0.4));
-        fade.GradientStops.Add(new GradientStop(Color.FromArgb(0, 0, 0, 0), 1));
-        fade.Freeze();
-        glow.OpacityMask = fade;
-        glow.Opacity = 0;
-        var pane = new RectangleGeometry(new Rect(10.4, 9.4, 3.2, 3.2));
-        pane.Freeze();
-        var light = Accent(pane, walls);
-        light.Opacity = 0;
-
-        foreach (double side in new[] { -1.0, 1.0 })
-        {
-            const double DustStart = 0.47, DustLife = 0.55;
-            var at = new Point(side < 0 ? 3.6 : 20.4, 20.6);
-            var dust = new EllipseGeometry(at, 1, 1);
-            dust.Freeze();
-            double D(double u) => Math.Min(1, ((u * Period - DustStart) % Period + Period) % Period / DustLife);
-            double Out(double u) => 1 - (1 - D(u)) * (1 - D(u));
-            var grow = new ScaleTransform(0.6, 0.6, at.X, at.Y);
-            var spread = new TranslateTransform();
-            var path = Draw(dust, new TransformGroup { Children = { grow, spread } }, fill: true);
-            path.Opacity = 0;
-            double s = side;
-            Animate(spread, TranslateTransform.XProperty, Sampled(0, u => s * 2.0 * Out(u), 144), Hold);
-            Animate(spread, TranslateTransform.YProperty, Sampled(0, u => -0.7 * Out(u), 144), Hold);
-            Animate(grow, ScaleTransform.ScaleXProperty, Sampled(0, u => 0.6 + 0.7 * Out(u), 144), Hold);
-            Animate(grow, ScaleTransform.ScaleYProperty, Sampled(0, u => 0.6 + 0.7 * Out(u), 144), Hold);
-            Animate(path, UIElement.OpacityProperty, Sampled(0, u =>
-            {
-                double p = D(u);
-                return 0.85 * (p < 0.08 ? p / 0.08 : p < 0.35 ? 1 : (1 - p) / 0.65);
-            }, 144));
-        }
-
-        Draw(G("M4 11.8V20a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8.2M10 21v-4.5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1V21"), walls);
-        Draw(G("M10.4 9.4h3.2v3.2h-3.2z"), walls, stroke: 1.4);
-        Draw(G("M2 13.5 12 5l10 8.5M16 8.4V5h2.5v5.5"), roof);
-
-        Animate(squash, ScaleTransform.ScaleYProperty, Keys(InOut, (0, 1), (0.12, 0.95), (0.3, 1.06), (Land, 1), (0.52, 0.84), (0.61, 1.07), (0.71, 0.97), (0.81, 1.01), (0.9, 1), (Period, 1)));
-        Animate(squash, ScaleTransform.ScaleXProperty, Keys(InOut, (0, 1), (0.12, 1.03), (0.3, 0.97), (Land, 1), (0.52, 1.1), (0.61, 0.96), (0.71, 1.02), (0.81, 0.995), (0.9, 1), (Period, 1)));
-        Animate(lift, TranslateTransform.YProperty, Keys(InOut, (0, 0), (0.12, 0), (0.3, -1.3), (Land, 0), (Period, 0)));
-        Animate(roofLag, TranslateTransform.YProperty, Keys(InOut, (0, 0), (0.3, 0.15), (Land, -0.6), (0.56, -0.4), (0.68, 0.35), (0.8, -0.08), (0.9, 0), (Period, 0)));
-        Animate(light, UIElement.OpacityProperty, Keys(null, (0, 0), (Land, 0), (0.54, 1), (1.2, 1), (2.1, 0), (Period, 0)));
-        Animate(glow, UIElement.OpacityProperty, Keys(null, (0, 0), (Land, 0), (0.56, 1), (0.8, 0.6), (1.2, 0.5), (2.1, 0), (Period, 0)));
-
-        var origin = new Point(17.25, 3.4);
-        var puff = new EllipseGeometry(origin, 1.15, 1.15);
-        puff.Freeze();
-        foreach (double start in new[] { 0.58, 0.8, 1.02, 1.24 })
-        {
-            const double Life = 1.6;
-            double s0 = start;
-            double P(double u) => Math.Min(1, ((u * Period - s0) % Period + Period) % Period / Life);
-            var grow = new ScaleTransform(1, 1, origin.X, origin.Y);
-            var drift = new TranslateTransform();
-            var path = Draw(puff, new TransformGroup { Children = { grow, drift } }, fill: true);
-            path.Opacity = 0;
-            Animate(drift, TranslateTransform.XProperty, Sampled(0, u => 3.6 * P(u), 72), Hold);
-            Animate(drift, TranslateTransform.YProperty, Sampled(0, u => -0.9 * Math.Sin(Math.PI * Math.Min(1, 1.6 * P(u))) + 0.2 * P(u), 72), Hold);
-            Animate(grow, ScaleTransform.ScaleXProperty, Sampled(0, u => 0.75 + 1.35 * P(u), 72), Hold);
-            Animate(grow, ScaleTransform.ScaleYProperty, Sampled(0, u => 0.75 + 1.35 * P(u), 72), Hold);
-            Animate(path, UIElement.OpacityProperty, Sampled(0, u =>
-            {
-                double p = P(u);
-                return 0.9 * (p < 0.08 ? p / 0.08 : p < 0.55 ? 1 : (1 - p) / 0.45);
-            }, 72));
-        }
-    }
 
     private Path Accent(Geometry data, Transform transform)
     {
@@ -657,62 +558,6 @@ public sealed class NavIcon : Viewbox
         }
     }
 
-    private const string HeartShape = "M2 9.5a5.5 5.5 0 0 1 9.591-3.676 0.56 0.56 0 0 0 0.818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 0.019L5 15c-1.5-1.5-3-3.2-3-5.5";
-
-    private const string PulseShape = "M3.22 13H9.5l0.5-1 2 4.5 2-7 1.5 3.5h5.27";
-
-    private void HeartPulse()
-    {
-        const double Period = 2.0, Repeat = 22, Tail = 9, Start = 3.22, End = 20.77;
-        Loop(Period);
-        var beat = new ScaleTransform(1, 1, 12, 12.5);
-        Draw(G(HeartShape), beat);
-        var full = Draw(G(PulseShape), beat);
-        Switch(full, UIElement.OpacityProperty, 1, 0.32);
-        var sweep = new TranslateTransform();
-        var mask = new LinearGradientBrush
-        {
-            MappingMode = BrushMappingMode.Absolute, StartPoint = new Point(Start - Repeat, 0), EndPoint = new Point(Start, 0),
-            SpreadMethod = GradientSpreadMethod.Repeat, Transform = sweep,
-        };
-        Color off = Color.FromArgb(0, 0, 0, 0), on = Color.FromArgb(255, 0, 0, 0);
-        mask.GradientStops.Add(new GradientStop(off, 0));
-        mask.GradientStops.Add(new GradientStop(off, 1 - Tail / Repeat));
-        mask.GradientStops.Add(new GradientStop(on, 1 - 0.6 / Repeat));
-        mask.GradientStops.Add(new GradientStop(on, 1));
-        var lit = Draw(G(PulseShape), beat);
-        lit.OpacityMask = mask;
-        Switch(lit, UIElement.OpacityProperty, 0, 1);
-        Animate(sweep, TranslateTransform.XProperty, Keys(null, (0, 0), (Period, Repeat)), Hold);
-        var dot = new EllipseGeometry(new Point(Start, 13), 1.3, 1.3);
-        dot.Freeze();
-        var head = new TranslateTransform();
-        var pop = new ScaleTransform(1, 1, Start, 13);
-        var headDot = Draw(dot, new TransformGroup { Children = { pop, head, beat } }, fill: true);
-        headDot.Opacity = 0;
-        Switch(pop, ScaleTransform.ScaleXProperty, 0.1, 1);
-        Switch(pop, ScaleTransform.ScaleYProperty, 0.1, 1);
-        var headX = new List<(double T, double V)>();
-        var headY = new List<(double T, double V)>();
-        foreach (var (x, y) in new (double X, double Y)[] { (Start, 13), (9.5, 13), (10, 12), (12, 16.5), (14, 9.5), (15.5, 13), (End, 13) })
-        {
-            double t = (x - Start) / Repeat * Period;
-            headX.Add((t, x - Start));
-            headY.Add((t, y - 13));
-        }
-        headX.Add((Period - 0.02, End - Start));
-        headX.Add((Period - 0.01, 0));
-        headX.Add((Period, 0));
-        headY.Add((Period, 0));
-        Animate(head, TranslateTransform.XProperty, Keys(null, headX.ToArray()), Hold);
-        Animate(head, TranslateTransform.YProperty, Keys(null, headY.ToArray()), Hold);
-        double end = (End - Start) / Repeat * Period;
-        Animate(headDot, UIElement.OpacityProperty, Keys(null, (0, 1), (end, 1), (end + 0.05, 0), (Period - 0.005, 0), (Period, 1)));
-        var thump = new (double, double)[] { (0, 1), (0.76, 1), (0.84, 1.13), (0.94, 0.97), (1.04, 1.08), (1.2, 1), (Period, 1) };
-        Animate(beat, ScaleTransform.ScaleXProperty, Keys(InOut, thump));
-        Animate(beat, ScaleTransform.ScaleYProperty, Keys(InOut, thump));
-    }
-
     private void Pulse()
     {
         const double Period = 2.2, Repeat = 30, Tail = 9;
@@ -734,21 +579,6 @@ public sealed class NavIcon : Viewbox
         lit.OpacityMask = mask;
         Switch(lit, UIElement.OpacityProperty, 0, 1);
         Animate(sweep, TranslateTransform.XProperty, Keys(null, (0, 0), (Period, Repeat)), Hold);
-    }
-
-    private void Headset()
-    {
-        const double Period = 2.6;
-        Loop(Period);
-        const string Left = "M4 14h2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H5a1 1 0 0 1-1-1z", Right = "M20 14h-2a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h1a1 1 0 0 0 1-1z";
-        Draw(G("M4 14v-2a8 8 0 0 1 16 0v2" + Left + Right + "M6 20c0 1.4 1.6 2 4 2h1.5"));
-        var left = Draw(G(Left), fill: true);
-        var right = Draw(G(Right), fill: true);
-        var tip = Draw(G("M13 22h0.01"));
-        left.Opacity = right.Opacity = tip.Opacity = 0;
-        Animate(left, UIElement.OpacityProperty, Keys(InOut, (0, 0), (0.2, 0.55), (0.45, 0.1), (0.7, 0.5), (1.0, 0), (Period, 0)));
-        Animate(right, UIElement.OpacityProperty, Keys(InOut, (0, 0), (0.12, 0), (0.32, 0.55), (0.58, 0.1), (0.82, 0.5), (1.1, 0), (Period, 0)));
-        Animate(tip, UIElement.OpacityProperty, Keys(InOut, (0, 0), (0.1, 1), (1.1, 1), (1.3, 0), (Period, 0)));
     }
 
     private void Chip()

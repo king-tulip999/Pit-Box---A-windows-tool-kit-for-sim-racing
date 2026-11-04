@@ -27,6 +27,10 @@ internal sealed class HudWebClient
     public string Kind { get; }
     public bool Sample { get; }
     public volatile int Width, Height;
+    internal byte[]? Offered;
+    internal double ToldOpacity = -1;
+
+    public bool Holding => Volatile.Read(ref _frame) is not null;
 
     public void Offer(byte[] frame)
     {

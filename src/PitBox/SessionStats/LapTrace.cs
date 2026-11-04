@@ -62,8 +62,6 @@ internal sealed class LapTrace
 
     public double TimeAt(double d) => At(TraceChannel.Time, d) ?? 0;
 
-    public bool HasPushToPass => this[TraceChannel.PushToPass] is { } p && p.Any(v => v > 0.5);
-
     public (double Kph, double From)? WindOfLap()
     {
         if (this[TraceChannel.Wind] is not { } speed || this[TraceChannel.WindDir] is not { } dir) return null;

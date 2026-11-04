@@ -170,10 +170,7 @@ public static class ConfigStore
         config.Ui.PageSections ??= new(StringComparer.OrdinalIgnoreCase);
         if (config.Ui.Window is null) config.Ui.SidebarVersion = 1;
         foreach (var key in config.Ui.PageSections.Where(p => string.IsNullOrWhiteSpace(p.Value)).Select(p => p.Key).ToList()) config.Ui.PageSections.Remove(key);
-        config.Ui.LandingVersion = 1;
         MigrateHardwareMonitor(config);
-        config.Ui.LandingLayout ??= new();
-        config.Ui.LandingLayout.RemoveAll(slot => slot.Id == "home");
         PanelSlot.MigrateToOrder(config.Fans.Layout);
         IgnoreCaseKeys(config);
         return config;

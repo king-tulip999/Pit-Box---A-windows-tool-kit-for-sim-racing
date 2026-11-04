@@ -176,20 +176,18 @@ internal static class CustomPalette
         var p = new Dictionary<string, Color>(Palettes.Custom);
 
         var tint = M(edge, accent, 0.5);
-        p["Bg"] = p["LogoBg"] = p["LogoEdge"] = bg;
+        p["Bg"] = p["LogoBg"] = bg;
         p["Panel"] = p["Surface"] = card;
         p["SidebarBg"] = Step(0.25);
         p["SurfaceAlt"] = p["SegmentBg"] = Step(0.22);
         p["TileRaised"] = p["IconWell"] = Step(0.46);
-        p["MeterTrack"] = p["TooltipBg"] = p["BtnHover"] = p["SwitchTrackHover"] = M(card, tint, 0.11);
+        p["MeterTrack"] = p["TooltipBg"] = p["BtnHover"] = M(card, tint, 0.11);
         p["Hover"] = M(card, tint, 0.14);
         p["HoverRaised"] = M(card, tint, 0.24);
         p["Selected"] = Step(0.56);
         p["SelectedHover"] = Step(0.64);
         p["SelectedEdge"] = Step(0.8);
-        p["SwitchTrack"] = Step(0.46);
-        p["Line"] = p["TileHighlight"] = p["TileEdge"] = p["ChipBorder"] = p["SidebarEdge"] = p["ScrollThumbBrush"] = Step(0.5);
-        p["ButtonEdge"] = p["SwitchBorder"] = edge;
+        p["Line"] = p["TileEdge"] = p["ChipBorder"] = Step(0.5);
         p["InputEdge"] = Readable(edge, card, 3);
         p["LineStrong"] = Readable(Step(0.82), card, 2.3);
         p["InputEdgeHover"] = M(edge, text, 0.25);
@@ -209,7 +207,7 @@ internal static class CustomPalette
         var accentText = ReadableOn(accent, bg);
         var pressed = Dark(accent, 0.23);
         if (ThemeManager.Contrast(onAccent, pressed) < 4.5) pressed = Dark(accent, 0.12);
-        p["Accent"] = p["AccentEdge"] = p["PrimaryEdge"] = p["PrimaryHover"] = p["SwitchOnBorder"] = p["SwitchOnKnob"] = p["LogoAccent"] = accent;
+        p["Accent"] = p["AccentEdge"] = p["PrimaryEdge"] = p["PrimaryHover"] = p["LogoAccent"] = accent;
         p["Mono"] = p["Meter1"] = p["Meter2"] = p["Meter3"] = M(bg, text, 0.8);
         p["Graph"] = hi;
         p["GraphSoft"] = M(bg, hi, 0.2);
@@ -218,16 +216,11 @@ internal static class CustomPalette
         p["AccentPressed"] = p["PrimaryPressed"] = p["ScrollThumbBrushDrag"] = pressed;
         p["OnAccent"] = p["PrimaryHoverFg"] = onAccent;
         p["AccentSoft"] = M(bg, accent, 0.165);
-        p["AccentSoftHover"] = M(bg, accent, 0.225);
-        p["ToggleOff"] = M(bg, accent, 0.34);
         p["AccentText"] = p["PrimaryFg"] = p["MetricText"] = accentText;
         p["PrimaryBg"] = A(accent, 0x12);
-        p["SwitchOn"] = M(bg, accent, 0.115);
 
         p["ActiveModeBg"] = A(hi, 0x1A);
-        p["ActiveModeHover"] = A(hi, 0x33);
         p["ActiveModeFg"] = hiText;
-        p["ActiveModeEdge"] = Readable(hi, bg, 3);
         p["FocusEdge"] = Readable(accent, bg, 3);
 
         p["Slate"] = hi;

@@ -216,6 +216,7 @@ internal static class StatsSessionView
                 if (lap.Flags.HasFlag(LapFlags.TimeDiffers)) Tag("Timed from the pits", "SurfaceAlt", "TextMuted", "iRacing's time for this lap started before you crossed the line, so it's never a clean lap");
                 if (!lap.Clean && lap.Flags == LapFlags.None) Tag("Not clean", coralSoft, coralDeep, "An incident, the pit lane or off track on this lap");
                 Cell(table, row, c, flag);
+                flag.Margin = new Thickness(15, 0, 0, 0);
             }
             lapsTable.Children.Add(Section(table, tyresOf.TryGetValue(gi, out var readings) ? StatsSessionTools.TyreRun(readings) : null));
         }

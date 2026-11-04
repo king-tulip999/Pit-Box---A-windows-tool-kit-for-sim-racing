@@ -225,12 +225,6 @@ internal sealed class HudHost : IDisposable
         _app.Notify("iRacing Overlay layout applied", _layoutName, NoticeKind.Success);
     }
 
-    public void Announce(string id, string title, string? detail)
-    {
-        Race.Alerts.Fire(id, Race.Now, title, detail, id + ":" + title + ":" + detail);
-        foreach (var s in _slots.Values) s.Dirty = true;
-    }
-
     public void DismissAlerts()
     {
         Race.Alerts.DismissAll();
@@ -311,6 +305,7 @@ internal sealed class HudHost : IDisposable
             if (!widgets.Any(w => ReferenceEquals(w, s.Config)))
             {
                 Close(s);
+                s.Widget.Dispose();
                 _slots.Remove(id);
             }
         }
@@ -321,7 +316,11 @@ internal sealed class HudHost : IDisposable
                 existing.Dirty = true;
                 continue;
             }
-            if (_slots.Remove(w.Id, out var stale)) Close(stale);
+            if (_slots.Remove(w.Id, out var stale))
+            {
+                Close(stale);
+                stale.Widget.Dispose();
+            }
             if (HudCatalog.Find(w.Kind) is not { } def) continue;
             _slots[w.Id] = new Slot { Config = w, Def = def, Widget = def.Create(), Options = new HudOptions(def, w) };
         }
@@ -947,7 +946,15 @@ internal sealed class HudHost : IDisposable
         painter.Begin(g, scale, layout, Palette, Settings.Appearance);
         painter.Background = config.Background;
         var key = (config.Id, config.Kind);
-        if (!_previewWidgets.TryGetValue(key, out var preview)) preview = (config, def.Create(), new HudOptions(def, config));
+        if (!_previewWidgets.TryGetValue(key, out var preview))
+        {
+            if (_previewWidgets.Count >= MaxPreviewWidgets)
+            {
+                foreach (var old in _previewWidgets.Values) old.Widget.Dispose();
+                _previewWidgets.Clear();
+            }
+            preview = (config, def.Create(), new HudOptions(def, config));
+        }
         else if (!ReferenceEquals(preview.Config, config)) preview = (config, preview.Widget, new HudOptions(def, config));
         _previewWidgets[key] = preview;
         var widget = preview.Widget;
@@ -958,7 +965,7 @@ internal sealed class HudHost : IDisposable
 
     private readonly record struct FitShape(bool Connected, SessionKind Kind, int Classes, int Cars, int Standings, int Player);
 
-    private readonly Dictionary<(HudWidgetConfig Config, RaceState Race), (int Hash, FitShape Shape, SizeF Size)> _fits = new();
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<RaceState, Dictionary<HudWidgetConfig, (int Hash, FitShape Shape, SizeF Size)>> _fits = new();
     private readonly HudPainter _fitPainter = new() { Overflow = new() };
 
     private const float FitTall = 2400;
@@ -968,16 +975,17 @@ internal sealed class HudHost : IDisposable
         var stored = new SizeF((float)Math.Max(1, config.W), (float)Math.Max(1, config.H));
         if (HudCatalog.Find(config.Kind) is not { } def || def.FixedSize) return stored;
         var f = race.Frame;
-        var shape = new FitShape(f.Status == SimStatus.Connected, f.SessionKind, f.Session.NumCarClasses, f.Session.ByCar.Count, race.Standings.Count, f.PlayerCarIdx);
+        var shape = new FitShape(f.Status == SimStatus.Connected, f.SessionKind, f.Session.NumCarClasses, f.Session.ByCar.Count, race.LastStandingsCount, f.PlayerCarIdx);
         int hash = FitHash(config);
-        bool known = _fits.TryGetValue((config, race), out var had);
+        var fits = _fits.GetOrCreateValue(race);
+        bool known = fits.TryGetValue(config, out var had);
         if (known && had.Hash == hash && (had.Shape == shape || !shape.Connected)) return had.Size;
         if (!shape.Connected && def.Natural is null) return known ? had.Size : stored;
         SizeF size;
         try { size = Fit(config, def, race, stored); }
         catch (Exception ex) { LogOnce("fit:" + def.Kind, ex); size = stored; }
-        if (_fits.Count > 256) _fits.Clear();
-        _fits[(config, race)] = (hash, shape, size);
+        if (fits.Count > 256) fits.Clear();
+        fits[config] = (hash, shape, size);
         return size;
     }
 
@@ -1040,6 +1048,7 @@ internal sealed class HudHost : IDisposable
     private readonly PitBox.Overlay.DibSurface _previewSurface = new();
 
     private readonly Dictionary<(string Id, string Kind), (HudWidgetConfig Config, HudWidget Widget, HudOptions Options)> _previewWidgets = new();
+    private const int MaxPreviewWidgets = 128;
 
     public void Dispose()
     {
@@ -1061,6 +1070,9 @@ internal sealed class HudHost : IDisposable
         _webRenderer.Dispose();
         _previewSurface.Dispose();
         _fitPainter.Dispose();
+        foreach (var slot in _slots.Values) slot.Widget.Dispose();
+        foreach (var preview in _previewWidgets.Values) preview.Widget.Dispose();
+        _previewWidgets.Clear();
         _toolbar = null;
         if (_holding) { _holding = false; _app.Telemetry.Release(Consumer); }
     }

@@ -24,19 +24,19 @@ internal sealed class HudWebRenderer : IDisposable
         public long LastSeq = -1;
         public long LastDraw;
         public byte[]? Last;
-        public double Opacity = -1;
-        public (int W, int H) Size;
 
         public void Dispose()
         {
+            Widget?.Dispose();
             Painter.Dispose();
             Surface.Dispose();
         }
     }
 
     private static readonly byte[] Empty = Array.Empty<byte>();
-    private readonly Dictionary<HudWebClient, Target> _targets = new(ReferenceEqualityComparer.Instance);
-    private readonly List<HudWebClient> _stale = new();
+    private readonly Dictionary<(string Kind, int W, int H, bool Sample), Target> _targets = new();
+    private readonly Dictionary<(string Kind, int W, int H, bool Sample), List<HudWebClient>> _groups = new();
+    private readonly List<(string Kind, int W, int H, bool Sample)> _stale = new();
     private readonly Dictionary<string, HudWidgetConfig> _fallbacks = new(StringComparer.OrdinalIgnoreCase);
     private readonly MemoryStream _png = new();
     private readonly TelemetryFrame _sampleFrame = new();
@@ -50,49 +50,66 @@ internal sealed class HudWebRenderer : IDisposable
     public int Render(IReadOnlyList<HudWebClient> clients, TelemetryFrame frame, RaceState race, RaceHudSettings settings, HudLayout? layout, HudPalette palette, bool dirty)
     {
         int fastest = 0;
-        _stale.Clear();
-        foreach (var known in _targets.Keys)
-            if (!clients.Contains(known)) _stale.Add(known);
-        foreach (var stale in _stale)
-        {
-            _targets[stale].Dispose();
-            _targets.Remove(stale);
-        }
-        _stale.Clear();
-        long now = Stopwatch.GetTimestamp();
         bool live = frame.Status == SimStatus.Connected;
         bool sampled = !live && AdvanceSample(clients, settings);
+        foreach (var group in _groups.Values) group.Clear();
         foreach (var client in clients)
         {
-            var (shown, shownRace) = sampled && client.Sample ? (_sampleFrame, _sampleRace!) : (frame, race);
-            if (HudCatalog.Find(client.Kind) is not { } def) continue;
-            if (!_targets.TryGetValue(client, out var t)) _targets[client] = t = new Target { Def = def };
+            var key = (client.Kind, client.Width, client.Height, sampled && client.Sample);
+            if (!_groups.TryGetValue(key, out var group)) _groups[key] = group = new List<HudWebClient>();
+            group.Add(client);
+        }
+        _stale.Clear();
+        foreach (var (key, group) in _groups)
+            if (group.Count == 0) _stale.Add(key);
+        foreach (var key in _stale)
+        {
+            _groups.Remove(key);
+            if (_targets.Remove(key, out var gone)) gone.Dispose();
+        }
+        long now = Stopwatch.GetTimestamp();
+        foreach (var (key, group) in _groups)
+        {
+            var (shown, shownRace) = key.Sample ? (_sampleFrame, _sampleRace!) : (frame, race);
+            if (HudCatalog.Find(key.Kind) is not { } def) continue;
+            if (!_targets.TryGetValue(key, out var t)) _targets[key] = t = new Target { Def = def };
+            bool redraw = dirty || t.Last is null;
             var config = ConfigFor(def, layout);
             if (!ReferenceEquals(config, t.Config))
             {
                 t.Config = config;
                 t.Options = new HudOptions(def, config);
+                t.Widget?.Dispose();
                 t.Widget = def.Create();
                 t.Last = null;
-                dirty = true;
+                redraw = true;
             }
             int hz = config.UpdateHz > 0 ? config.UpdateHz : def.Hz(t.Options!);
             fastest = Math.Max(fastest, hz);
-            var size = (client.Width, client.Height);
-            bool due = Stopwatch.GetElapsedTime(t.LastDraw, now).TotalMilliseconds >= 1000.0 / hz - 4;
-            if (!dirty && size == t.Size && !(due && t.LastSeq != shown.Sequence)) continue;
-            t.Size = size;
-            t.LastSeq = shown.Sequence;
-            t.LastDraw = now;
-            if (Math.Abs(config.Opacity - t.Opacity) > 0.01)
+            string? look = null;
+            foreach (var client in group)
             {
-                t.Opacity = config.Opacity;
-                client.Say(string.Create(CultureInfo.InvariantCulture, $"{{\"type\":\"look\",\"opacity\":{Math.Clamp(config.Opacity / 100, 0, 1):0.###}}}"));
+                if (Math.Abs(config.Opacity - client.ToldOpacity) <= 0.01) continue;
+                client.ToldOpacity = config.Opacity;
+                look ??= string.Create(CultureInfo.InvariantCulture, $"{{\"type\":\"look\",\"opacity\":{Math.Clamp(config.Opacity / 100, 0, 1):0.###}}}");
+                client.Say(look);
             }
-            var bytes = Draw(t, shown, shownRace, settings, palette, size);
-            if (ReferenceEquals(bytes, t.Last) || t.Last is not null && bytes.AsSpan().SequenceEqual(t.Last)) continue;
-            t.Last = bytes;
-            client.Offer(bytes);
+            bool due = Stopwatch.GetElapsedTime(t.LastDraw, now).TotalMilliseconds >= 1000.0 / hz - 4;
+            bool waited = !redraw && group.TrueForAll(c => c.Holding);
+            if (redraw || due && t.LastSeq != shown.Sequence && !waited)
+            {
+                t.LastSeq = shown.Sequence;
+                t.LastDraw = now;
+                var bytes = Draw(t, shown, shownRace, settings, palette, (key.W, key.H));
+                if (!ReferenceEquals(bytes, t.Last) && (t.Last is null || !bytes.AsSpan().SequenceEqual(t.Last))) t.Last = bytes;
+            }
+            if (t.Last is not { } last) continue;
+            foreach (var client in group)
+            {
+                if (ReferenceEquals(client.Offered, last)) continue;
+                client.Offered = last;
+                client.Offer(last);
+            }
         }
         return fastest;
     }

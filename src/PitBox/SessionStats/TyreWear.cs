@@ -16,11 +16,6 @@ internal sealed record TyreReading(int Lap, int Run, int Laps, double[] Start, d
 
     public double? UsedPerLap(int corner) => Laps > 0 ? Used(corner) / Laps : null;
 
-    public double? LapsTo(int corner, double floor)
-    {
-        if (UsedPerLap(corner) is not { } rate || rate <= 1e-6) return null;
-        return Math.Max(0, (Lowest(corner) - floor) / rate);
-    }
 }
 
 internal sealed class TyreWearTracker

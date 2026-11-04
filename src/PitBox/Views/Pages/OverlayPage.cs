@@ -36,6 +36,8 @@ internal sealed class OverlayPage : UserControl, IPage
     private readonly Dictionary<OverlayMetric, (Grid Row, TextBlock Label)> _metricRows = new();
     private (Grid Row, TextBlock Label)? _litRow;
     private bool _glideNext, _growNext;
+    private System.Windows.Media.Imaging.WriteableBitmap? _previewBits;
+    private double _previewDpi;
     private readonly Image _closeUp = new() { Stretch = Stretch.None, HorizontalAlignment = HorizontalAlignment.Left, SnapsToDevicePixels = true };
     private readonly Border _closeUpBox = new() { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 8, 0, 0) };
 
@@ -115,21 +117,21 @@ internal sealed class OverlayPage : UserControl, IPage
 
     private void Morphing(Action change, double ms = 340)
     {
-        var before = _motion.Capture();
+        var before = _motion.Capture(keepPixels: true);
         change();
         if (before is { } frame) _motion.Fade(frame, ms);
     }
 
     private void Wiping(Action change, bool glow = false)
     {
-        var before = _motion.Capture();
+        var before = _motion.Capture(keepPixels: true);
         change();
         if (before is { } frame) _motion.Wipe(frame, glow, glow ? 620 : 450);
     }
 
     private void Fading(Action change)
     {
-        var before = _motion.Capture();
+        var before = _motion.Capture(keepPixels: true);
         change();
         if (before is { } frame) _motion.Fade(frame);
     }
@@ -170,7 +172,7 @@ internal sealed class OverlayPage : UserControl, IPage
 
         var columns = new Grid();
         columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(13) });
+        columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Ui.PanelSpacing) });
         columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         Grid.SetColumn(_right, 2);
         columns.Children.Add(_left);
@@ -427,10 +429,10 @@ internal sealed class OverlayPage : UserControl, IPage
         }, 162);
         AutomationProperties.SetName(pick, "Layout");
         row.Children.Add(pick);
-        var edit = Ui.IconButton("I.Pencil", "Rename, duplicate, reset or delete this layout", () => _ = EditLayoutAsync(), "GhostButton");
+        var edit = Ui.IconButton("I.Pencil", "Rename, duplicate, reset or delete this layout", () => _ = EditLayoutAsync());
         edit.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0);
         row.Children.Add(edit);
-        var add = Ui.IconButton("I.Plus", "New layout", () => _ = NewLayoutAsync(copy: false), "GhostButton");
+        var add = Ui.IconButton("I.Plus", "New layout", () => _ = NewLayoutAsync(copy: false));
         add.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0);
         row.Children.Add(add);
         Ui.Anchor(row, "overlay.layouts");
@@ -612,7 +614,7 @@ internal sealed class OverlayPage : UserControl, IPage
         var lampHost = new Grid { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0), Children = { allLamp, partly } };
         DockPanel.SetDock(lampHost, Dock.Left);
         FrameworkElement headFace = several ? new DockPanel { LastChildFill = true, Children = { lampHost, title } } : title;
-        var head = new Border { Padding = new Thickness(16, 0, 10, 0), MinHeight = 34, Background = Brushes.Transparent, Child = headFace };
+        var head = new Border { Padding = new Thickness(17, 0, 10, 0), MinHeight = 34, Background = Brushes.Transparent, Child = headFace };
         headFace.VerticalAlignment = VerticalAlignment.Center;
         if (several)
         {
@@ -940,13 +942,22 @@ internal sealed class OverlayPage : UserControl, IPage
         try
         {
             double dpi = VisualTreeHelper.GetDpi(_preview).DpiScaleX;
-            using var bitmap = _app.Overlay.RenderPreview(L, stats, times, (float)dpi);
-            _preview.Source = BitmapConvert.ToSource(bitmap, dpi);
+            var surface = _app.Overlay.RenderPreview(L, stats, times, (float)dpi);
+            var (w, h) = (surface.Size.Width, surface.Size.Height);
+            if (w <= 0 || h <= 0 || surface.Bits == IntPtr.Zero) return;
+            if (_previewBits is null || _previewBits.PixelWidth != w || _previewBits.PixelHeight != h || _previewDpi != dpi)
+            {
+                _previewBits = new System.Windows.Media.Imaging.WriteableBitmap(w, h, 96 * dpi, 96 * dpi, PixelFormats.Pbgra32, null);
+                _previewDpi = dpi;
+            }
+            _previewBits.WritePixels(new Int32Rect(0, 0, w, h), surface.Bits, w * 4 * h, w * 4);
+            if (!ReferenceEquals(_preview.Source, _previewBits)) _preview.Source = _previewBits;
             bool closeUp = L.Style == OverlayStyle.Compact;
-            _closeUp.Source = closeUp ? _preview.Source : null;
+            var closeUpSource = closeUp ? _previewBits : null;
+            if (!ReferenceEquals(_closeUp.Source, closeUpSource)) _closeUp.Source = closeUpSource;
             _closeUpBox.Visibility = closeUp ? Visibility.Visible : Visibility.Collapsed;
             double wasWidth = _overlaySize.W;
-            _overlaySize = (bitmap.Width / dpi, bitmap.Height / dpi);
+            _overlaySize = (w / dpi, h / dpi);
             if (_growNext && wasWidth > 0)
                 _motion.Grow(wasWidth / _overlaySize.W, L.Corner is OverlayCorner.TopRight or OverlayCorner.BottomRight, L.Corner is OverlayCorner.BottomLeft or OverlayCorner.BottomRight);
             _growNext = false;

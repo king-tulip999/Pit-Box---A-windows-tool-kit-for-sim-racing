@@ -140,6 +140,4 @@ internal static class LayoutGuard
     public static double Number(SettingsSession s, string key, double fallback) =>
         s.Find(IracingPaths.MonitorRenderer, "MonitorSetup", key) is { } x && CommentInference.TryNumber(x.Draft, out var n) ? n : fallback;
 
-    public static double IdealAngle(double monitorWidthMm, double viewingDistMm) =>
-        Math.Clamp(Math.Round(2 * Math.Atan2(monitorWidthMm / 2, Math.Max(1, viewingDistMm)) * 180 / Math.PI), 10, 65);
 }

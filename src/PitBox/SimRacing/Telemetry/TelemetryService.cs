@@ -24,7 +24,14 @@ internal sealed class TelemetryService : IDisposable
     private readonly AutoResetEvent _wake = new(false);
     private readonly DemoTelemetry _demo = new();
     private Thread? _thread;
-    private volatile bool _stop, _simRunning, _simulated;
+    private volatile bool _simRunning, _simulated;
+    private RunToken? _run;
+    private Thread? _stopping;
+
+    private sealed class RunToken
+    {
+        public volatile bool Stop;
+    }
     private volatile SimStatus _status = SimStatus.NotRunning;
     private SimStatus _raisedStatus = SimStatus.NotRunning;
     private long _sequence;
@@ -57,12 +64,29 @@ internal sealed class TelemetryService : IDisposable
         lock (_observerLock) _observers = _observers.Where(o => o != observe).ToArray();
     }
 
+    private const int ObserverGivesUpAfter = 600;
+    private readonly Dictionary<Action<TelemetryFrame>, int> _observerFailures = new();
+
     private void Observe(TelemetryFrame f)
     {
         foreach (var observe in _observers)
         {
-            try { observe(f); }
-            catch (Exception ex) { _lastError = ex.Message; RemoveObserver(observe); App.LogError(ex); }
+            try
+            {
+                observe(f);
+                if (_observerFailures.Count > 0) _observerFailures.Remove(observe);
+            }
+            catch (Exception ex)
+            {
+                _lastError = ex.Message;
+                int failures = _observerFailures.GetValueOrDefault(observe) + 1;
+                _observerFailures[observe] = failures;
+                if (failures == 1) App.LogError(ex);
+                if (failures < ObserverGivesUpAfter) continue;
+                _observerFailures.Remove(observe);
+                RemoveObserver(observe);
+                App.LogError(new InvalidOperationException($"A telemetry reader failed on {ObserverGivesUpAfter} frames in a row and was stopped", ex));
+            }
         }
     }
 
@@ -92,8 +116,10 @@ internal sealed class TelemetryService : IDisposable
             _watcher.Acquire("iRacing Overlay telemetry", new[] { SimProcess });
             _simRunning = _watcher.IsRunning(SimProcess);
         }
-        _stop = false;
-        _thread = new Thread(Run) { IsBackground = true, Name = "Telemetry", Priority = ThreadPriority.Normal };
+        if (_stopping is { IsAlive: true } stopping) stopping.Join(2000);
+        _stopping = null;
+        var token = _run = new RunToken();
+        _thread = new Thread(() => Run(token)) { IsBackground = true, Name = "Telemetry", Priority = ThreadPriority.Normal };
         _thread.Start();
     }
 
@@ -106,15 +132,20 @@ internal sealed class TelemetryService : IDisposable
             _watcher.Stopped -= OnProcessStopped;
             _watcher.Release("iRacing Overlay telemetry");
         }
-        _stop = true;
+        if (_run is { } token) token.Stop = true;
+        _run = null;
         _wake.Set();
-        _thread?.Join(2000);
+        bool exited = _thread?.Join(2000) ?? true;
+        _stopping = exited ? null : _thread;
         _thread = null;
-        var f = _frames.Back;
-        f.Reset();
-        f.Session = SessionInfo.Empty;
-        f.Sequence = ++_sequence;
-        _frames.Publish();
+        if (exited)
+        {
+            var f = _frames.Back;
+            f.Reset();
+            f.Session = SessionInfo.Empty;
+            f.Sequence = ++_sequence;
+            _frames.Publish();
+        }
         SetStatus(SimStatus.NotRunning);
     }
 
@@ -144,7 +175,7 @@ internal sealed class TelemetryService : IDisposable
         _wake.Set();
     }
 
-    private void Run()
+    private void Run(RunToken token)
     {
         IrsdkMemory? mem = null;
         var decoder = new FrameDecoder();
@@ -155,7 +186,7 @@ internal sealed class TelemetryService : IDisposable
         long second = Stopwatch.GetTimestamp();
         try
         {
-            while (!_stop)
+            while (!token.Stop)
             {
                 if (_simulated)
                 {
@@ -195,7 +226,7 @@ internal sealed class TelemetryService : IDisposable
                 }
 
                 bool signalled = mem.WaitForData(250);
-                if (_stop || _simulated) continue;
+                if (token.Stop || _simulated) continue;
                 if (!mem.Connected || !signalled && Stopwatch.GetElapsedTime(lastData).TotalSeconds > 2)
                 {
                     PublishStatus(SimStatus.Waiting);

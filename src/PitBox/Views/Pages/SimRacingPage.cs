@@ -265,7 +265,7 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
             _view.Build(id);
             built = true;
         }
-        return built || _hud?.ShowTabFor(anchor) == true;
+        return built || _hud?.ShowTabFor(anchor) == true || _controller?.ShowTabFor(anchor) == true;
     }
 
     public void OnShown()

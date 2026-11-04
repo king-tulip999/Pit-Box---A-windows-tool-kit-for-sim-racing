@@ -24,9 +24,6 @@ internal sealed record HardwareSnapshot
     public float? GpuFanRpm { get; init; }
     public float? GpuFanPercent { get; init; }
 
-    public float? DiskReadBps { get; init; }
-    public float? DiskWriteBps { get; init; }
-    public float? DiskActivePercent { get; init; }
 
     public float? RamUsedGb { get; init; }
     public float? RamTotalGb { get; init; }
@@ -76,7 +73,6 @@ internal sealed class HardwareService : IDisposable
     private IHardware? _cpu;
     private IHardware? _gpu;
     private readonly List<IHardware> _memory = new();
-    private readonly DiskActivity _disk = new();
     private FanController? _fans;
     private System.Threading.Timer? _fanWatchdog;
     private Thread? _fanHandBack;
@@ -581,7 +577,7 @@ internal sealed class HardwareService : IDisposable
             if (snapshot is not null && (publish || fanLoop))
             {
                 Latest = snapshot;
-                if (deep || fanLoop)
+                if (deep || !_overrides.IsEmpty)
                 {
                     try { Catalog = BuildCatalog(); }
                     catch (Exception ex) { LogOnce("catalog", ex); }
@@ -618,7 +614,6 @@ internal sealed class HardwareService : IDisposable
         InvalidateSensorCache();
         _sensorSignature = -1;
         _sensorsChanged = true;
-        _disk.Dispose();
         _sourceCache.Clear();
         ClearPublished();
         return true;
@@ -1012,7 +1007,6 @@ internal sealed class HardwareService : IDisposable
     {
         var set = _snapshotSensors ??= ResolveSnapshotSensors();
         float? ramUsed = First(set.RamUsed), ramAvailable = First(set.RamAvailable);
-        var (diskRead, diskWrite, diskActive) = _disk.Read();
 
         return new HardwareSnapshot
         {
@@ -1030,9 +1024,6 @@ internal sealed class HardwareService : IDisposable
             VramTotalMb = First(set.VramTotal),
             GpuFanRpm = First(set.GpuFanRpm),
             GpuFanPercent = First(set.GpuFanPercent),
-            DiskReadBps = diskRead,
-            DiskWriteBps = diskWrite,
-            DiskActivePercent = diskActive,
 
             RamUsedGb = ramUsed,
             RamTotalGb = ramUsed + ramAvailable,

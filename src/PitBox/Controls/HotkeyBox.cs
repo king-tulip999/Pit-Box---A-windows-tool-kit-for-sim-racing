@@ -54,7 +54,7 @@ public sealed class HotkeyBox : TextBox
         Hairline.Frame(border);
         _hint = new Popup
         {
-            PlacementTarget = this, Placement = PlacementMode.Bottom, VerticalOffset = 3, AllowsTransparency = true, PopupAnimation = PopupAnimation.Fade,
+            PlacementTarget = this, Placement = PlacementMode.Bottom, VerticalOffset = 3, UseLayoutRounding = true, AllowsTransparency = true, PopupAnimation = PopupAnimation.Fade,
             StaysOpen = true, Focusable = false, IsHitTestVisible = false, Child = border,
         };
         RenderOptions.SetClearTypeHint(border, ClearTypeHint.Enabled);
@@ -65,7 +65,7 @@ public sealed class HotkeyBox : TextBox
     public void SetHotkey(string? hotkey)
     {
         Hotkey = string.IsNullOrWhiteSpace(hotkey) ? null : hotkey;
-        if (!_recording) Text = Theme.ThemeManager.Case(PitBox.Hotkeys.Hotkey.Display(Hotkey));
+        if (!_recording) Text = PitBox.Hotkeys.Hotkey.Display(Hotkey);
     }
 
     protected override void OnGotKeyboardFocus(KeyboardFocusChangedEventArgs e)
@@ -137,7 +137,7 @@ public sealed class HotkeyBox : TextBox
         }
         _recording = false;
         Tag = _placeholder;
-        Text = Theme.ThemeManager.Case(PitBox.Hotkeys.Hotkey.Display(Hotkey));
+        Text = PitBox.Hotkeys.Hotkey.Display(Hotkey);
     }
 
     protected override void OnPreviewKeyDown(KeyEventArgs e)
@@ -258,11 +258,11 @@ public sealed class HotkeyBox : TextBox
             {
                 if (i > 0)
                 {
-                    var plus = new FormattedText(ThemeManager.Case("+"), System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, typeface, 11, text, null, TextFormattingMode.Display, dip);
+                    var plus = new FormattedText("+", System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, typeface, 11, text, null, TextFormattingMode.Display, dip);
                     dc.DrawText(plus, new Point(x + 3, y + (height - plus.Height) / 2));
                     x += plus.Width + 6;
                 }
-                var label = new FormattedText(ThemeManager.Case(_keys[i]), System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, typeface, 11, text, null, TextFormattingMode.Display, dip);
+                var label = new FormattedText(_keys[i], System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, typeface, 11, text, null, TextFormattingMode.Display, dip);
                 double width = Math.Round(label.Width + 12);
                 dc.DrawRectangle(fill, edge, new Rect(x + 0.5, y + 0.5, width, height));
                 dc.DrawText(label, new Point(x + 6.5, y + 0.5 + (height - label.Height) / 2));

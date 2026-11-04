@@ -29,6 +29,8 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
     private readonly ContentControl _curveEditorHost = new() { Focusable = false };
     private readonly Dictionary<string, FanCardParts> _cards = new();
     private string _fanSignature = "";
+    private int _fanShape;
+    private readonly List<FanInfo> _visibleFans = new();
     private string? _selectedCurve;
     private CurveEditor? _liveEditor;
     private (TextBlock Text, FanCurve Curve)? _liveMix;
@@ -164,6 +166,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         _fansView.Children.Add(_fanGrid);
         Ui.Anchor(_presetBar, "fans.presets");
         Ui.Anchor(_fanGrid, "fans.fans");
+        Ui.Anchor(_fanTools, "fans.actions");
 
         _fansView.Children.Add(_hiddenPanel);
         Ui.Anchor(_hiddenPanel, "fans.hidden");
@@ -415,14 +418,26 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         }
         if (_curvesBeforeCatalog) BuildCurveEditor();
 
-        var visible = catalog.Fans.Where(f => !Fans.HardwareFor(f.ControlId).Hidden).ToList();
-        string signature = string.Join("|", visible.Select(f => f.ControlId + "=" + _app.FanName(f))) + "#" + Fans.ActivePreset + "#" + string.Join(",", Fans.Curves.Select(c => c.Name))
-                           + "#" + string.Join("|", catalog.Fans.Where(f => Fans.HardwareFor(f.ControlId).Hidden).Select(f => f.ControlId));
-        if (signature != _fanSignature)
+        _visibleFans.Clear();
+        var shape = new HashCode();
+        foreach (var f in catalog.Fans)
         {
-            _fanSignature = signature;
+            bool hidden = Fans.HardwareFor(f.ControlId).Hidden;
+            if (!hidden) _visibleFans.Add(f);
+            shape.Add(f.ControlId, StringComparer.Ordinal);
+            shape.Add(hidden);
+            if (!hidden) shape.Add(_app.FanName(f), StringComparer.Ordinal);
+        }
+        shape.Add(Fans.ActivePreset, StringComparer.Ordinal);
+        foreach (var c in Fans.Curves) shape.Add(c.Name, StringComparer.Ordinal);
+        int shapeHash = shape.ToHashCode();
+        var visible = _visibleFans;
+        if (_fanSignature.Length == 0 || shapeHash != _fanShape)
+        {
+            _fanShape = shapeHash;
+            _fanSignature = "built";
             BuildBanners();
-            BuildFanCards(visible);
+            BuildFanCards(visible.ToList());
             ShowUncalibrated();
             BuildHidden(catalog.Fans.Where(f => Fans.HardwareFor(f.ControlId).Hidden).ToList());
             BuildCurveEditor();
@@ -436,14 +451,14 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
 
         if (_liveEditor is not null && _selectedCurve is not null && catalog.Curves.TryGetValue(_selectedCurve, out var live))
         {
-            if (live.Temp is { } t) Motion.To(_liveEditor, CurveEditor.LiveTempProperty, t, 700);
+            if (live.Temp is { } t) Motion.To(_liveEditor, CurveEditor.LiveTempProperty, t, 700, glideFrom: 0.25);
             else _liveEditor.LiveTemp = double.NaN;
             if (live.Output is { } o)
             {
                 double band = Math.Floor(o / PingStep);
                 if (_liveStep is { } step && step != band) _liveEditor.PingLive();
                 _liveStep = band;
-                Motion.To(_liveEditor, CurveEditor.LiveOutputProperty, o, 700);
+                Motion.To(_liveEditor, CurveEditor.LiveOutputProperty, o, 700, glideFrom: 0.5);
             }
             else _liveEditor.LiveOutput = double.NaN;
         }
@@ -489,7 +504,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         foreach (int i in Enumerable.Range(0, visible.Count).OrderBy(k => order[k]))
         {
             var f = visible[i];
-            _fanGrid.Add(new PanelDef(f.ControlId, _app.FanName(f), _ => FanCard(f)) { Order = order[i], FullWidthWhen = () => _expanded.Contains(f.ControlId) });
+            _fanGrid.Add(new PanelDef(f.ControlId, _app.FanName(f), () => FanCard(f)) { Order = order[i], FullWidthWhen = () => _expanded.Contains(f.ControlId) });
         }
     }
 
@@ -1094,7 +1109,8 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
                 checkTitle.FontSize = 13.5;
                 TextCase.SetUpper(checkTitle, false);
                 ToggleCards.Dress(check, checkTitle, null);
-                check.Padding = new Thickness(9, 5, 10, 5);
+                check.Padding = new Thickness(9, 2, 10, 2);
+                check.MinHeight = Ui.ControlHeight;
                 check.HorizontalAlignment = HorizontalAlignment.Left;
                 check.VerticalAlignment = VerticalAlignment.Center;
                 string name = other.Name;

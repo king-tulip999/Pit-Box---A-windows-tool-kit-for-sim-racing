@@ -304,6 +304,8 @@ internal sealed class KeybindsBoard : StackPanel
         if (changed > 0)
         {
             var count = RaceParts.Big(changed.ToString(CultureInfo.CurrentCulture), 20, "AccentText", italic: true, heavy: false);
+            count.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
+            count.LineHeight = 22;
             var label = new TextBlock { Text = "changed from default", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 1, 0, 0) };
             var chip = new Button
             {
@@ -421,7 +423,7 @@ internal sealed class KeybindsBoard : StackPanel
             }
             var button = new Button
             {
-                Style = Ui.Res<Style>("QuietButton"), Content = holder, Padding = new Thickness(0), HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                Style = Ui.Res<Style>("QuietButton"), Content = holder, Padding = new Thickness(0), BorderThickness = new Thickness(0), HorizontalContentAlignment = HorizontalAlignment.Stretch,
                 Opacity = filtering && found == 0 ? 0.4 : 1,
             };
             AutomationProperties.SetName(button, group);
@@ -782,9 +784,10 @@ internal sealed class KeybindsBoard : StackPanel
     private void ResetGroup(string group, List<HotkeyEntry> changed)
     {
         var before = changed.Select(e => (Entry: e, Key: e.Get())).ToList();
-        foreach (var e in changed)
-            if (_app.Hotkeys.Change(e, e.Default) is { } problem)
+        for (int i = 0; i < changed.Count; i++)
+            if (_app.Hotkeys.Change(changed[i], changed[i].Default) is { } problem)
             {
+                for (int k = i - 1; k >= 0; k--) _app.Hotkeys.Change(before[k].Entry, before[k].Key);
                 _app.Notify("Keybinds not changed", problem, NoticeKind.Warning, important: true);
                 Render();
                 return;
@@ -793,12 +796,15 @@ internal sealed class KeybindsBoard : StackPanel
         Render();
         _app.Notify($"{group} keybinds back to default", RaceFormat.Count(changed.Count, "keybind") + " changed", action: new NoticeAction("Undo", () =>
         {
-            foreach (var (entry, key) in before) _app.Hotkeys.Change(entry, key);
+            string? failed = null;
+            foreach (var (entry, key) in before)
+                if (_app.Hotkeys.Change(entry, key) is { } problem) failed ??= problem;
+            if (failed is not null) _app.Notify("Some keybinds not put back", failed, NoticeKind.Warning, important: true);
             Render();
         }));
     }
 
-    internal static FrameworkElement Caps(string hotkey)
+    private static FrameworkElement Caps(string hotkey)
     {
         var panel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         var parts = PitBox.Hotkeys.Hotkey.Display(hotkey).Split('+');

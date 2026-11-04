@@ -254,7 +254,6 @@ If you race in the GRR league, turn on the GRR League tool (Settings â†’ Tools â
 | What | Used for | Licence |
 | --- | --- | --- |
 | [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) | Sensors and fan control | MPL 2.0 |
-| [TraceEvent](https://github.com/microsoft/perfview) (Microsoft) | Frame counting for the FPS readouts | MIT |
 | [.NET, WPF and Windows Forms](https://github.com/dotnet) (Microsoft) | The app framework | MIT |
 | [Lucide](https://lucide.dev) | Icons (some adapted) | ISC |
 | [Saira](https://github.com/Omnibus-Type/Saira) by Omnibus-Type | The app font, wordmark and the iRacing Overlay's numbers | SIL Open Font License 1.1 |

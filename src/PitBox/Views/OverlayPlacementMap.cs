@@ -53,7 +53,7 @@ internal sealed class OverlayPlacementMap : Grid
             number.SetResourceReference(TextBlock.FontFamilyProperty, "RaceFont");
             number.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
             tag.Children.Add(number);
-            if (screen.Primary) tag.Children.Add(new TextBlock { Text = ThemeManager.Case("Main"), Style = Ui.Res<Style>("Caption"), HorizontalAlignment = HorizontalAlignment.Center });
+            if (screen.Primary) tag.Children.Add(new TextBlock { Text = "Main", Style = Ui.Res<Style>("Caption"), HorizontalAlignment = HorizontalAlignment.Center });
             face.Children.Add(tag);
             face.ColumnDefinitions.Add(new ColumnDefinition());
             face.ColumnDefinitions.Add(new ColumnDefinition());
@@ -110,7 +110,7 @@ internal sealed class OverlayPlacementMap : Grid
     {
         bool right = corner is OverlayCorner.TopRight or OverlayCorner.BottomRight, bottom = corner is OverlayCorner.BottomLeft or OverlayCorner.BottomRight;
         string name = $"{Words(corner)} of monitor {screen.Number}";
-        var target = new Border { Background = Brushes.Transparent, Cursor = Cursors.Hand, Focusable = true, ToolTip = ThemeManager.Case(name), FocusVisualStyle = Ui.Res<Style>("FocusRing") };
+        var target = new Border { Background = Brushes.Transparent, Cursor = Cursors.Hand, Focusable = true, ToolTip = name, FocusVisualStyle = Ui.Res<Style>("FocusRing") };
         AutomationProperties.SetName(target, name);
         SetColumn(target, right ? 1 : 0);
         SetRow(target, bottom ? 1 : 0);
@@ -206,6 +206,7 @@ internal sealed class OverlayPlacementMap : Grid
             monitor.Width = boxes[i].Width;
             monitor.Height = boxes[i].Height;
             monitor.SetResourceReference(Border.BorderBrushProperty, _screens[i] == chosen ? "Accent" : "LineStrong");
+            monitor.SetResourceReference(Border.BackgroundProperty, _screens[i] == chosen ? "AccentSoft" : "SurfaceAlt");
             var corners = new[] { OverlayCorner.TopLeft, OverlayCorner.TopRight, OverlayCorner.BottomLeft, OverlayCorner.BottomRight };
             for (int k = 0; k < corners.Length; k++)
             {

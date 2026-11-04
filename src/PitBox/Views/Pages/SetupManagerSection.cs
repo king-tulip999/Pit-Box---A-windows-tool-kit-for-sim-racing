@@ -410,7 +410,7 @@ internal sealed class SetupManagerSection : StackPanel
             var (lit, on) = SetupCars.FilterLook(cls, _classFilter);
             var name = new TextBlock
             {
-                Text = ThemeManager.Case(cls), VerticalAlignment = VerticalAlignment.Center,
+                Text = cls, VerticalAlignment = VerticalAlignment.Center,
                 FontWeight = on ? FontWeights.Bold : FontWeights.SemiBold, Foreground = Ui.Res<Brush>(on ? "AccentText" : lit ? "Text" : "TextFaint"),
             };
             var tile = new Tile
@@ -421,7 +421,6 @@ internal sealed class SetupManagerSection : StackPanel
                     : $"Show only {cls} (click more classes to add them). Drag to change the class order. Hide a class in the Sort menu.",
                 Child = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Children = { name } },
             };
-            Tile.SetChamfer(tile, true);
             tile.MouseLeftButtonUp += (_, _) =>
             {
                 SetClassFilter(() => { if (!_classFilter.Remove(cls)) _classFilter.Add(cls); });
@@ -444,7 +443,7 @@ internal sealed class SetupManagerSection : StackPanel
         bool onlyHidden = _classFilter.Count == 0 && hiddenClasses > 0;
         var allText = new TextBlock
         {
-            Text = ThemeManager.Case(onlyHidden ? $"All · {hiddenClasses} hidden" : "All"), VerticalAlignment = VerticalAlignment.Center,
+            Text = onlyHidden ? $"All · {hiddenClasses} hidden" : "All", VerticalAlignment = VerticalAlignment.Center,
             FontWeight = picked && !onlyHidden ? FontWeights.SemiBold : FontWeights.Bold, Foreground = Ui.Res<Brush>(picked && !onlyHidden ? "Text" : "AccentText"),
         };
         var all = new Tile
@@ -455,7 +454,6 @@ internal sealed class SetupManagerSection : StackPanel
                 : picked ? "Every class again (clears the pick and shows the classes hidden in the Sort menu)" : "Every class is shown",
             Child = allText, Cursor = System.Windows.Input.Cursors.Hand, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 0, 5, 0),
         };
-        Tile.SetChamfer(all, true);
         System.Windows.Automation.AutomationProperties.SetName(all, "All classes");
         all.MouseLeftButtonUp += (_, _) =>
         {
@@ -636,13 +634,12 @@ internal sealed class SetupManagerSection : StackPanel
             CornerRadius = new CornerRadius(r.TopLeft, r.TopRight, 0, 0),
         }, Sides.Bottom);
         var title = new StackPanel { Orientation = Orientation.Horizontal };
-        title.Children.Add(new TextBlock { Text = ThemeManager.Case(cls), Style = Ui.Res<Style>("Eyebrow"), Foreground = Ui.Res<Brush>("Heading"), FontWeight = FontWeights.Bold });
+        title.Children.Add(new TextBlock { Text = cls, Style = Ui.Res<Style>("Eyebrow"), Foreground = Ui.Res<Brush>("Heading"), FontWeight = FontWeights.Bold });
         title.Children.Add(new TextBlock { Text = "  " + SetupTree.Plural(cars.Count, "car"), Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center });
         head.Child = title;
         var body = new StackPanel();
         body.Children.Add(head);
         var rows = Rows(cars, selected, since, chips: false);
-        rows.Margin = new Thickness(2, 2, 2, 2);
         body.Children.Add(rows);
         return Hairline.Frame(new Tile
         {
@@ -729,7 +726,7 @@ internal sealed class SetupManagerSection : StackPanel
 
         var row = new Tile
         {
-            Child = grid, CornerRadius = ThemeManager.Round(6), Cursor = Cursors.Hand, Margin = new Thickness(0, 1, 0, 1),
+            Child = grid, CornerRadius = ThemeManager.Round(6), Cursor = Cursors.Hand, Padding = new Thickness(2, 1, 2, 1),
             Background = selected ? Ui.Res<Brush>("AccentSoft") : Brushes.Transparent,
             BorderThickness = new Thickness(3, 0, 0, 0), BorderBrush = selected ? Ui.Res<Brush>("Accent") : Brushes.Transparent,
         };
@@ -896,13 +893,14 @@ internal sealed class SetupManagerSection : StackPanel
             if (one is not null)
                 buttons.Children.Add(Spaced(Ui.LabeledButton("I.Folder", one.IsFolder ? "Open in Explorer" : "Show in Explorer", () => { if (one.IsFolder) OpenFolder(one); else Reveal(one); }), null));
             var delete = Spaced(Ui.LabeledButton("I.Trash", "Delete", () => Delete(sel), "DangerButton"), "Move to the Recycle Bin");
-            delete.Margin = new Thickness(Ui.GroupGap, 2, 0, 2);
+            if (buttons.Children[^1] is FrameworkElement before) before.Margin = new Thickness(0, 2, Ui.GroupGap, 2);
+            delete.Margin = new Thickness(0, 2, 0, 2);
             buttons.Children.Add(delete);
             var clear = Ui.IconButton("I.X", "Clear the selection", () => { _selected.Clear(); RenderExplorer(); }, "QuietIconButton");
             clear.VerticalAlignment = VerticalAlignment.Top;
             clear.Margin = new Thickness(2, 2, 0, 0);
             DockPanel.SetDock(clear, Dock.Right);
-            buttons.Margin = new Thickness(10, 0, 0, 0);
+            buttons.Margin = new Thickness(10 + Ui.ButtonGap, 0, 0, 0);
             var bar = new DockPanel { Children = { clear, Ui.SplitRow(selected, buttons, stackLeft: true) } };
             var barTile = new Tile { Style = Ui.Res<Style>("Inset"), Background = Ui.Res<Brush>("AccentSoft"), Padding = new Thickness(0, 5, 5, 5), Margin = new Thickness(0, 8, 0, 0), Child = bar };
             DockPanel.SetDock(barTile, Dock.Top);
@@ -976,7 +974,7 @@ internal sealed class SetupManagerSection : StackPanel
 
     private static FrameworkElement Spaced(Button button, string? tip)
     {
-        button.Margin = new Thickness(Ui.ButtonGap, 2, 0, 2);
+        button.Margin = new Thickness(0, 2, Ui.ButtonGap, 2);
         if (tip is not null) button.ToolTip = tip;
         return button;
     }

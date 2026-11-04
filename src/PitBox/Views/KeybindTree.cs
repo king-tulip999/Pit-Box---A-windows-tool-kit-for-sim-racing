@@ -54,21 +54,6 @@ internal sealed class KeybindTree : Tile
 
     private EditUndo? _undo;
 
-    public bool CancelArrange()
-    {
-        if (!_arranging) return false;
-        var undo = _undo;
-        Arranging = false;
-        if (undo?.Restore(_app) == true) Rebuild();
-        return true;
-    }
-
-    private readonly Dictionary<string, FrameworkElement> _groups = new(StringComparer.Ordinal);
-
-    public void ShowGroup(string key)
-    {
-        if (_groups.TryGetValue(key, out var group)) group.BringIntoView(new Rect(0, 0, 1, 400));
-    }
 
     private readonly List<(TextBlock Count, SegmentMeter? Meter, List<HotkeyEntry> Entries)> _counts = new();
 
@@ -104,17 +89,9 @@ internal sealed class KeybindTree : Tile
             e.Label.Contains(word, StringComparison.OrdinalIgnoreCase) || e.Note?.Contains(word, StringComparison.OrdinalIgnoreCase) == true
             || e.Get()?.Contains(word, StringComparison.OrdinalIgnoreCase) == true || e.Path.Any(p => p.Contains(word, StringComparison.OrdinalIgnoreCase)));
 
-    public void ResetOrder()
-    {
-        U.KeybindOrder.RemoveAll(HotkeyCatalog.IsCategoryKey);
-        _app.Save();
-        Rebuild();
-    }
-
     public void Rebuild()
     {
         _root.Children.Clear();
-        _groups.Clear();
         _counts.Clear();
         var entries = _app.Hotkeys.Catalog().Where(e => _app.Hotkeys.IsAvailable(e) && _include(e) && (_flat ? e.Path.Count >= _skip : e.Path.Count > _skip)).ToList();
         if (entries.Count == 0)
@@ -269,7 +246,6 @@ internal sealed class KeybindTree : Tile
             rule.SetResourceReference(Border.BackgroundProperty, "Line");
             panel.Children.Add(rule);
         }
-        _groups[key] = panel;
         bool folded = !Searching && IsFolded(key);
         var chevron = new Icon { Data = Ui.Res<Geometry>(folded ? "I.ChevronRight" : "I.ChevronDown"), Width = 11, Height = 11, VerticalAlignment = VerticalAlignment.Center };
         var head = GroupTitle(name, level, entries, out var count, hue, IconOf(name, entries, level));

@@ -18,15 +18,6 @@ internal static class Dividers
         dc.Pop();
     }
 
-    public static void DrawVertical(DrawingContext dc, double x, double top, double bottom)
-    {
-        if (bottom - top < 40 || Brushes(vertical: true) is not var (halo, core, fade)) return;
-        dc.PushOpacityMask(fade);
-        dc.DrawRectangle(halo, null, new Rect(x - 5, top, 11, bottom - top));
-        dc.DrawRectangle(core, null, new Rect(x, top, 1, bottom - top));
-        dc.Pop();
-    }
-
     private static ThemeSpec? _spec;
 
     private static (Brush, Brush, Brush)? Brushes(bool vertical, bool fromStart = false)

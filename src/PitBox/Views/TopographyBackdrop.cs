@@ -14,8 +14,7 @@ internal sealed class TopographyBackdrop : Grid
     public const int DecodeWidth = 2560;
     public const string LineKey = "TextMuted";
 
-    private static byte[]? _mask;
-    private static int _maskWidth, _maskHeight;
+    private static BitmapSource? _mask;
     private static readonly object MaskGate = new();
 
     public static void Preload()
@@ -58,11 +57,14 @@ internal sealed class TopographyBackdrop : Grid
 
     private static ImageSource? Picture(Color line, double alpha)
     {
-        if (!LoadMask()) return null;
+        if (!LoadMask() || _mask is not { } mask) return null;
         var colors = new Color[256];
         for (int i = 0; i < colors.Length; i++)
             colors[i] = Color.FromArgb((byte)Math.Round(i * alpha), line.R, line.G, line.B);
-        var picture = BitmapSource.Create(_maskWidth, _maskHeight, 96, 96, PixelFormats.Indexed8, new BitmapPalette(colors), _mask, _maskWidth);
+        int width = mask.PixelWidth, height = mask.PixelHeight;
+        var bytes = new byte[width * height];
+        mask.CopyPixels(bytes, width, 0);
+        var picture = BitmapSource.Create(width, height, 96, 96, PixelFormats.Indexed8, new BitmapPalette(colors), bytes, width);
         picture.Freeze();
         return picture;
     }
@@ -81,11 +83,11 @@ internal sealed class TopographyBackdrop : Grid
                 source.CacheOption = BitmapCacheOption.OnLoad;
                 source.EndInit();
                 var gray = new FormatConvertedBitmap(source, PixelFormats.Gray8, null, 0);
-                _maskWidth = gray.PixelWidth;
-                _maskHeight = gray.PixelHeight;
-                var bytes = new byte[_maskWidth * _maskHeight];
-                gray.CopyPixels(bytes, _maskWidth, 0);
-                _mask = bytes;
+                var bytes = new byte[gray.PixelWidth * gray.PixelHeight];
+                gray.CopyPixels(bytes, gray.PixelWidth, 0);
+                var mask = BitmapSource.Create(gray.PixelWidth, gray.PixelHeight, 96, 96, PixelFormats.Gray8, null, bytes, gray.PixelWidth);
+                mask.Freeze();
+                _mask = mask;
                 return true;
             }
             catch (Exception ex)

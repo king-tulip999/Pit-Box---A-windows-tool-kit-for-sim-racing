@@ -41,8 +41,6 @@ internal sealed class HudPalette
         set => Volatile.Write(ref _themeAccent, value?.ToArgb() ?? 0);
     }
 
-    public static readonly Color CatFur = Color.FromArgb(0xD9, 0xDC, 0xE6), CatInk = Color.FromArgb(0x0A, 0x0D, 0x16), CatHeadset = Color.FromArgb(0x2B, 0x33, 0x48), CatPink = Color.FromArgb(0xF2, 0x8C, 0xA0);
-
     public static HudPalette Of(HudAppearance look) => Default;
 
     public static HudPalette Default { get; } = new HudPalette

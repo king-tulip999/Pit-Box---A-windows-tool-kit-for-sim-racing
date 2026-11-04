@@ -17,7 +17,7 @@ public class Lamp : Border
 
     private readonly Border _lit;
     private readonly ScaleTransform _rise = new(1, 0);
-    private string _litKey = "Accent";
+    private const string LitKey = "Accent";
 
     public Lamp()
     {
@@ -52,17 +52,11 @@ public class Lamp : Border
         set => SetValue(HotProperty, value);
     }
 
-    public string LitKey
-    {
-        get => _litKey;
-        set { _litKey = value; Paint(animate: false); }
-    }
-
     private void Paint(bool animate)
     {
         bool on = On == true;
-        SetResourceReference(BorderBrushProperty, on || Hot ? _litKey : "LineStrong");
-        _lit.SetResourceReference(BackgroundProperty, _litKey);
+        SetResourceReference(BorderBrushProperty, on || Hot ? LitKey : "LineStrong");
+        _lit.SetResourceReference(BackgroundProperty, LitKey);
         double to = on ? 1 : 0;
         if (animate && IsLoaded)
             Motion.To(_rise, ScaleTransform.ScaleYProperty, to, on ? RiseMs : FallMs, ease: Motion.Smooth);

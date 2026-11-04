@@ -65,6 +65,7 @@ internal sealed class SectionView
         _name = new TrimRow { VerticalAlignment = VerticalAlignment.Center, Background = Brushes.Transparent, Children = { _title, _beta } };
         _right.Children.Add(_tools);
         _heading.Children.Add(Ui.SplitRow(_name, _right));
+        _heading.Children.Add(Ui.TitleRule(_title));
         _heading.Children.Add(_subtitle);
     }
 
@@ -73,8 +74,6 @@ internal sealed class SectionView
     public FrameworkElement Content => _content;
 
     public string? Current { get; private set; }
-
-    public void AddRight(FrameworkElement element) => _right.Children.Add(element);
 
     public void Add(SectionDef def)
     {

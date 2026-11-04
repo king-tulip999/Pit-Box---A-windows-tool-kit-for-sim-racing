@@ -43,7 +43,8 @@ internal static class ToggleCards
         var title = Title(label, false);
         title.FontSize = 13.5;
         Dress(box, title, null);
-        box.Padding = new Thickness(9, 5, 10, 5);
+        box.Padding = new Thickness(9, 2, 10, 2);
+        box.MinHeight = Ui.ControlHeight;
         box.HorizontalAlignment = HorizontalAlignment.Left;
         box.VerticalAlignment = VerticalAlignment.Center;
         box.VerticalContentAlignment = VerticalAlignment.Center;
@@ -58,13 +59,6 @@ internal static class ToggleCards
     }
 
     public static TextBlock RowTitle(string text) => new() { Text = text, Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
-
-    public static CheckBox OnOff(CheckBox box)
-    {
-        Row(box, null, null);
-        box.HorizontalAlignment = HorizontalAlignment.Left;
-        return box;
-    }
 
     public static CheckBox Row(CheckBox box, FrameworkElement? heading, string? caption, FrameworkElement? below = null, FrameworkElement? trailing = null)
     {
@@ -120,7 +114,7 @@ internal static class ToggleCards
         return Compact(box, title);
     }
 
-    public static CheckBox Dress(CheckBox box, FrameworkElement heading, string? caption, FrameworkElement? below = null, Action<TextBlock>? captionText = null, FrameworkElement? trailing = null)
+    public static CheckBox Dress(CheckBox box, FrameworkElement heading, string? caption, FrameworkElement? below = null, Action<TextBlock>? captionText = null, FrameworkElement? trailing = null, bool centerLamp = false)
     {
         bool tall = !string.IsNullOrEmpty(caption);
         var top = new Grid();
@@ -129,7 +123,7 @@ internal static class ToggleCards
         top.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         top.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         top.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        var lamp = new Lamp { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, tall ? 10 : 8, 0) };
+        var lamp = new Lamp { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
         top.Children.Add(lamp);
         heading.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(heading, 1);
@@ -143,6 +137,7 @@ internal static class ToggleCards
             Grid.SetColumn(text, 1);
             Grid.SetRow(text, 1);
             top.Children.Add(text);
+            if (centerLamp) Grid.SetRowSpan(lamp, 2);
         }
         if (trailing is not null)
         {

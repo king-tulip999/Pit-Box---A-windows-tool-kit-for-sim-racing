@@ -158,7 +158,7 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         identify.Margin = new Thickness(11, 0, 0, 0);
         arrangeHead.Children.Add(identify);
         var refresh = Ui.IconButton("I.Refresh", "Re-read displays", Reload);
-        refresh.Margin = new Thickness(5, 0, 0, 0);
+        refresh.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0);
         arrangeHead.Children.Add(refresh);
         var open = Ui.LabeledButton("I.Settings", "Windows display settings", () => Ui.OpenUrl("ms-settings:display"), "GhostButton");
         open.ToolTip = "Text and app scaling (100%, 125%, 150%…) has no supported Windows API, so it stays in Windows Settings. Night light and color profiles live there too.";

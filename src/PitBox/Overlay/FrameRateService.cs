@@ -1,7 +1,5 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using Microsoft.Diagnostics.Tracing;
-using Microsoft.Diagnostics.Tracing.Session;
 
 namespace PitBox.Overlay;
 
@@ -26,7 +24,7 @@ internal sealed class FrameRateService : IDisposable
 
     private readonly object _lock = new();
     private readonly Dictionary<int, ProcessFrames> _processes = new();
-    private TraceEventSession? _session;
+    private EtwSession? _session;
     private Thread? _thread;
     private long _nextPruneMs;
 
@@ -72,25 +70,16 @@ internal sealed class FrameRateService : IDisposable
 
         try
         {
-            try { TraceEventSession.GetActiveSession(SessionName)?.Stop(noThrow: true); } catch { }
-
-            var session = _session = new TraceEventSession(SessionName) { StopOnDispose = true };
-            session.EnableProvider(DxgiProvider, TraceEventLevel.Verbose, ulong.MaxValue,
-                new TraceEventProviderOptions { EventIDsToEnable = new List<int> { DxgiPresentStart, DxgiPresentMultiplaneOverlayStart } });
-            session.EnableProvider(D3D9Provider, TraceEventLevel.Verbose, ulong.MaxValue,
-                new TraceEventProviderOptions { EventIDsToEnable = new List<int> { D3D9PresentStart } });
-            try
-            {
-                session.EnableProvider(DxgKrnlProvider, TraceEventLevel.Informational, ulong.MaxValue,
-                    new TraceEventProviderOptions { EventIDsToEnable = new List<int> { DxgKrnlPresentInfo } });
-            }
+            var session = _session = EtwSession.Start(SessionName, OnEvent);
+            session.Enable(DxgiProvider, EtwSession.LevelVerbose, DxgiPresentStart, DxgiPresentMultiplaneOverlayStart);
+            session.Enable(D3D9Provider, EtwSession.LevelVerbose, D3D9PresentStart);
+            try { session.Enable(DxgKrnlProvider, EtwSession.LevelInformational, DxgKrnlPresentInfo); }
             catch { }
-            session.Source.AllEvents += OnEvent;
 
             var ui = System.Windows.Threading.Dispatcher.CurrentDispatcher;
             _thread = new Thread(() =>
             {
-                try { session.Source.Process(); }
+                try { session.Process(); }
                 catch (Exception) when (_session != session) { }
                 catch (Exception ex) { Error = "FPS tracing stopped: " + ex.Message; }
                 if (_session == session) ui.BeginInvoke(() => Restart(session));
@@ -210,37 +199,37 @@ internal sealed class FrameRateService : IDisposable
         InvalidateMostActive();
     }
 
-    private void OnEvent(TraceEvent e)
+    private void OnEvent(in EtwEvent e)
     {
-        int id = (int)e.ID;
-        if (e.ProviderGuid == DxgKrnlProvider)
+        int id = e.Id;
+        if (e.Provider == DxgKrnlProvider)
         {
             if (id != DxgKrnlPresentInfo)
                 return;
             lock (_lock)
             {
                 PruneStale(Environment.TickCount64);
-                if (!_processes.TryGetValue(e.ProcessID, out var kernelProcess))
-                    kernelProcess = _processes[e.ProcessID] = new ProcessFrames();
-                kernelProcess.AddKernel(e.TimeStampRelativeMSec);
+                if (!_processes.TryGetValue(e.ProcessId, out var kernelProcess))
+                    kernelProcess = _processes[e.ProcessId] = new ProcessFrames();
+                kernelProcess.AddKernel(e.TimeMs);
             }
             return;
         }
-        bool isPresent = e.ProviderGuid == DxgiProvider ? id is DxgiPresentStart or DxgiPresentMultiplaneOverlayStart
-                       : e.ProviderGuid == D3D9Provider && id == D3D9PresentStart;
+        bool isPresent = e.Provider == DxgiProvider ? id is DxgiPresentStart or DxgiPresentMultiplaneOverlayStart
+                       : e.Provider == D3D9Provider && id == D3D9PresentStart;
         if (!isPresent)
             return;
 
         ulong swapChain = 0;
-        if (e.EventDataLength >= e.PointerSize)
-            swapChain = e.PointerSize == 8 ? (ulong)Marshal.ReadInt64(e.DataStart) : (uint)Marshal.ReadInt32(e.DataStart);
+        if (e.DataLength >= e.PointerSize && e.Data != IntPtr.Zero)
+            swapChain = e.PointerSize == 8 ? (ulong)Marshal.ReadInt64(e.Data) : (uint)Marshal.ReadInt32(e.Data);
 
         lock (_lock)
         {
             PruneStale(Environment.TickCount64);
-            if (!_processes.TryGetValue(e.ProcessID, out var process))
-                process = _processes[e.ProcessID] = new ProcessFrames();
-            process.Add(swapChain, e.TimeStampRelativeMSec);
+            if (!_processes.TryGetValue(e.ProcessId, out var process))
+                process = _processes[e.ProcessId] = new ProcessFrames();
+            process.Add(swapChain, e.TimeMs);
         }
     }
 
@@ -269,7 +258,7 @@ internal sealed class FrameRateService : IDisposable
 
     private DateTime _lastRestart;
 
-    private async void Restart(TraceEventSession dead)
+    private async void Restart(EtwSession dead)
     {
         if (_session != dead) return;
         Stop();

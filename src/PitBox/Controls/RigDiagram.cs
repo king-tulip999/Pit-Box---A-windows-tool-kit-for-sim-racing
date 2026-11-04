@@ -312,7 +312,7 @@ internal sealed class RigDiagram : FrameworkElement, IFrameStep
 
     private void Label(DrawingContext dc, string text, Point at, Brush brush, double size, bool bold = false, bool centre = false, bool alignRight = false)
     {
-        var ft = new FormattedText(ThemeManager.Case(text), CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+        var ft = new FormattedText(text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
             ThemeManager.UiFace(bold),
             size, brush, VisualTreeHelper.GetDpi(this).PixelsPerDip);
         double x = centre ? at.X - ft.Width / 2 : alignRight ? at.X - ft.Width : at.X;

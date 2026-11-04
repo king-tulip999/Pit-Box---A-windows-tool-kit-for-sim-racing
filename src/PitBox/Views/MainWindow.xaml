@@ -27,12 +27,12 @@
             <!-- title bar (draggable; buttons opt out of the caption area) -->
             <DockPanel x:Name="TitleBar" Grid.Row="0" LastChildFill="False">
                 <!-- left: the brand wordmark (not a button); the update badge lives in the sidebar footer above Settings.
-                     Lined up with the pages' content (28 px). -->
-                <StackPanel x:Name="TitleLeft" DockPanel.Dock="Left" Orientation="Horizontal" Margin="23,6,0,0" VerticalAlignment="Top">
-                    <StackPanel x:Name="Brand" Orientation="Horizontal" VerticalAlignment="Center">
+                     Centred over the sidebar and between the window top and the title rule (FitBrand). -->
+                <Grid x:Name="TitleLeft" DockPanel.Dock="Left" Margin="13,6,0,0" VerticalAlignment="Top">
+                    <StackPanel x:Name="Brand" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Top">
                         <TextBlock x:Name="Wordmark" Foreground="{DynamicResource Heading}" />
                     </StackPanel>
-                </StackPanel>
+                </Grid>
                 <StackPanel x:Name="CaptionButtons" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
                     <Button x:Name="MinButton" Style="{StaticResource CaptionButton}" WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="Minimize">
                         <c:CaptionGlyph Kind="Minimize" />

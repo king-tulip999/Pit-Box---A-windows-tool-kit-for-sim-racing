@@ -62,7 +62,7 @@ internal sealed class OverlayController : IDisposable
 
     private void Refresh()
     {
-        bool show = _enabled && _settings.Visible && (!DemoMode || Showcase.ShowcaseRunner.Active);
+        bool show = _enabled && _settings.Visible && !DemoMode;
         if (show == _running)
             return;
         _running = show;
@@ -165,7 +165,7 @@ internal sealed class OverlayController : IDisposable
 
     public IReadOnlyList<OverlayHit> PreviewHits => _previewRenderer.Hits!;
 
-    public Bitmap RenderPreview(OverlayLayout layout, FrameStats? frames, double[] frameTimes, float scale = 1f)
+    public DibSurface RenderPreview(OverlayLayout layout, FrameStats? frames, double[] frameTimes, float scale = 1f)
     {
         string? fpsNote = _frames.Error is not null && frames is null ? "needs admin" : null;
         var hw = _hardware.Latest;
@@ -209,7 +209,6 @@ internal sealed class OverlayController : IDisposable
             {
                 stats = _frames.GetStats(pid);
             }
-            if (stats is null && DemoMode && Showcase.ShowcaseRunner.Active) stats = Showcase.ShowcaseRunner.SampleFrames();
 
             var screen = TargetScreen(layout);
             float scale = DpiScale(screen);

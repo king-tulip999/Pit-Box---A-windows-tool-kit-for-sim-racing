@@ -96,8 +96,6 @@ public sealed class UpdateSettings
     public string SeenVersion { get; set; } = "";
 }
 
-public enum PanelSize { Small, Medium, Large }
-
 [JsonConverter(typeof(AppThemeConverter))]
 public readonly struct AppTheme : IEquatable<AppTheme>
 {
@@ -186,10 +184,6 @@ public sealed class UiSettings
 
     public int SidebarVersion { get; set; }
 
-    public List<PanelSlot> LandingLayout { get; set; } = new();
-
-    public int LandingVersion { get; set; }
-
     public bool AlwaysOnTop { get; set; }
 
     public WindowBounds? Window { get; set; }
@@ -231,8 +225,6 @@ public sealed class UiSettings
 
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
     public string? SearchKey { get; set; } = "Ctrl+F";
-
-    public bool KeybindsOpen { get; set; } = true;
 
     public List<string> KeybindsFolded { get; set; } = new();
 

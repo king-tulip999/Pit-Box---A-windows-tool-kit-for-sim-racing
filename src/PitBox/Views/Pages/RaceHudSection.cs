@@ -159,6 +159,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     private RaceHudSettings S => _app.Config.SimRacing.Hud;
 
     private HudHost? _watched;
+    private HudHost? _changedHost;
 
     private HudHost? Host => _app.Plugins.Find(PluginIds.SimRacing) is SimRacingPlugin { Hud: { } hud } ? hud : null;
 
@@ -170,6 +171,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         if (Host is { } h)
         {
             h.Changed += OnHostChanged;
+            _changedHost = h;
             Dispatcher.BeginInvoke(() =>
             {
                 if (!_shown || _watched is not null) return;
@@ -185,7 +187,9 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     {
         if (!_shown) return;
         _shown = false;
-        if (Host is { } h) h.Changed -= OnHostChanged;
+        _rules?.SetEditing(false);
+        if (_changedHost is { } h) h.Changed -= OnHostChanged;
+        _changedHost = null;
         _watched?.Watch(false);
         _watched = null;
         _timer.Stop();
@@ -446,71 +450,6 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         _widgets = new RaceHudWidgets(_app, this, inPage: true);
         root.Children.Add(_widgets.Root);
         return root;
-    }
-
-    private Tile Foldable(string id, string title, string? caption, FrameworkElement? actions, FrameworkElement body, bool foldable = true)
-    {
-        bool folded = foldable && S.FoldedPanels.Contains(id, StringComparer.OrdinalIgnoreCase);
-        var chevron = Ui.FoldChevron(!folded);
-        var titles = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        titles.Children.Add(Ui.Text(title, "H3"));
-        if (caption is not null) titles.Children.Add(Caption(caption, 2));
-        var header = new DockPanel { LastChildFill = true };
-        header.Children.Add(chevron);
-        header.Children.Add(titles);
-        var bar = new Button { Style = Ui.Res<Style>("QuietButton"), Content = header, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(13, 11, 10, 11) };
-        Controls.ClickGuard.SetAllowRepeat(bar, true);
-        System.Windows.Automation.AutomationProperties.SetName(bar, title);
-        body.Margin = new Thickness(10, 0, 13, 11);
-        void Show(bool open)
-        {
-            body.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
-            if (actions is not null) actions.Visibility = body.Visibility;
-            Ui.SetFold(chevron, open);
-        }
-        Show(!folded);
-        bar.Click += (_, _) =>
-        {
-            bool fold = body.Visibility == Visibility.Visible;
-            Show(!fold);
-            S.FoldedPanels.RemoveAll(x => string.Equals(x, id, StringComparison.OrdinalIgnoreCase));
-            if (fold) S.FoldedPanels.Add(id);
-            _app.Save();
-        };
-        var head = new Grid();
-        head.ColumnDefinitions.Add(new ColumnDefinition());
-        head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        if (foldable) head.Children.Add(bar);
-        else
-        {
-            header.Children.Remove(chevron);
-            bar.Content = null;
-            header.Margin = new Thickness(13, 11, 10, 11);
-            head.Children.Add(header);
-        }
-        if (actions is not null)
-        {
-            actions.VerticalAlignment = VerticalAlignment.Center;
-            actions.Margin = new Thickness(10, 0, 13, 0);
-            Grid.SetColumn(actions, 1);
-            head.Children.Add(actions);
-        }
-        if (foldable)
-        {
-            bar.Background = Brushes.Transparent;
-            Ui.HoverHighlight(head);
-            head.Cursor = System.Windows.Input.Cursors.Hand;
-            head.MouseLeftButtonUp += (_, e) =>
-            {
-                if (e.Handled) return;
-                e.Handled = true;
-                bar.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
-            };
-        }
-        var stack = new StackPanel();
-        stack.Children.Add(head);
-        stack.Children.Add(body);
-        return new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Padding = new Thickness(0), Child = stack };
     }
 
     private ArrangeList? _rules;
@@ -885,7 +824,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         header.Children.Add(chevron);
         DockPanel.SetDock(count, Dock.Right);
         header.Children.Add(count);
-        header.Children.Add(new TextBlock { Text = ThemeManager.Case(group.Title), Style = Ui.Res<Style>("H3"), VerticalAlignment = VerticalAlignment.Center });
+        header.Children.Add(new TextBlock { Text = group.Title, Style = Ui.Res<Style>("H3"), VerticalAlignment = VerticalAlignment.Center });
         var bar = new Button { Style = Ui.Res<Style>("QuietButton"), Content = header, HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(13, 8, 18, 6) };
         Controls.ClickGuard.SetAllowRepeat(bar, true);
         System.Windows.Automation.AutomationProperties.SetName(bar, group.Title);

@@ -201,40 +201,4 @@ internal static class FovCalculator
     private static List<V2> Mirror(List<V2> rightHalf) =>
         rightHalf.Skip(1).Reverse().Select(p => new V2(-p.X, p.Y)).Concat(rightHalf).ToList();
 
-    internal sealed record SimValue(string Sim, string Axis, double? Degrees, string Note, string? Range, bool OutOfRange, string? Extra = null);
-
-    public static IReadOnlyList<SimValue> SimValues(FovResult r)
-    {
-        double v = r.VerticalFov, hc = r.HorizontalFovCentre, ht = r.HorizontalFovTotal;
-        bool tri = r.Triple;
-
-        SimValue Vertical(string sim, string note, double? min = null, double? max = null, string? extra = null) =>
-            new(sim, "Vertical", v, note, min is null ? null : $"{min:0}–{max:0}°", min is not null && (v < min || v > max), extra);
-        SimValue Horizontal(string sim, double value, string note, double? min = null, double? max = null, string? extra = null) =>
-            new(sim, "Horizontal", value, note, min is null ? null : $"{min:0}–{max:0}°", min is not null && (value < min || value > max), extra);
-
-        return new List<SimValue>
-        {
-            Horizontal("iRacing", ht, tri ? "Total across all three screens, not the center one. Also enter the side angle and bezel in its triple-screen setup." : "Horizontal FOV of your screen."),
-            Vertical("Assetto Corsa", tri ? "Vertical FOV; on triples the screen geometry (angle, bezel) drives the rest." : "Vertical FOV."),
-            Vertical("Assetto Corsa Competizione", "Set per car in View Settings.", 10, 90),
-            Vertical("Assetto Corsa EVO", "Early access; the default of 55 suggests a vertical value."),
-            Vertical("Le Mans Ultimate", "Vertical FOV (default 49). With Multi-View on the slider is locked and geometry decides.", 10, 100),
-            Vertical("rFactor 2", "Vertical FOV. Multi-View overrides the FOV value entirely."),
-            Vertical("Automobilista 1", tri ? "With MultiView on this is the center screen's value." : "Vertical FOV."),
-            Vertical("BeamNG.drive", "Often listed as horizontal; it's vertical (default 65).", 10, 120),
-            Horizontal("Automobilista 2", tri ? hc : hc, tri ? "With triple-screen mode on, enter the center screen's value." : "Horizontal FOV.",
-                extra: tri ? $"Triple mode off (one stretched image): {ht:0.0}°" : null),
-            Horizontal("Project CARS 2", hc, tri ? "Same as AMS2: center screen with triple-screen mode on." : "Horizontal FOV.",
-                extra: tri ? $"Triple mode off: {ht:0.0}°" : null),
-            Horizontal("RaceRoom", hc, "Degrees in versions since 2021 (older guides use a 0.5–1.3 multiplier).",
-                extra: tri ? $"Across all three: {ht:0.0}°" : null),
-            Horizontal("Live for Speed", hc, tri ? "Once side screens are configured, the number is your center screen only." : "Horizontal FOV (default 90).", 30, 160),
-            new("Gran Turismo 7", "None", null, "No FOV setting, only seat height and depth.", null, false),
-            new("F1 (Codemasters / EA)", "Slider", null, "Unitless slider, roughly −20 to +20 around a fixed base.", null, false),
-            new("EA Sports WRC", "Slider", null, "Unitless 0–100 slider.", null, false),
-            new("DiRT Rally 2.0", "Slider", null, "Unitless slider in game; degrees only by editing its XML.", null, false),
-            new("Forza Motorsport / Horizon", "Unknown", null, "25–65 slider; which axis has never been stated.", null, false),
-        };
-    }
 }

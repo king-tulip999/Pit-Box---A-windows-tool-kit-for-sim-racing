@@ -50,7 +50,6 @@ internal static class LegacyModes
         config.Plugins.Remove("automations");
         config.Plugins.Remove("launcher");
         var ui = config.Ui;
-        foreach (var slot in ui.LandingLayout.Where(s => s.Id == OldPluginId)) slot.Id = Plugins.PluginIds.WindowProfiles;
         for (int i = 0; i < ui.NavOrder.Count; i++)
             if (ui.NavOrder[i] is OldPluginId or "automations" or "launcher") ui.NavOrder[i] = Plugins.PluginIds.WindowProfilesPage;
         ui.NavOrder = ui.NavOrder.Distinct(StringComparer.OrdinalIgnoreCase).ToList();

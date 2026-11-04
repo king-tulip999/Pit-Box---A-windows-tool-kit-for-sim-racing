@@ -16,13 +16,7 @@ internal sealed class ReorderGrid : Panel
     public double Gap { get; init; } = 6;
     public int MaxColumns { get; init; } = int.MaxValue;
 
-    public bool Swap { get; init; }
-
     public bool Flow { get; init; }
-
-    public bool CenterRows { get; init; }
-
-    private double _gridWidth;
 
     private readonly Dictionary<UIElement, double> _widths = new();
     private Rect[] _rects = Array.Empty<Rect>();
@@ -83,7 +77,6 @@ internal sealed class ReorderGrid : Panel
             child.Measure(new Size(_cellWidth, double.PositiveInfinity));
             _cellHeight = Math.Max(_cellHeight, child.DesiredSize.Height);
         }
-        _gridWidth = width;
         int rows = (n + _columns - 1) / _columns;
         return new Size(width, rows == 0 ? 0 : rows * _cellHeight + (rows - 1) * Gap);
     }
@@ -97,7 +90,6 @@ internal sealed class ReorderGrid : Panel
             for (int i = 0; i < InternalChildren.Count; i++) InternalChildren[i].Arrange(_rects[i]);
             return final;
         }
-        _gridWidth = final.Width;
         for (int i = 0; i < InternalChildren.Count; i++)
             InternalChildren[i].Arrange(new Rect(Slot(i), new Size(_cellWidth, _cellHeight)));
         return final;
@@ -121,14 +113,7 @@ internal sealed class ReorderGrid : Panel
 
     private Point Slot(int index) => Flow
         ? (index < _rects.Length ? _rects[index].Location : new Point())
-        : new(RowStart(index / _columns) + index % _columns * (_cellWidth + Gap), index / _columns * (_cellHeight + Gap));
-
-    private double RowStart(int row)
-    {
-        if (!CenterRows) return 0;
-        int inRow = Math.Clamp(InternalChildren.Count - row * _columns, 1, _columns);
-        return Math.Max(0, Math.Floor((_gridWidth - inRow * _cellWidth - (inRow - 1) * Gap) / 2));
-    }
+        : new(index % _columns * (_cellWidth + Gap), index / _columns * (_cellHeight + Gap));
 
     private Size CellSize(int index) => Flow ? (index < _rects.Length ? _rects[index].Size : new Size()) : new Size(_cellWidth, _cellHeight);
 
@@ -147,7 +132,7 @@ internal sealed class ReorderGrid : Panel
             return best;
         }
         int row = Math.Max(0, (int)(p.Y / (_cellHeight + Gap)));
-        int col = Math.Clamp((int)((p.X - RowStart(row)) / (_cellWidth + Gap)), 0, _columns - 1);
+        int col = Math.Clamp((int)(p.X / (_cellWidth + Gap)), 0, _columns - 1);
         return Math.Clamp(row * _columns + col, 0, InternalChildren.Count - 1);
     }
 
@@ -232,8 +217,7 @@ internal sealed class ReorderGrid : Panel
         {
             if (i == _from) continue;
             int shown = i;
-            if (Swap) shown = i == _to ? _from : i;
-            else if (_from < _to && i > _from && i <= _to) shown = i - 1;
+            if (_from < _to && i > _from && i <= _to) shown = i - 1;
             else if (_from > _to && i >= _to && i < _from) shown = i + 1;
             Slide(InternalChildren[i], Slot(shown) - Slot(i));
         }
@@ -276,20 +260,8 @@ internal sealed class ReorderGrid : Panel
             Slide(drag, new Vector());
             return;
         }
-        if (Swap)
-        {
-            int lo = Math.Min(from, to), hi = Math.Max(from, to);
-            UIElement a = InternalChildren[lo], b = InternalChildren[hi];
-            InternalChildren.RemoveAt(hi);
-            InternalChildren.RemoveAt(lo);
-            InternalChildren.Insert(lo, b);
-            InternalChildren.Insert(hi, a);
-        }
-        else
-        {
-            InternalChildren.RemoveAt(from);
-            InternalChildren.Insert(to, drag);
-        }
+        InternalChildren.RemoveAt(from);
+        InternalChildren.Insert(to, drag);
         var settle = Shift(drag);
         if (Flow) _rects = Layout(InternalChildren.Cast<UIElement>().ToList());
         var target = Slot(to);

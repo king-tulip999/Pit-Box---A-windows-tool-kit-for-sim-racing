@@ -62,8 +62,6 @@ public sealed class RaceHudSettings
 
     public List<string> FoldedPanels { get; set; } = new();
 
-    public List<string> EditorSectionsToggled { get; set; } = new();
-
     public List<TrackNote> Notes { get; set; } = new();
 
     public const int MaxNotes = 500, NoteLength = 160;
@@ -220,7 +218,6 @@ public sealed class RaceHudSettings
         AlertGroupOrder = (AlertGroupOrder ?? new()).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         AlertGroupsFolded = (AlertGroupsFolded ?? new()).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         FoldedPanels = (FoldedPanels ?? new()).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        EditorSectionsToggled = (EditorSectionsToggled ?? new()).Where(x => !string.IsNullOrWhiteSpace(x) && (!before2 || x.Contains(':'))).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (Layout(ActiveLayout) is null) ActiveLayout = Layouts[0].Name;
         Appearance ??= new();
         Appearance.Clamp();
@@ -376,7 +373,13 @@ public sealed class HudWidgetConfig
         return copy;
     }
 
-    public bool ShowsIn(string session) => Sessions.Count == 0 || Sessions.Any(s => string.Equals(s, session, StringComparison.OrdinalIgnoreCase));
+    public bool ShowsIn(string session)
+    {
+        if (Sessions.Count == 0) return true;
+        foreach (var s in Sessions)
+            if (string.Equals(s, session, StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
 }
 
 public sealed class TrackNote

@@ -164,6 +164,9 @@ internal sealed class RaceState
             {
                 _standings = FieldOrder.Standings(Frame, Frame.SessionKind == SessionKind.Race);
                 _standingsSeq = Frame.Sequence;
+                Array.Fill(_standingIndex, -1);
+                for (int i = 0; i < _standings.Count; i++)
+                    if ((uint)_standings[i].CarIdx < (uint)_standingIndex.Length && _standingIndex[_standings[i].CarIdx] < 0) _standingIndex[_standings[i].CarIdx] = i;
             }
             return _standings;
         }
@@ -202,10 +205,14 @@ internal sealed class RaceState
         return _irChange[car];
     }
 
+    private readonly int[] _standingIndex = new int[TelemetryFrame.MaxCars];
+
+    public int LastStandingsCount => _standings.Count;
+
     public StandingRow? StandingOf(int car)
     {
-        foreach (var r in Standings) if (r.CarIdx == car) return r;
-        return null;
+        var standings = Standings;
+        return (uint)car < (uint)_standingIndex.Length && _standingIndex[car] is >= 0 and var i && i < standings.Count ? standings[i] : null;
     }
 
     public int? PositionsGained(int car) =>

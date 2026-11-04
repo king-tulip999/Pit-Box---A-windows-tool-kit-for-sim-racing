@@ -682,18 +682,19 @@ internal sealed partial class RaceHudWidgets
     {
         var names = new List<(string Id, string Title)> { (LayoutTab, "Look") };
         if (editor.Has(HudTab.Content)) names.Add((ContentTab, editor.ContentTitle));
-        var row = new WrapPanel();
+        var row = new WrapPanel { Margin = new Thickness(0, 0, 0, -1) };
+        Panel.SetZIndex(row, 1);
         foreach (var (id, title) in names)
         {
             bool on = id == _tab;
             var text = new TextBlock { Text = title, FontSize = 13 };
             text.SetResourceReference(TextBlock.ForegroundProperty, on ? "Heading" : "TextMuted");
             if (on) text.FontWeight = FontWeights.SemiBold;
-            var underline = new Border { Height = 2, Margin = new Thickness(0, 7, 0, 0) };
-            if (on) underline.SetResourceReference(Border.BackgroundProperty, "Accent");
+            var underline = new Border { Height = 3, Margin = new Thickness(0, 6, 0, 0) };
+            if (on) underline.SetResourceReference(Border.BackgroundProperty, "AccentText");
             var stack = new StackPanel { Children = { text, underline } };
             var tabId = id;
-            var b = new Button { Style = Ui.Res<Style>("QuietButton"), Content = stack, Padding = new Thickness(11, 6, 11, 0), MinHeight = 0, Height = double.NaN };
+            var b = new Button { Style = Ui.Res<Style>("QuietButton"), Content = stack, Padding = new Thickness(11, 6, 11, 0), MinHeight = 0, Height = double.NaN, BorderThickness = new Thickness(0) };
             System.Windows.Automation.AutomationProperties.SetName(b, title + " tab");
             b.Click += (_, _) => { if (_tab == tabId) return; _tab = tabId; Fill(); };
             row.Children.Add(b);
@@ -705,7 +706,7 @@ internal sealed partial class RaceHudWidgets
 
     private FrameworkElement TabBody(HudWidgetConfig w, HudWidgetDef def, HudEditorDef editor)
     {
-        var stack = new StackPanel { Margin = new Thickness(3, 0, 3, 0) };
+        var stack = new StackPanel();
         var tab = _tab == ContentTab ? HudTab.Content : HudTab.Layout;
         _context = new HudSettingContext
         {
@@ -1062,10 +1063,14 @@ internal sealed partial class RaceHudWidgets
             _highlightBoxes.AddRange(boxes);
         }
         double s = _previewScale;
+        var dpi = VisualTreeHelper.GetDpi(_previewHighlight);
+        double sx = dpi.DpiScaleX, sy = dpi.DpiScaleY;
+        double maxW = _previewHighlight.ActualWidth, maxH = _previewHighlight.ActualHeight;
+        var edge = new Thickness(Math.Round(2 * sx) / sx, Math.Round(2 * sy) / sy, Math.Round(2 * sx) / sx, Math.Round(2 * sy) / sy);
         while (shown.Count > _highlightBoxes.Count) shown.RemoveAt(shown.Count - 1);
         while (shown.Count < _highlightBoxes.Count)
         {
-            var mark = new Border { BorderThickness = new Thickness(2), SnapsToDevicePixels = true };
+            var mark = new Border { BorderThickness = edge, SnapsToDevicePixels = true };
             mark.SetResourceReference(Border.BorderBrushProperty, "AccentText");
             var fill = (Ui.Res<Brush>("AccentSoft") as SolidColorBrush)?.Clone();
             if (fill is not null) { fill.Opacity = 0.35; fill.Freeze(); mark.Background = fill; }
@@ -1075,8 +1080,13 @@ internal sealed partial class RaceHudWidgets
         {
             var box = _highlightBoxes[i];
             var mark = (Border)shown[i];
-            double left = Math.Round(box.X * s - 2), top = Math.Round(box.Y * s - 2);
-            double width = Math.Max(4, Math.Round(box.Right * s + 2) - left), height = Math.Max(4, Math.Round(box.Bottom * s + 2) - top);
+            if (mark.BorderThickness != edge) mark.BorderThickness = edge;
+            double l = Math.Max(0, box.X * s - 2), t = Math.Max(0, box.Y * s - 2);
+            double r = box.Right * s + 2, b = box.Bottom * s + 2;
+            if (maxW > 0) r = Math.Min(maxW, r);
+            if (maxH > 0) b = Math.Min(maxH, b);
+            double left = Math.Round(l * sx) / sx, top = Math.Round(t * sy) / sy;
+            double width = Math.Max(4, Math.Round(r * sx) / sx - left), height = Math.Max(4, Math.Round(b * sy) / sy - top);
             if (mark.Width != width) mark.Width = width;
             if (mark.Height != height) mark.Height = height;
             if (Canvas.GetLeft(mark) != left) Canvas.SetLeft(mark, left);

@@ -38,12 +38,12 @@ internal sealed class ThemePicker : UniformGrid
 
         var dots = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Right };
         foreach (var key in new[] { "Accent", "ActiveModeBg", "Sage" })
-            dots.Children.Add(new Rectangle { Width = 8, Height = 8, RadiusX = theme.ChipRadius > 6 ? 5 : 2, RadiusY = theme.ChipRadius > 6 ? 5 : 2, Fill = Of(key), Margin = new Thickness(3, 0, 0, 0) });
+            dots.Children.Add(new Rectangle { Width = 8, Height = 8, Fill = Of(key), Margin = new Thickness(3, 0, 0, 0) });
 
         var name = new TextBlock
         {
-            Text = theme.Caps ? theme.Label.ToUpperInvariant() : theme.Label,
-            FontFamily = ThemeManager.Family(theme.DisplayFont), FontWeight = theme.HeadingWeight, FontStyle = theme.HeadingStyle, FontSize = 11.5,
+            Text = theme.Label,
+            FontFamily = ThemeManager.Family(ThemeSpec.Saira), FontWeight = theme.HeadingWeight, FontSize = 11.5,
             Foreground = Of("Heading"), VerticalAlignment = VerticalAlignment.Bottom, TextWrapping = TextWrapping.Wrap,
             LineHeight = 12.5, LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
             Margin = new Thickness(0, 9, menu is not null ? 13 : selected ? 9 : 0, 0),
@@ -60,7 +60,7 @@ internal sealed class ThemePicker : UniformGrid
         var card = new Border
         {
             Background = Of("Surface"), BorderBrush = Of(theme.TileEdge ? "TileEdge" : "Line"), BorderThickness = theme.TileEdge ? new Thickness(0, 0, 0, 2) : Hairline.Edges(),
-            CornerRadius = new CornerRadius(8 * theme.Radius),
+            CornerRadius = new CornerRadius(8 * theme.Radius), Padding = new Thickness(4, 3, 4, 3),
             Child = new Grid { Children = { label, dots } },
         };
         var face = new Grid();

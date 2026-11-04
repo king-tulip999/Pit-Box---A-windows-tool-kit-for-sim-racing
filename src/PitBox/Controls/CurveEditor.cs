@@ -248,7 +248,7 @@ public sealed class CurveEditor : FrameworkElement
     }
 
     private static FormattedText Text(string s, double size, Brush brush, double dpi, Typeface? face = null) =>
-        new(ThemeManager.Case(s), CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, face ?? Face, size, brush, dpi);
+        new(s, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, face ?? Face, size, brush, dpi);
 
     private void DrawGraph(DrawingContext dc, Rect plot, double dpi)
     {

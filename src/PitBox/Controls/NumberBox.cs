@@ -24,6 +24,7 @@ internal sealed class NumberBox : Grid
     public double Step { get; init; } = 1;
     public int Decimals { get; init; }
     public (double Min, double Max)? WidthFor { get; init; }
+    public string? UnitRoomFor { get; init; }
 
     public event Action<double>? ValueChanged;
 
@@ -103,17 +104,6 @@ internal sealed class NumberBox : Grid
         }
     }
 
-    public void ShowCaption(FrameworkElement caption)
-    {
-        RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        foreach (UIElement child in Children)
-            SetRow(child, 1);
-        caption.HorizontalAlignment = HorizontalAlignment.Center;
-        SetColumn(caption, 1);
-        Children.Add(caption);
-    }
-
     private Button StepButton(string icon, string tooltip, int direction)
     {
         var button = new Button
@@ -190,6 +180,12 @@ internal sealed class NumberBox : Grid
         var padding = _box.Padding;
         _unit.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         double unitWidth = Math.Ceiling(_unit.DesiredSize.Width);
+        if (UnitRoomFor is { } like)
+        {
+            var probe = new TextBlock { Text = like, FontFamily = _unit.FontFamily, FontSize = _unit.FontSize, FontWeight = _unit.FontWeight, FontStyle = _unit.FontStyle };
+            probe.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            unitWidth = Math.Max(unitWidth, Math.Ceiling(probe.DesiredSize.Width));
+        }
         _unit.Margin = new Thickness(0, 0, padding.Right + _box.BorderThickness.Right, 0);
         _box.Padding = new Thickness(padding.Left, padding.Top, padding.Right + unitWidth + 4, padding.Bottom);
     }

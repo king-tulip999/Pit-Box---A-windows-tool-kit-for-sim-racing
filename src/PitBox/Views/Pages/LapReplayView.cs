@@ -1199,7 +1199,7 @@ internal sealed class ReplayStage : FrameworkElement
             c.Close();
             geos[k]!.Freeze();
             double u = k / (Buckets - 1.0);
-            var color = u < 0.5 ? LapAnalysisView.Mix(brakeC, coast, u * 2) : LapAnalysisView.Mix(coast, gas, u * 2 - 1);
+            var color = u < 0.5 ? ThemeManager.Mix(brakeC, coast, u * 2) : ThemeManager.Mix(coast, gas, u * 2 - 1);
             var pen = new Pen(new SolidColorBrush(color), width) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round };
             pen.Freeze();
             dc.DrawGeometry(null, pen, geos[k]);

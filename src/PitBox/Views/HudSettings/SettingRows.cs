@@ -149,7 +149,7 @@ internal static class SettingRows
     private static Tile PictureChoice(IReadOnlyList<string> labels, IReadOnlyList<string?> tips, IReadOnlyList<System.Windows.Media.ImageSource> pictures, int selected, Action<int> pick, string group)
     {
         string name = group + "-" + Guid.NewGuid().ToString("N");
-        var panel = new WrapPanel();
+        var panel = new WrapPanel { Margin = Ui.SegmentRowMargin };
         for (int i = 0; i < labels.Count; i++)
         {
             int index = i;

@@ -33,7 +33,8 @@ internal sealed class Sidebar : Border, IFrameStep
     private Point _glideFrom;
     private double _glideFromHeight, _glideStart;
     private const double GlideMs = Motion.SwapMs;
-    private readonly StackPanel _footer = new() { Margin = new Thickness(6, 5, 6, 6) };
+    private readonly StackPanel _footer = new() { Margin = new Thickness(FooterInset, 5, FooterInset, 6) };
+    private const double FooterInset = 6;
     private readonly ScrollViewer _scroll;
     private readonly Dictionary<string, Group> _groups = new(StringComparer.OrdinalIgnoreCase);
     private readonly DragList _pageDrag;
@@ -198,9 +199,10 @@ internal sealed class Sidebar : Border, IFrameStep
         DockPanel.SetDock(searchButton, Dock.Right);
         line.Children.Add(searchButton);
         var settingsGroup = MakeGroup(settings, () => false);
-        settingsGroup.Row.Box.Margin = new Thickness(0);
+        settingsGroup.Row.Box.Margin = new Thickness(-FooterInset, 0, 0, 0);
         line.Children.Add(settingsGroup.Row.Box);
         _footer.Children.Add(line);
+        settingsGroup.SubHost.Margin = new Thickness(-FooterInset, settingsGroup.SubHost.Margin.Top, 0, settingsGroup.SubHost.Margin.Bottom);
         _footer.Children.Add(settingsGroup.SubHost);
         FitText();
     }

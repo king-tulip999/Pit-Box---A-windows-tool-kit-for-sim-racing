@@ -14,11 +14,6 @@ internal sealed class GameAudioBridge
     private int _inRate, _cutoff = -1;
     private Biquad _low1, _low2, _high;
 
-    public int Buffered
-    {
-        get { lock (_gate) return (int)Math.Max(0, _written - (long)_read); }
-    }
-
     public void Write(ReadOnlySpan<float> mono, int rate, int cutoffHz)
     {
         if (rate <= 0) return;

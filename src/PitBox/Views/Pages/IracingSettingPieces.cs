@@ -356,7 +356,7 @@ internal sealed partial class IracingControllerSection
                     AutomationProperties.SetName(b, s.Def.Label + ": " + options[option].Label);
                     b.ToolTip = (options[option].Tip ?? options[option].Label) + (option == std ? "\niRacing default" : "");
                     b.Click += (_, _) => { if (!pick) Apply(s, Setting.Format(options[option].Value), Fill); };
-                    var wrap = new Grid();
+                    var wrap = new Grid { VerticalAlignment = VerticalAlignment.Center };
                     wrap.Children.Add(b);
                     if (option == std)
                     {

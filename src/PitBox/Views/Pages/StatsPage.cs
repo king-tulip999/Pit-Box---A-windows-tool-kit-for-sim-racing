@@ -1760,7 +1760,7 @@ internal static class StatsCharts
         protected virtual double LabelSize => 10.5;
 
         protected FormattedText Text(string s, Brush? brush = null, bool bold = false, double? size = null) =>
-            new(ThemeManager.Case(s), CultureInfo.CurrentCulture, FlowDirection.LeftToRight, ThemeManager.UiFace(bold: bold), size ?? LabelSize, brush ?? Ui.Res<Brush>("TextMuted"), Dpi);
+            new(s, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, ThemeManager.UiFace(bold: bold), size ?? LabelSize, brush ?? Ui.Res<Brush>("TextMuted"), Dpi);
 
         protected Func<double, double> LapAxis(DrawingContext dc, double lo, double hi, double step)
         {

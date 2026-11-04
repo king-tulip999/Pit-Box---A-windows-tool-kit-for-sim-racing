@@ -6,9 +6,8 @@
     <!-- Every theme-dependent value is a DynamicResource set by ThemeManager from Theme/Themes.cs + Palettes.cs:
          colours, fonts (DisplayFont, UiFont, MonoFont, MetricFont, LabelFont, HeadingWeight, HeadingStyle), corners (R.*),
          edges (CardEdge, CardEdgeThickness, BtnEdgeThickness, BtnEdgePressed, PressDrop), effects (AccentGlow…)
-         and Caps (all text in capitals: Theme/TextCase.cs). -->
+         and text casing (Theme/TextCase.cs). -->
     <th:CaseConverter x:Key="Case" />
-    <th:CaseConverter x:Key="Verbatim" Verbatim="True" />
     <!-- string / Choice content (buttons, nav, check boxes, segments, combo and menu items, tooltips) in the theme's case;
          TextBlocks are cased by the TextCase.Upper setters in the text styles -->
     <DataTemplate x:Key="CasedText">
@@ -19,10 +18,7 @@
     <DataTemplate x:Key="CasedPickedText">
         <TextBlock Text="{Binding Converter={StaticResource Case}}" TextWrapping="Wrap" />
     </DataTemplate>
-    <DataTemplate x:Key="PlainPickedText">
-        <TextBlock Text="{Binding Converter={StaticResource Verbatim}}" TextWrapping="Wrap" />
-    </DataTemplate>
-    <th:CaseTemplateSelector x:Key="CasedPicked" Text="{StaticResource CasedPickedText}" Plain="{StaticResource PlainPickedText}" />
+    <th:CaseTemplateSelector x:Key="CasedPicked" Text="{StaticResource CasedPickedText}" />
     <DataTemplate x:Key="CasedWrappedText">
         <TextBlock Text="{Binding Converter={StaticResource Case}}" TextWrapping="Wrap" />
     </DataTemplate>
@@ -36,16 +32,16 @@
     <!-- keyboard focus (Tab): a 2 px ring (FocusEdge, the accent unless a theme sets its own) outside the control; WPF
          shows it only for keyboard focus, never after a click. The gap between ring and control (FocusRingGap, ThemeSpec.
          FocusOffset) is painted in FocusGap (transparent unless a theme sets it), so the ring reads even on accent fills.
-         Both follow the control's chamfer (ThemeSpec.ControlChamfer; Tile.Outset keeps the cuts parallel). -->
+         -->
     <Style x:Key="FocusRing">
         <Setter Property="Control.Template">
             <Setter.Value>
                 <ControlTemplate>
                     <Grid>
                         <c:Tile Margin="{DynamicResource FocusRingGapMargin}" BorderBrush="{DynamicResource FocusGap}" BorderThickness="{DynamicResource FocusRingGapThickness}" CornerRadius="{DynamicResource R.Small}"
-                                c:Tile.Chamfer="True" c:Tile.Outset="{DynamicResource FocusRingGap}" SnapsToDevicePixels="True" />
+                                SnapsToDevicePixels="True" />
                         <c:Tile Margin="{DynamicResource FocusRingMargin}" BorderBrush="{DynamicResource FocusEdge}" BorderThickness="2" CornerRadius="{DynamicResource R.Small}"
-                                c:Tile.Chamfer="True" c:Tile.Outset="{DynamicResource FocusRingOutset}" SnapsToDevicePixels="True" />
+                                SnapsToDevicePixels="True" />
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>
@@ -59,7 +55,6 @@
          Every TextBlock is in the theme's case: the implicit style (code-built text, templates, popups) and the same setter
          in each keyed style (a keyed style replaces the implicit one; a new TextBlock style needs it too). -->
     <Style TargetType="TextBlock">
-        <Setter Property="th:TextCase.Upper" Value="{DynamicResource Caps}" />
         <Setter Property="th:TextCase.KeepName" Value="True" />
     </Style>
     <Style x:Key="H1" TargetType="TextBlock">
@@ -73,7 +68,6 @@
         <Setter Property="Foreground" Value="{DynamicResource Heading}" />
     </Style>
     <Style x:Key="H2" TargetType="TextBlock">
-        <Setter Property="th:TextCase.Upper" Value="{DynamicResource Caps}" />
         <Setter Property="th:TextCase.KeepName" Value="True" />
         <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
         <Setter Property="FontSize" Value="15.5" />
@@ -82,7 +76,6 @@
         <Setter Property="Foreground" Value="{DynamicResource Heading}" />
     </Style>
     <Style x:Key="H3" TargetType="TextBlock">
-        <Setter Property="th:TextCase.Upper" Value="{DynamicResource Caps}" />
         <Setter Property="th:TextCase.KeepName" Value="True" />
         <Setter Property="FontSize" Value="13.5" />
         <Setter Property="FontWeight" Value="SemiBold" />
@@ -90,7 +83,6 @@
         <Setter Property="Foreground" Value="{DynamicResource Heading}" />
     </Style>
     <Style x:Key="Body" TargetType="TextBlock">
-        <Setter Property="th:TextCase.Upper" Value="{DynamicResource Caps}" />
         <Setter Property="th:TextCase.KeepName" Value="True" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="Foreground" Value="{DynamicResource Text}" />
@@ -100,7 +92,6 @@
         <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
     </Style>
     <Style x:Key="Caption" TargetType="TextBlock">
-        <Setter Property="th:TextCase.Upper" Value="{DynamicResource Caps}" />
         <Setter Property="th:TextCase.KeepName" Value="True" />
         <Setter Property="FontSize" Value="12" />
         <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
@@ -108,14 +99,12 @@
     </Style>
     <!-- metadata labels (CPU, SWITCH MODE…): small, semibold, faint -->
     <Style x:Key="Eyebrow" TargetType="TextBlock">
-        <Setter Property="th:TextCase.Upper" Value="{DynamicResource Caps}" />
         <Setter Property="th:TextCase.KeepName" Value="True" />
         <Setter Property="FontSize" Value="12" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="Foreground" Value="{DynamicResource EyebrowText}" />
     </Style>
     <Style x:Key="BigValue" TargetType="TextBlock">
-        <Setter Property="th:TextCase.Upper" Value="{DynamicResource Caps}" />
         <Setter Property="th:TextCase.KeepName" Value="True" />
         <Setter Property="FontFamily" Value="{DynamicResource MetricFont}" />
         <Setter Property="FontSize" Value="26" />
@@ -150,14 +139,13 @@
 
     <!-- ============================================================ surfaces
          Cards are Surface outlined like the folded Sim Racing Tools panels (CardEdge = LineStrong, 1 px, every theme)
-         and the theme's chamfered corners (ThemeSpec.CardChamfer); insets are wells (Panel); corners from R.*. -->
+         and square corners; insets are wells (Panel); corners from R.*. -->
     <Style x:Key="Card" TargetType="Border">
         <Setter Property="Background" Value="{DynamicResource Surface}" />
         <Setter Property="BorderBrush" Value="{DynamicResource CardEdge}" />
         <Setter Property="BorderThickness" Value="{DynamicResource CardEdgeThickness}" />
         <Setter Property="CornerRadius" Value="{DynamicResource R.Card}" />
         <Setter Property="Padding" Value="15" />
-        <Setter Property="c:Tile.Framed" Value="True" /> <!-- the theme's card chamfer (ThemeSpec.CardChamfer), drawn by Tile; R.Card is 0 then -->
     </Style>
     <!-- a card floating above the page (dialogs, toasts, popups): the lifted shadow -->
     <Style x:Key="LiftedCard" TargetType="Border" BasedOn="{StaticResource Card}">
@@ -176,20 +164,12 @@
         <Setter Property="BorderBrush" Value="{DynamicResource ChipBorder}" />
         <Setter Property="BorderThickness" Value="{DynamicResource HairlineEdge}" />
         <Setter Property="CornerRadius" Value="{DynamicResource R.Chip}" />
-        <Setter Property="c:Tile.Chamfer" Value="True" />
         <Setter Property="Height" Value="24" />
         <Setter Property="Padding" Value="7,0" />
         <Setter Property="Margin" Value="0,0,5,5" />
         <Setter Property="TextElement.FontSize" Value="11.5" />
         <Setter Property="TextElement.FontWeight" Value="SemiBold" />
         <Setter Property="TextElement.Foreground" Value="{DynamicResource TextMuted}" />
-    </Style>
-    <Style x:Key="IconBadge" TargetType="Border">
-        <Setter Property="Width" Value="29" />
-        <Setter Property="Height" Value="29" />
-        <Setter Property="CornerRadius" Value="{DynamicResource R.Control}" />
-        <Setter Property="Background" Value="{DynamicResource IconWell}" />
-        <Setter Property="TextElement.Foreground" Value="{DynamicResource IconInk}" />
     </Style>
     <!-- danger (error banners, failure cards, destructive confirmations): always the DangerSoft fill with a 1.5 px Danger
          edge, a warning triangle (I.Alert) in Danger and bold DangerDeep text, so it never reads as "selected" (a plain
@@ -199,7 +179,6 @@
         <Setter Property="BorderBrush" Value="{DynamicResource Danger}" />
         <Setter Property="BorderThickness" Value="1.5" />
         <Setter Property="CornerRadius" Value="{DynamicResource R.Control}" />
-        <Setter Property="c:Tile.Chamfer" Value="True" />
         <Setter Property="Padding" Value="11,9" />
         <Setter Property="TextElement.Foreground" Value="{DynamicResource DangerDeep}" />
     </Style>
@@ -210,7 +189,7 @@
     <ControlTemplate x:Key="ButtonTemplate" TargetType="ButtonBase">
         <c:Tile x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
                 BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{DynamicResource R.Control}" RenderTransformOrigin="0.5,0.5"
-                c:Tile.Chamfer="True" SnapsToDevicePixels="True">
+                SnapsToDevicePixels="True">
             <Border.RenderTransform>
                 <ScaleTransform />
             </Border.RenderTransform>
@@ -511,17 +490,20 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <c:Tile x:Name="Bd" Background="{DynamicResource SurfaceAlt}" BorderBrush="{DynamicResource Line}" BorderThickness="{DynamicResource HairlineEdge}" SnapsToDevicePixels="True">
-                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Stretch" />
-                    </c:Tile>
+                    <Grid>
+                        <c:Tile x:Name="Bd" Background="{DynamicResource SurfaceAlt}" BorderBrush="{DynamicResource Line}" BorderThickness="{DynamicResource HairlineEdge}" SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Stretch" />
+                        </c:Tile>
+                        <Border x:Name="Stripe" Width="3" HorizontalAlignment="Left" Background="{DynamicResource Accent}" Visibility="Collapsed" IsHitTestVisible="False" SnapsToDevicePixels="True" />
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource LineStrong}" />
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentSoft}" />
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Accent}" />
-                            <Setter TargetName="Bd" Property="BorderThickness" Value="3,0,0,0" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentSoft}" />
+                            <Setter TargetName="Stripe" Property="Visibility" Value="Visible" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -541,7 +523,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <c:Tile x:Name="Bd" Background="Transparent" BorderBrush="Transparent" BorderThickness="3,0,0,0" CornerRadius="{DynamicResource R.Control}" c:Tile.Chamfer="True"
+                    <c:Tile x:Name="Bd" Background="Transparent" BorderBrush="Transparent" BorderThickness="3,0,0,0" CornerRadius="{DynamicResource R.Control}"
                             Padding="3,4,6,4" RenderTransformOrigin="0.5,0.5">
                         <c:Tile.RenderTransform><ScaleTransform /></c:Tile.RenderTransform>
                         <DockPanel VerticalAlignment="Center">
@@ -679,7 +661,7 @@
             <Setter.Value>
                 <!-- every choice is outlined (SegmentEdge = BtnOutline unless a theme sets it), so the unpicked ones still read as buttons -->
                 <ControlTemplate TargetType="RadioButton">
-                    <c:Tile x:Name="Bd" Background="{DynamicResource SegmentBg}" BorderBrush="{DynamicResource SegmentEdge}" BorderThickness="{DynamicResource HairlineEdge}" CornerRadius="{DynamicResource R.Input}" c:Tile.Chamfer="True" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True" RenderTransformOrigin="0.5,0.5">
+                    <c:Tile x:Name="Bd" Background="{DynamicResource SegmentBg}" BorderBrush="{DynamicResource SegmentEdge}" BorderThickness="{DynamicResource HairlineEdge}" CornerRadius="{DynamicResource R.Input}" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True" RenderTransformOrigin="0.5,0.5">
                         <c:Tile.RenderTransform><ScaleTransform /></c:Tile.RenderTransform>
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </c:Tile>
@@ -762,7 +744,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
-                    <c:Tile x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{DynamicResource R.Input}" c:Tile.Chamfer="True">
+                    <c:Tile x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{DynamicResource R.Input}">
                         <Grid>
                             <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" Focusable="False" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" />
                             <TextBlock x:Name="Ph" Text="{TemplateBinding Tag}" Foreground="{DynamicResource TextFaint}" Margin="{TemplateBinding Padding}" Padding="2,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False" Visibility="Collapsed" TextTrimming="CharacterEllipsis" />
@@ -793,7 +775,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
-                    <c:Tile x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{DynamicResource R.Input}" c:Tile.Chamfer="True">
+                    <c:Tile x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{DynamicResource R.Input}">
                         <Grid>
                             <c:Icon Data="{StaticResource I.Search}" Width="11" Height="11" Margin="9,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center" Foreground="{DynamicResource TextMuted}" IsHitTestVisible="False" />
                             <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" Focusable="False" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" />
@@ -832,7 +814,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ComboBoxItem">
-                    <c:Tile x:Name="Bd" Background="Transparent" CornerRadius="{DynamicResource R.Small}" c:Tile.Chamfer="True" Padding="{TemplateBinding Padding}">
+                    <c:Tile x:Name="Bd" Background="Transparent" CornerRadius="{DynamicResource R.Small}" Padding="{TemplateBinding Padding}">
                         <ContentPresenter />
                     </c:Tile>
                     <ControlTemplate.Triggers>
@@ -873,7 +855,7 @@
                                       IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
                             <ToggleButton.Template>
                                 <ControlTemplate TargetType="ToggleButton">
-                                    <c:Tile x:Name="Bd" CornerRadius="{DynamicResource R.Input}" c:Tile.Chamfer="True" BorderThickness="{DynamicResource BtnEdgeThickness}" SnapsToDevicePixels="True"
+                                    <c:Tile x:Name="Bd" CornerRadius="{DynamicResource R.Input}" BorderThickness="{DynamicResource BtnEdgeThickness}" SnapsToDevicePixels="True"
                                             Background="{Binding Background, RelativeSource={RelativeSource AncestorType=ComboBox}}"
                                             BorderBrush="{Binding BorderBrush, RelativeSource={RelativeSource AncestorType=ComboBox}}">
                                         <c:Icon Data="{StaticResource I.ChevronDown}" Width="11" Height="11" HorizontalAlignment="Right" Margin="0,0,9,0" Foreground="{DynamicResource TextMuted}" />
@@ -897,7 +879,7 @@
                         <Popup x:Name="PART_Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True"
                                Focusable="False" PopupAnimation="Fade">
                             <!-- the menus' look (ContextMenu below), exactly as wide as the box at least -->
-                            <c:Tile Margin="0,2,0,0" CornerRadius="{DynamicResource R.Popup}" c:Tile.Chamfer="True" Background="{DynamicResource TileRaised}"
+                            <c:Tile Margin="0,2,0,0" CornerRadius="{DynamicResource R.Popup}" Background="{DynamicResource TileRaised}"
                                     BorderBrush="{DynamicResource LineStrong}" BorderThickness="{DynamicResource HairlineEdge}" RenderOptions.ClearTypeHint="Enabled"
                                     MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
                                     MaxHeight="{TemplateBinding MaxDropDownHeight}">
@@ -1147,7 +1129,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="ContextMenu">
                     <!-- flush under its button (no side margin), a step above the page: raised fill, strong edge, accent strip on top -->
-                    <c:Tile Margin="0,2,0,0" CornerRadius="{DynamicResource R.Popup}" c:Tile.Chamfer="True" Background="{DynamicResource TileRaised}" BorderBrush="{DynamicResource LineStrong}"
+                    <c:Tile Margin="0,2,0,0" CornerRadius="{DynamicResource R.Popup}" Background="{DynamicResource TileRaised}" BorderBrush="{DynamicResource LineStrong}"
                             BorderThickness="{DynamicResource HairlineEdge}" RenderOptions.ClearTypeHint="Enabled" MinWidth="162" MaxHeight="373">
                         <DockPanel>
                             <Border DockPanel.Dock="Top" Height="2" Background="{DynamicResource Accent}" />
@@ -1183,7 +1165,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="MenuItem">
                     <Grid>
-                        <c:Tile x:Name="Bd" Background="Transparent" CornerRadius="{DynamicResource R.Small}" c:Tile.Chamfer="True" Padding="8,6,8,6">
+                        <c:Tile x:Name="Bd" Background="Transparent" CornerRadius="{DynamicResource R.Small}" Padding="8,6,8,6">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="18" />
@@ -1199,7 +1181,7 @@
                         </c:Tile>
                         <Popup x:Name="PART_Popup" Placement="Right" IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}" AllowsTransparency="True"
                                Focusable="False" PopupAnimation="Fade" HorizontalOffset="2" VerticalOffset="-6">
-                            <c:Tile Margin="0" CornerRadius="{DynamicResource R.Popup}" c:Tile.Chamfer="True" Background="{DynamicResource TileRaised}" BorderBrush="{DynamicResource LineStrong}"
+                            <c:Tile Margin="0" CornerRadius="{DynamicResource R.Popup}" Background="{DynamicResource TileRaised}" BorderBrush="{DynamicResource LineStrong}"
                                     BorderThickness="{DynamicResource HairlineEdge}" RenderOptions.ClearTypeHint="Enabled" MinWidth="162" MaxHeight="373">
                                 <DockPanel>
                                     <Border DockPanel.Dock="Top" Height="2" Background="{DynamicResource Accent}" />
@@ -1247,11 +1229,10 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ToolTip">
-                    <c:Tile Background="{TemplateBinding Background}" BorderBrush="{DynamicResource TooltipEdge}" BorderThickness="{DynamicResource HairlineEdge}" CornerRadius="{DynamicResource R.Tooltip}" c:Tile.Chamfer="True" Padding="10,7" MaxWidth="320">
+                    <c:Tile Background="{TemplateBinding Background}" BorderBrush="{DynamicResource TooltipEdge}" BorderThickness="{DynamicResource HairlineEdge}" CornerRadius="{DynamicResource R.Tooltip}" Padding="10,7" MaxWidth="320">
                         <ContentPresenter>
                             <ContentPresenter.Resources>
                                 <Style TargetType="TextBlock">
-                                    <Setter Property="th:TextCase.Upper" Value="{DynamicResource Caps}" />
                                     <Setter Property="th:TextCase.KeepName" Value="True" />
                                     <Setter Property="TextWrapping" Value="Wrap" />
                                 </Style>

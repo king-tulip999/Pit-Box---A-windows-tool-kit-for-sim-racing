@@ -297,7 +297,7 @@ public sealed class WindowMapView : FrameworkElement, Views.IFrameStep
     private FormattedText? Number(string text, Brush brush, double dpi)
     {
         if (_numbers.TryGetValue((text, brush), out var cached) && cached.PixelsPerDip == dpi) return cached;
-        var formatted = new FormattedText(ThemeManager.Case(text), CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, ThemeManager.RaceFace, BigNumberSize, brush, dpi);
+        var formatted = new FormattedText(text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, ThemeManager.RaceFace, BigNumberSize, brush, dpi);
         _numbers[(text, brush)] = formatted;
         return formatted;
     }
@@ -308,7 +308,7 @@ public sealed class WindowMapView : FrameworkElement, Views.IFrameStep
         var key = (text, size, bold, brush);
         if (_labels.TryGetValue(key, out var cached) && cached.PixelsPerDip == dpi) return cached;
         var face = bold ? ThemeManager.DisplayFace : ThemeManager.UiFace();
-        var formatted = new FormattedText(ThemeManager.Case(text), CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, face, size, brush, dpi);
+        var formatted = new FormattedText(text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, face, size, brush, dpi);
         _labels[key] = formatted;
         return formatted;
     }

@@ -121,7 +121,18 @@ internal sealed class ShakersSection : Tile
                 Changed();
                 Dispatcher.BeginInvoke(Build);
             }, "shaker-iracing")));
-        if (S.Mode != ShakerMode.Off) sources.Children.Add(SupportedGames());
+        if (S.Mode != ShakerMode.Off)
+        {
+            var iracing = Ui.SettingRow("iRacing", "Off leaves iRacing to its own bass shaker output. The other games still play.",
+                Ui.Switch(S.IracingOn, v =>
+                {
+                    S.SetGameOn(ShakerSettings.IracingId, v);
+                    Changed();
+                }));
+            Ui.Anchor(iracing, "simracing.shakers.iracing");
+            sources.Children.Add(iracing);
+            sources.Children.Add(SupportedGames());
+        }
         var gamesBox = GamesBox();
         gamesBox.MaxWidth = double.PositiveInfinity;
         gamesBox.HorizontalAlignment = HorizontalAlignment.Stretch;

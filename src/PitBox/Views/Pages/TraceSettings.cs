@@ -14,6 +14,15 @@ internal static class TraceSettings
 {
     private static Popup? _open;
     private static DispatcherTimer? _settle;
+    private static SessionStatsService? _settleFor;
+
+    private static void OnSettle(object? sender, EventArgs e)
+    {
+        _settle?.Stop();
+        var stats = _settleFor;
+        _settleFor = null;
+        stats?.RetentionChanged();
+    }
 
     public static void CloseOpen()
     {
@@ -87,12 +96,14 @@ internal static class TraceSettings
                 settings.Normalize();
             }
             app.Save();
-            _settle ??= new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
+            _settleFor = stats;
+            if (_settle is null)
+            {
+                _settle = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
+                _settle.Tick += OnSettle;
+            }
             _settle.Stop();
-            _settle.Tick -= OnSettle;
-            _settle.Tick += OnSettle;
             _settle.Start();
-            void OnSettle(object? sender, EventArgs e) { _settle!.Stop(); _settle.Tick -= OnSettle; stats.RetentionChanged(); }
         }
 
         var heading = Ui.Text("Lap traces", "H3");

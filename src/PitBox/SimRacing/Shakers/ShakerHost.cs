@@ -19,6 +19,7 @@ internal sealed class ShakerHost : IDisposable
     private readonly AppServices _app;
     private readonly ShakerFeed _feed = new();
     private readonly object _gate = new();
+    private readonly object _feedGate = new();
     private readonly SynchronizationContext _ui;
     private readonly Dictionary<string, GameReader> _readers = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _seenLive = new(StringComparer.OrdinalIgnoreCase);
@@ -97,7 +98,7 @@ internal sealed class ShakerHost : IDisposable
 
     private void SyncInputs()
     {
-        bool telemetry = _active && S.Mode == ShakerMode.Effects;
+        bool telemetry = _active && S.Mode == ShakerMode.Effects && S.IracingOn;
         if (telemetry != _telemetryHeld)
         {
             _telemetryHeld = telemetry;
@@ -145,7 +146,7 @@ internal sealed class ShakerHost : IDisposable
         if (S.OtherGames) names.AddRange(S.Games);
         if (S.Mode != ShakerMode.Off)
             foreach (var game in EnabledGames()) names.AddRange(game.Processes);
-        if (names.Count > 0 || S.Mode == ShakerMode.GameAudio) names.Add(TelemetryService.SimProcess);
+        if (S.IracingOn && (names.Count > 0 || S.Mode == ShakerMode.GameAudio)) names.Add(TelemetryService.SimProcess);
         return names;
     }
 
@@ -160,7 +161,8 @@ internal sealed class ShakerHost : IDisposable
     private void OnFrame(TelemetryFrame f)
     {
         if (_feeding != IracingFeed) return;
-        var levels = _feed.Update(f);
+        ShakerLevels levels;
+        lock (_feedGate) levels = _feed.Update(f);
         lock (_gate) _levels = levels;
     }
 
@@ -184,7 +186,8 @@ internal sealed class ShakerHost : IDisposable
             var reader = game.Open(S.Port(id, game.Port), input =>
             {
                 if (_feeding != id) return;
-                var levels = _feed.Update(input);
+                ShakerLevels levels;
+                lock (_feedGate) levels = _feed.Update(input);
                 lock (_gate) _levels = levels;
             });
             reader.StateChanged += () => _ui.Post(_ => Sync(), null);
@@ -197,8 +200,10 @@ internal sealed class ShakerHost : IDisposable
 
     private GameReader? ReaderFor(ShakerGame game) => _readers.GetValueOrDefault(ReaderKey(game));
 
+    private bool IracingConnected => _app.Telemetry.Status == SimStatus.Connected && !_app.Telemetry.Simulated;
+
     private bool IracingRunning =>
-        _telemetryHeld && _app.Telemetry.Status == SimStatus.Connected || _watching && _app.Watcher.IsRunning(TelemetryService.SimProcess);
+        _telemetryHeld && IracingConnected || _watching && _app.Watcher.IsRunning(TelemetryService.SimProcess);
 
     private sealed record Choice(ShakerSource Source, string? Game = null, string? Process = null, string? Feed = null, ShakerGame? Waiting = null, string? Problem = null);
 
@@ -206,10 +211,10 @@ internal sealed class ShakerHost : IDisposable
     {
         if (!_active || S.DeviceId is null) return new(ShakerSource.None);
         if (DateTime.UtcNow < _testUntil) return new(ShakerSource.Effects);
-        if (IracingRunning)
+        if (S.IracingOn && IracingRunning)
             return S.Mode switch
             {
-                ShakerMode.Effects when _app.Telemetry.Status == SimStatus.Connected => new(ShakerSource.Effects, "iRacing", Feed: IracingFeed),
+                ShakerMode.Effects when IracingConnected => new(ShakerSource.Effects, "iRacing", Feed: IracingFeed),
                 ShakerMode.GameAudio => new(ShakerSource.GameAudio, "iRacing", TelemetryService.SimProcess),
                 _ => new(ShakerSource.None),
             };
@@ -244,7 +249,7 @@ internal sealed class ShakerHost : IDisposable
         if (choice.Feed != _feeding)
         {
             _feeding = choice.Feed;
-            _feed.Reset();
+            lock (_feedGate) _feed.Reset();
             lock (_gate) _levels = default;
         }
         string key = $"{choice.Source}|{S.DeviceId}|{S.Channel}|{choice.Process}";
@@ -266,6 +271,7 @@ internal sealed class ShakerHost : IDisposable
     private void Start(ShakerSource source, string? process)
     {
         int[] channels = S.Channel switch { ShakerChannel.Left => new[] { 0 }, ShakerChannel.Right => new[] { 1 }, _ => new[] { 0, 1 } };
+        int generation = ++_renderGeneration;
         AudioRender render;
         if (source == ShakerSource.GameAudio)
         {
@@ -276,7 +282,7 @@ internal sealed class ShakerHost : IDisposable
             }
             var bridge = new GameAudioBridge();
             var loopback = new AudioLoopback(processId, (mono, rate) => bridge.Write(mono, rate, S.GameAudioCutoffHz));
-            loopback.Failed += Fail;
+            loopback.Failed += message => Fail(generation, message);
             _loopback = loopback;
             render = new AudioRender(S.DeviceId!, channels, rate => span => bridge.Render(span, rate, S));
             loopback.Start();
@@ -295,13 +301,16 @@ internal sealed class ShakerHost : IDisposable
                 };
             });
         }
-        render.Failed += Fail;
+        render.Failed += message => Fail(generation, message);
         _render = render;
         render.Start();
     }
 
-    private void Fail(string message) => _ui.Post(_ =>
+    private int _renderGeneration;
+
+    private void Fail(int generation, string message) => _ui.Post(_ =>
     {
+        if (generation != _renderGeneration || _render is null) return;
         Problem = message;
         StopRender();
         Changed?.Invoke();

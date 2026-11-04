@@ -2,7 +2,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
-using System.Windows.Media;
 using PitBox.Views;
 
 namespace PitBox.Controls;
@@ -10,7 +9,7 @@ namespace PitBox.Controls;
 internal sealed class SearchCombo : ComboBox
 {
     private object? _before;
-    private readonly TextBox _search = new() { Tag = "Search…", Margin = new Thickness(2, 2, 2, 5), Padding = new Thickness(23, 5, 6, 5) };
+    private readonly TextBox _search = new() { Tag = "Search…", Margin = new Thickness(2, 2, 2, 5) };
 
     public SearchCombo()
     {
@@ -37,11 +36,7 @@ internal sealed class SearchCombo : ComboBox
         if (GetTemplateChild("PART_Popup") is not Popup { Child: Border { Child: DockPanel card } } || card.Children.OfType<ScrollViewer>().FirstOrDefault() is not { } list) return;
         var head = new Grid();
         head.Children.Add(_search);
-        head.Children.Add(new Icon
-        {
-            Data = (Geometry)FindResource("I.Search"), Width = 11, Height = 11, IsHitTestVisible = false,
-            HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(10, 0, 0, 3), Foreground = Ui.Res<Brush>("TextFaint"),
-        });
+        Ui.SearchFace(_search);
         head.Margin = new Thickness(3, 3, 3, 0);
         DockPanel.SetDock(head, Dock.Top);
         card.Children.Insert(card.Children.IndexOf(list), head);

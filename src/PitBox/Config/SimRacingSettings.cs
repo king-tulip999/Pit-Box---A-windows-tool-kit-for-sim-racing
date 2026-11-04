@@ -46,14 +46,6 @@ public sealed class SimRacingSettings
         return rows;
     }
 
-    public void RemoveCompare(int slot)
-    {
-        if (slot < 0 || slot >= Compare.Count) return;
-        var rows = ValidCompareRows();
-        Compare.RemoveAt(slot);
-        CompareRows = rows.Where(x => x != slot).Select(x => x > slot ? x - 1 : x).ToList();
-    }
-
     public void MakeCurrent(int slot)
     {
         if (slot < 0 || slot >= Compare.Count) return;

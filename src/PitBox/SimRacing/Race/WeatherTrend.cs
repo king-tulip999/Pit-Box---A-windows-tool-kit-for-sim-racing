@@ -21,8 +21,6 @@ internal sealed class WeatherTrend
 
     public double? TrackPerWindow => Slope(s => s.Track);
 
-    public double? RainPerWindow => _samples.All(s => s.Rain is not null) ? Slope(s => s.Rain!.Value) : null;
-
     private double? Slope(Func<(double T, double Track, double? Rain), double> value)
     {
         if (_samples.Count < 3 || Span < MinSpanSeconds) return null;

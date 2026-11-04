@@ -59,9 +59,10 @@ internal sealed class OverlayPreviewMotion
 
     private static double Seconds(double ms) => ms / 1000;
 
-    public Frame? Capture()
+    public Frame? Capture(bool keepPixels = false)
     {
         if (_preview.Source is not BitmapSource source || source.PixelWidth == 0 || _preview.ActualWidth <= 0) return null;
+        if (keepPixels && !source.IsFrozen) source = source.GetCurrentValueAsFrozen() as BitmapSource ?? source;
         return new Frame(source, _hits().ToList(), new Point(Canvas.GetLeft(_preview), Canvas.GetTop(_preview)), _preview.ActualWidth / source.PixelWidth);
     }
 

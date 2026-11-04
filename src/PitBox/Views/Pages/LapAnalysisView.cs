@@ -336,7 +336,7 @@ internal static class LapAnalysisView
         var row = new DockPanel { VerticalAlignment = VerticalAlignment.Center, LastChildFill = true };
         var name = new TextBlock
         {
-            Text = ThemeManager.Case(LaneNames[id]), VerticalAlignment = VerticalAlignment.Center, FontWeight = FontWeights.SemiBold,
+            Text = LaneNames[id], VerticalAlignment = VerticalAlignment.Center, FontWeight = FontWeights.SemiBold,
             Foreground = Ui.Res<Brush>("AccentText"),
         };
         if (remove is not null)
@@ -506,10 +506,8 @@ internal static class LapAnalysisView
 
     internal static SolidColorBrush Brush(string key) => Ui.Res<Brush>(key) as SolidColorBrush ?? Brushes.Gray;
 
-    internal static Color Mix(Color a, Color b, double t) => Color.FromRgb((byte)(a.R + (b.R - a.R) * t), (byte)(a.G + (b.G - a.G) * t), (byte)(a.B + (b.B - a.B) * t));
-
     internal static FormattedText Text(Visual v, string s, Brush brush, double size = 10.5, bool bold = false) =>
-        new(ThemeManager.Case(s), CultureInfo.CurrentCulture, FlowDirection.LeftToRight, ThemeManager.UiFace(bold: bold), size, brush, VisualTreeHelper.GetDpi(v).PixelsPerDip);
+        new(s, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, ThemeManager.UiFace(bold: bold), size, brush, VisualTreeHelper.GetDpi(v).PixelsPerDip);
 }
 
 internal readonly record struct MapView(double MinX, double MaxY, double Scale, double Ox, double Oy)
@@ -661,14 +659,14 @@ internal sealed class LapMap : FrameworkElement, IKeepsWheel
             double lo = double.MaxValue, hi = double.MinValue;
             for (int i = a; i <= b; i++) { lo = Math.Min(lo, values[i]); hi = Math.Max(hi, values[i]); }
             Color slow = LapAnalysisView.Brush(StatsUi.Hue("Coral").Deep).Color, mid = LapAnalysisView.Brush(StatsUi.Hue("Gold").Deep).Color, fast = LapAnalysisView.Brush(StatsUi.Hue("Sage").Deep).Color;
-            colors = Enumerable.Range(0, Buckets).Select(k => { double u = k / (Buckets - 1.0); return u < 0.5 ? LapAnalysisView.Mix(slow, mid, u * 2) : LapAnalysisView.Mix(mid, fast, u * 2 - 1); }).ToArray();
+            colors = Enumerable.Range(0, Buckets).Select(k => { double u = k / (Buckets - 1.0); return u < 0.5 ? ThemeManager.Mix(slow, mid, u * 2) : ThemeManager.Mix(mid, fast, u * 2 - 1); }).ToArray();
             double span = Math.Max(1e-6, hi - lo);
             bucket = v => (int)Math.Clamp((v - lo) / span * (Buckets - 1), 0, Buckets - 1);
         }
         else
         {
             Color gain = LapAnalysisView.Brush(StatsUi.Hue("Sage").Deep).Color, even = LapAnalysisView.Brush("TextFaint").Color, loss = LapAnalysisView.Brush(StatsUi.Hue("Coral").Deep).Color;
-            colors = Enumerable.Range(0, Buckets).Select(k => { double u = k / (Buckets - 1.0); return u < 0.5 ? LapAnalysisView.Mix(gain, even, u * 2) : LapAnalysisView.Mix(even, loss, u * 2 - 1); }).ToArray();
+            colors = Enumerable.Range(0, Buckets).Select(k => { double u = k / (Buckets - 1.0); return u < 0.5 ? ThemeManager.Mix(gain, even, u * 2) : ThemeManager.Mix(even, loss, u * 2 - 1); }).ToArray();
             const double Full = 0.0015;
             bucket = v => (int)Math.Clamp((v / Full + 1) / 2 * (Buckets - 1), 0, Buckets - 1);
         }
@@ -777,8 +775,6 @@ internal sealed class TraceChart : FrameworkElement
     public List<string> Lanes { get; }
 
     public AnalysisState State => _s;
-
-    public const double BoostStrip = 3;
 
     public static double LaneHeight(string lane) => lane switch { "gear" or "bias" or "abs" or "tc" => 58, "delta" => 96, "speed" => 112, "pedals" => 91, _ => 81 };
 

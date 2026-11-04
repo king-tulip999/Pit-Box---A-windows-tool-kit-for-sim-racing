@@ -182,6 +182,16 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
         return new Tile { Style = Ui.Res<Style>("Card"), Child = stack };
     }
 
+    public const string KeybindsAnchor = "simracing.iracing.keybinds";
+
+    public bool ShowTabFor(string anchor)
+    {
+        if (anchor != KeybindsAnchor || Session is null || _tabIndex == 1) return false;
+        _tabIndex = 1;
+        Build();
+        return true;
+    }
+
     private void ShowTab()
     {
         _cardSteps.Clear();
@@ -197,7 +207,11 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
         switch (_tabIndex)
         {
             case 0: AllSettings(); break;
-            case 1: _tab.Children.Add(_keybinds = IracingKeybindsView.Build(_app, _ws)); break;
+            case 1:
+                _keybinds = IracingKeybindsView.Build(_app, _ws);
+                Ui.Anchor(_keybinds, KeybindsAnchor);
+                _tab.Children.Add(_keybinds);
+                break;
             default:
                 IReadOnlyList<Backup>? backups = null;
                 string? backupProblem = null;
@@ -501,6 +515,7 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
         var values = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 16, 0) };
         var mine = Ui.Chip(s.Show(s.Draft), "SlateSoft", "SlateDeep");
         mine.VerticalAlignment = VerticalAlignment.Center;
+        mine.Margin = new Thickness(0, 0, 5, 0);
         mine.ToolTip = "Yours";
         values.Children.Add(mine);
         string? was = std is not null && s.Def.UnusualNote is null ? "Default " + s.Show(std) : s.UnusualNote;
@@ -533,7 +548,7 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
         var check = new Icon { Data = Ui.Res<Geometry>("I.Check"), Width = 11, Height = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) };
         check.SetResourceReference(Control.ForegroundProperty, "SageDeep");
         line.Children.Add(check);
-        var label = new TextBlock { Text = ThemeManager.Case(text), VerticalAlignment = VerticalAlignment.Center };
+        var label = new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center };
         label.SetResourceReference(TextBlock.ForegroundProperty, "SageDeep");
         line.Children.Add(label);
         var chip = new Border { Height = 24, Padding = new Thickness(8, 0, 10, 0), Margin = new Thickness(0, 0, 6, 6), Child = line };
@@ -573,7 +588,7 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
         layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         var sideNav = new StackPanel();
         var railLayer = new Canvas { IsHitTestVisible = false };
-        var sideCard = new Tile { Style = Ui.Res<Style>("Card"), Width = 226, Padding = new Thickness(6, 6, 6, 3), Margin = new Thickness(0, 0, 16, 0), VerticalAlignment = VerticalAlignment.Top, Child = new Grid { Children = { railLayer, sideNav } } };
+        var sideCard = new Tile { Style = Ui.Res<Style>("Card"), Width = 226, Padding = new Thickness(0), Margin = new Thickness(0, 0, 16, 0), VerticalAlignment = VerticalAlignment.Top, Child = new Grid { Children = { railLayer, sideNav } } };
         var topNav = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
         Grid.SetRow(topNav, 0);
         Grid.SetColumnSpan(topNav, 2);
@@ -674,7 +689,7 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
                 var b = new Button
                 {
                     Content = row, Style = Ui.Res<Style>(selected ? "SelectedButton" : side ? "QuietButton" : "GhostButton"),
-                    Margin = side ? new Thickness(0, 0, 0, 3) : new Thickness(0, 0, 5, 5),
+                    Margin = side ? new Thickness(0) : new Thickness(0, 0, 5, 5),
                     HorizontalAlignment = side ? HorizontalAlignment.Stretch : HorizontalAlignment.Left,
                     HorizontalContentAlignment = HorizontalAlignment.Stretch,
                 };
@@ -1021,15 +1036,6 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
         }
     }
 
-    public void CollapseAll()
-    {
-        if (Session is null) return;
-        foreach (var sec in Session.Sections.Where(Shown))
-            S.SetCollapsed(SectionKey(sec), true);
-        _app.Save();
-        if (_tabIndex == 0) ShowTab();
-    }
-
     private static string SectionKey(SectionInfo sec) => SettingsCatalog.FileKey(sec.FileName) + "|" + sec.Section;
 
     private static bool Shown(SectionInfo sec) => !HiddenSections.Contains(SectionKey(sec));
@@ -1339,7 +1345,7 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
         var list = new StackPanel();
         foreach (var day in backups.GroupBy(b => b.Created.Date))
         {
-            list.Children.Add(Ui.SubHeader(ThemeManager.Case(Dates.Day(day.Key)), first: list.Children.Count == 0));
+            list.Children.Add(Ui.SubHeader(Dates.Day(day.Key), first: list.Children.Count == 0));
             var rows = day.ToList();
             for (int i = 0; i < rows.Count; i++)
                 list.Children.Add(BackupRow(rows[i], i == rows.Count - 1));

@@ -14,14 +14,7 @@ internal sealed record ThemeSpec
 
     public const string Saira = "./Assets/Fonts/Saira/#Saira, Segoe UI";
 
-    public string DisplayFont { get; init; } = Saira;
-    public string UiFont { get; init; } = Saira;
-    public string MonoFont { get; init; } = Saira;
-    public string? MetricFont { get; init; }
     public FontWeight HeadingWeight { get; init; } = FontWeights.Bold;
-    public FontStyle HeadingStyle { get; init; } = FontStyles.Normal;
-    public bool Caps { get; init; }
-    public bool MonoLabels { get; init; } = true;
 
     public Uri? WindowIcon { get; init; }
     public ThemeLink? Link { get; init; }
@@ -29,8 +22,6 @@ internal sealed record ThemeSpec
     public double Radius { get; init; }
     public double PanelOpacity { get; init; } = 0.85;
     public double SidebarOpacity { get; init; } = 0.6;
-    public double SwitchRadius { get; init; } = 11;
-    public double KnobRadius { get; init; } = 8;
     public double ChipRadius { get; init; }
     public double ControlRadius { get; init; } = 5;
     public Thickness CardEdge { get; init; } = new(0, 1, 0, 2);
@@ -39,9 +30,6 @@ internal sealed record ThemeSpec
     public Thickness ButtonEdgePressed { get; init; } = new(1);
     public double PressDrop { get; init; } = 0;
     public string Outline { get; init; } = "LineStrong";
-    public Thickness LogoEdge { get; init; }
-    public double CardChamfer { get; init; }
-    public double ControlChamfer { get; init; }
 
     public bool RacingDecor { get; init; }
     public double FocusOffset { get; init; } = 1;
@@ -49,7 +37,6 @@ internal sealed record ThemeSpec
     public bool Glow { get; init; }
     public double GlowStrength { get; init; } = 1;
     public bool CornerGlow { get; init; }
-    public bool StepsClimb { get; init; } = true;
 }
 
 internal static class Themes
@@ -59,15 +46,15 @@ internal static class Themes
     public static readonly ThemeSpec Dark = new()
     {
         Id = AppTheme.Dark, Name = "The Pits", Dark = true, Colors = Palettes.Dark,
-        CardEdge = Hairline, LogoEdge = new(0),
-        StepsClimb = false, Outline = "ScrollThumbBrushDrag",
+        CardEdge = Hairline,
+        Outline = "ScrollThumbBrushDrag",
     };
 
     public static readonly ThemeSpec Custom = new()
     {
         Id = AppTheme.Custom, Name = DefaultCustomName, Dark = true, Colors = CustomPalette.Default,
-        CardEdge = Hairline, LogoEdge = new(0),
-        Glow = true, GlowStrength = 0.45, StepsClimb = false,
+        CardEdge = Hairline,
+        Glow = true, GlowStrength = 0.45,
     };
 
     public static readonly ThemeSpec Teams = SetSpec(ThemeSets.Teams, null);
@@ -119,7 +106,7 @@ internal static class Themes
         return new ThemeSpec
         {
             Id = set.Id, Name = set.Name, Variant = pick, Dark = CustomPalette.IsDark(colors), Colors = CustomPalette.BuildBrand(colors),
-            CardEdge = Hairline, LogoEdge = new(0), StepsClimb = false,
+            CardEdge = Hairline,
         };
     }
 

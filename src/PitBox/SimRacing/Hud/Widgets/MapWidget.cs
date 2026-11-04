@@ -81,20 +81,7 @@ internal sealed class MapWidget : HudWidget
         _toScreen.Rotate(_view.Angle * 180 / MathF.PI);
         _toScreen.Scale(_view.Scale, _view.Scale);
         _toScreen.Translate(-_view.Centre.X, -_view.Centre.Y);
-        _back.Reset();
-        _back.Multiply(_toScreen);
-        _back.Invert();
-        g.MultiplyTransform(_toScreen);
-        float k = _view.Scale;
-        if (_pit is not null) g.FillPath(p.Brush(pitColor), _pit);
-        if (_pitLines is not null) g.DrawPath(p.Pen(pitColor, Math.Max(1, _pitWidth * k) / k), _pitLines);
-        if (_surface is not null)
-        {
-            g.FillPath(p.Brush(track), _surface);
-            g.DrawPath(p.Pen(edge, 1 / k), _surface);
-        }
-        else if (_centre is not null) g.DrawPath(p.Pen(track, Math.Max(2, map.Width * k) / k), _centre);
-        g.MultiplyTransform(_back);
+        DrawTrackDirect(p, map, track, edge, pitColor);
         if (map.StartLine is { } sf)
         {
             var a = _view.ToScreen(sf.A);
@@ -104,6 +91,39 @@ internal sealed class MapWidget : HudWidget
         if (v.Options.Bool("turns")) Turns(p, map, area);
         Cars(p, v, map, dot);
         g.ResetClip();
+    }
+
+    private void DrawTrackDirect(HudPainter p, TrackMap map, Color track, Color edge, Color pitColor)
+    {
+        var g = p.G;
+        _back.Reset();
+        _back.Multiply(_toScreen);
+        _back.Invert();
+        g.MultiplyTransform(_toScreen);
+        DrawTrack(g, p, map, track, edge, pitColor);
+        g.MultiplyTransform(_back);
+    }
+
+    private void DrawTrack(Graphics g, HudPainter p, TrackMap map, Color track, Color edge, Color pitColor)
+    {
+        float k = _view.Scale;
+        if (_pit is not null) g.FillPath(p.Brush(pitColor), _pit);
+        if (_pitLines is not null) g.DrawPath(p.Pen(pitColor, Math.Max(1, _pitWidth * k) / k), _pitLines);
+        if (_surface is not null)
+        {
+            g.FillPath(p.Brush(track), _surface);
+            g.DrawPath(p.Pen(edge, 1 / k), _surface);
+        }
+        else if (_centre is not null) g.DrawPath(p.Pen(track, Math.Max(2, map.Width * k) / k), _centre);
+    }
+
+    public override void Dispose()
+    {
+        foreach (var path in new[] { _surface, _centre, _pit, _pitLines }) path?.Dispose();
+        (_surface, _centre, _pit, _pitLines) = (null, null, null, null);
+        _builtFor = null;
+        _toScreen.Dispose();
+        _back.Dispose();
     }
 
     private MapView View(HudPainter p, HudView v, TrackMap map, RectangleF area, float margin)

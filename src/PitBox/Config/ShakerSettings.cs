@@ -15,6 +15,8 @@ public sealed class ShakerEffectSettings
 
 public sealed class ShakerSettings
 {
+    public const string IracingId = "iracing";
+
     public const int MinHz = 15, MaxHz = 120, MinCutoffHz = 40, MinPort = 1024, MaxPort = 65535;
 
     public static readonly string[] DefaultGames =
@@ -57,6 +59,9 @@ public sealed class ShakerSettings
         GamesOff = (GamesOff ?? new()).Where(g => !string.IsNullOrWhiteSpace(g)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         Ports = (Ports ?? new()).Where(p => p.Key.Length > 0 && p.Value is >= MinPort and <= MaxPort).ToDictionary(p => p.Key, p => p.Value, StringComparer.OrdinalIgnoreCase);
     }
+
+    [JsonIgnore]
+    public bool IracingOn => GameOn(IracingId);
 
     public bool GameOn(string id) => !GamesOff.Contains(id, StringComparer.OrdinalIgnoreCase);
 

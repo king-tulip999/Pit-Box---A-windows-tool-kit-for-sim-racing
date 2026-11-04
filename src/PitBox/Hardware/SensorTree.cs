@@ -28,20 +28,7 @@ internal sealed record DeviceNode(string Id, string Name, DeviceKind Kind, IRead
     }
 }
 
-internal sealed record SensorTree(IReadOnlyList<DeviceNode> Devices)
-{
-    public IEnumerable<DeviceNode> OfKind(DeviceKind kind) => Devices.Where(d => d.Kind == kind);
-
-    public DeviceNode? FirstOfKind(DeviceKind kind)
-    {
-        for (int i = 0; i < Devices.Count; i++)
-        {
-            if (Devices[i].Kind == kind)
-                return Devices[i];
-        }
-        return null;
-    }
-}
+internal sealed record SensorTree(IReadOnlyList<DeviceNode> Devices);
 
 internal interface ISensorSource
 {
@@ -50,45 +37,6 @@ internal interface ISensorSource
     TimeSpan Interval { get; }
 
     IReadOnlyList<DeviceNode> Read();
-}
-
-internal static class SensorLookup
-{
-    public static SensorReading? Find(DeviceNode device, SensorKind kind, params string[] names)
-    {
-        foreach (var name in names)
-            if (FindNamed(device, kind, name) is { } s)
-                return s;
-        return null;
-    }
-
-    private static SensorReading? FindNamed(DeviceNode device, SensorKind kind, string name)
-    {
-        var sensors = device.Sensors;
-        for (int i = 0; i < sensors.Count; i++)
-        {
-            var s = sensors[i];
-            if (s.Kind == kind && string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase))
-                return s;
-        }
-        var children = device.Children;
-        for (int i = 0; i < children.Count; i++)
-        {
-            if (FindNamed(children[i], kind, name) is { } s)
-                return s;
-        }
-        return null;
-    }
-
-    public static SensorReading? FindAny(SensorTree tree, DeviceKind deviceKind, SensorKind kind, params string[] names)
-    {
-        foreach (var device in tree.Devices.SelectMany(Flatten).Where(d => d.Kind == deviceKind))
-            if (Find(device, kind, names) is { } s)
-                return s;
-        return null;
-    }
-
-    public static IEnumerable<DeviceNode> Flatten(DeviceNode d) => new[] { d }.Concat(d.Children.SelectMany(Flatten));
 }
 
 internal static class SensorFormat

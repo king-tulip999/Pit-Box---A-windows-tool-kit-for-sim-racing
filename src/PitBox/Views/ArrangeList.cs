@@ -1,7 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
 using PitBox.Config;
-using PitBox.Theme;
 
 namespace PitBox.Views;
 
@@ -45,7 +44,7 @@ internal sealed class ArrangeList
         for (int i = 0; i < items.Count; i++)
         {
             var (id, label, build) = items[i];
-            grid.Add(new PanelDef(id, label, _ => build()) { FullWidth = true, Order = i });
+            grid.Add(new PanelDef(id, label, build) { FullWidth = true, Order = i });
         }
         _host.Content = grid;
         Button.IsEnabled = items.Count > 1 || Editing;
@@ -57,7 +56,7 @@ internal sealed class ArrangeList
         Editing = on;
         _before = on ? _getOrder().ToList() : null;
         Button.Style = Ui.Res<Style>(on ? "PrimaryButton" : "GhostButton");
-        _buttonText.Text = ThemeManager.Case(on ? "Done" : _label);
+        _buttonText.Text = on ? "Done" : _label;
         ((StackPanel)Button.Content).Children[0].Visibility = on ? Visibility.Collapsed : Visibility.Visible;
         Fill();
         EditingChanged?.Invoke(on);

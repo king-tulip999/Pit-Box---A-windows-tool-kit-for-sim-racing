@@ -307,13 +307,13 @@ internal sealed class FovSection : StackPanel
         _tripleRows.AddRange(Enumerable.Range(tripleFrom, _inputs.Children.Count - tripleFrom).Select(i => _inputs.Children[i]));
 
         _inputs.Children.Add(Section("Position"));
-        var distance = new NumberBox(ToLen(C.DistanceCm), LenUnit, 64) { Minimum = ToLen(10), Maximum = ToLen(400), Step = Imperial ? 0.5 : 1, Decimals = Imperial ? 1 : 0 };
+        var distance = new NumberBox(ToLen(C.DistanceCm), LenUnit, 64) { UnitRoomFor = BezelUnit, Minimum = ToLen(10), Maximum = ToLen(400), Step = Imperial ? 0.5 : 1, Decimals = Imperial ? 1 : 0 };
         distance.ValueChanged += v => Change(() => C.DistanceCm = FromLen(v));
         _inputs.Children.Add(Row("Eyes to screen", distance,
             "Sit in your driving position, helmet off. Measure from your eyes straight ahead to the surface of the center screen (not the bezel or the stand). The most important number: a few cm changes the FOV noticeably."));
         tripleFrom = _inputs.Children.Count;
         {
-            var bezel = new NumberBox(ToBezel(C.BezelMm), BezelUnit, 64) { Minimum = ToBezel(-30), Maximum = ToBezel(100), Step = Imperial ? 0.05 : 1, Decimals = Imperial ? 2 : 0 };
+            var bezel = new NumberBox(ToBezel(C.BezelMm), BezelUnit, 64) { UnitRoomFor = LenUnit, Minimum = ToBezel(-30), Maximum = ToBezel(100), Step = Imperial ? 0.05 : 1, Decimals = Imperial ? 2 : 0 };
             bezel.ValueChanged += v => Change(() => C.BezelMm = FromBezel(v));
             _inputs.Children.Add(Row("Bezel per seam", bezel,
                 "The gap between the picture on one screen and the next, where they meet: both bezels together, last lit pixel to first lit pixel. Bezel-free kit (lenses / overlap): enter a negative value."));

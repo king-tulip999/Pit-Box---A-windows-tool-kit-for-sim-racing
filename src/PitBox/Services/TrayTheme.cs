@@ -30,7 +30,6 @@ internal static class TrayTheme
         menu.Opened += SquareCorners;
         foreach (ToolStripItem item in menu.Items)
         {
-            if (item is not ToolStripSeparator && !string.IsNullOrEmpty(item.Text)) item.Text = ThemeManager.Current.Caps ? TextCase.UpperForGdi(item.Text) : item.Text;
             item.ForeColor = item.Enabled ? colors.Text : colors.Faint;
             item.Padding = item is ToolStripSeparator ? item.Padding : new Padding(2, 4, 2, 4);
             if (item is ToolStripMenuItem { HasDropDownItems: true } parent && parent.DropDown is ToolStripDropDownMenu drop)
@@ -94,10 +93,8 @@ internal static class TrayTheme
         {
             if (!e.Item.Selected || !e.Item.Enabled) return;
             var r = new Rectangle(2, 0, e.Item.Width - 4, e.Item.Height - 1);
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             using var brush = new SolidBrush(_c.Hover);
-            using var path = Rounded(r, 6);
-            e.Graphics.FillPath(brush, path);
+            e.Graphics.FillRectangle(brush, r);
         }
 
         protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
@@ -129,17 +126,6 @@ internal static class TrayTheme
             e.Graphics.DrawLine(pen, 8, y, e.Item.Width - 8, y);
         }
 
-        private static GraphicsPath Rounded(Rectangle r, int radius)
-        {
-            int d = radius * 2;
-            var path = new GraphicsPath();
-            path.AddArc(r.X, r.Y, d, d, 180, 90);
-            path.AddArc(r.Right - d, r.Y, d, d, 270, 90);
-            path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
-            path.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
-            path.CloseFigure();
-            return path;
-        }
     }
 
     private sealed class Table : ProfessionalColorTable

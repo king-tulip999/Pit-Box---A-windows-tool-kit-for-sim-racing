@@ -647,7 +647,7 @@ internal sealed class GrrDashboardSection : StackPanel
             string fg = me ? "AccentText" : "Text";
             var weight = me ? FontWeights.SemiBold : FontWeights.Normal;
             var posCell = GrrParts.Position(pos(row), me);
-            posCell.Margin = new Thickness(6, 6, 0, 6);
+            posCell.Margin = pos(row) is >= 1 and <= 3 ? new Thickness(6, 3, 0, 4) : new Thickness(6, 6, 0, 6);
             posCell.IsHitTestVisible = pos(row) <= 3;
             Cell(posCell, r, 0);
 

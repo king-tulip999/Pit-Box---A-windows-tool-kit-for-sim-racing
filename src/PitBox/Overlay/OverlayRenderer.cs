@@ -67,16 +67,12 @@ internal sealed class OverlayRenderer : IDisposable
 
     private DibSurface? _copySurface;
 
-    public Bitmap Render(OverlayLayout layout, OverlayData data, float scale)
+    public DibSurface Render(OverlayLayout layout, OverlayData data, float scale)
     {
         var surface = _copySurface ??= new DibSurface();
         var size = Render(layout, data, scale, surface.Ensure);
         End(surface.Dc, size);
-        var bitmap = new Bitmap(size.Width, size.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-        using var copy = Graphics.FromImage(bitmap);
-        copy.CompositingMode = CompositingMode.SourceCopy;
-        copy.DrawImageUnscaled(surface.Bitmap!, 0, 0);
-        return bitmap;
+        return surface;
     }
 
     private readonly SharpText _sharp = new();

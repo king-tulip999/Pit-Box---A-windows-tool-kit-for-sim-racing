@@ -130,7 +130,6 @@ internal sealed class SegmentMeter : FrameworkElement
         SetResourceReference(HotProperty, "Danger");
     }
 
-    public void SetFill(string key) => SetResourceReference(FillProperty, key);
 
     protected override void OnRender(DrawingContext dc)
     {
@@ -318,7 +317,7 @@ internal static class RaceParts
 
     public static Border Chip(FrameworkElement content, string background = "SurfaceAlt", string edge = "Line", string? tip = null)
     {
-        var chip = Hairline.Frame(new Border { Padding = new Thickness(7, 0, 7, 0), Height = 22, Child = content, ToolTip = tip, Margin = new Thickness(0, 0, 5, 5) });
+        var chip = Hairline.Frame(new Border { Padding = new Thickness(7, 0, 7, 0), Height = Ui.ChipHeight, Child = content, ToolTip = tip, Margin = new Thickness(0, 0, 5, 5) });
         chip.SetResourceReference(Border.BackgroundProperty, background);
         chip.SetResourceReference(Border.BorderBrushProperty, edge);
         content.VerticalAlignment = VerticalAlignment.Center;
@@ -336,7 +335,7 @@ internal static class RaceParts
 
     public static Border AwardSquare(Award award, string place)
     {
-        var square = Hairline.Frame(new Border { Width = 22, Height = 22, Child = Glyph(RaceResult.Icon(award), 13, place + "Text"), Margin = new Thickness(3, 0, 0, 0),
+        var square = Hairline.Frame(new Border { Width = Ui.ChipHeight, Height = Ui.ChipHeight, Child = Glyph(RaceResult.Icon(award), 13, place + "Text"), Margin = new Thickness(3, 0, 0, 0),
             ToolTip = $"{RaceResult.Name(award)}: {RaceResult.Why(award)}" });
         ((FrameworkElement)square.Child).HorizontalAlignment = HorizontalAlignment.Center;
         square.SetResourceReference(Border.BackgroundProperty, place + "Soft");

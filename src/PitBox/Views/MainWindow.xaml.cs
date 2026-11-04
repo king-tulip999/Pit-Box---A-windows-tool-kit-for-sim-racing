@@ -59,7 +59,13 @@ public partial class MainWindow : Window
         ThemeManager.Changing += OnThemeChanging;
         ThemeManager.Applying += OnThemeApplying;
         IsVisibleChanged += (_, _) => { UpdatePageSensors(); UpdatePageActive(); ScheduleTrim(); };
-        _trimTimer.Tick += (_, _) => { _trimTimer.Stop(); if (!OnScreen) TrimWhileHidden(); };
+        _trimTimer.Tick += (_, _) =>
+        {
+            _trimTimer.Stop();
+            if (OnScreen) return;
+            if (OverlaysDrawing) _trimTimer.Start();
+            else TrimWhileHidden();
+        };
 
         MinButton.Click += (_, _) => WindowState = WindowState.Minimized;
         MaxButton.Click += (_, _) => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
@@ -98,7 +104,7 @@ public partial class MainWindow : Window
         {
             if (_launched) return;
             _launched = true;
-            if (!SetupOpen && !Showcase.ShowcaseRunner.Active) LaunchLights.Play(Brand);
+            if (!SetupOpen) LaunchLights.Play(Brand);
         };
         Activated += (_, _) => Motion.SetWindowActive(true);
         Deactivated += (_, _) => Motion.SetWindowActive(false);
@@ -280,7 +286,7 @@ public partial class MainWindow : Window
     {
         SettlePages();
         Motion.PageSettlesAt = 0;
-        if (!Motion.Flourish || !PcClass.Effects || Showcase.ShowcaseRunner.Active || from is null || ReferenceEquals(from, to) || !ReferenceEquals(from.Parent, _pageHost))
+        if (!Motion.Flourish || !PcClass.Effects || from is null || ReferenceEquals(from, to) || !ReferenceEquals(from.Parent, _pageHost))
             return;
         _leaving = from;
         _arriving = to;
@@ -443,13 +449,27 @@ public partial class MainWindow : Window
         Motion.Refresh();
     }
 
+    private static bool HasResource(Uri uri)
+    {
+        try
+        {
+            using var stream = Application.GetResourceStream(uri)?.Stream;
+            return stream is not null;
+        }
+        catch (System.IO.IOException)
+        {
+            return false;
+        }
+    }
+
     private void ApplyThemeIcon()
     {
         try
         {
             var spec = ThemeManager.Current;
-            Icon =System.Windows.Media.Imaging.BitmapFrame.Create(spec.WindowIcon
-                ?? new Uri(Themes.BuiltIn.Contains(spec) ? $"pack://application:,,,/Assets/Themes/PitBox-{spec.Id}.ico" : "pack://application:,,,/Assets/PitBox.ico"));
+            var themed = new Uri($"pack://application:,,,/Assets/Themes/PitBox-{spec.Id}.ico");
+            Icon = System.Windows.Media.Imaging.BitmapFrame.Create(spec.WindowIcon
+                ?? (Themes.BuiltIn.Contains(spec) && HasResource(themed) ? themed : new Uri("pack://application:,,,/Assets/PitBox.ico")));
         }
         catch (Exception ex)
         {
@@ -459,12 +479,12 @@ public partial class MainWindow : Window
 
     private void OnThemeApplying()
     {
-        if (!Showcase.ShowcaseRunner.Active) DropPages(keepCurrent: true);
+        DropPages(keepCurrent: true);
     }
 
     private void OnThemeChanging()
     {
-        if (OnScreen && !Showcase.ShowcaseRunner.Active) ThemeWipe.Begin(Root, ContentArea);
+        if (OnScreen) ThemeWipe.Begin(Root, ContentArea);
     }
 
     private void OnThemeChanged()
@@ -475,12 +495,7 @@ public partial class MainWindow : Window
         ApplyBackdrop();
         string? key = _current;
         double offset = key is not null && _pages.GetValueOrDefault(key) is UserControl { Content: ScrollViewer sv } ? sv.VerticalOffset : 0;
-        if (Showcase.ShowcaseRunner.Active)
-        {
-            DeactivatePage();
-            if (key is not null) RemovePage(key);
-        }
-        else DropPages(keepCurrent: false);
+        DropPages(keepCurrent: false);
         BuildNav();
         if (key is null)
             return;
@@ -499,6 +514,8 @@ public partial class MainWindow : Window
         _trimTimer.Stop();
         if (!OnScreen && !ScreenshotRunner.Active) _trimTimer.Start();
     }
+
+    private bool OverlaysDrawing => _app.Overlay.Showing || _app.Telemetry.Status == SimRacing.Telemetry.SimStatus.Connected && !_app.Telemetry.Simulated;
 
     internal void TrimWhileHidden()
     {
@@ -961,11 +978,30 @@ public partial class MainWindow : Window
         toast.MouseLeftButtonUp += (_, e) => { if (e.Handled) return; timer.Stop(); Dismiss(toast); };
         toast.MouseEnter += (_, _) => timer.Stop();
         toast.MouseLeave += (_, _) => { if (!stays && toast.Parent is not null) timer.Start(); };
+        toast.Tag = new ToastState(timer, stays || action is not null);
         Toasts.Children.Add(toast);
-        while (Toasts.Children.Count > 3)
-            Toasts.Children.RemoveAt(0);
+        TrimToasts();
         Motion.Enter(toast, distance: 16);
         if (!stays) timer.Start();
+    }
+
+    private sealed record ToastState(DispatcherTimer Timer, bool Keep);
+
+    private const int ToastsShown = 3, ToastsKept = 5;
+
+    private void TrimToasts()
+    {
+        while (Toasts.Children.Count > ToastsShown)
+        {
+            var oldest = Toasts.Children.OfType<FrameworkElement>().FirstOrDefault(t => t.Tag is ToastState { Keep: false });
+            if (oldest is null)
+            {
+                if (Toasts.Children.Count <= ToastsKept) return;
+                oldest = (FrameworkElement)Toasts.Children[0];
+            }
+            if (oldest.Tag is ToastState state) state.Timer.Stop();
+            Toasts.Children.Remove(oldest);
+        }
     }
 
     private void Dismiss(Border toast) =>
@@ -1049,7 +1085,11 @@ public partial class MainWindow : Window
 
     private void FitBrand()
     {
-        Ui.FitWordmark(Wordmark, Theme.Brand.CrispSize(TitleButtonHeight, VisualTreeHelper.GetDpi(this).PixelsPerDip) ?? TitleButtonHeight);
+        double height = Theme.Brand.CrispSize(TitleButtonHeight, VisualTreeHelper.GetDpi(this).PixelsPerDip) ?? TitleButtonHeight;
+        Ui.FitWordmark(Wordmark, height);
+        double ruleY = ContentArea.RowDefinitions[0].Height.Value - TitleRule.Height + Math.Floor(TitleRule.Height / 2);
+        TitleLeft.Margin = new Thickness(SidebarHost.Margin.Left, Math.Round((ruleY - Ui.WordmarkCapHeight(height)) / 2), 0, 0);
+        TitleLeft.Width = Sidebar.PanelWidth;
         ShowThemeLink(ThemeManager.Current.Link);
         FitThemeLogo();
     }

@@ -6,7 +6,6 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using PitBox.Config;
 using PitBox.Controls;
@@ -105,26 +104,6 @@ internal static class IdentifyDisplays
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter, int x, int y, int cx, int cy, uint flags);
 }
 
-internal static class BitmapConvert
-{
-    public static BitmapSource ToSource(System.Drawing.Bitmap bitmap, double scale = 1)
-    {
-        var rect = new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height);
-        var data = bitmap.LockBits(rect, System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-        try
-        {
-            var source = BitmapSource.Create(bitmap.Width, bitmap.Height, 96 * scale, 96 * scale, PixelFormats.Bgra32, null,
-                data.Scan0, data.Stride * bitmap.Height, data.Stride);
-            source.Freeze();
-            return source;
-        }
-        finally
-        {
-            bitmap.UnlockBits(data);
-        }
-    }
-}
-
 internal sealed record Choice(string? Id, string Text, string? Extra = null)
 {
     public override string ToString() => Text;
@@ -168,7 +147,7 @@ internal sealed class Collapsible : StackPanel
         _subtitle = new TextBlock { Text = framed ? "" : subtitle, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) };
         if (framed)
         {
-            var name = TextFit.TipWhenTrimmed(new TextBlock { Text = Ui.Spaced(title), Style = Ui.Res<Style>("H3"), FontSize = Ui.CardTitleSize, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
+            var name = TextFit.TipWhenTrimmed(new TextBlock { Text = title, Style = Ui.Res<Style>("H3"), FontSize = Ui.CardTitleSize, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
             name.SetResourceReference(TextBlock.ForegroundProperty, "Text");
             var face = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 10, 0) };
             face.Children.Add(badge);
@@ -262,14 +241,6 @@ internal sealed class Collapsible : StackPanel
 
     private readonly Tile _badge;
 
-    public void SetBadgeImage(ImageSource image)
-    {
-        double size = _badge.Width * (_frame is null ? 0.7 : 0.85);
-        var picture = new Image { Source = image, Width = size, Height = size, Stretch = Stretch.Uniform };
-        RenderOptions.SetBitmapScalingMode(picture, BitmapScalingMode.HighQuality);
-        _badge.Child = picture;
-    }
-
     public void Toggle()
     {
         Expanded = !Expanded;
@@ -314,7 +285,7 @@ internal static class Ui
 {
     public const double HeaderGap = 16;
 
-    public const double HeaderIndent = 6, HeaderTop = 11;
+    public const double HeaderIndent = 6, HeaderTop = 0;
 
     public static Thickness HeaderMargin => new(HeaderIndent, HeaderTop, 0, HeaderGap);
 
@@ -324,6 +295,8 @@ internal static class Ui
 
     public const double InlineGap = 3, ButtonGap = 6, GroupGap = 13;
 
+    public const double ControlHeight = 28, ChipHeight = 24;
+
     public static Thickness DialogPadding => new(21, 18, 21, 16);
 
     public const double DialogTitleGap = 4, DialogFooterGap = 16, DialogScrollGutter = 8;
@@ -332,7 +305,6 @@ internal static class Ui
 
     public const double CardRowHeight = 68, CardTitleSize = 32.5;
 
-    public static string Spaced(string name) => ThemeManager.Current.Caps ? string.Join((char)0x200A, name.ToUpperInvariant().ToCharArray()) : name;
 
     public const double PageWidth = 1393;
 
@@ -364,6 +336,7 @@ internal static class Ui
 
     public static void FollowTarget(System.Windows.Controls.Primitives.Popup popup)
     {
+        popup.UseLayoutRounding = true;
         var viewers = new List<ScrollViewer>();
         Window? window = null;
         void Reposition()
@@ -451,15 +424,21 @@ internal static class Ui
 
     public static TextBox Search(TextBox box)
     {
-        box.Style = Res<Style>("SearchBox");
-        box.ApplyTemplate();
-        if (box.Template.FindName("Clear", box) is Button clear) clear.Click += (_, _) => { box.Clear(); box.Focus(); };
+        SearchFace(box);
         box.PreviewKeyDown += (_, e) =>
         {
             if (e.Key != Key.Escape || box.Text.Length == 0) return;
             box.Clear();
             e.Handled = true;
         };
+        return box;
+    }
+
+    public static TextBox SearchFace(TextBox box)
+    {
+        box.Style = Res<Style>("SearchBox");
+        box.ApplyTemplate();
+        if (box.Template.FindName("Clear", box) is Button clear) clear.Click += (_, _) => { box.Clear(); box.Focus(); };
         return box;
     }
 
@@ -542,7 +521,7 @@ internal static class Ui
             var first = fe is StackPanel { Orientation: Orientation.Vertical } column ? column.Children.OfType<UIElement>().FirstOrDefault() : fe;
             bool stacked = fe is StackPanel { Orientation: Orientation.Vertical };
             fe.VerticalAlignment = stacked ? VerticalAlignment.Top : VerticalAlignment.Center;
-            if (stacked && first is CheckBox) fe.Margin = new Thickness(fe.Margin.Left, fe.Margin.Top + 7, fe.Margin.Right, fe.Margin.Bottom);
+            if (stacked && first is CheckBox) fe.Margin = new Thickness(fe.Margin.Left, fe.Margin.Top + 4, fe.Margin.Right, fe.Margin.Bottom);
             if (fill)
             {
                 fe.HorizontalAlignment = HorizontalAlignment.Stretch;
@@ -573,18 +552,6 @@ internal static class Ui
         HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(labelWidth, 0, 0, 6),
     };
 
-    public static Border RemovableChip(string text, Action remove)
-    {
-        var panel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        panel.Children.Add(new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center });
-        var x = new Button { Style = Res<Style>("QuietButton"), Padding = new Thickness(2), Margin = new Thickness(5, -2, -3, -2), ToolTip = "Remove",
-            Content = new Icon { Data = Res<Geometry>("I.X"), Width = 9, Height = 9 } };
-        System.Windows.Automation.AutomationProperties.SetName(x, "Remove " + text);
-        x.Click += (_, _) => remove();
-        panel.Children.Add(x);
-        return new Tile { Style = Res<Style>("Chip"), Child = panel };
-    }
-
     public static Border Dialog(MainWindow window, string title, string subtitle, UIElement content, StackPanel buttons, TextBlock? error = null, double width = 518, FrameworkElement? leftAction = null)
     {
         var stack = new StackPanel();
@@ -611,14 +578,14 @@ internal static class Ui
             row.Children.Add(buttons);
             footer = row;
         }
-        footer.Margin = new Thickness(0, DialogFooterGap, 0, 0);
+        footer.Margin = new Thickness(0, DialogFooterGap, DialogScrollGutter, 0);
         DockPanel.SetDock(footer, Dock.Bottom);
         outer.Children.Add(footer);
         if (error is not null)
         {
             error.Foreground = Res<Brush>("Danger");
             error.TextWrapping = TextWrapping.Wrap;
-            error.Margin = new Thickness(0, 8, 0, 0);
+            error.Margin = new Thickness(0, 8, DialogScrollGutter, 0);
             DockPanel.SetDock(error, Dock.Bottom);
             outer.Children.Add(error);
         }
@@ -690,6 +657,14 @@ internal static class Ui
         return bar;
     }
 
+    public static double WordmarkCapHeight(double height)
+    {
+        var probe = new FormattedText(Brand.Wordmark, System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+            Brand.WordmarkFace, 100, Brushes.Black, 1.0);
+        double k = height / probe.Extent;
+        return (probe.Baseline - (probe.Height + probe.OverhangAfter - probe.Extent)) * k;
+    }
+
     public static void FitWordmark(TextBlock text, double height, double gap = 0)
     {
         var probe = new FormattedText(Brand.Wordmark, System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
@@ -728,12 +703,21 @@ internal static class Ui
 
     public static StackPanel PageTitle(string text)
     {
-        var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        var row = new StackPanel { VerticalAlignment = VerticalAlignment.Top };
         var title = Text(text, "H1");
-        title.VerticalAlignment = VerticalAlignment.Center;
         SetTitle(title, text);
         row.Children.Add(title);
+        row.Children.Add(TitleRule(title));
         return row;
+    }
+
+    public const double TitleRuleGap = -4, TitleRuleOverhang = 64;
+
+    public static DividerLine TitleRule(FrameworkElement title)
+    {
+        var line = new DividerLine { FromStart = true, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, TitleRuleGap, 0, 0) };
+        title.SizeChanged += (_, e) => line.Width = e.NewSize.Width + TitleRuleOverhang;
+        return line;
     }
 
     public static void SetTitle(TextBlock title, string text)
@@ -796,7 +780,7 @@ internal static class Ui
     {
         var panel = new StackPanel { Orientation = Orientation.Horizontal };
         panel.Children.Add(new Icon { Data = Res<Geometry>(icon), Width = iconSize, Height = iconSize, VerticalAlignment = VerticalAlignment.Center });
-        var text = new TextBlock { Text = ThemeManager.Case(label), Margin = new Thickness(Math.Round(iconSize * 0.47), 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        var text = new TextBlock { Text = label, Margin = new Thickness(Math.Round(iconSize * 0.47), 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         if (fontSize is { } size) text.FontSize = size;
         panel.Children.Add(text);
         return panel;
@@ -840,29 +824,6 @@ internal static class Ui
         return row;
     }
 
-    public static Tile PanelTools(string tooltip, string anchor, Action<Button> openMenu, CollapseAllButton? collapseAll, out Button panels)
-    {
-        var content = new StackPanel { Orientation = Orientation.Horizontal };
-        content.Children.Add(new Icon { Data = Res<Geometry>("I.Tune"), Width = 13, Height = 13, VerticalAlignment = VerticalAlignment.Center });
-        content.Children.Add(new TextBlock { Text = ThemeManager.Case("Panels"), Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
-        content.Children.Add(new Icon { Data = Res<Geometry>("I.ChevronDown"), Width = 8, Height = 8, Margin = new Thickness(4, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
-        var button = new Button { Style = Res<Style>("GhostButton"), VerticalAlignment = VerticalAlignment.Center, Content = content, ToolTip = tooltip };
-        System.Windows.Automation.AutomationProperties.SetName(button, "Panels");
-        Anchor(button, anchor);
-        button.Click += (_, _) => openMenu(button);
-        panels = button;
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal };
-        buttons.Children.Add(button);
-        if (collapseAll is not null)
-        {
-            collapseAll.Style = Res<Style>("GhostButton");
-            collapseAll.Margin = new Thickness(ButtonGap, 0, 0, 0);
-            collapseAll.VerticalAlignment = VerticalAlignment.Center;
-            buttons.Children.Add(collapseAll);
-        }
-        return new Tile { Margin = new Thickness(ButtonGap, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Child = buttons };
-    }
-
     public static Tile Badge(string icon, string soft, string deep, double size, double radius, double iconSize)
     {
         var glyph = Glyph(icon);
@@ -892,7 +853,7 @@ internal static class Ui
 
     public static Border Chip(string text, string? soft = null, string? deep = null)
     {
-        var chip = new Tile { Style = Res<Style>("Chip"), Child = TextFit.TipWhenTrimmed(new TextBlock { Text = ThemeManager.Case(text), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center }) };
+        var chip = new Tile { Style = Res<Style>("Chip"), Child = TextFit.TipWhenTrimmed(new TextBlock { Text = text, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center }) };
         if (soft is not null) { chip.Background = Res<Brush>(soft); chip.BorderBrush = Res<Brush>(ChipEdge(soft)); }
         if (deep is not null) ((TextBlock)chip.Child).Foreground = Res<Brush>(deep);
         if (soft == "DangerSoft") Danger(chip, (TextBlock)chip.Child, 9);
@@ -910,7 +871,6 @@ internal static class Ui
         tile.Background = Res<Brush>("DangerSoft");
         tile.BorderBrush = Res<Brush>("Danger");
         tile.BorderThickness = new Thickness(1.5);
-        Tile.SetChamfer(tile, true);
         text.Foreground = Res<Brush>("DangerDeep");
         text.FontWeight = FontWeights.Bold;
         if (!icon) return;
@@ -972,7 +932,7 @@ internal static class Ui
     public static Border Segmented(IReadOnlyList<string> options, int selected, Action<int> onChange, string group, IReadOnlyList<string?>? tips = null)
     {
         string name = group + "-" + Guid.NewGuid().ToString("N");
-        var panel = new WrapPanel();
+        var panel = new WrapPanel { Margin = SegmentRowMargin };
         for (int i = 0; i < options.Count; i++)
         {
             int index = i;
@@ -983,6 +943,8 @@ internal static class Ui
         }
         return new Tile { Style = Res<Style>("Segmented"), Child = panel };
     }
+
+    internal static readonly Thickness SegmentRowMargin = new(-2, 0, -2, 0);
 
     public static Border PageTabs(IReadOnlyList<string> options, int selected, Action<int> onChange, string group)
     {
@@ -1018,7 +980,7 @@ internal static class Ui
         var tools = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Bottom };
         for (int i = 0; i < actions.Length; i++)
         {
-            if (i > 0) actions[i].Margin = new Thickness(6, 0, 0, 0);
+            actions[i].Margin = new Thickness(i > 0 ? ButtonGap : 0, 0, 0, 0);
             tools.Children.Add(actions[i]);
         }
         Grid.SetColumn(tools, 1);
@@ -1037,6 +999,8 @@ internal static class Ui
 
     public const double SettingControlLane = 190;
 
+    private const string SettingLaneGroup = "SettingLane";
+
     public sealed record SettingDefault(Func<bool> IsDefault, Action Reset, string Default);
 
     public static Grid SettingRow(string title, string? description, UIElement control, SettingDefault? fallback = null, string? more = null)
@@ -1047,7 +1011,8 @@ internal static class Ui
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3000, GridUnitType.Star), MaxWidth = SettingLabelMax });
         var lane = new ColumnDefinition { Width = new GridLength(1000, GridUnitType.Star), MaxWidth = SettingControlLane };
         grid.ColumnDefinitions.Add(lane);
-        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        var rest = new ColumnDefinition { Width = new GridLength(0) };
+        grid.ColumnDefinitions.Add(rest);
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         var text = new StackPanel { Margin = new Thickness(0, 0, 15, 0), VerticalAlignment = VerticalAlignment.Center };
@@ -1070,6 +1035,7 @@ internal static class Ui
         {
             lane.Width = GridLength.Auto;
             lane.MaxWidth = double.PositiveInfinity;
+            rest.Width = new GridLength(1, GridUnitType.Star);
             return grid;
         }
         fe.VerticalAlignment = VerticalAlignment.Center;
@@ -1081,6 +1047,14 @@ internal static class Ui
         void Fit()
         {
             if (grid.ActualWidth <= 0) return;
+            bool spare = grid.ActualWidth > SettingLabelMax + SettingControlLane + 0.5;
+            if (rest.Width.IsStar != spare)
+            {
+                rest.Width = spare ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+                lane.Width = spare ? GridLength.Auto : new GridLength(1000, GridUnitType.Star);
+                lane.MaxWidth = spare ? double.PositiveInfinity : SettingControlLane;
+                lane.SharedSizeGroup = spare ? SettingLaneGroup : null;
+            }
             fe.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             string key = title + "\n" + description + "\n" + text.Children.Count;
             if (key != measuredFor)
@@ -1093,7 +1067,7 @@ internal static class Ui
             }
             double room = grid.ActualWidth - fe.DesiredSize.Width - 18;
             bool stack = StacksSettingControl(room, natural, titleWidth, longest, titleOnly: text.Children.Count == 1);
-            double laneMin = stack ? 0 : fe.DesiredSize.Width;
+            double laneMin = stack ? 0 : spare ? Math.Max(SettingControlLane, fe.DesiredSize.Width) : fe.DesiredSize.Width;
             if (lane.MinWidth != laneMin) lane.MinWidth = laneMin;
             if (stack == stacked) return;
             stacked = stack;
@@ -1293,7 +1267,15 @@ internal static class Ui
         DockPanel.SetDock(glyph, Dock.Left);
         line.Children.Add(glyph);
         line.Children.Add(text);
+        text.Loaded += (_, _) => glyph.Margin = new Thickness(0, Math.Max(0, Math.Round(CapCentre(text) - glyph.Height / 2)), 5, 0);
         return line;
+    }
+
+    internal static double CapCentre(TextBlock text)
+    {
+        var face = new Typeface(text.FontFamily, text.FontStyle, text.FontWeight, text.FontStretch);
+        double caps = face.TryGetGlyphTypeface(out var glyphs) ? glyphs.CapsHeight : 0.7;
+        return text.FontSize * (text.FontFamily.Baseline - caps / 2);
     }
 
     public static StackPanel SliderWithValue(double min, double max, double value, string format, Action<double> changed, double width = 146, double step = 1) =>
@@ -1318,78 +1300,6 @@ internal static class Ui
         if (!PitBox.Services.External.Allowed("open " + url)) return;
         try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true })?.Dispose(); }
         catch { }
-    }
-}
-
-internal static class ExeIcons
-{
-    private static readonly Dictionary<string, ImageSource?> Cache = new(StringComparer.OrdinalIgnoreCase);
-
-    private static bool Cached(string path, out ImageSource? image)
-    {
-        lock (Cache) return Cache.TryGetValue(path, out image);
-    }
-
-    public static ImageSource? For(string? path)
-    {
-        if (string.IsNullOrWhiteSpace(path) || path.Contains("://"))
-            return null;
-        if (Cached(path, out var cached))
-            return cached;
-        ImageSource? image = null;
-        try
-        {
-            if (System.IO.File.Exists(path))
-            {
-                string ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
-                if (ext is ".png" or ".jpg" or ".jpeg" or ".bmp" or ".ico")
-                {
-                    var bitmap = new BitmapImage();
-                    bitmap.BeginInit();
-                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                    bitmap.DecodePixelWidth = 64;
-                    bitmap.UriSource = new Uri(path);
-                    bitmap.EndInit();
-                    bitmap.Freeze();
-                    image = bitmap;
-                }
-                else
-                {
-                    using var icon = System.Drawing.Icon.ExtractAssociatedIcon(path);
-                    if (icon is not null)
-                    {
-                        var source = Imaging.CreateBitmapSourceFromHIcon(icon.Handle, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
-                        source.Freeze();
-                        image = source;
-                    }
-                }
-            }
-        }
-        catch
-        {
-        }
-        lock (Cache) Cache[path] = image;
-        return image;
-    }
-
-    public static Border IconTile(string? path, string fallbackIcon, double size = 32)
-    {
-        var tile = new Tile { Width = size, Height = size, CornerRadius = ThemeManager.Round(size * 0.28), Background = Ui.Res<Brush>("TileRaised") };
-        UIElement Picture(ImageSource image) => new Image { Source = image, Width = size * 0.62, Height = size * 0.62 };
-        tile.Child = new Icon { Data = Ui.Res<Geometry>(fallbackIcon), Width = size * 0.5, Height = size * 0.5, Foreground = Ui.Res<Brush>("AccentText") };
-        if (string.IsNullOrWhiteSpace(path) || path.Contains("://")) return tile;
-        if (Cached(path, out var known))
-        {
-            if (known is not null) tile.Child = Picture(known);
-            return tile;
-        }
-        Load();
-        return tile;
-
-        async void Load()
-        {
-            if (await Task.Run(() => For(path)) is { } image) tile.Child = Picture(image);
-        }
     }
 }
 

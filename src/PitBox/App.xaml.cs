@@ -91,16 +91,15 @@ public partial class App : Application
 
         string? screenshotDir = ArgValue(e.Args, "--screenshots");
         bool fromStartup = e.Args.Contains("--minimized", StringComparer.OrdinalIgnoreCase);
-        string? showcaseDir = ArgValue(e.Args, "--showcase");
         string? perfFile = ArgValue(e.Args, "--perf");
         string? monkeyDir = ArgValue(e.Args, "--monkey");
         string? controlsDir = ArgValue(e.Args, "--controls");
         PerfProbe.File = perfFile;
         if (perfFile is not null) try { File.Delete(perfFile); } catch { }
-        Motion.FollowFocus = screenshotDir is null && showcaseDir is null && perfFile is null && monkeyDir is null && controlsDir is null;
-        bool demo = screenshotDir is not null || showcaseDir is not null || perfFile is not null || monkeyDir is not null || controlsDir is not null || e.Args.Contains("--demo", StringComparer.OrdinalIgnoreCase);
+        Motion.FollowFocus = screenshotDir is null && perfFile is null && monkeyDir is null && controlsDir is null;
+        bool demo = screenshotDir is not null || perfFile is not null || monkeyDir is not null || controlsDir is not null || e.Args.Contains("--demo", StringComparer.OrdinalIgnoreCase);
         bool fresh = e.Args.Contains("--fresh", StringComparer.OrdinalIgnoreCase);
-        bool withTray = screenshotDir is null && showcaseDir is null && perfFile is null && controlsDir is null;
+        bool withTray = screenshotDir is null && perfFile is null && controlsDir is null;
         if (demo && ArgValue(e.Args, "--culture") is { } cultureName)
         {
             var culture = System.Globalization.CultureInfo.GetCultureInfo(cultureName);
@@ -146,12 +145,6 @@ public partial class App : Application
         bool themed = themeAt >= 0 && themeAt + 1 < e.Args.Length;
         var asked = themed ? AppTheme.Named(e.Args[themeAt + 1]) : AppTheme.Dark;
         if (demo && screenshotDir is null && themed) config.Ui.Theme = asked;
-        if (showcaseDir is not null)
-        {
-            config.Ui.Animations = true;
-            if (!themed) config.Ui.Theme = AppTheme.Dark;
-            config.Overlay.Visible = false;
-        }
         if (screenshotDir is not null)
         {
             config.Ui.Theme = asked;
@@ -207,11 +200,6 @@ public partial class App : Application
         {
             MonkeyRunner.Run(window, monkeyDir, int.TryParse(ArgValue(e.Args, "--seed"), out int seed) ? seed : Environment.TickCount,
                 double.TryParse(ArgValue(e.Args, "--minutes"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double minutes) ? minutes : 10);
-            return;
-        }
-        if (showcaseDir is not null)
-        {
-            Showcase.ShowcaseRunner.Run(window, showcaseDir, ArgValue(e.Args, "--ffmpeg"));
             return;
         }
         if (perfFile is not null)

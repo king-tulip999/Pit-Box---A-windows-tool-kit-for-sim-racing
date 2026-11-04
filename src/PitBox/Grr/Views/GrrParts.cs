@@ -241,7 +241,7 @@ internal static class GrrParts
         var pill = new Tile
         {
             MinWidth = 21 * k, Padding = new Thickness(5 * k, 1 * k, 5 * k, 2 * k), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center,
-            CornerRadius = ThemeManager.Round(4 * Math.Min(k, 1.5)), Chamfer = true, BorderThickness = new Thickness(1.5),
+            CornerRadius = ThemeManager.Round(4 * Math.Min(k, 1.5)), BorderThickness = new Thickness(1.5),
             Background = Ui.Res<Brush>($"Podium{p}Bg"), BorderBrush = Ui.Res<Brush>($"Podium{p}Edge"), ToolTip = tip, Child = text,
         };
         System.Windows.Automation.AutomationProperties.SetName(pill, $"Position {p}, {tip}");

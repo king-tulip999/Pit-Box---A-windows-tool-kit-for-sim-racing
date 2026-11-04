@@ -7,10 +7,10 @@ internal static class HudCatalog
     public static readonly HudWidgetDef[] All =
     {
         new("relative", "Relative", "The cars nearest to you on track, with gaps in seconds, laps ahead / behind, classes, license badges, pit stops and battles.", 448, 300, () => new RelativeWidget())
-            { MinW = 180, MinH = 90, DefaultHz = 15, Options = RelativeWidget.Options, Editor = Editors.RelativeEditor.Def, Clickable = true,
+            { MinW = 180, MinH = 90, DefaultHz = 15, Options = RelativeWidget.Options, Editor = Editors.RelativeEditor.Def,
               Limits = "Gaps are iRacing's own time-behind estimates for cars in your class, and distance × that car's pace for other classes." },
         new("standings", "Standings", "The whole field: overall and class positions, gaps, laps, pit stops, out laps, licenses and more, grouped by class.", 488, 520, () => new StandingsWidget())
-            { MinW = 200, MinH = 120, DefaultHz = 5, Options = StandingsWidget.Options, Editor = Editors.StandingsEditor.Def, Clickable = true,
+            { MinW = 200, MinH = 120, DefaultHz = 5, Options = StandingsWidget.Options, Editor = Editors.StandingsEditor.Def,
               Limits = "Pit stop counts, stints and out laps start when the overlay first sees the session. Other drivers' incidents come from iRacing's session information, which it updates every so often." },
         new("timing", "Lap timing and delta", "Live delta to your best, the session best or your optimal lap, predicted lap, lap times and sectors.", 380, 150, () => new TimingWidget())
             { MinW = 200, MinH = 70, DefaultHz = 20, Options = TimingWidget.Options, Editor = Editors.TimingEditor.Def,

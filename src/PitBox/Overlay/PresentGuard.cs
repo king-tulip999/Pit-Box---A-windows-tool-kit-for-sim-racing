@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace PitBox.Overlay;
@@ -7,7 +8,7 @@ internal sealed class PresentGuard
 {
     internal const int Chunk = 64 * 1024;
 
-    private byte[]? _last, _chunk;
+    private byte[]? _last;
     private Point _at;
     private byte _opacity;
     private bool _valid;
@@ -17,7 +18,7 @@ internal sealed class PresentGuard
     public void Release()
     {
         _valid = false;
-        _last = _chunk = null;
+        _last = null;
     }
 
     public bool Same(IntPtr bits, int length, Point at, byte opacity)
@@ -32,20 +33,19 @@ internal sealed class PresentGuard
             _last = new byte[length];
             _valid = false;
         }
+        var now = MemoryMarshal.CreateReadOnlySpan(ref Unsafe.AddByteOffset(ref Unsafe.NullRef<byte>(), bits), length);
         int from = 0;
         if (_valid && at == _at && opacity == _opacity)
         {
-            if (_chunk is null || _chunk.Length < Math.Min(Chunk, length)) _chunk = new byte[Math.Min(Chunk, length)];
             while (from < length)
             {
-                int n = Math.Min(_chunk.Length, length - from);
-                Marshal.Copy(bits + from, _chunk, 0, n);
-                if (!_chunk.AsSpan(0, n).SequenceEqual(_last.AsSpan(from, n))) break;
+                int n = Math.Min(Chunk, length - from);
+                if (!now.Slice(from, n).SequenceEqual(_last.AsSpan(from, n))) break;
                 from += n;
             }
             if (from >= length) return true;
         }
-        Marshal.Copy(bits + from, _last, from, length - from);
+        now[from..].CopyTo(_last.AsSpan(from));
         _at = at;
         _opacity = opacity;
         _valid = true;

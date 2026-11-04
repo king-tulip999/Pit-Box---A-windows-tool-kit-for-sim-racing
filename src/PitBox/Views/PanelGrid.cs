@@ -9,19 +9,13 @@ using PitBox.Theme;
 
 namespace PitBox.Views;
 
-internal sealed record PanelTier(PanelSize Size, double MinWidth, double MinHeight = 0);
-
-internal sealed record PanelDef(string Id, string Label, Func<PanelSize, FrameworkElement> Build)
+internal sealed record PanelDef(string Id, string Label, Func<FrameworkElement> Build)
 {
-    public IReadOnlyList<PanelTier> Tiers { get; init; } = new[] { new PanelTier(PanelSize.Medium, 0) };
-
     public double DefaultWidth { get; init; } = 381;
 
     public double MinWidth { get; init; } = 211;
 
     public double MaxWidth { get; init; } = 381;
-
-    public Func<double>? MaxWidthFor { get; init; }
 
     public bool FullWidth { get; init; }
 
@@ -33,17 +27,11 @@ internal sealed record PanelDef(string Id, string Label, Func<PanelSize, Framewo
 
     public int Order { get; init; } = int.MaxValue;
 
-    public Func<UIElement>? VeilExtra { get; init; }
-
     public Action? VeilClick { get; init; }
-
-    public string? VeilClickTip { get; init; }
-
-    public bool FreeHeight { get; init; }
 
     public double MinHeight { get; init; }
 
-    public bool Resizable => !FullWidth && (FreeHeight || MaxWidthFor is not null || MaxWidth > MinWidth + 1 || Tiers.Count > 1);
+    public bool Resizable => !FullWidth && MaxWidth > MinWidth + 1;
 }
 
 internal sealed class PanelGrid : Panel
@@ -67,19 +55,7 @@ internal sealed class PanelGrid : Panel
 
     public bool InRows { get; init; }
 
-    public bool Dividers { get; init; }
-
     public bool LiveEdit { get; init; }
-
-    private bool _centered;
-
-    public bool Centered
-    {
-        get => _centered;
-        set { if (_centered == value) return; _centered = value; InvalidateArrange(); }
-    }
-
-    private double _offsetX;
 
     private sealed class Item
     {
@@ -91,7 +67,7 @@ internal sealed class PanelGrid : Panel
         public FrameworkElement? LiveGrip;
         public bool GripShown;
         public readonly TranslateTransform Shift = new();
-        public PanelSize? Tier;
+        public bool Built;
         public Rect Last = Rect.Empty;
     }
 
@@ -246,10 +222,10 @@ internal sealed class PanelGrid : Panel
         Children.Remove(item.Host);
     }
 
-    private void SetContent(Item item, PanelSize tier)
+    private void SetContent(Item item)
     {
-        item.Tier = tier;
-        var content = item.Def.Build(tier);
+        item.Built = true;
+        var content = item.Def.Build();
         content.Margin = new Thickness(0, 0, 0, PanelSpacing);
         if (ReferenceEquals(item.Host.Children[0], content)) return;
         if (content.Parent is Panel previous) previous.Children.Remove(content);
@@ -271,7 +247,7 @@ internal sealed class PanelGrid : Panel
         if (def.IsFull) return (_columns, _columns);
         if (Halves) return (1, 1);
         int min = ColumnsFor(def.MinWidth, +1);
-        return (min, Math.Max(min, ColumnsFor(def.MaxWidthFor?.Invoke() ?? def.MaxWidth, -1)));
+        return (min, Math.Max(min, ColumnsFor(def.MaxWidth, -1)));
     }
 
     private int ColumnsOf(Item item)
@@ -280,37 +256,27 @@ internal sealed class PanelGrid : Panel
         return Math.Clamp(item.Slot.Cols ?? ColumnsFor(item.Def.DefaultWidth), min, max);
     }
 
-    private static PanelSize TierFor(PanelDef def, double width, double? height)
-    {
-        var tier = def.Tiers[0];
-        foreach (var t in def.Tiers.Skip(1))
-            if (t.MinWidth <= width + 0.5 && (height is not { } h || t.MinHeight <= h + 0.5))
-                tier = t;
-        return tier.Size;
-    }
+    private const byte VeilAlpha = 215;
 
     private Border Veil(Item item)
     {
         var def = item.Def;
         var veil = new Tile
         {
-            CardOutline = true,
             Margin = new Thickness(0, 0, 0, PanelSpacing),
             BorderBrush = Ui.Res<Brush>("Accent"), BorderThickness = new Thickness(1.5), CornerRadius = ThemeManager.CardCorner,
-            ToolTip = $"Drag {def.Label} to move it in the order" + (CanResize(def) ? "; drag its corner to resize" : "")
-                + (def.VeilClick is not null && def.VeilClickTip is { } tip ? "; click to " + tip : ""),
+            ToolTip = $"Drag {def.Label} to move it in the order" + (CanResize(def) ? "; drag its corner to resize" : ""),
         };
         var surface = ((SolidColorBrush)Ui.Res<Brush>("Surface")).Color;
-        veil.Background = new SolidColorBrush(Color.FromArgb(130, surface.R, surface.G, surface.B));
+        veil.Background = new SolidColorBrush(Color.FromArgb(VeilAlpha, surface.R, surface.G, surface.B));
 
         var tag = new StackPanel { Orientation = Orientation.Horizontal };
-        tag.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = def.Label, FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>("AccentText"), Margin = new Thickness(0, 0, 5, 0), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis }));
-        if (def.VeilExtra?.Invoke() is { } extra) tag.Children.Add(extra);
+        tag.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = def.Label, FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>("AccentText"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis }));
         var layers = new Grid();
         layers.Children.Add(new Tile
         {
             Background = Ui.Res<Brush>("AccentSoft"), BorderBrush = Ui.Res<Brush>("Accent"), BorderThickness = Hairline.Edges(), CornerRadius = ThemeManager.Round(12),
-            Padding = new Thickness(10, 3, 3, 3), Margin = new Thickness(6), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Child = tag,
+            Padding = new Thickness(9, 0, 9, 0), Height = 24, Margin = new Thickness(6), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Child = tag,
         });
         if (CanResize(def))
             layers.Children.Add(Grip(item));
@@ -556,7 +522,7 @@ internal sealed class PanelGrid : Panel
         item.Shift.X = item.Def.IsFull ? 0 : pointer.X - _grab.X - _dragFrom.X;
         item.Shift.Y = pointer.Y - _grab.Y - _dragFrom.Y;
 
-        int col = (int)Math.Round((pointer.X - _grab.X - _offsetX) / ColStep);
+        int col = (int)Math.Round((pointer.X - _grab.X) / ColStep);
         int row = (int)Math.Round((pointer.Y - _grab.Y) / RowStep);
         col = Math.Clamp(col, 0, Math.Max(0, _columns - item.Box.Cols));
         row = Math.Max(0, row);
@@ -651,13 +617,11 @@ internal sealed class PanelGrid : Panel
         {
             int cols = ColumnsOf(item);
             double w = item.Def.IsFull ? width : ColumnsWidth(cols);
-            var tier = TierFor(item.Def, w, item.Slot.Rows is { } r ? r * RowStep - Gap : null);
-            if (item.Tier != tier && (item.Tier is null || !LiveResize)) SetContent(item, tier);
+            if (!item.Built) SetContent(item);
             item.Def.Fit?.Invoke(w);
-            double? height = item.Def.FreeHeight && item.Slot.Rows is { } userRows ? Math.Max(userRows * RowStep - Gap, item.Def.MinHeight) : null;
-            item.Host.Measure(new Size(w, height ?? double.PositiveInfinity));
+            item.Host.Measure(new Size(w, double.PositiveInfinity));
             item.Box.Cols = cols;
-            item.Box.Rows = Math.Max(1, (int)Math.Ceiling(((height ?? item.Host.DesiredSize.Height) + Gap) / RowStep - 0.001));
+            item.Box.Rows = Math.Max(1, (int)Math.Ceiling((item.Host.DesiredSize.Height + Gap) / RowStep - 0.001));
         }
         GridLayout.Pack((DragOrder() ?? Ordered()).Select(i => i.Box).ToList(), _columns, InRows);
         _usedRows = GridLayout.Bottom(_items.Select(i => i.Box));
@@ -669,12 +633,10 @@ internal sealed class PanelGrid : Panel
 
     protected override Size ArrangeOverride(Size final)
     {
-        double used = _items.Count == 0 ? 0 : _items.Max(i => i.Def.IsFull ? _width : (i.Box.Col + i.Box.Cols) * ColStep - HGap);
-        _offsetX = _centered ? Math.Max(0, (_width - used) / 2) : 0;
         foreach (var item in _items)
         {
             var b = item.Box;
-            var rect = new Rect(b.Col * ColStep + (item.Def.IsFull ? 0 : _offsetX), b.Row * RowStep, item.Def.IsFull ? _width : ColumnsWidth(b.Cols), b.Rows * RowStep - Gap);
+            var rect = new Rect(b.Col * ColStep, b.Row * RowStep, item.Def.IsFull ? _width : ColumnsWidth(b.Cols), b.Rows * RowStep - Gap);
             if (item == _drag)
             {
                 item.Host.Arrange(new Rect(_dragFrom.Location, rect.Size));
@@ -692,14 +654,12 @@ internal sealed class PanelGrid : Panel
             item.Last = rect;
         }
         if (_drag is null && _resize is null) _ghost.Arrange(new Rect());
-        if (Dividers) InvalidateVisual();
         return final;
     }
 
     protected override void OnRender(DrawingContext dc)
     {
         base.OnRender(dc);
-        if (!_editing) DrawDividers(dc);
         if (!_editing || ActualHeight <= 0) return;
         var line = Ui.Res<Brush>("Line");
         double px = Hairline.ScaleOf(this);
@@ -713,21 +673,6 @@ internal sealed class PanelGrid : Panel
     }
 
     private Pen? _columnPen;
-
-    private void DrawDividers(DrawingContext dc)
-    {
-        if (!Dividers) return;
-        var stacked = _items.Where(i => !i.Last.IsEmpty).OrderBy(i => i.Last.Top).ToList();
-        for (int k = 1; k < stacked.Count; k++)
-        {
-            Rect a = stacked[k - 1].Last, b = stacked[k].Last;
-            if (b.Top - a.Bottom > Gap + 1 || b.Top < a.Bottom) continue;
-            var above = stacked[k - 1].Host.Children.OfType<FrameworkElement>().FirstOrDefault();
-            var below = stacked[k].Host.Children.OfType<FrameworkElement>().FirstOrDefault();
-            double top = a.Bottom - (above?.Margin.Bottom ?? 0), bottom = b.Top + (below?.Margin.Top ?? 0);
-            Views.Dividers.Draw(dc, Math.Max(a.Left, b.Left) + 24, Math.Min(a.Right, b.Right) - 24, Math.Round((top + bottom) / 2));
-        }
-    }
 
     private sealed class GhostOutline : FrameworkElement
     {

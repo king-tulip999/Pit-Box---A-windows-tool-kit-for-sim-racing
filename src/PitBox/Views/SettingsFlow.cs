@@ -31,6 +31,8 @@ internal sealed class SettingsFlow : StackPanel
     private bool _flowing;
     private double _laidOutWidth = double.NaN;
 
+    public SettingsFlow() => Grid.SetIsSharedSizeScope(this, true);
+
     private int Columns(double width) =>
         double.IsInfinity(width) || double.IsNaN(width) ? 1 : Math.Clamp((int)((width + ColumnGap) / (MinColumnWidth + ColumnGap)), 1, MaxColumns);
 

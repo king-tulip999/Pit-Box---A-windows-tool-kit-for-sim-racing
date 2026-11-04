@@ -488,7 +488,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         var section = new StackPanel();
         Ui.Anchor(section, "settings.diagnostics");
         parent.Children.Add(section);
-        section.Children.Add(new TextBlock { Text = ThemeManager.Case("Diagnostics"), Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 6, 0, 3) });
+        section.Children.Add(new TextBlock { Text = "Diagnostics", Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 6, 0, 3) });
         section.Children.Add(new TextBlock
         {
             Text = "Tools for troubleshooting hardware and app problems. Reports leave out personal details (user and PC names, folders, IP addresses).",
@@ -811,7 +811,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
     {
         var u = _app.Updates;
         _updates.Children.Clear();
-        _updates.Children.Add(new TextBlock { Text = ThemeManager.Case("Updates"), Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 6, 0, 3) });
+        _updates.Children.Add(new TextBlock { Text = "Updates", Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 6, 0, 3) });
 
         if (u.Available && u.Latest is { } r)
         {

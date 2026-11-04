@@ -36,13 +36,6 @@ internal sealed partial class ControllerButtons : IDisposable
         return button.Button > 0;
     }
 
-    public static bool IsBinding(string? text) => TryParse(text, out _);
-
-    public bool IsHeld(ControllerButton button)
-    {
-        lock (_lock) return _held.Contains(button);
-    }
-
     public static string Display(ControllerButton b)
     {
         string? name;

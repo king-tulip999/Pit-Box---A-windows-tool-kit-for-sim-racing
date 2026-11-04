@@ -76,12 +76,15 @@ internal sealed class InputsWidget : HudWidget
     private Shows _on;
     private bool _throttle, _brake, _clutch, _steering, _speed, _rpm, _trace, _abs;
     private readonly GraphicsPath _path = new(), _absPath = new();
+
+    public override void Dispose()
+    {
+        _path.Dispose();
+        _absPath.Dispose();
+    }
     private float _k = 1;
 
-    private readonly record struct RpmScale(double Min, double Max, double First, double Shift, double Blink, double ZoneFrom)
-    {
-        public double Frac(double rpm) => Max > Min ? Math.Clamp((rpm - Min) / (Max - Min), 0, 1) : 0;
-    }
+    private readonly record struct RpmScale(double Min, double Max, double First, double Shift, double Blink, double ZoneFrom);
 
     private readonly record struct Live(double? Throttle, double? Brake, double? Clutch, double? SteerDeg, double SteerFrac,
         double? Rpm, RpmScale Scale, bool Limiter, bool Abs, double Now);
@@ -298,13 +301,13 @@ internal sealed class InputsWidget : HudWidget
         p.Fill(new RectangleF(cx - S(1), r.Y - S(2), S(2), r.Height + S(4)), p.P.Accent);
     }
 
-    private static string RpmText(double? rpm) => rpm is { } x ? string.Create(CultureInfo.InvariantCulture, $"{x:0} RPM") : RaceFormat.Missing + " RPM";
+    private static string RpmText(double? rpm) => rpm is { } x ? PooledText.Number("", x, "0", CultureInfo.InvariantCulture, " RPM") : RaceFormat.Missing + " RPM";
 
     private static readonly string[] SpeedSamples = { "888" };
 
     private void SpeedLine(HudPainter p, HudView v, RectangleF r, Font number, Font unitFont)
     {
-        string value = v.Frame.Speed is { } ms ? RaceFormat.SpeedValue(ms, v.Units).ToString("0", CultureInfo.InvariantCulture) : RaceFormat.Missing;
+        string value = v.Frame.Speed is { } ms ? PooledText.Number("", RaceFormat.SpeedValue(ms, v.Units), "0", CultureInfo.InvariantCulture) : RaceFormat.Missing;
         string unit = RaceFormat.SpeedUnit(v.Units);
         float nw = p.Widest(SpeedSamples, number), uw = p.Measure(unit, unitFont), gap = S(3);
         float x = r.X + (r.Width - nw - gap - uw) / 2;
@@ -403,7 +406,7 @@ internal sealed class InputsWidget : HudWidget
         float speedLeft = _speed ? right - S(SpeedW - 12) : right + S(12);
         if (_speed)
         {
-            string value = v.Frame.Speed is { } ms ? RaceFormat.SpeedValue(ms, v.Units).ToString("0", CultureInfo.InvariantCulture) : RaceFormat.Missing;
+            string value = v.Frame.Speed is { } ms ? PooledText.Number("", RaceFormat.SpeedValue(ms, v.Units), "0", CultureInfo.InvariantCulture) : RaceFormat.Missing;
             float numberH = p.DisplaySize("888", S(30), false).Height;
             p.Display(value, S(30), p.P.Heading, new RectangleF(speedLeft, oy + S(36) - numberH, right - speedLeft, numberH), HAlign.Right, VAlign.Bottom, false);
             var unit = p.Font(S(10.5f), true);

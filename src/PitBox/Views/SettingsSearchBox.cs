@@ -11,7 +11,7 @@ namespace PitBox.Views;
 internal sealed class SettingsSearchBox : Grid
 {
     private readonly MainWindow _window;
-    private readonly TextBox _box = new() { Tag = "Search settings and keybinds", Padding = new Thickness(26, 6, 7, 6) };
+    private readonly TextBox _box = new() { Tag = "Search settings and keybinds" };
     private readonly Popup _popup;
     private readonly StackPanel _results = new();
     private List<SearchEntry> _found = new();
@@ -21,17 +21,10 @@ internal sealed class SettingsSearchBox : Grid
     {
         _window = window;
         Children.Add(_box);
-        var icon = new Icon
-        {
-            Data = (Geometry)Application.Current.FindResource("I.Search"), Width = 11, Height = 11,
-            HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(10, 0, 0, 0),
-            IsHitTestVisible = false,
-        };
-        icon.SetResourceReference(Control.ForegroundProperty, "TextFaint");
-        Children.Add(icon);
+        Ui.SearchFace(_box);
         _popup = new Popup
         {
-            PlacementTarget = _box, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true, PopupAnimation = PopupAnimation.Fade,
+            PlacementTarget = _box, Placement = PlacementMode.Bottom, UseLayoutRounding = true, StaysOpen = false, AllowsTransparency = true, PopupAnimation = PopupAnimation.Fade,
             Child = new Tile { Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(5), Margin = new Thickness(0, 0, 11, 11), Child = _results },
         };
         RenderOptions.SetClearTypeHint(_popup.Child, ClearTypeHint.Enabled);

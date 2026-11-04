@@ -59,7 +59,7 @@ internal sealed class WindowProfileEditor
         pick.Click += (_, _) => ShowPrograms(pick, all: false);
         foreach (var b in new[] { browse, pick })
         {
-            b.Margin = new Thickness(5, 0, 0, 0);
+            b.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0);
             DockPanel.SetDock(b, Dock.Right);
             program.Children.Add(b);
         }

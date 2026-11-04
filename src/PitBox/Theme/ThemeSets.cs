@@ -37,5 +37,4 @@ internal static class ThemeSets
 
     public static ThemeSet? For(AppTheme id) => All.FirstOrDefault(s => s.Id == id);
 
-    public static bool Knows(string? name) => All.Any(s => s.Known(name) is not null);
 }

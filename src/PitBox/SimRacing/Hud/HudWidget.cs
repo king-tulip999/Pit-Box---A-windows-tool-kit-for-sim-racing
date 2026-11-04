@@ -57,7 +57,6 @@ internal sealed record HudWidgetDef(string Kind, string Name, string Description
     public Func<HudOptions, bool>? Moves { get; init; }
     public IReadOnlyList<HudOption> Options { get; init; } = Array.Empty<HudOption>();
     public string? Limits { get; init; }
-    public bool Clickable { get; init; }
     public bool? HideWhenEmpty { get; init; }
     public Editors.HudEditorDef? Editor { get; init; }
     public Func<HudOptions, SizeF>? Natural { get; init; }
@@ -194,8 +193,12 @@ internal sealed class HudView
     }
 }
 
-internal abstract class HudWidget
+internal abstract class HudWidget : IDisposable
 {
+    public virtual void Dispose()
+    {
+    }
+
     public static readonly HudOption TitleRow = HudOption.Bool("titleRow", "Title row", true);
 
     public abstract void Draw(HudPainter p, HudView v);

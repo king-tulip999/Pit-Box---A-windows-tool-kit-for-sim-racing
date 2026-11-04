@@ -118,9 +118,7 @@ internal sealed class PluginManager
         return plugins.OrderBy(Rank).ToList();
     }
 
-    internal static List<string> PageKeys(IEnumerable<Plugin> plugins) => plugins.SelectMany(Keys).ToList();
-
-    private static IEnumerable<string> Keys(Plugin plugin) =>
+    internal static IEnumerable<string> Keys(Plugin plugin) =>
         plugin.Pages.Count > 0 ? plugin.Pages.Select(p => p.Key) : new[] { PluginKeyPrefix + plugin.Id };
 
     public const string PluginKeyPrefix = "plugin:";

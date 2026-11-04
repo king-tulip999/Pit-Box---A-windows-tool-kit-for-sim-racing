@@ -29,6 +29,7 @@ internal static class HudArt
         {
             if (_liveryVersion != LiveryPictures.Version)
             {
+                foreach (var old in Cars.Values) old?.Dispose();
                 Cars.Clear();
                 _liveryVersion = LiveryPictures.Version;
             }

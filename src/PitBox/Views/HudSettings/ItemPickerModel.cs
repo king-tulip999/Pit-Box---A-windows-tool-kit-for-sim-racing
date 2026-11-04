@@ -44,11 +44,6 @@ internal sealed class ItemPickerModel
         return !before.SequenceEqual(Values);
     }
 
-    public void AddAll(int lane = 0)
-    {
-        foreach (var c in _choices) Add(c.Id, lane);
-    }
-
     public void Clear()
     {
         foreach (var l in Lanes) l.Clear();

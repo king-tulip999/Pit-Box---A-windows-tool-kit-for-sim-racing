@@ -587,7 +587,8 @@ internal static class ScreenshotRunner
         waiting.IntersectWith(Unlaid(window));
         LayoutRates.Add($"{perSecond,6:0} {waiting.Count,4} {where}");
         if (waiting.Count > 0)
-            RecordError(new InvalidOperationException($"Layout never finished on {where}: {waiting.Count} elements still waiting for layout ({string.Join(", ", waiting.Select(e => e.GetType().Name).Distinct().Take(6))})"));
+            RecordError(new InvalidOperationException($"Layout never finished on {where}: {waiting.Count} elements still waiting for layout ({string.Join(", ", waiting.Select(e => e.GetType().Name).Distinct().Take(6))}): "
+                + string.Join("; ", waiting.OfType<FrameworkElement>().Take(3).Select(e => $"{(e.IsMeasureValid ? "" : "measure ")}{(e.IsArrangeValid ? "" : "arrange ")}{PixelLint.Describe(e, 8)}"))));
     }
 
     private static HashSet<UIElement> Unlaid(Window window)

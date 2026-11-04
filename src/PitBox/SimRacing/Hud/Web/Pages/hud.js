@@ -31,6 +31,7 @@
 
   function sendSize() {
     if (!socket || socket.readyState !== 1) return;
+    if (document.hidden) { socket.send(JSON.stringify({ w: 0, h: 0 })); return; }
     var ratio = window.devicePixelRatio || 1;
     socket.send(JSON.stringify({ w: Math.round(window.innerWidth * ratio), h: Math.round(window.innerHeight * ratio) }));
   }
@@ -77,6 +78,8 @@
     };
     socket.onerror = function () { };
   }
+
+  document.addEventListener("visibilitychange", sendSize);
 
   var resizeTimer = 0;
   window.addEventListener("resize", function () {

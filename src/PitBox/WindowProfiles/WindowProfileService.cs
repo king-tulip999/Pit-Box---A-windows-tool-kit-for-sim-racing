@@ -67,10 +67,6 @@ internal sealed class WindowProfileService : IDisposable
         Same(a.ProcessName, b.ProcessName) && a.X == b.X && a.Y == b.Y && a.Width == b.Width && a.Height == b.Height
         && a.RemoveBorders == b.RemoveBorders && a.HideTitleBar == b.HideTitleBar;
 
-    public WindowProfile? FindProfile(string name) => S.Profiles.FirstOrDefault(p => Same(p.Name, name));
-
-    public WindowGroup? FindGroup(string name) => S.Groups.FirstOrDefault(g => Same(g.Name, name));
-
     public static bool IsRunning(WindowProfile p, HashSet<string> running) =>
         !string.IsNullOrWhiteSpace(p.ProcessName) && running.Contains(AppWatcher.Normalize(p.ProcessName));
 

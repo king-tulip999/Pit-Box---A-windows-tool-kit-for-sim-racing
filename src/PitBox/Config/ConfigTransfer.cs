@@ -94,11 +94,11 @@ internal static class ConfigTransfer
         var lines = new List<string>
         {
             $"Theme {ThemeName(c.Ui.Theme)}, animations {(c.Ui.Animations ? "on" : "off")}",
-            Count(c.WindowProfiles.Profiles.Count, "window profile", "window profiles") + $" ({c.WindowProfiles.Profiles.Count(p => p.Auto)} automatic), {Count(c.WindowProfiles.Groups.Count, "group", "groups")}",
-            Count(c.Displays.Profiles.Count, "display profile", "display profiles"),
-            $"Fan control {(c.Fans.Enabled ? "on" : "off")}: {Count(c.Fans.Presets.Count, "preset", "presets")}, {Count(c.Fans.Curves.Count, "curve", "curves")}, {Count(c.Fans.Hardware.Count, "fan", "fans")} set up",
-            Count(c.Overlay.Layouts.Count, "overlay layout", "overlay layouts"),
-            Count(Keybinds(c), "keybind", "keybinds"),
+            SimRacing.Race.RaceFormat.Count(c.WindowProfiles.Profiles.Count, "window profile") + $" ({c.WindowProfiles.Profiles.Count(p => p.Auto)} automatic), {SimRacing.Race.RaceFormat.Count(c.WindowProfiles.Groups.Count, "group")}",
+            SimRacing.Race.RaceFormat.Count(c.Displays.Profiles.Count, "display profile"),
+            $"Fan control {(c.Fans.Enabled ? "on" : "off")}: {SimRacing.Race.RaceFormat.Count(c.Fans.Presets.Count, "preset")}, {SimRacing.Race.RaceFormat.Count(c.Fans.Curves.Count, "curve")}, {SimRacing.Race.RaceFormat.Count(c.Fans.Hardware.Count, "fan")} set up",
+            SimRacing.Race.RaceFormat.Count(c.Overlay.Layouts.Count, "overlay layout"),
+            SimRacing.Race.RaceFormat.Count(Keybinds(c), "keybind"),
             $"Sensor update rate {PerformanceSettings.Name(c.Performance.Rate)} ({PerformanceSettings.Describe(c.Performance.IntervalMs)}), background usage {c.Performance.Background}",
         };
         if (c.Plugins.Count > 0)
@@ -120,5 +120,4 @@ internal static class ConfigTransfer
 
     private static bool Set(string? hotkey) => !string.IsNullOrWhiteSpace(hotkey);
 
-    private static string Count(int n, string one, string many) => n == 0 ? "No " + many : n == 1 ? "1 " + one : $"{n} {many}";
 }

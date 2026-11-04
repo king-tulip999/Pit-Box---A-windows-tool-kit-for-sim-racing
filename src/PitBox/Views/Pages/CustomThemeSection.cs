@@ -62,12 +62,13 @@ internal sealed class CustomThemeSection : StackPanel
         Grid.SetRow(bar, 2);
         face.Children.Add(bar);
 
+        double ring = selected ? Hairline.Pixels(2, Hairline.Scale) : Hairline.Width, give = Hairline.Width - ring;
         var button = new Button
         {
-            Style = Ui.Res<Style>("Btn"), Width = SwatchWidth, Height = SwatchHeight, Margin = new Thickness(0, 0, 6, 6), Padding = new Thickness(6, 5, 6, 4),
+            Style = Ui.Res<Style>("Btn"), Width = SwatchWidth, Height = SwatchHeight, Margin = new Thickness(0, 0, 6, 6), Padding = new Thickness(6 + give, 5 + give, 6 + give, 4 + give),
             HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalContentAlignment = VerticalAlignment.Stretch,
             Background = Of("Bg"), BorderBrush = selected ? Ui.Res<Brush>("Accent") : Ui.Res<Brush>("LineStrong"),
-            BorderThickness = selected ? new Thickness(2) : Hairline.Edges(), Content = face, ToolTip = name,
+            BorderThickness = new Thickness(ring), Content = face, ToolTip = name,
         };
         button.MouseEnter += (_, _) => button.BorderBrush = Ui.Res<Brush>("Accent");
         button.MouseLeave += (_, _) => button.BorderBrush = selected ? Ui.Res<Brush>("Accent") : Ui.Res<Brush>("LineStrong");

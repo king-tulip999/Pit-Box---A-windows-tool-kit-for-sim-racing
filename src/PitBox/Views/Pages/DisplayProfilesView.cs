@@ -87,7 +87,12 @@ internal sealed class DisplayProfilesView : Tile
             tags.Children.Add(activeTag);
         }
         if (profile.Hotkey is { } hk)
-            tags.Children.Add(KeybindsBoard.Caps(hk));
+        {
+            var keys = Ui.Chip(PitBox.Hotkeys.Hotkey.Display(hk));
+            keys.Margin = new Thickness(0);
+            keys.VerticalAlignment = VerticalAlignment.Center;
+            tags.Children.Add(keys);
+        }
         if (tags.Children.Count > 0)
         {
             Grid.SetRow(tags, 1);
@@ -334,6 +339,8 @@ internal sealed class DisplayProfileEditor
                 if (ProgramPicker.BrowseExe("Images (*.jpg;*.jpeg;*.png;*.bmp)|*.jpg;*.jpeg;*.png;*.bmp|All files (*.*)|*.*") is { } path)
                     box.Text = path;
             });
+            clear.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0);
+            browse.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0);
             DockPanel.SetDock(clear, Dock.Right);
             DockPanel.SetDock(browse, Dock.Right);
             row.Children.Add(clear);

@@ -68,20 +68,15 @@ internal static class ThemeManager
             res[key] = Freeze(new SolidColorBrush(key == "SidebarBg" ? Faded(color, spec.SidebarOpacity)
                 : SeeThroughKeys.Contains(key) ? Faded(color, spec.PanelOpacity) : color));
 
-        res["DisplayFont"] = Family(spec.DisplayFont);
-        res["UiFont"] = Family(spec.UiFont);
-        res["MonoFont"] = Family(spec.MonoFont);
-        res["MetricFont"] = Family(spec.MetricFont ?? spec.DisplayFont);
-        res["LabelFont"] = Family(spec.MonoLabels ? spec.MonoFont : spec.UiFont);
+        var font = Family(ThemeSpec.Saira);
+        foreach (var key in new[] { "DisplayFont", "UiFont", "MonoFont", "MetricFont", "LabelFont" })
+            res[key] = font;
         res["HeadingWeight"] = spec.HeadingWeight;
-        res["HeadingStyle"] = spec.HeadingStyle;
-        res["Caps"] = spec.Caps;
+        res["HeadingStyle"] = FontStyles.Normal;
 
         foreach (var (key, r) in new (string, double)[]
                  { ("R.Card", CardRadius), ("R.Inset", 10), ("R.Popup", 10), ("R.Tooltip", 8), ("R.Small", 7), ("R.Tiny", 5) })
             res[key] = Round(r);
-        res["R.Switch"] = new CornerRadius(spec.SwitchRadius);
-        res["R.Knob"] = new CornerRadius(spec.KnobRadius);
         res["R.Chip"] = Round(spec.ChipRadius);
         res["R.Control"] = res["R.Input"] = Round(spec.ControlRadius);
 
@@ -101,7 +96,6 @@ internal static class ThemeManager
         res["BtnEdgeThickness"] = spec.ButtonEdge;
         res["BtnEdgePressed"] = spec.ButtonEdgePressed;
         res["PressDrop"] = new Thickness(0, spec.PressDrop, 0, 0);
-        res["LogoEdgeThickness"] = spec.LogoEdge;
 
         res["WindowBg"] = spec.CornerGlow
             ? Freeze(new RadialGradientBrush(p["BgGlow"], p["Bg"]) { Center = new Point(0, 0), GradientOrigin = new Point(0, 0), RadiusX = GlowRadius, RadiusY = GlowRadius })
@@ -111,7 +105,6 @@ internal static class ThemeManager
 
         double glow = spec.GlowStrength;
         res["AccentGlow"] = spec.Glow ? Shadow(p["Accent"], 14, 0, 0.75 * glow) : null;
-        res["ActiveGlow"] = spec.Glow ? Shadow(p["ActiveModeFg"], 16, 0, 0.7 * glow) : null;
 
         double gap = Math.Max(0, spec.FocusOffset);
         res["FocusRingGap"] = gap;
@@ -119,13 +112,7 @@ internal static class ThemeManager
         res["FocusRingGapMargin"] = new Thickness(-gap);
         res["FocusRingOutset"] = gap + 2;
         res["FocusRingMargin"] = new Thickness(-(gap + 2));
-        res["SwitchRingMargin"] = new Thickness(-(gap + 2), 0, 0, 0);
-        res["SwitchRingWidth"] = 32 + 2 * (gap + 2);
-        res["SwitchRingHeight"] = 18 + 2 * (gap + 2);
-        res["R.SwitchRing"] = new CornerRadius(spec.SwitchRadius + gap + 2);
-        res["R.SwitchRingGap"] = new CornerRadius(spec.SwitchRadius + gap);
 
-        res["RacingVisibility"] = spec.RacingDecor ? Visibility.Visible : Visibility.Collapsed;
         res["RacingFade"] = Fade;
         res["RacingChecker"] = Checker(p["Accent"], 4);
 
@@ -198,7 +185,7 @@ internal static class ThemeManager
     private static DropShadowEffect Shadow(Color color, double blur, double depth, double opacity) =>
         Freeze(new DropShadowEffect { BlurRadius = blur, ShadowDepth = depth, Direction = 270, Opacity = opacity, Color = color, RenderingBias = RenderingBias.Performance });
 
-    private static double CardRadius => Current.CardChamfer > 0 ? 0 : 12;
+    private const double CardRadius = 12;
 
     public static CornerRadius CardCorner => Round(CardRadius);
 
@@ -214,19 +201,19 @@ internal static class ThemeManager
 
     private static readonly string[] MeterKeys = { "Meter1", "Meter2", "Meter3", "Meter4", "Meter5" };
 
-    public static Brush StepBrush(double position) => Current.StepsClimb ? RampBrush(position) : Brush("Mono", Brushes.Orange);
+    public static Brush StepBrush(double position) => Brush("Mono", Brushes.Orange);
 
     private static Typeface? _ui, _uiBold, _display;
 
     public static Typeface UiFace(bool bold = false) => bold
-        ? _uiBold ??= new(Family(Current.UiFont), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal)
-        : _ui ??= new(Family(Current.UiFont), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+        ? _uiBold ??= new(Family(ThemeSpec.Saira), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal)
+        : _ui ??= new(Family(ThemeSpec.Saira), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
 
     private static Typeface? _race;
 
     public static Typeface RaceFace => _race ??= new(Family(RaceLook.FontPath), FontStyles.Normal, FontWeights.ExtraBold, FontStretches.Normal);
 
-    public static Typeface DisplayFace => _display ??= new(Family(Current.DisplayFont), Current.HeadingStyle, FontWeights.SemiBold, FontStretches.Normal);
+    public static Typeface DisplayFace => _display ??= new(Family(ThemeSpec.Saira), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal);
 
     private static Uri? _fontBase;
 
@@ -249,7 +236,6 @@ internal static class ThemeManager
         }
     }
 
-    public static string Case(string text) => Current.Caps ? TextCase.Upper(text) : text;
 
     private static double Luminance(Color c)
     {
