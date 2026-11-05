@@ -24,7 +24,7 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
     private int _scan;
     private List<(string Name, List<LayoutTile> Screens)> _layouts = new();
     private string? _mapLayout;
-    private const double MapHeight = 210;
+    private const double MapHeight = 140, RowGap = 8;
 
     public WindowProfilesPage(AppServices app, MainWindow window)
     {
@@ -151,7 +151,7 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
             int n = S.Profiles.Count;
             left.Children.Add(Ui.SectionHeader("Your profiles", RaceFormatCount(n) + (S.Layout.Count > 1 ? " · drag to arrange" : ""), newGroup, create));
 
-            var grid = new PanelGrid(S.Layout, _app.Save) { LiveEdit = true, RowHeight = 1, Gap = 0, PanelSpacing = Ui.PanelSpacing, TwoColumnsFrom = double.PositiveInfinity, ColumnGap = Ui.PanelSpacing };
+            var grid = new PanelGrid(S.Layout, _app.Save) { LiveEdit = true, RowHeight = 1, Gap = 0, PanelSpacing = RowGap, TwoColumnsFrom = double.PositiveInfinity, ColumnGap = Ui.PanelSpacing };
             int order = 0;
             foreach (var slot in S.Layout.ToList())
             {
@@ -182,7 +182,10 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
         }
         else if (_map.Parent is Panel holder) holder.Children.Remove(_map);
         _map.SetScreens(MapScreens());
-        var stack = new StackPanel();
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        FrameworkElement side;
         if (_layouts.Count > 0)
         {
             var names = _layouts.Select(l => l.Name).ToList();
@@ -190,20 +193,22 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
             options.AddRange(names);
             var tips = new List<string?> { "The displays that are on now" };
             tips.AddRange(names.Select(n => (string?)$"Your “{n}” display profile"));
-            var picker = Ui.Segmented(options, _mapLayout is null ? 0 : names.IndexOf(_mapLayout) + 1, i => ShowLayout(i == 0 ? null : names[i - 1]), "window-map-layout", tips);
-            picker.HorizontalAlignment = HorizontalAlignment.Left;
-            picker.Margin = new Thickness(0, 0, 0, 13);
-            stack.Children.Add(picker);
+            side = Ui.Segmented(options, _mapLayout is null ? 0 : names.IndexOf(_mapLayout) + 1, i => ShowLayout(i == 0 ? null : names[i - 1]), "window-map-layout", tips);
         }
         else
         {
             var hint = Ui.Text("Each profile's window shows here. Point at an open window in the list to see where it is.", "Caption");
             hint.TextWrapping = TextWrapping.Wrap;
-            hint.Margin = new Thickness(0, 0, 0, 10);
-            stack.Children.Add(hint);
+            hint.MaxWidth = 256;
+            side = hint;
         }
-        stack.Children.Add(_map);
-        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(13), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Child = stack };
+        side.HorizontalAlignment = HorizontalAlignment.Left;
+        side.VerticalAlignment = VerticalAlignment.Top;
+        side.Margin = new Thickness(0, 0, 21, 0);
+        grid.Children.Add(side);
+        Grid.SetColumn(_map, 1);
+        grid.Children.Add(_map);
+        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(13, 8, 13, 8), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Child = grid };
     }
 
     private List<LayoutTile> MapScreens() => _layouts.FirstOrDefault(l => l.Name == _mapLayout).Screens ?? _screens;
@@ -395,26 +400,28 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
     private Tile ProfileCard(WindowProfile p)
     {
         var row = ProfileRow(p);
-        row.Margin = new Thickness(15, 10, ApplyInset - 1, 10);
+        row.Margin = new Thickness(13, 3, ApplyInset - 1, 3);
         return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Child = row, ClipToBounds = true, Cursor = System.Windows.Input.Cursors.Hand, ToolTip = "Click to edit, drag to arrange" };
     }
 
     private Grid ProfileRow(WindowProfile p)
     {
         bool running = Running(p);
-        var row = new Grid { Background = System.Windows.Media.Brushes.Transparent };
+        var row = new Grid { Background = System.Windows.Media.Brushes.Transparent, MinHeight = 36 };
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(new ColumnDefinition());
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var badge = Ui.Badge("I.AppWindow", "SurfaceAlt", "TextMuted", 32, 0, 16);
+        var badge = Ui.Glyph("I.AppWindow");
+        badge.Width = badge.Height = 16;
+        badge.Foreground = Ui.Res<System.Windows.Media.Brush>("TextMuted");
         badge.VerticalAlignment = VerticalAlignment.Center;
         row.Children.Add(badge);
 
-        var names = new StackPanel { Margin = new Thickness(11, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
+        var names = new StackPanel { Margin = new Thickness(9, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
         var title = new TrimRow();
         title.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = p.Name, Style = Ui.Res<Style>("H3"), FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) }));
         names.Children.Add(title);
-        var detail = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) };
+        var detail = TextFit.TipWhenTrimmed(new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.NoWrap, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 0, 0) });
         detail.Inlines.Add(new System.Windows.Documents.Run(p.ProcessName.Length > 0 ? p.ProcessName : "No program picked") { FontWeight = FontWeights.SemiBold });
         detail.Inlines.Add(new System.Windows.Documents.Run("   " + Summary(p)));
         TextCase.Verbatim(detail);
@@ -444,7 +451,7 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
 
     private static Border TitleChip(Border chip)
     {
-        chip.Margin = new Thickness(0, 2, 5, 2);
+        chip.Margin = new Thickness(0, -2, 5, -2);
         chip.VerticalAlignment = VerticalAlignment.Center;
         return chip;
     }
@@ -488,20 +495,22 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
     {
         var members = S.Members(g).ToList();
         var stack = new StackPanel();
-        var head = new Grid();
+        var head = new Grid { MinHeight = 36 };
         head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         head.ColumnDefinitions.Add(new ColumnDefinition());
         head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var badge = Ui.Badge("I.Folder", "IconWell", "IconInk", 32, 0, 16);
+        var badge = Ui.Glyph("I.Folder");
+        badge.Width = badge.Height = 16;
+        badge.Foreground = Ui.Res<System.Windows.Media.Brush>("IconInk");
         badge.VerticalAlignment = VerticalAlignment.Center;
         head.Children.Add(badge);
-        var text = new StackPanel { Margin = new Thickness(11, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
+        var text = new StackPanel { Margin = new Thickness(9, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
         var title = new TrimRow();
         title.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = g.Name, Style = Ui.Res<Style>("H3"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) }));
         if (g.Hotkey is not null)
         {
             var keys = Ui.Chip(Hotkeys.Hotkey.Display(g.Hotkey));
-            keys.Margin = new Thickness(0);
+            keys.Margin = new Thickness(0, -2, 0, -2);
             keys.VerticalAlignment = VerticalAlignment.Center;
             title.Children.Add(keys);
         }
@@ -520,11 +529,11 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
 
         if (members.Count > 0)
         {
-            var list = new ReorderGrid { MaxColumns = 1, MinCellWidth = 162, Gap = 5, Margin = new Thickness(0, 10, 0, 2) };
+            var list = new ReorderGrid { MaxColumns = 1, MinCellWidth = 162, Gap = 4, Margin = new Thickness(0, 4, 0, 0) };
             foreach (var m in members)
             {
                 var member = m;
-                var tile = new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(11, 8, ApplyInset - GroupPad - 2, 8), Child = ProfileRow(member), ToolTip = "Click to edit, drag to arrange within the group" };
+                var tile = new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(11, 3, ApplyInset - GroupPad - 2, 3), Child = ProfileRow(member), ToolTip = "Click to edit, drag to arrange within the group" };
                 tile.MouseLeftButtonUp += (_, e) => { if (!e.Handled && (e.OriginalSource is not DependencyObject d || !PanelGrid.IsControl(d, tile))) _ = EditAsync(member, isNew: false); };
                 list.Children.Add(tile);
             }
@@ -532,7 +541,7 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
             PanelGrid.SetNoDrag(list, true);
             stack.Children.Add(list);
         }
-        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(GroupPad, 10, GroupPad, 11), Child = stack, Cursor = System.Windows.Input.Cursors.Hand, ToolTip = "Click to edit the group, drag to arrange" };
+        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(GroupPad, 4, GroupPad, 8), Child = stack, Cursor = System.Windows.Input.Cursors.Hand, ToolTip = "Click to edit the group, drag to arrange" };
     }
 
     private const double GroupPad = 13, ApplyInset = 26;

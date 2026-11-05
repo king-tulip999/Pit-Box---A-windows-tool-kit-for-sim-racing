@@ -18,7 +18,8 @@ internal sealed class OverlayPage : UserControl, IPage
     private readonly MainWindow _window;
     private readonly bool _embedded;
     private readonly StackPanel _body;
-    private readonly StackPanel _left = new(), _right = new();
+    private readonly DockPanel _left = new() { LastChildFill = true };
+    private readonly StackPanel _right = new(), _wide = new();
     private StackPanel _position = new();
     private readonly Image _preview = new() { Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, SnapsToDevicePixels = true, ToolTip = "Drag a value or a group name to change the order" };
     private readonly Canvas _scene = new() { ClipToBounds = true };
@@ -174,9 +175,14 @@ internal sealed class OverlayPage : UserControl, IPage
         columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Ui.PanelSpacing) });
         columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        columns.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        columns.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         Grid.SetColumn(_right, 2);
+        Grid.SetRow(_wide, 1);
+        Grid.SetColumnSpan(_wide, 3);
         columns.Children.Add(_left);
         columns.Children.Add(_right);
+        columns.Children.Add(_wide);
         _body.Children.Add(columns);
     }
 
@@ -210,12 +216,12 @@ internal sealed class OverlayPage : UserControl, IPage
         _built = L;
         _left.Children.Clear();
         _right.Children.Clear();
+        _wide.Children.Clear();
         BuildLayouts();
         BuildPreview();
         BuildLook();
         BuildPosition();
         BuildMetrics();
-        BuildGeneral();
     }
 
     private readonly ContentControl _statusChip = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
@@ -440,7 +446,9 @@ internal sealed class OverlayPage : UserControl, IPage
         var stack = new StackPanel();
         stack.Children.Add(Ui.Text("Layout", "H2"));
         stack.Children.Add(row);
-        _left.Children.Add(Card(stack));
+        var layoutCard = Card(stack);
+        DockPanel.SetDock(layoutCard, Dock.Top);
+        _left.Children.Add(layoutCard);
     }
 
     private async Task EditLayoutAsync()
@@ -485,11 +493,10 @@ internal sealed class OverlayPage : UserControl, IPage
         BuildSettings();
     }
 
-    private void BuildGeneral()
+    private void BuildGeneral(SettingsFlow general)
     {
         var hotkey = HotkeyEditor("overlay", () => O.Hotkey, hk => O.Hotkey = hk);
         Ui.SettingDefault D(Func<bool> same, Action reset, string shown) => new(same, () => { reset(); Changed(); BuildSettings(); }, shown);
-        var general = new SettingsFlow();
         general.Children.Add(Ui.Text("Data and keybinds", "H2"));
         general.Children.Add(Anchored(Ui.SettingRow("Update rate", "All layouts. Sensors follow Settings → Performance.",
             Ui.Segmented(new[] { "4 " + Units.Hz, "2 " + Units.Hz, "1 " + Units.Hz }, O.UpdateIntervalMs switch { <= 250 => 0, >= 1000 => 2, _ => 1 },
@@ -500,14 +507,13 @@ internal sealed class OverlayPage : UserControl, IPage
         general.Children.Add(Anchored(Ui.SettingRow("Show / hide", null, hotkey), "overlay.hotkey"));
         general.Children.Add(Anchored(Ui.SettingRow("Reset FPS statistics", null,
             HotkeyEditor("overlay.fps", () => O.ResetFpsHotkey, hk => O.ResetFpsHotkey = hk)), "overlay.fpshotkey"));
-        _left.Children.Add(Card(general));
     }
 
     private void BuildLook()
     {
         var std = new OverlayLayout();
         Ui.SettingDefault D(Func<bool> same, Action reset, string shown) => new(same, () => { reset(); Changed(); BuildSettings(); }, shown);
-        var general = new SettingsFlow();
+        var general = new SettingsFlow { MaxColumns = 1 };
         general.Children.Add(Ui.Text("Look", "H2"));
         general.Children.Add(Anchored(Ui.SettingRow("Style", null,
             Ui.Segmented(new[] { "Expanded", "Compact" }, (int)L.Style, i => Morphing(() => { L.Style = (OverlayStyle)i; Changed(); }), "Style",
@@ -520,7 +526,16 @@ internal sealed class OverlayPage : UserControl, IPage
         general.Children.Add(Anchored(Ui.SettingRow("Frame-time graph", null,
             Ui.Switch(L.ShowGraph, v => { L.ShowGraph = v; Changed(); RenderPreview(); }),
             D(() => L.ShowGraph == std.ShowGraph, () => L.ShowGraph = std.ShowGraph, std.ShowGraph ? "On" : "Off")), "overlay.graph"));
-        _left.Children.Add(Card(general));
+        var data = new SettingsFlow { MaxColumns = 1 };
+        BuildGeneral(data);
+        var halves = new Grid();
+        halves.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        halves.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Ui.PanelSpacing * 2) });
+        halves.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid.SetColumn(data, 2);
+        halves.Children.Add(general);
+        halves.Children.Add(data);
+        _wide.Children.Add(Card(halves));
     }
 
     private void BuildPosition()
@@ -565,7 +580,7 @@ internal sealed class OverlayPage : UserControl, IPage
         _position.Children.Add(metrics);
     }
 
-    private const double MetricCardWidth = 150;
+    private const double MetricCardWidth = 130;
 
     internal static int[] SplitInOrder(IReadOnlyList<double> sizes, int columns)
     {
@@ -600,7 +615,7 @@ internal sealed class OverlayPage : UserControl, IPage
         return columns;
     }
 
-    private Tile MetricCard(string group, List<OverlayMetricEntry> entries)
+    private StackPanel MetricCard(string group, List<OverlayMetricEntry> entries)
     {
         var name = new TextBlock { Text = group, Style = Ui.Res<Style>("Eyebrow"), VerticalAlignment = VerticalAlignment.Center };
         var count = RaceParts.LiveFigure("", 10.5, "TextFaint", heavy: false);
@@ -614,7 +629,7 @@ internal sealed class OverlayPage : UserControl, IPage
         var lampHost = new Grid { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0), Children = { allLamp, partly } };
         DockPanel.SetDock(lampHost, Dock.Left);
         FrameworkElement headFace = several ? new DockPanel { LastChildFill = true, Children = { lampHost, title } } : title;
-        var head = new Border { Padding = new Thickness(17, 0, 10, 0), MinHeight = 34, Background = Brushes.Transparent, Child = headFace };
+        var head = new Border { Padding = new Thickness(several ? 0 : allLamp.Height + 8, 0, 6, 0), Height = MetricRow, Background = Brushes.Transparent, Child = headFace };
         headFace.VerticalAlignment = VerticalAlignment.Center;
         if (several)
         {
@@ -629,7 +644,6 @@ internal sealed class OverlayPage : UserControl, IPage
 
         var body = new StackPanel();
         body.Children.Add(head);
-        body.Children.Add(Hairline.Rule(new Border { Background = Ui.Res<Brush>("Line") }));
         var setters = new List<Action<bool>>();
 
         void Sync()
@@ -648,18 +662,15 @@ internal sealed class OverlayPage : UserControl, IPage
             var label = TextFit.TipWhenTrimmed(new TextBlock { Text = ShortLabel(entry.Metric), Style = Ui.Res<Style>("Body"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
             var bar = new PitBox.Controls.Lamp();
             var face = ToggleCards.WithLamp(bar, label);
-            face.Margin = new Thickness(10, 0, 10, 0);
+            face.Margin = new Thickness(MetricIndent, 0, 6, 0);
             face.VerticalAlignment = VerticalAlignment.Center;
-            var row = new Grid { MinHeight = 36, Background = Brushes.Transparent, Children = { face } };
+            var row = new Grid { Height = MetricRow, Background = Brushes.Transparent, Children = { face } };
             var tile = new Border
             {
                 Child = row, Cursor = Cursors.Hand, ToolTip = MetricLabel(entry.Metric), Focusable = true, FocusVisualStyle = Ui.Res<Style>("FocusRing"),
-                Margin = new Thickness(6, 4, 6, 0), BorderThickness = Hairline.Edges(),
             };
-            tile.SetResourceReference(Border.BackgroundProperty, "SurfaceAlt");
-            tile.SetResourceReference(Border.BorderBrushProperty, "Line");
-            tile.MouseEnter += (_, _) => tile.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
-            tile.MouseLeave += (_, _) => tile.SetResourceReference(Border.BorderBrushProperty, "Line");
+            tile.MouseEnter += (_, _) => bar.Hot = true;
+            tile.MouseLeave += (_, _) => bar.Hot = false;
             AutomationProperties.SetName(tile, MetricLabel(entry.Metric));
 
             void Show(bool on)
@@ -716,8 +727,10 @@ internal sealed class OverlayPage : UserControl, IPage
             };
         }
         Sync();
-        return new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(0, 0, 0, 4), Child = body };
+        return body;
     }
+
+    private const double MetricRow = 26, MetricIndent = 22;
 
     private Button ResetButton()
     {

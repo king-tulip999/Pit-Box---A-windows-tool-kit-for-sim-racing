@@ -53,7 +53,7 @@ internal static class IracingKeybindsView
 
 internal sealed class KeybindsBoard : StackPanel
 {
-    private enum Filter { All, Set, NotSet, Changed, Wheel }
+    private enum Filter { All, Set, Keyboard, NotSet, Changed, Wheel }
 
     private const double RailWidth = 340, RowHeight = 36, SlotWidth = 26, GearWidth = 86;
     private static string? _lastGroup;
@@ -71,9 +71,9 @@ internal sealed class KeybindsBoard : StackPanel
 
     private static TextBlock SetNumber()
     {
-        var number = RaceParts.LiveFigure("", 38, "Heading");
+        var number = RaceParts.LiveFigure("", 26, "Heading");
         number.HorizontalAlignment = HorizontalAlignment.Left;
-        number.VerticalAlignment = VerticalAlignment.Bottom;
+        number.VerticalAlignment = VerticalAlignment.Center;
         return number;
     }
     private List<HotkeyEntry> _entries = new();
@@ -159,6 +159,7 @@ internal sealed class KeybindsBoard : StackPanel
     private bool Passes(HotkeyEntry e, Filter filter) => filter switch
     {
         Filter.Set => IsSet(e),
+        Filter.Keyboard => IsSet(e) && !OnWheel(e),
         Filter.NotSet => !IsSet(e),
         Filter.Changed => Changed(e),
         Filter.Wheel => OnWheel(e),
@@ -186,53 +187,59 @@ internal sealed class KeybindsBoard : StackPanel
 
     private void Refresh() => Dispatcher.BeginInvoke(Render, System.Windows.Threading.DispatcherPriority.Input);
 
+    private const double StripHeight = 48;
+
     private FrameworkElement Band()
     {
-        var grid = new Grid();
+        var grid = new Grid { MinHeight = StripHeight };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.Children.Add(ProfileBlock());
         Grid.SetColumn(_summary, 1);
         grid.Children.Add(_summary);
+        var bar = new Border { Width = 3, HorizontalAlignment = HorizontalAlignment.Left };
+        bar.SetResourceReference(Border.BackgroundProperty, "Accent");
+        Grid.SetColumnSpan(bar, 2);
+        grid.Children.Add(bar);
         return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), ClipToBounds = true, Child = grid };
     }
 
     private FrameworkElement ProfileBlock()
     {
-        var stack = new StackPanel { Margin = new Thickness(20, 14, 22, 13) };
-        var eyebrow = new TextBlock { Text = "Editing control profile", Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 0, 0, 7) };
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        var eyebrow = new TextBlock { Text = "Profile", Style = Ui.Res<Style>("Eyebrow"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0) };
         Ui.AddInfo(eyebrow, IracingKeybindsView.ProfileExplained + " iRacing saves its own copy of the keys when it exits, so changes here only work while it's closed. Wheel and button-box bindings are shown but set in iRacing. To bind a number-pad key, turn Num Lock off first.");
-        stack.Children.Add(eyebrow);
-        stack.Children.Add(ProfilePicker());
+        row.Children.Add(eyebrow);
+        row.Children.Add(ProfilePicker());
 
-        var chips = new WrapPanel { Margin = new Thickness(0, 9, 0, 0) };
-        var state = _ws.SimRunning
-            ? Ui.Chip("iRacing is running: close it to change keybinds", "ApricotSoft", "ApricotDeep")
-            : Ui.Chip("Saved as you change them");
-        if (!_ws.SimRunning) state.ToolTip = "A backup is made before the first change";
-        state.Margin = new Thickness(0, 0, 6, 0);
-        chips.Children.Add(state);
+        var state = new TextBlock
+        {
+            Text = _ws.SimRunning ? "iRacing is running: close it to change keybinds" : "Saved as you change them",
+            Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0),
+            ToolTip = _ws.SimRunning ? null : "A backup is made before the first change",
+        };
+        if (_ws.SimRunning) state.SetResourceReference(TextBlock.ForegroundProperty, "ApricotDeep");
+        row.Children.Add(state);
         if (_keys.CarFiles > 0)
         {
-            var cars = Ui.Chip(RaceFormat.Count(_keys.CarFiles, "car") + (_keys.CarFiles == 1 ? " uses its own controls" : " use their own controls"));
-            cars.ToolTip = "Their controls.cfg files in the setups folder aren't changed here";
-            chips.Children.Add(cars);
+            var cars = new TextBlock
+            {
+                Text = "· " + RaceFormat.Count(_keys.CarFiles, "car") + (_keys.CarFiles == 1 ? " uses its own controls" : " use their own controls"),
+                Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 0, 0, 0),
+                ToolTip = "Their controls.cfg files in the setups folder aren't changed here",
+            };
+            row.Children.Add(cars);
         }
-        stack.Children.Add(chips);
         if (_keys.Error is { } error)
         {
-            var note = new TextBlock { Text = error, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, MaxWidth = 420, Margin = new Thickness(0, 8, 0, 0) };
+            var note = new TextBlock { Text = error, ToolTip = error, Style = Ui.Res<Style>("Caption"), TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 260, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
             note.SetResourceReference(TextBlock.ForegroundProperty, "ApricotDeep");
-            stack.Children.Add(note);
+            row.Children.Add(note);
         }
 
-        var block = new Grid { MinWidth = 420 };
-        var bar = new Border { Width = 3, HorizontalAlignment = HorizontalAlignment.Left };
-        bar.SetResourceReference(Border.BackgroundProperty, "Accent");
-        block.Children.Add(bar);
-        block.Children.Add(stack);
-        var edge = Hairline.Frame(new Border { Child = block }, Sides.Right);
+        var edge = Hairline.Frame(new Border { Child = row, Padding = new Thickness(0, 0, 14, 0) }, Sides.Right);
         edge.SetResourceReference(Border.BorderBrushProperty, "Line");
+        edge.Margin = new Thickness(0, 9, 0, 9);
         return edge;
     }
 
@@ -241,44 +248,26 @@ internal sealed class KeybindsBoard : StackPanel
         string name = _keys.Profile ?? "No profile";
         string? sub = _keys.Profile is null ? "Documents\\iRacing\\controls.cfg" : _keys.Profile == _keys.DefaultProfile ? "iRacing's default" : null;
 
-        var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        grid.ColumnDefinitions.Add(new ColumnDefinition());
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var badge = new Tile { Width = 44, Height = 44, CornerRadius = ThemeManager.Round(0), Child = RaceParts.Glyph("I.Keyboard", 22, "TextMuted") };
-        badge.SetResourceReference(Border.BackgroundProperty, "SurfaceAlt");
-        grid.Children.Add(badge);
-        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 16, 0) };
-        var title = RaceParts.Big(name, 28, "Heading", heavy: false);
-        title.HorizontalAlignment = HorizontalAlignment.Left;
-        title.TextTrimming = TextTrimming.CharacterEllipsis;
-        title.MaxWidth = 300;
-        title.ToolTip = name;
-        text.Children.Add(title);
+        var text = TextFit.TipWhenTrimmed(new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis });
+        text.Inlines.Add(new System.Windows.Documents.Run(name) { FontWeight = FontWeights.Bold });
         if (sub is not null)
         {
-            var caption = new TextBlock { Text = sub, Style = Ui.Res<Style>("Caption") };
-            if (_keys.Profile is null) TextCase.Verbatim(caption);
-            text.Children.Add(caption);
+            var rest = new System.Windows.Documents.Run(" · " + sub);
+            rest.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "TextMuted");
+            if (_keys.Profile is null) TextCase.Verbatim(rest);
+            text.Inlines.Add(rest);
         }
-        Grid.SetColumn(text, 1);
-        grid.Children.Add(text);
+        var glyph = RaceParts.Glyph("I.Keyboard", 14, "TextMuted");
+        glyph.Margin = new Thickness(0, 0, 8, 0);
         bool canPick = _keys.Profiles.Count > 0;
-        if (canPick)
-        {
-            var caret = RaceParts.Glyph("I.ChevronDown", 16, "TextMuted");
-            Grid.SetColumn(caret, 2);
-            grid.Children.Add(caret);
-        }
+        var face = canPick ? Ui.MenuFace(text, glyph) : new DockPanel { Children = { glyph, text } };
 
         var button = new Button
         {
-            Style = Ui.Res<Style>("QuietButton"), Content = grid, HorizontalAlignment = HorizontalAlignment.Left, HorizontalContentAlignment = HorizontalAlignment.Stretch,
-            Padding = new Thickness(6, 6, 12, 6), MinWidth = 300, BorderThickness = Hairline.Edges(), IsHitTestVisible = canPick,
+            Style = Ui.Res<Style>("MenuButton"), Content = face, HorizontalContentAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Center,
+            Width = 240, IsHitTestVisible = canPick,
             ToolTip = _keys.FilePath is { } path ? TextCase.PathTip(path) : null,
         };
-        button.SetResourceReference(Control.BorderBrushProperty, "LineStrong");
-        button.SetResourceReference(Control.BackgroundProperty, "Surface");
         AutomationProperties.SetName(button, "Control profile " + name);
         button.Click += (_, _) =>
         {
@@ -300,27 +289,29 @@ internal sealed class KeybindsBoard : StackPanel
         int total = _entries.Count, set = _entries.Count(IsSet), wheel = _entries.Count(OnWheel), keyboard = set - wheel, none = total - set, changed = _entries.Count(Changed);
         TextCase.Set(_setNumber, set.ToString(CultureInfo.CurrentCulture));
 
-        var top = new DockPanel();
+        var row = new DockPanel { Margin = new Thickness(14, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center, LastChildFill = true };
         if (changed > 0)
         {
-            var count = RaceParts.Big(changed.ToString(CultureInfo.CurrentCulture), 20, "AccentText", heavy: false);
+            var count = RaceParts.Big(changed.ToString(CultureInfo.CurrentCulture), 18, "AccentText", heavy: false);
             count.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
-            count.LineHeight = 22;
-            var label = new TextBlock { Text = "changed from default", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 1, 0, 0) };
+            count.LineHeight = 20;
+            var label = new TextBlock { Text = "changed from default", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(7, 1, 0, 0) };
             var chip = new Button
             {
                 Style = Ui.Res<Style>("GhostButton"), Content = new StackPanel { Orientation = Orientation.Horizontal, Children = { count, label } },
-                VerticalAlignment = VerticalAlignment.Center, ToolTip = "Show only the keybinds changed from iRacing's default",
+                VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0), ToolTip = "Show only the keybinds changed from iRacing's default",
             };
             chip.Click += (_, _) => { _filter = Filter.Changed; _clash = null; Render(); };
             DockPanel.SetDock(chip, Dock.Right);
-            top.Children.Add(chip);
+            row.Children.Add(chip);
         }
         (_setNumber.Parent as Panel)?.Children.Remove(_setNumber);
-        var of = new TextBlock { Text = $"of {total} keybinds set", Style = Ui.Res<Style>("Muted"), VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(10, 0, 0, 7) };
-        top.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Children = { _setNumber, of } });
+        var of = new TextBlock { Text = $"of {total} keybinds set", Style = Ui.Res<Style>("Muted"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 1, 14, 0) };
+        var figure = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { _setNumber, of } };
+        DockPanel.SetDock(figure, Dock.Left);
+        row.Children.Add(figure);
 
-        var bar = new Grid { Height = 10, Margin = new Thickness(0, 10, 0, 9) };
+        var bar = new Grid { Height = 6, VerticalAlignment = VerticalAlignment.Center };
         void Part(int n, string brush)
         {
             bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(n, GridUnitType.Star) });
@@ -330,26 +321,14 @@ internal sealed class KeybindsBoard : StackPanel
             Grid.SetColumn(piece, bar.ColumnDefinitions.Count - 1);
             bar.Children.Add(piece);
         }
-        Part(keyboard, "Accent");
-        Part(wheel, "TextFaint");
-        Part(none, "LineStrong");
-
-        var legend = new WrapPanel();
-        void Item(string label, int n, string brush)
-        {
-            var swatch = new Border { Width = 11, Height = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 7, 0) };
-            swatch.SetResourceReference(Border.BackgroundProperty, brush);
-            var text = new TextBlock { Text = label, FontSize = 13.5, VerticalAlignment = VerticalAlignment.Center };
-            text.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
-            var number = new TextBlock { Text = n.ToString(CultureInfo.CurrentCulture), FontSize = 15, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(7, 0, 22, 0) };
-            legend.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 2), Children = { swatch, text, number } });
-        }
-        Item("Keyboard", keyboard, "Accent");
-        Item("Wheel or controller", wheel, "TextFaint");
-        Item("Not set", none, "LineStrong");
-
-        _summary.Child = new StackPanel { Margin = new Thickness(22, 12, 22, 12), VerticalAlignment = VerticalAlignment.Center, MaxWidth = 760, HorizontalAlignment = HorizontalAlignment.Stretch, Children = { top, bar, legend } };
+        Part(keyboard, KeyboardBrush);
+        Part(wheel, WheelBrush);
+        Part(none, NotSetBrush);
+        row.Children.Add(bar);
+        _summary.Child = row;
     }
+
+    private const string KeyboardBrush = "Accent", WheelBrush = "TextFaint", NotSetBrush = "LineStrong";
 
     private FrameworkElement Toolbar()
     {
@@ -363,11 +342,24 @@ internal sealed class KeybindsBoard : StackPanel
     private void RenderFilters()
     {
         _filters.Children.Clear();
-        foreach (var (filter, label) in new[] { (Filter.All, "All"), (Filter.Set, "Set"), (Filter.NotSet, "Not set"), (Filter.Changed, "Changed"), (Filter.Wheel, "Wheel or controller") })
+        foreach (var (filter, label, dot) in new (Filter, string, string?)[]
+        {
+            (Filter.All, "All", null), (Filter.Set, "Set", null), (Filter.Keyboard, "Keyboard", KeyboardBrush), (Filter.Wheel, "Wheel or controller", WheelBrush),
+            (Filter.NotSet, "Not set", NotSetBrush), (Filter.Changed, "Changed", null),
+        })
         {
             int n = _entries.Count(e => Passes(e, filter));
             var count = new TextBlock { Text = n.ToString(CultureInfo.CurrentCulture), Margin = new Thickness(7, 0, 0, 0), Opacity = 0.6, VerticalAlignment = VerticalAlignment.Center };
-            var button = new Button { Content = new StackPanel { Orientation = Orientation.Horizontal, Children = { new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center }, count } }, Margin = Ui.AfterButton };
+            var face = new StackPanel { Orientation = Orientation.Horizontal };
+            if (dot is not null)
+            {
+                var swatch = new Border { Width = 9, Height = 9, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 7, 0) };
+                swatch.SetResourceReference(Border.BackgroundProperty, dot);
+                face.Children.Add(swatch);
+            }
+            face.Children.Add(new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center });
+            face.Children.Add(count);
+            var button = new Button { Content = face, Margin = Ui.AfterButton };
             Ui.SetToggled(button, _filter == filter);
             var pick = filter;
             button.Click += (_, _) => { _filter = pick; _clash = null; Render(); };
@@ -413,7 +405,7 @@ internal sealed class KeybindsBoard : StackPanel
             grid.Children.Add(count);
 
             var holder = new Grid();
-            holder.Children.Add(new Border { Padding = new Thickness(12, 13, 12, 13), Child = grid });
+            holder.Children.Add(new Border { Height = RailRowHeight, Padding = new Thickness(12, 0, 12, 0), Child = grid });
             if (on)
             {
                 holder.SetResourceReference(Panel.BackgroundProperty, "AccentSoft");
@@ -442,7 +434,7 @@ internal sealed class KeybindsBoard : StackPanel
 
     private static string Current(List<string> groups) => _lastGroup is { } g && groups.Contains(g) ? g : groups.FirstOrDefault() ?? "";
 
-    private const double RailText = 15, RailCount = 13;
+    private const double RailText = 13.5, RailCount = 13, RailRowHeight = 32;
 
     private void RenderPane()
     {
@@ -482,7 +474,7 @@ internal sealed class KeybindsBoard : StackPanel
         {
             string text = _query.Length > 0 ? $"Results for “{_query}”" : _filter switch
             {
-                Filter.Set => "Set", Filter.NotSet => "Not set", Filter.Changed => "Changed from iRacing's default", _ => "On a wheel or controller",
+                Filter.Set => "Set", Filter.Keyboard => "On the keyboard", Filter.NotSet => "Not set", Filter.Changed => "Changed from iRacing's default", _ => "On a wheel or controller",
             };
             heading.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = text, Style = Ui.Res<Style>("H3"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 520, Margin = new Thickness(0, 0, 10, 0) }));
         }
@@ -863,7 +855,7 @@ internal sealed class KeybindsBoard : StackPanel
     public void ShowFilter(string which)
     {
         ClearSearch();
-        _filter = which switch { "not-set" => Filter.NotSet, "changed" => Filter.Changed, "wheel" => Filter.Wheel, "set" => Filter.Set, _ => Filter.All };
+        _filter = which switch { "not-set" => Filter.NotSet, "changed" => Filter.Changed, "wheel" => Filter.Wheel, "set" => Filter.Set, "keyboard" => Filter.Keyboard, _ => Filter.All };
         _clash = null;
         Render();
     }

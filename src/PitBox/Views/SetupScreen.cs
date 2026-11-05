@@ -182,7 +182,7 @@ internal sealed class SetupScreen : UserControl
     {
         var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 6, 0, HeaderGap) };
         stack.Children.Add(new TextBlock { Text = _firstRun ? "Welcome" : "Setup", Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(2, 0, 0, 4) });
-        var heading = new TextBlock { Text = "Set up your workspace", Style = Ui.Res<Style>("H1"), TextWrapping = TextWrapping.Wrap, LineStackingStrategy = LineStackingStrategy.BlockLineHeight };
+        var heading = new TextBlock { Text = "Set up your workspace", Style = Ui.Res<Style>("H1"), FontSize = 34, TextWrapping = TextWrapping.Wrap, LineStackingStrategy = LineStackingStrategy.BlockLineHeight };
         heading.LineHeight = Math.Round(heading.FontSize * 1.1);
         stack.Children.Add(heading);
         return stack;

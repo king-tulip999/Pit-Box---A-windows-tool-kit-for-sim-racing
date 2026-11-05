@@ -51,6 +51,24 @@ internal sealed class CompanionAppSection : Tile
 
     private int _version;
 
+    private static Border TickRow(string title, string description, bool on, Action<bool> changed)
+    {
+        var box = Ui.Switch(on, changed);
+        var line = new Grid();
+        line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(180) });
+        line.ColumnDefinitions.Add(new ColumnDefinition());
+        var name = TextFit.TipWhenTrimmed(new TextBlock { Text = title, Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) });
+        line.Children.Add(name);
+        var note = TextFit.TipWhenTrimmed(new TextBlock { Text = description, Style = Ui.Res<Style>("Caption"), TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap, VerticalAlignment = VerticalAlignment.Center });
+        Grid.SetColumn(note, 1);
+        line.Children.Add(note);
+        ToggleCards.Row(box, line, null);
+        Ui.NameFor(box, title);
+        var row = Hairline.Frame(new Border { Padding = new Thickness(0, 4, 0, 4), Child = box }, Sides.Bottom);
+        row.SetResourceReference(Border.BorderBrushProperty, "Line");
+        return row;
+    }
+
     private async void Build()
     {
         int version = ++_version;
@@ -68,8 +86,7 @@ internal sealed class CompanionAppSection : Tile
         var s = app.Settings;
 
         var heading = Ui.Text(spec.Name, "H2");
-        heading.Margin = new Thickness(0, 0, 0, 8);
-        _stack.Children.Add(heading);
+        heading.VerticalAlignment = VerticalAlignment.Center;
         var info = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         var (text, soft, deep) = status switch
         {
@@ -79,12 +96,13 @@ internal sealed class CompanionAppSection : Tile
             _ => ("Unable to determine whether it's running", "WarnSoft", "Warn"),
         };
         var chip = Ui.Chip(text, soft, deep);
-        chip.HorizontalAlignment = HorizontalAlignment.Left;
-        info.Children.Add(chip);
+        chip.Margin = new Thickness(10, 0, 0, 0);
+        chip.VerticalAlignment = VerticalAlignment.Center;
+        _stack.Children.Add(new TrimRow { Margin = new Thickness(0, 0, 0, 2), Children = { heading, chip } });
         var where = new TextBlock
         {
             Text = app.ExePath ?? $"{CompanionApp.Upper(spec.Program)} wasn't found on this PC. {_about} Install it from the official website, then come back here.",
-            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 10, 0), MaxWidth = 454, HorizontalAlignment = HorizontalAlignment.Left,
+            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 10, 0), MaxWidth = 454, HorizontalAlignment = HorizontalAlignment.Left,
         };
         TextCase.SetVerbatim(where, app.ExePath is not null);
         info.Children.Add(where);
@@ -136,21 +154,15 @@ internal sealed class CompanionAppSection : Tile
         _stack.Children.Add(info);
         _stack.Children.Add(actions);
 
-        var cards = new System.Windows.Controls.Primitives.UniformGrid { Rows = 1, Margin = new Thickness(-3, 8, -3, 0) };
-        void Card(CheckBox card)
-        {
-            CardTop.Align(card);
-            card.Margin = new Thickness(3);
-            cards.Children.Add(card);
-        }
-        Card(ToggleCards.Card("Start with Pit-Box", "When Pit-Box starts (skipped if it's already running).",
+        var ticks = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+        ticks.Children.Add(TickRow("Start with Pit-Box", "When Pit-Box starts (skipped if it's already running).",
             s.LaunchWithPitBox, v => { s.LaunchWithPitBox = v; _app.Save(); }));
-        Card(ToggleCards.Card("Start with iRacing", "When iRacing starts (skipped if it's already running).",
+        ticks.Children.Add(TickRow("Start with iRacing", "When iRacing starts (skipped if it's already running).",
             s.LaunchWithIracing, v => { s.LaunchWithIracing = v; _app.Save(); app.UpdateWatch(); }));
         if (spec == CompanionApp.TradingPaints)
         {
             var sim = _app.Config.SimRacing;
-            Card(ToggleCards.Card("Car pictures in your paint", "Drawn by iRacing while it's open; a new paint shows once iRacing has run.",
+            ticks.Children.Add(TickRow("Car pictures in your paint", "Drawn by iRacing: a new paint shows once iRacing has run.",
                 sim.PaintedCarPictures, v =>
                 {
                     sim.PaintedCarPictures = v;
@@ -158,21 +170,13 @@ internal sealed class CompanionAppSection : Tile
                     if (_app.Plugins.Find(PluginIds.SimRacing) is SimRacingPlugin plugin) plugin.Liveries?.SetActive(LiveryPictures.On(_app));
                 }));
         }
-        _stack.Children.Add(cards);
-        _stack.Children.Add(new TextBlock
+        _stack.Children.Add(ticks);
+        string full = "the " + spec.Name + " ";
+        string program = spec.Program.StartsWith(full, StringComparison.Ordinal) ? "the " + spec.Program[full.Length..] : spec.Program;
+        _stack.Children.Add(TextFit.TipWhenTrimmed(new TextBlock
         {
-            Text = $"Pit-Box starts {spec.Program} the normal way and never changes or updates it. It keeps running after Pit-Box quits.",
-            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 5, 0, 0),
-        });
-    }
-}
-
-internal static class CardTop
-{
-    public static CheckBox Align(CheckBox card)
-    {
-        if (card.Content is not StackPanel body) return card;
-        body.VerticalAlignment = VerticalAlignment.Top;
-        return card;
+            Text = $"Pit-Box only starts {program}, never changes it. It keeps running after Pit-Box quits.",
+            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.NoWrap, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 6, 0, 0),
+        }));
     }
 }

@@ -25,7 +25,7 @@ internal sealed partial class IracingControllerSection
             var detail = new SwitchDetail(FillDetail);
             var grid = new EvenGrid { MinItemWidth = CellMin, ColumnSteps = new[] { 1, 2, 3 }, ColumnGap = ItemGap, RowGap = 0 };
             foreach (var s in switches) grid.Children.Add(SwitchCell(s, detail));
-            var frame = new Border { Child = grid, BorderThickness = new Thickness(0, 1, 0, 0), Margin = new Thickness(0, 2, 0, 0) };
+            var frame = Hairline.Frame(new Border { Child = grid, Margin = new Thickness(0, 2, 0, 0) }, Sides.Top);
             frame.SetResourceReference(Border.BorderBrushProperty, "Line");
             yield return frame;
             yield return detail.Box;
@@ -75,17 +75,18 @@ internal sealed partial class IracingControllerSection
 
     private static void Notes(Setting s, Panel text)
     {
-        void Note(string? note, string brush, string? icon = null)
+        void Note(string? note, string brush, bool shownNow = true, string? icon = null)
         {
             if (string.IsNullOrWhiteSpace(note)) return;
             var line = new TextBlock { Text = note, Style = Ui.Res<Style>("Caption"), Foreground = Ui.Res<Brush>(brush), TextWrapping = TextWrapping.Wrap };
             FrameworkElement shown = icon is null ? line : Ui.IconText(icon, line, brush);
             shown.Margin = new Thickness(0, 2, 0, 0);
+            shown.Visibility = shownNow ? Visibility.Visible : Visibility.Hidden;
             text.Children.Add(shown);
         }
-        Note(s.Def.Danger, "Danger", "I.Alert");
-        Note(s.IsChanged ? s.Def.Caution : null, "WarnDeep");
-        Note(s.IsInert ? s.Def.DependsOn?.Message : null, "TextFaint");
+        Note(s.Def.Danger, "Danger", icon: "I.Alert");
+        Note(s.Def.Caution, "WarnDeep", s.IsChanged);
+        Note(s.Def.DependsOn?.Message, "TextFaint", s.IsInert);
     }
 
     private StackPanel ItemHead(Setting s, Func<bool>? popChip = null)
@@ -183,7 +184,7 @@ internal sealed partial class IracingControllerSection
 
     private Border SwitchCell(Setting s, SwitchDetail detail)
     {
-        var host = new Border { Padding = new Thickness(8, 0, 4, 0), BorderThickness = new Thickness(0, 0, 0, 1) };
+        var host = Hairline.Frame(new Border { Padding = new Thickness(8, 0, 4, 0) }, Sides.Bottom);
         host.SetResourceReference(Border.BorderBrushProperty, "Line");
         Ui.HoverHighlight(host);
         var head = new ContentControl { Focusable = false, IsTabStop = false, HorizontalContentAlignment = HorizontalAlignment.Stretch };

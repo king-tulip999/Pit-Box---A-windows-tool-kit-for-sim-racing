@@ -49,19 +49,19 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
         _body.Children.Add(_view.Content);
 
         _view.Add(Def("fov", "The correct field of view for your seat and screens, so speed, distance and apexes look real.",
-            () => _fov ??= new FovSection(app, window), "simracing.fov", () => _fov?.OnShown()));
+            () => _fov ??= new FovSection(app, window), "simracing.fov", () => _fov?.OnShown(), tools: () => _fov?.TitleTools));
         _view.Add(Def("iracing", "Every iRacing setting with a plain-language description, a health check and backups.",
             () => _controller = new IracingControllerSection(_app, _window), "simracing.iracing",
-            () => _controller?.OnShown()));
+            () => _controller?.OnShown(), tools: () => _controller?.TitleTools));
         _view.Add(Def("setups", "Your car setups by car: find, rename, move, import and share them with league mates without File Explorer.",
             () => _setups = new SetupManagerSection(_app, _window), "simracing.setups",
-            () => _setups?.OnShown(), () => _setups?.OnHidden()));
+            () => _setups?.OnShown(), () => _setups?.OnHidden(), () => _setups?.TitleTools));
         _view.Add(Def("hud", "",
             () => _hud = new RaceHudSection(_app, _window), "simracing.hud.panel",
-            () => _hud?.OnShown(), () => _hud?.OnHidden()));
+            () => _hud?.OnShown(), () => _hud?.OnHidden(), () => _hud?.TitleTools));
         _view.Add(Def("shakers", "Tactile transducers under your seat or pedals, driven by iRacing's telemetry or game audio through a sound output.",
             () => _shakers = new ShakersSection(_app), "simracing.shakers",
-            () => _shakers?.OnShown(), () => _shakers?.OnHidden()));
+            () => _shakers?.OnShown(), () => _shakers?.OnHidden(), () => _shakers?.TitleTools));
         _view.Add(Def("companions", "",
             BuildCompanions, "simracing.companions",
             ShowCompanions, HideCompanions));
@@ -118,10 +118,18 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
         _garage61?.OnHidden();
     }
 
-    private static SectionDef Def(string id, string subtitle, Func<UIElement> build, string anchor, Action? shown = null, Action? hidden = null)
+    private static SectionDef Def(string id, string subtitle, Func<UIElement> build, string anchor, Action? shown = null, Action? hidden = null, Func<FrameworkElement?>? tools = null)
     {
         var t = Tool(id);
-        return new SectionDef(id, t.Title, subtitle, t.Icon, build, anchor, shown, hidden);
+        if (tools is null) return new SectionDef(id, t.Title, subtitle, t.Icon, build, anchor, shown, hidden);
+        var slot = new ContentControl { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
+        UIElement Build()
+        {
+            var built = build();
+            slot.Content = tools();
+            return built;
+        }
+        return new SectionDef(id, t.Title, subtitle, t.Icon, Build, anchor, shown, hidden, slot);
     }
 
     private SimRacingSettings S => _app.Config.SimRacing;

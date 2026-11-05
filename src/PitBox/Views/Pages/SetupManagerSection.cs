@@ -17,7 +17,10 @@ internal sealed class SetupManagerSection : StackPanel
     private readonly AppServices _app;
     private readonly MainWindow _window;
     private readonly SetupStore _store;
-    private readonly Border _intro = new(), _inbox = new(), _classes = new(), _explorer = new();
+    private readonly Border _intro = new(), _inbox = new(), _explorer = new();
+    private readonly Button _downloads = new() { VerticalAlignment = VerticalAlignment.Center };
+    private readonly Button _class = new() { MinWidth = 150, Margin = Ui.AfterButton };
+    public FrameworkElement TitleTools { get; }
     private readonly Button _clearFilters = new() { Content = "Clear filters", Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
     private Button _show = null!;
     private Tile _split = null!;
@@ -48,8 +51,7 @@ internal sealed class SetupManagerSection : StackPanel
         _store.Changed += () => { Prune(); RenderAll(); };
 
         Children.Add(_intro);
-        _inbox.Margin = new Thickness(0, 0, 0, Ui.PanelSpacing);
-        Children.Add(_inbox);
+        TitleTools = BuildTitleTools();
 
         var card = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(13) };
         var stack = new StackPanel();
@@ -62,7 +64,13 @@ internal sealed class SetupManagerSection : StackPanel
         _search = Ui.Search(new TextBox { Tag = "Search cars, folders or setups…", MinWidth = 178 });
         _search.TextChanged += (_, _) => { RenderFilters(); RenderCars(); RenderExplorer(); };
         top.Children.Add(_search);
-        var sortRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        top.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        top.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var sortRow = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        _class.Style = Ui.Res<Style>("MenuButton");
+        _class.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+        _class.Click += (_, _) => OpenClassMenu();
+        sortRow.Children.Add(_class);
         _show = new Button { Style = Ui.Res<Style>("MenuButton"), MinWidth = 162, Margin = Ui.AfterButton, Padding = new Thickness(10, 2, 9, 2), HorizontalContentAlignment = HorizontalAlignment.Stretch };
         _show.Click += (_, _) => OpenShowMenu();
         sortRow.Children.Add(_show);
@@ -75,10 +83,23 @@ internal sealed class SetupManagerSection : StackPanel
         sortRow.Children.Add(_clearFilters);
         Grid.SetColumn(sortRow, 1);
         top.Children.Add(sortRow);
+        top.SizeChanged += (_, e) =>
+        {
+            if (!e.WidthChanged || e.NewSize.Width <= 0) return;
+            sortRow.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            bool below = e.NewSize.Width - sortRow.DesiredSize.Width < SearchMinWidth;
+            if (Grid.GetRow(sortRow) == (below ? 1 : 0)) return;
+            Grid.SetRow(sortRow, below ? 1 : 0);
+            Grid.SetColumn(sortRow, below ? 0 : 1);
+            Grid.SetColumnSpan(sortRow, below ? 2 : 1);
+            sortRow.Margin = below ? new Thickness(0, 8, 0, 0) : new Thickness(10, 0, 0, 0);
+            Grid.SetColumnSpan(_search, below ? 2 : 1);
+        };
         stack.Children.Add(top);
 
-        _classes.Margin = new Thickness(0, 10, 0, 0);
-        stack.Children.Add(_classes);
+        _inbox.Margin = new Thickness(0, 10, 0, 0);
+        _inbox.Visibility = Visibility.Collapsed;
+        stack.Children.Add(_inbox);
 
         var split = new Grid();
         split.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(CarListWidth) });
@@ -96,8 +117,10 @@ internal sealed class SetupManagerSection : StackPanel
         _split.IsVisibleChanged += (_, _) => Dispatcher.BeginInvoke(FitSplit, System.Windows.Threading.DispatcherPriority.Loaded);
         Loaded += (_, _) => AttachPage();
         _inbox.SizeChanged += (_, e) => { if (e.HeightChanged) FitSplit(); };
-        _classes.SizeChanged += (_, e) => { if (e.HeightChanged) FitSplit(); };
         _intro.SizeChanged += (_, e) => { if (e.HeightChanged) FitSplit(); };
+        _inbox.IsVisibleChanged += (_, _) => Dispatcher.BeginInvoke(FitSplit, System.Windows.Threading.DispatcherPriority.Loaded);
+        _intro.IsVisibleChanged += (_, _) => Dispatcher.BeginInvoke(FitSplit, System.Windows.Threading.DispatcherPriority.Loaded);
+        top.SizeChanged += (_, e) => { if (e.HeightChanged) Dispatcher.BeginInvoke(FitSplit, System.Windows.Threading.DispatcherPriority.Loaded); };
         Unloaded += (_, _) => { if (_page is not null) _page.SizeChanged -= OnPageSize; _page = null; };
 
         Focusable = true;
@@ -107,7 +130,7 @@ internal sealed class SetupManagerSection : StackPanel
 
     private SetupManagerSettings S => _app.Config.SimRacing.Setups;
 
-    private const double SplitMin = 380, SplitMax = 3000, PageBottom = 23, CarListWidth = 300;
+    private const double SplitMin = 380, SplitMax = 3000, PageBottom = 23, CarListWidth = 300, SearchMinWidth = 210, TreeMinHeight = 150;
 
     private void AttachPage()
     {
@@ -185,7 +208,7 @@ internal sealed class SetupManagerSection : StackPanel
         RenderInbox();
         _classFilter.RemoveWhere(cls => !_store.Cars.Any(c => c.Class == cls));
         RenderFilters();
-        RenderClasses();
+        UpdateClassButton();
         RenderCars();
         RenderExplorer();
     }
@@ -204,85 +227,89 @@ internal sealed class SetupManagerSection : StackPanel
         _intro.Child = Ui.Notice("Accent", "I.Info", "Your iRacing setups, without File Explorer", detail, ("Got it", () => { S.IntroSeen = true; Save(); RenderIntro(); }));
     }
 
-    private void RenderInbox()
+    private FrameworkElement BuildTitleTools()
     {
-        var items = _store.Inbox;
-        if (!_loaded) { _inbox.Child = null; _inbox.Visibility = Visibility.Collapsed; return; }
-        _inbox.Visibility = Visibility.Visible;
-        var stack = new StackPanel();
-        var head = new Grid { Cursor = Cursors.Hand, Background = Brushes.Transparent };
-        head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        head.ColumnDefinitions.Add(new ColumnDefinition());
-        head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var chevron = Ui.FoldChevron(!S.InboxFolded);
-        head.Children.Add(chevron);
-        var badge = Ui.Badge("I.Download", "IconWell", "IconInk", 24, 6.5, 13);
-        Grid.SetColumn(badge, 1);
-        head.Children.Add(badge);
-        var title = new DockPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
-        var label = new TextBlock { Text = "Downloads", Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold };
-        DockPanel.SetDock(label, Dock.Left);
-        title.Children.Add(label);
-        string found = items.Count > 0 ? $"{SetupTree.Plural(items.Count, "new setup file")} found, ready to move into iRacing" : "No new setups or share packs found";
-        title.Children.Add(new TextBlock
+        _downloads.Click += (_, _) =>
         {
-            Text = found, ToolTip = found, Margin = new Thickness(10, 0, 0, 0),
-            Style = Ui.Res<Style>("Muted"), TextTrimming = TextTrimming.CharacterEllipsis,
-        });
-        Grid.SetColumn(title, 2);
-        head.Children.Add(title);
-        var scan = Ui.IconButton("I.Refresh", "Scan " + (_store.Downloads ?? "Downloads") + " again", () =>
+            S.InboxFolded = !S.InboxFolded;
+            Save();
+            RenderInbox();
+        };
+        System.Windows.Automation.AutomationProperties.SetName(_downloads, "Downloads");
+        var scan = Ui.IconButton("I.Refresh", "Scan Downloads again", () =>
         {
             _store.ScanInbox();
             S.InboxFolded = false;
             Save();
             RenderInbox();
             _app.Notify("Downloads scanned", _store.Inbox.Count == 0 ? "No new setups or share packs found." : $"{SetupTree.Plural(_store.Inbox.Count, "setup file")} ready to file.", NoticeKind.Info);
-        }, "QuietIconButton");
-        scan.ToolTip = TextCase.PathTip("Scan " + (_store.Downloads ?? "Downloads") + " again");
-        scan.Margin = new Thickness(10, 0, 0, 0);
+        });
+        scan.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0);
         scan.VerticalAlignment = VerticalAlignment.Center;
-        Grid.SetColumn(scan, 3);
-        head.Children.Add(scan);
-        title.ToolTip = S.InboxFolded ? "Show the files found" : "Hide the files found";
-        head.MouseLeftButtonUp += (_, e) =>
-        {
-            if (e.OriginalSource is DependencyObject d && IsInButton(d)) return;
-            S.InboxFolded = !S.InboxFolded;
-            Save();
-            RenderInbox();
-        };
-        stack.Children.Add(head);
+        scan.ToolTipOpening += (_, _) => scan.ToolTip = TextCase.PathTip("Scan " + (_store.Downloads ?? "Downloads") + " again");
+        RenderDownloadsButton();
+        return new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { _downloads, scan } };
+    }
 
-        if (!S.InboxFolded)
+    private void RenderDownloadsButton()
+    {
+        int count = _loaded ? _store.Inbox.Count : 0;
+        var label = new TextBlock { VerticalAlignment = VerticalAlignment.Center };
+        label.Inlines.Add(new System.Windows.Documents.Run("Downloads"));
+        if (count > 0)
         {
+            var fresh = new System.Windows.Documents.Run($" {count} new");
+            fresh.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "AccentText");
+            label.Inlines.Add(fresh);
+        }
+        _downloads.Content = label;
+        _downloads.IsEnabled = _loaded;
+        Ui.SetToggled(_downloads, _loaded && !S.InboxFolded);
+        _downloads.ToolTip = !_loaded ? null
+            : count > 0 ? $"{SetupTree.Plural(count, "new setup file")} found, ready to move into iRacing"
+            : "No new setups or share packs found";
+    }
+
+    private void RenderInbox()
+    {
+        RenderDownloadsButton();
+        var items = _store.Inbox;
+        if (!_loaded || S.InboxFolded) { _inbox.Child = null; _inbox.Visibility = Visibility.Collapsed; return; }
+        _inbox.Visibility = Visibility.Visible;
+        var stack = new StackPanel();
+        var head = new DockPanel();
+        var close = Ui.IconButton("I.X", "Hide the files found", () => { S.InboxFolded = true; Save(); RenderInbox(); }, "QuietIconButton");
+        close.VerticalAlignment = VerticalAlignment.Top;
+        DockPanel.SetDock(close, Dock.Right);
+        head.Children.Add(close);
+        head.Children.Add(new TextBlock
+        {
+            Text = "Pit-Box watches your Downloads folder for iRacing setups (.sto) and share packs (.zip) from league mates or setup shops. Each one is listed with the car it looks like it's for. File it moves the file into that car's iRacing setups folder, so it shows up in the iRacing garage. Change the car if the guess is wrong, or press × to leave the file where it is.",
+            Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 10, 5), VerticalAlignment = VerticalAlignment.Center,
+        });
+        stack.Children.Add(head);
+        if (items.Count == 0)
             stack.Children.Add(new TextBlock
             {
-                Text = "Pit-Box watches your Downloads folder for iRacing setups (.sto) and share packs (.zip) from league mates or setup shops. Each one is listed with the car it looks like it's for. File it moves the file into that car's iRacing setups folder, so it shows up in the iRacing garage. Change the car if the guess is wrong, or press × to leave the file where it is.",
-                Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 5),
+                Text = _store.Downloads is { } folder && Directory.Exists(folder)
+                    ? $"Nothing from the last {SetupStore.InboxDays} days in {folder}. New downloads show up here on their own."
+                    : "Your Downloads folder wasn't found.",
+                Style = Ui.Res<Style>("Caption"), Foreground = Ui.Res<Brush>("TextFaint"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 3, 0, 0),
             });
-            if (items.Count == 0)
-                stack.Children.Add(new TextBlock
-                {
-                    Text = _store.Downloads is { } folder && Directory.Exists(folder)
-                        ? $"Nothing from the last {SetupStore.InboxDays} days in {folder}. New downloads show up here on their own."
-                        : "Your Downloads folder wasn't found.",
-                    Style = Ui.Res<Style>("Caption"), Foreground = Ui.Res<Brush>("TextFaint"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 3, 0, 0),
-                });
-            var choices = _store.Cars.OrderBy(c => c.Name, Natural.Comparer).Select(c => new Choice(c.Dir, c.Name)).Prepend(new Choice(null, "Choose the car…")).ToList();
-            foreach (var item in items.ToList())
-                stack.Children.Add(InboxRow(item, choices));
-            int ready = items.Count(i => i.Car is not null);
-            if (ready > 1)
-            {
-                var all = Ui.LabeledButton("I.Check", $"File all {ready} matched", () => FileDownloads(items.Where(i => i.Car is not null).ToList()));
-                all.HorizontalAlignment = HorizontalAlignment.Right;
-                all.Margin = new Thickness(0, 6, 0, 0);
-                stack.Children.Add(all);
-            }
+        var choices = _store.Cars.OrderBy(c => c.Name, Natural.Comparer).Select(c => new Choice(c.Dir, c.Name)).Prepend(new Choice(null, "Choose the car…")).ToList();
+        foreach (var item in items.ToList())
+            stack.Children.Add(InboxRow(item, choices));
+        int ready = items.Count(i => i.Car is not null);
+        if (ready > 1)
+        {
+            var all = Ui.LabeledButton("I.Check", $"File all {ready} matched", () => FileDownloads(items.Where(i => i.Car is not null).ToList()));
+            all.HorizontalAlignment = HorizontalAlignment.Right;
+            all.Margin = new Thickness(0, 6, 0, 0);
+            stack.Children.Add(all);
         }
-        _inbox.Child = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(11, 10, 11, 10), Child = stack };
+        var pane = Pane(stack);
+        pane.Padding = new Thickness(11, 8, 6, 8);
+        _inbox.Child = pane;
     }
 
     private FrameworkElement InboxRow(DownloadItem item, List<Choice> choices)
@@ -400,76 +427,97 @@ internal sealed class SetupManagerSection : StackPanel
 
     private List<string> ClassOrder => SetupCars.Order(S.ClassOrder);
 
-    private void RenderClasses()
+    private void UpdateClassButton()
     {
         UpdateSortButton();
+        var picked = ClassOrder.Where(_classFilter.Contains).ToList();
+        string label = picked.Count == 0 ? "All" : picked.Count <= 2 ? string.Join(", ", picked) : PitBox.SimRacing.Race.RaceFormat.Count(picked.Count, "class");
+        _class.Content = Ui.MenuFace(TextFit.TipWhenTrimmed(new TextBlock { Text = "Class: " + label, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis }));
+        _class.Style = Ui.Res<Style>(picked.Count > 0 ? "SelectedButton" : "MenuButton");
+        _class.ToolTip = "Which classes are listed. Pick more than one to add them; drag a class to change the class order.";
+        System.Windows.Automation.AutomationProperties.SetName(_class, "Class filter");
+    }
+
+    private void OpenClassMenu()
+    {
+        var popup = new System.Windows.Controls.Primitives.Popup
+        {
+            PlacementTarget = _class, StaysOpen = false, AllowsTransparency = true, UseLayoutRounding = true,
+            PopupAnimation = System.Windows.Controls.Primitives.PopupAnimation.Fade,
+        };
+        Ui.DropBelow(popup);
+        Ui.FollowTarget(popup);
+        var host = new StackPanel { MinWidth = Math.Max(211, _class.ActualWidth) };
+        FillClassMenu(host);
+        popup.Child = new Tile { Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(4), Margin = new Thickness(0, 3, 6, 13), Child = host };
+        popup.IsOpen = true;
+    }
+
+    private void ClassFilterChanged()
+    {
+        UpdateClassButton();
+        RenderFilters(); RenderCars(); RenderExplorer();
+    }
+
+    private FrameworkElement ClassMenuRow(UIElement content, string? tip, Action click)
+    {
+        var row = new Tile { Height = 28, Padding = new Thickness(8, 0, 10, 0), Background = Brushes.Transparent, Cursor = Cursors.Hand, ToolTip = tip, Child = content };
+        Ui.HoverHighlight(row);
+        row.MouseLeftButtonUp += (_, _) => click();
+        return row;
+    }
+
+    private void FillClassMenu(StackPanel host)
+    {
+        host.Children.Clear();
         var present = ClassOrder.Where(k => _store.Cars.Any(c => c.Class == k) && !S.IsClassHidden(k)).ToList();
-        var grid = new ReorderGrid { Flow = true, MinCellWidth = 42, Gap = 5 };
+        int hiddenClasses = ClassOrder.Count(k => S.IsClassHidden(k) && _store.Cars.Any(c => c.Class == k));
+        bool everything = _classFilter.Count == 0 && hiddenClasses == 0;
+        var allText = new TextBlock { Text = hiddenClasses > 0 ? $"All classes · {hiddenClasses} hidden" : "All classes", VerticalAlignment = VerticalAlignment.Center };
+        var allRow = ClassMenuRow(ToggleCards.WithLamp(new PitBox.Controls.Lamp { On = everything }, allText),
+            hiddenClasses > 0 ? $"{PitBox.SimRacing.Race.RaceFormat.Count(hiddenClasses, "class")} hidden in the Sort menu. Click to show every class again."
+                : everything ? "Every class is shown" : "Every class again (clears the pick)",
+            () =>
+            {
+                if (everything) return;
+                S.HiddenClasses.Clear();
+                SetClassFilter(() => _classFilter.Clear());
+                ClassFilterChanged();
+                FillClassMenu(host);
+            });
+        System.Windows.Automation.AutomationProperties.SetName(allRow, "All classes");
+        host.Children.Add(allRow);
+        if (present.Count == 0) return;
+        var rule = Hairline.Rule(new Border { Margin = new Thickness(6, 4, 6, 4) });
+        rule.SetResourceReference(Border.BackgroundProperty, "Line");
+        host.Children.Add(rule);
+        var grid = new ReorderGrid { MinCellWidth = 180, MaxColumns = 1, Gap = 0 };
         foreach (var cls in present)
         {
-            var (lit, on) = SetupCars.FilterLook(cls, _classFilter);
-            var name = new TextBlock
-            {
-                Text = cls, VerticalAlignment = VerticalAlignment.Center,
-                FontWeight = on ? FontWeights.Bold : FontWeights.SemiBold, Foreground = Ui.Res<Brush>(on ? "AccentText" : lit ? "Text" : "TextFaint"),
-            };
-            var tile = new Tile
-            {
-                Tag = cls, Height = 24, CornerRadius = ThemeManager.Round(6), BorderThickness = on ? new Thickness(2) : Hairline.Edges(), Padding = new Thickness(10, 0, 10, 0),
-                Background = Ui.Res<Brush>(on ? "AccentSoft" : "SurfaceAlt"), BorderBrush = Ui.Res<Brush>(on ? "AccentText" : "Line"),
-                ToolTip = on ? $"Showing {cls}. Click to stop filtering by it; drag to change the class order."
+            bool on = _classFilter.Contains(cls);
+            var name = new TextBlock { Text = cls, VerticalAlignment = VerticalAlignment.Center };
+            var row = ClassMenuRow(ToggleCards.WithLamp(new PitBox.Controls.Lamp { On = on }, name),
+                on ? $"Showing {cls}. Click to stop filtering by it; drag to change the class order."
                     : $"Show only {cls} (click more classes to add them). Drag to change the class order. Hide a class in the Sort menu.",
-                Child = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Children = { name } },
-            };
-            tile.MouseLeftButtonUp += (_, _) =>
-            {
-                SetClassFilter(() => { if (!_classFilter.Remove(cls)) _classFilter.Add(cls); });
-                RenderFilters(); RenderClasses(); RenderCars(); RenderExplorer();
-            };
-            grid.Children.Add(tile);
+                () =>
+                {
+                    SetClassFilter(() => { if (!_classFilter.Remove(cls)) _classFilter.Add(cls); });
+                    ClassFilterChanged();
+                    FillClassMenu(host);
+                });
+            row.Tag = cls;
+            grid.Children.Add(row);
         }
         grid.Moved += (_, _) =>
         {
             var shown = grid.Children.OfType<FrameworkElement>().Select(e => (string)e.Tag).ToList();
             S.ClassOrder = SetupCars.Reorder(ClassOrder, shown);
             S.Sort = "class";
-            UpdateSortButton();
             Save();
+            UpdateClassButton();
             RenderCars();
         };
-
-        bool picked = _classFilter.Count > 0 || S.HiddenClasses.Count > 0;
-        int hiddenClasses = ClassOrder.Count(k => S.IsClassHidden(k) && _store.Cars.Any(c => c.Class == k));
-        bool onlyHidden = _classFilter.Count == 0 && hiddenClasses > 0;
-        var allText = new TextBlock
-        {
-            Text = onlyHidden ? $"All · {hiddenClasses} hidden" : "All", VerticalAlignment = VerticalAlignment.Center,
-            FontWeight = picked && !onlyHidden ? FontWeights.SemiBold : FontWeights.Bold, Foreground = Ui.Res<Brush>(picked && !onlyHidden ? "Text" : "AccentText"),
-        };
-        var all = new Tile
-        {
-            Height = 24, CornerRadius = ThemeManager.Round(6), BorderThickness = picked ? Hairline.Edges() : new Thickness(2), Padding = new Thickness(10, 0, 10, 0),
-            Background = Ui.Res<Brush>(picked && !onlyHidden ? "SurfaceAlt" : "AccentSoft"), BorderBrush = Ui.Res<Brush>(picked && !onlyHidden ? "Line" : "AccentText"),
-            ToolTip = onlyHidden ? $"{PitBox.SimRacing.Race.RaceFormat.Count(hiddenClasses, "class")} hidden in the Sort menu. Click to show every class again."
-                : picked ? "Every class again (clears the pick and shows the classes hidden in the Sort menu)" : "Every class is shown",
-            Child = allText, Cursor = System.Windows.Input.Cursors.Hand, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 0, 5, 0),
-        };
-        System.Windows.Automation.AutomationProperties.SetName(all, "All classes");
-        all.MouseLeftButtonUp += (_, _) =>
-        {
-            if (!picked) return;
-            S.HiddenClasses.Clear();
-            SetClassFilter(() => _classFilter.Clear());
-            UpdateSortButton();
-            RenderFilters(); RenderClasses(); RenderCars(); RenderExplorer();
-        };
-        var row = new Grid();
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        row.ColumnDefinitions.Add(new ColumnDefinition());
-        row.Children.Add(all);
-        Grid.SetColumn(grid, 1);
-        row.Children.Add(grid);
-        _classes.Child = row;
+        host.Children.Add(grid);
     }
 
     private static readonly (string Id, string Label)[] SortChoices =
@@ -511,7 +559,7 @@ internal sealed class SetupManagerSection : StackPanel
             S.Sort = "class";
             Save();
             UpdateSortButton();
-            RenderClasses();
+            UpdateClassButton();
             RenderCars();
             _app.Notify("Class order", "The classes are back in their default order.", NoticeKind.Info);
         };
@@ -544,7 +592,7 @@ internal sealed class SetupManagerSection : StackPanel
                     item.ToolTip = hide ? $"List {cls} again" : $"Hide {cls} and its cars from the list (files untouched)";
                     UpdateSortButton();
                     if (all is not null) all.IsEnabled = S.HiddenClasses.Count > 0;
-                    RenderFilters(); RenderClasses(); RenderCars(); RenderExplorer();
+                    RenderFilters(); UpdateClassButton(); RenderCars(); RenderExplorer();
                 };
                 classes.Items.Add(item);
             }
@@ -555,7 +603,7 @@ internal sealed class SetupManagerSection : StackPanel
                 S.HiddenClasses.Clear();
                 Save();
                 UpdateSortButton();
-                RenderFilters(); RenderClasses(); RenderCars(); RenderExplorer();
+                RenderFilters(); UpdateClassButton(); RenderCars(); RenderExplorer();
                 menu.IsOpen = false;
             };
             classes.Items.Add(all);
@@ -612,7 +660,7 @@ internal sealed class SetupManagerSection : StackPanel
             _carList.Children.Add(Empty(_store.Cars.Count == 0 ? "No cars yet" : "No cars match", _store.Cars.Count == 0
                 ? "iRacing makes a folder for a car the first time you save a setup for it in the garage."
                 : _view == 2 ? "No hidden cars." : S.HiddenClasses.Count > 0 && _store.Cars.All(c => S.IsClassHidden(c.Class))
-                    ? "Every class is hidden. The All tile before the classes brings them back."
+                    ? "Every class is hidden. All classes in the Class menu brings them back."
                     : "Try another search or class, or clear the filters."));
             return;
         }
@@ -665,13 +713,14 @@ internal sealed class SetupManagerSection : StackPanel
         return stack;
     }
 
-    private const double NameLine = 18;
+    private const double CarRowHeight = 30;
 
     private FrameworkElement CarRow(SetupCar car, bool selected, DateTime since, bool chip)
     {
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition());
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         bool fav = Fav(car), hidden = Hidden(car);
         var star = Ui.IconButton("I.Star", fav ? "Remove from favorites" : "Add to favorites", () =>
@@ -685,31 +734,35 @@ internal sealed class SetupManagerSection : StackPanel
         star.VerticalAlignment = VerticalAlignment.Center;
         grid.Children.Add(star);
 
-        var text = new StackPanel { Margin = new Thickness(5, 5, 5, 5), VerticalAlignment = VerticalAlignment.Center, Opacity = car.Root.Files == 0 && !selected ? 0.55 : 1 };
-        text.Children.Add(TextFit.TipWhenTrimmed(new TextBlock
+        bool dim = car.Root.Files == 0 && !selected;
+        var name = TextFit.TipWhenTrimmed(new TextBlock
         {
-            Text = car.Name, Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis,
-            LineStackingStrategy = LineStackingStrategy.BlockLineHeight, LineHeight = NameLine, MaxHeight = NameLine * 2,
-        }));
-        var sub = new WrapPanel { Margin = new Thickness(0, 2, 0, 0) };
+            Text = car.Name, Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis,
+            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 0, 6, 0), Opacity = dim ? 0.55 : 1,
+        });
+        Grid.SetColumn(name, 1);
+        grid.Children.Add(name);
+
+        var tail = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        if (!car.Known) tail.Children.Add(Small("folder name", "TextFaint"));
+        if (Search(car) is { Hits.Count: > 0 } m) tail.Children.Add(Small(SetupTree.Plural(m.Hits.Count, "match"), "AccentText"));
+        int fresh = car.Root.NewCount(since);
+        if (fresh > 0) tail.Children.Add(Small($"{fresh} new", "AccentText"));
         if (chip)
         {
             var tag = Ui.Chip(car.Class);
-            tag.MinWidth = 60;
-            tag.Padding = new Thickness(5, 1, 5, 1);
-            if (tag.Child is TextBlock tagText) tagText.HorizontalAlignment = HorizontalAlignment.Center;
-            sub.Children.Add(tag);
+            tag.Padding = new Thickness(5, 0, 5, 0);
+            tag.Height = 20;
+            tag.Margin = new Thickness(6, 0, 0, 0);
+            tail.Children.Add(tag);
         }
-        var count = Small(SetupTree.Plural(car.Root.Files, "setup"));
-        if (!chip) count.Margin = new Thickness(0);
-        sub.Children.Add(count);
-        int fresh = car.Root.NewCount(since);
-        if (fresh > 0) sub.Children.Add(Small($"· {fresh} new", "AccentText"));
-        if (Search(car) is { Hits.Count: > 0 } m) sub.Children.Add(Small($"· {SetupTree.Plural(m.Hits.Count, "match")}", "AccentText"));
-        if (!car.Known) sub.Children.Add(Small("· folder name", "TextFaint"));
-        text.Children.Add(sub);
-        Grid.SetColumn(text, 1);
-        grid.Children.Add(text);
+        var count = Small(car.Root.Files.ToString(System.Globalization.CultureInfo.CurrentCulture));
+        count.Margin = new Thickness(8, 0, 0, 0);
+        count.ToolTip = SetupTree.Plural(car.Root.Files, "setup");
+        if (dim) count.Opacity = 0.55;
+        tail.Children.Add(count);
+        Grid.SetColumn(tail, 2);
+        grid.Children.Add(tail);
 
         var hide = Ui.IconButton(hidden ? "I.Eye" : "I.EyeOff", hidden ? "Show this car again" : "Hide this car from the list", () =>
         {
@@ -721,12 +774,12 @@ internal sealed class SetupManagerSection : StackPanel
         }, "QuietIconButton");
         hide.VerticalAlignment = VerticalAlignment.Center;
         hide.Opacity = hidden ? 1 : 0;
-        Grid.SetColumn(hide, 2);
+        Grid.SetColumn(hide, 3);
         grid.Children.Add(hide);
 
         var row = new Tile
         {
-            Child = grid, CornerRadius = ThemeManager.Round(6), Cursor = Cursors.Hand, Padding = new Thickness(2, 1, 2, 1),
+            Child = grid, CornerRadius = ThemeManager.Round(6), Cursor = Cursors.Hand, Padding = new Thickness(2, 0, 2, 0), Height = CarRowHeight,
             Background = selected ? Ui.Res<Brush>("AccentSoft") : Brushes.Transparent,
             BorderThickness = new Thickness(3, 0, 0, 0), BorderBrush = selected ? Ui.Res<Brush>("Accent") : Brushes.Transparent,
         };
@@ -781,83 +834,9 @@ internal sealed class SetupManagerSection : StackPanel
         var search = Search(car);
         var stack = new DockPanel();
 
-        var title = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        var nameRow = new TrimRow { HorizontalAlignment = HorizontalAlignment.Left };
-        var name = RaceParts.Big(car.Name, 30, "Heading", heavy: false);
-        name.VerticalAlignment = VerticalAlignment.Center;
-        name.TextTrimming = TextTrimming.CharacterEllipsis;
-        TextFit.TipWhenTrimmed(name);
-        nameRow.Children.Add(name);
-        var tag = new Grid { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 3, 0, 0) };
-        tag.Children.Add(new Slant("Accent", 0.12, 0, 1, 0, 0.88, 1, 0, 1));
-        var tagText = RaceParts.Big(car.Class, 13, "OnAccent", heavy: false);
-        tagText.Margin = new Thickness(14, 2, 14, 3);
-        tag.Children.Add(tagText);
-        nameRow.Children.Add(tag);
-        title.Children.Add(nameRow);
-        var identity = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        var raw = new TextBlock { Text = car.Dir, Style = Ui.Res<Style>("Caption"), FontFamily = Ui.Res<FontFamily>("MonoFont"), VerticalAlignment = VerticalAlignment.Center, ToolTip = "The folder's real name on disk (never renamed)" };
-        identity.Children.Add(raw);
-        var rename = Ui.IconButton("I.Pencil", "Change the name or class Pit-Box shows", () => EditCarName(car), "QuietIconButton");
-        rename.VerticalAlignment = VerticalAlignment.Center;
-        identity.Children.Add(rename);
-        title.Children.Add(identity);
-        var counts = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(28, 0, 0, 0) };
-        void Count(int n, string label, string brush)
-        {
-            var cell = new StackPanel { Margin = new Thickness(0, 0, 22, 0) };
-            var number = RaceParts.Big(n.ToString(System.Globalization.CultureInfo.CurrentCulture), 44, brush);
-            number.HorizontalAlignment = HorizontalAlignment.Left;
-            number.Margin = new Thickness(0, 0, 0, -9);
-            cell.Children.Add(number);
-            cell.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(1, 0, 0, 0) });
-            cell.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-            cell.Tag = cell.DesiredSize.Width;
-            counts.Children.Add(cell);
-        }
-        var leadMargin = new Thickness(18, 14, 18, 14);
-        void FitCounts(double bannerWidth)
-        {
-            title.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-            double room = bannerWidth - leadMargin.Left - leadMargin.Right - title.DesiredSize.Width - counts.Margin.Left;
-            foreach (FrameworkElement cell in counts.Children)
-            {
-                double width = (double)cell.Tag;
-                var fits = room >= width - cell.Margin.Right ? Visibility.Visible : Visibility.Collapsed;
-                room = fits == Visibility.Visible ? room - width : -1;
-                if (cell.Visibility != fits) cell.Visibility = fits;
-            }
-        }
-        Count(car.Root.Files, "Setups", "Heading");
-        Count(car.Root.Folders, "Folders", "Heading");
-        int fresh = car.Root.NewCount(_store.NewSince);
-        if (fresh > 0) Count(fresh, "New in 3 days", "AccentText");
-        var banner = new Grid { MinHeight = BannerHeight, ClipToBounds = true, Margin = new Thickness(0, 0, 0, 10) };
-        var backdrop = new Backdrop(0);
-        banner.Children.Add(backdrop);
-        var stripe = RaceParts.CarOnStripe(car.Dir, "Place4", BannerHeight, 118, 300, carArea: 320);
-        banner.Children.Add(stripe);
-        var lead = new StackPanel { Orientation = Orientation.Horizontal, Margin = leadMargin, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, Children = { title, counts } };
-        banner.Children.Add(lead);
-        stripe.KeepClearOf(lead);
-        banner.SizeChanged += (_, e) =>
-        {
-            title.MaxWidth = Math.Max(0, e.NewSize.Width - leadMargin.Left - leadMargin.Right);
-            FitCounts(e.NewSize.Width);
-            var shown = e.NewSize.Width - lead.ActualWidth >= 260 ? Visibility.Visible : Visibility.Collapsed;
-            if (stripe.Car is { } picture && picture.Visibility != shown) picture.Visibility = shown;
-            var behind = stripe.Car is not null && shown == Visibility.Visible ? Visibility.Visible : Visibility.Collapsed;
-            if (backdrop.Visibility != behind) backdrop.Visibility = behind;
-        };
-        DockPanel.SetDock(banner, Dock.Top);
-        stack.Children.Add(banner);
-        var actions = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
-        actions.Children.Add(Spaced(Ui.LabeledButton("I.Download", "Import", () => PickImport(target), "PrimaryButton"), "Copy .sto files or a .zip share pack into " + Label(target)));
-        actions.Children.Add(Spaced(Ui.LabeledButton("I.External", sel.Count > 0 ? $"Share / export ({sel.Count})" : "Share / export", () => Export(car, sel.Count > 0 ? sel : new List<SetupNode> { target })), "Save a share pack for league mates, or plain copies"));
-        actions.Children.Add(Spaced(Ui.LabeledButton("I.Plus", "New folder", () => NewFolder(target)), "Make a folder inside " + Label(target)));
-        actions.Children.Add(Spaced(Ui.LabeledButton("I.Folder", "Open in Explorer", () => OpenFolder(target)), "Open " + Label(target) + " in File Explorer"));
-        DockPanel.SetDock(actions, Dock.Top);
-        stack.Children.Add(actions);
+        var head = CarHead(car, target, sel);
+        DockPanel.SetDock(head, Dock.Top);
+        stack.Children.Add(head);
 
         if (!target.IsRoot)
         {
@@ -881,30 +860,6 @@ internal sealed class SetupManagerSection : StackPanel
             }
             DockPanel.SetDock(path, Dock.Top);
             stack.Children.Add(path);
-        }
-
-        if (sel.Count > 0)
-        {
-            var selected = new TextBlock { Text = Describe(sel) + " selected", Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
-            var buttons = new WrapPanel();
-            var one = sel.Count == 1 ? sel[0] : null;
-            if (one is not null) buttons.Children.Add(Spaced(Ui.LabeledButton("I.Pencil", "Rename", () => Rename(one)), "Rename"));
-            buttons.Children.Add(Spaced(Ui.LabeledButton("I.Move", "Move", () => PickMove(car, sel)), "Move to another folder of this car"));
-            if (one is not null)
-                buttons.Children.Add(Spaced(Ui.LabeledButton("I.Folder", one.IsFolder ? "Open in Explorer" : "Show in Explorer", () => { if (one.IsFolder) OpenFolder(one); else Reveal(one); }), null));
-            var delete = Spaced(Ui.LabeledButton("I.Trash", "Delete", () => Delete(sel), "DangerButton"), "Move to the Recycle Bin");
-            if (buttons.Children[^1] is FrameworkElement before) before.Margin = new Thickness(0, 2, Ui.GroupGap, 2);
-            delete.Margin = new Thickness(0, 2, 0, 2);
-            buttons.Children.Add(delete);
-            var clear = Ui.IconButton("I.X", "Clear the selection", () => { _selected.Clear(); RenderExplorer(); }, "QuietIconButton");
-            clear.VerticalAlignment = VerticalAlignment.Top;
-            clear.Margin = new Thickness(2, 2, 0, 0);
-            DockPanel.SetDock(clear, Dock.Right);
-            buttons.Margin = new Thickness(10 + Ui.ButtonGap, 0, 0, 0);
-            var bar = new DockPanel { Children = { clear, Ui.SplitRow(selected, buttons, stackLeft: true) } };
-            var barTile = new Tile { Style = Ui.Res<Style>("Inset"), Background = Ui.Res<Brush>("AccentSoft"), Padding = new Thickness(0, 5, 5, 5), Margin = new Thickness(0, 8, 0, 0), Child = bar };
-            DockPanel.SetDock(barTile, Dock.Top);
-            stack.Children.Add(barTile);
         }
 
         if (sel.Count == 0)
@@ -953,7 +908,7 @@ internal sealed class SetupManagerSection : StackPanel
             _treeScroll.ScrollToVerticalOffset(offset);
             return;
         }
-        var details = Details(car, sel, target);
+        var details = new ScrollViewer { Content = Details(car, sel, target), HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false };
         body.Children.Add(details);
         void Place()
         {
@@ -963,20 +918,134 @@ internal sealed class SetupManagerSection : StackPanel
             Grid.SetColumnSpan(details, under ? 2 : 1);
             body.ColumnDefinitions[1].Width = under ? new GridLength(0) : new GridLength(202);
             details.Margin = under ? new Thickness(0, 10, 0, 0) : new Thickness(11, 0, 0, 0);
+            details.VerticalScrollBarVisibility = under ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled;
+            body.RowDefinitions[0].MinHeight = under ? TreeMinHeight : 0;
+            if (under && body.ActualHeight > 0) details.MaxHeight = Math.Max(0, body.ActualHeight - TreeMinHeight - details.Margin.Top);
+            else details.ClearValue(MaxHeightProperty);
         }
         Place();
-        body.SizeChanged += (_, e) => { if (e.WidthChanged) Place(); };
+        body.SizeChanged += (_, e) => Place();
         stack.Children.Add(body);
 
         _explorer.Child = stack;
         _treeScroll.ScrollToVerticalOffset(offset);
     }
 
-    private static FrameworkElement Spaced(Button button, string? tip)
+    private const double CarHeadHeight = 48, CarHeadPicture = 34, CarHeadMinName = 200, ActionLineGap = 6;
+
+    private FrameworkElement CarHead(SetupCar car, SetupNode target, List<SetupNode> sel)
     {
-        button.Margin = new Thickness(0, 2, Ui.ButtonGap, 2);
-        if (tip is not null) button.ToolTip = tip;
-        return button;
+        var name = RaceParts.Big(car.Name, 21, "Heading", heavy: false);
+        name.VerticalAlignment = VerticalAlignment.Center;
+        name.TextTrimming = TextTrimming.CharacterEllipsis;
+        TextFit.TipWhenTrimmed(name);
+        var tag = new Grid { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 1, 0, 0) };
+        tag.Children.Add(new Slant("Accent", 0.12, 0, 1, 0, 0.88, 1, 0, 1));
+        var tagText = RaceParts.Big(car.Class, 12, "OnAccent", heavy: false);
+        tagText.Margin = new Thickness(11, 1, 11, 2);
+        tag.Children.Add(tagText);
+        var counts = new TextBlock { Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 1, 0, 0) };
+        counts.Inlines.Add(new System.Windows.Documents.Run(SetupTree.Plural(car.Root.Files, "setup") + " · " + SetupTree.Plural(car.Root.Folders, "folder")));
+        int fresh = car.Root.NewCount(_store.NewSince);
+        if (fresh > 0)
+        {
+            var news = new System.Windows.Documents.Run($" · {fresh} new in 3 days");
+            news.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "AccentText");
+            counts.Inlines.Add(news);
+        }
+        var rename = Ui.IconButton("I.Pencil", "Change the name or class Pit-Box shows", () => EditCarName(car), "QuietIconButton");
+        rename.VerticalAlignment = VerticalAlignment.Center;
+        rename.ToolTip = $"Change the name or class Pit-Box shows (the folder on disk stays {car.Dir})";
+        rename.Margin = new Thickness(2, 0, 0, 0);
+        var identity = new TrimRow { VerticalAlignment = VerticalAlignment.Center, Children = { name, tag, counts, rename } };
+
+        var lead = new DockPanel { VerticalAlignment = VerticalAlignment.Center, LastChildFill = true };
+        var picture = CarPictures.Slotted(car.Dir, CarHeadPicture);
+        if (picture is not null)
+        {
+            picture.Margin = new Thickness(0, 0, 10, 0);
+            DockPanel.SetDock(picture, Dock.Left);
+            lead.Children.Add(picture);
+        }
+        lead.Children.Add(identity);
+
+        var actions = new WrapPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        void Act(Button button, string? tip)
+        {
+            if (actions.Children.Count > 0) button.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0);
+            if (tip is not null) button.ToolTip = tip;
+            actions.Children.Add(button);
+        }
+        Button Plain(string label, Action click, string style = "GhostButton")
+        {
+            var b = new Button { Content = label, Style = Ui.Res<Style>(style) };
+            b.Click += (_, _) => click();
+            return b;
+        }
+        if (sel.Count == 0)
+        {
+            Act(Ui.LabeledButton("I.Download", "Import", () => PickImport(target), "PrimaryButton"), "Copy .sto files or a .zip share pack into " + Label(target));
+            Act(Plain("Share / export", () => Export(car, new List<SetupNode> { target })), "Save a share pack for league mates, or plain copies");
+            Act(Plain("New folder", () => NewFolder(target)), "Make a folder inside " + Label(target));
+            Act(Plain("Open in Explorer", () => OpenFolder(target)), "Open " + Label(target) + " in File Explorer");
+        }
+        else
+        {
+            var one = sel.Count == 1 ? sel[0] : null;
+            var selected = new TextBlock { Text = $"{sel.Count} selected", ToolTip = Describe(sel) + " selected", Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0) };
+            selected.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
+            actions.Children.Add(selected);
+            if (one is not null) Act(Plain("Rename", () => Rename(one)), "Rename (F2)");
+            Act(Plain("Move", () => PickMove(car, sel)), "Move to another folder of this car");
+            var share = Ui.IconButton("I.External", $"Share / export ({sel.Count}): save a share pack for league mates, or plain copies", () => Export(car, sel));
+            share.VerticalAlignment = VerticalAlignment.Center;
+            Act(share, null);
+            if (one is not null) Act(Plain(one.IsFolder ? "Open in Explorer" : "Show in Explorer", () => { if (one.IsFolder) OpenFolder(one); else Reveal(one); }), null);
+            var delete = Plain("Delete", () => Delete(sel), "DangerButton");
+            Act(delete, "Move to the Recycle Bin");
+            delete.Margin = new Thickness(Ui.GroupGap, 0, 0, 0);
+            var clear = Ui.IconButton("I.X", "Clear the selection (Esc)", () => { _selected.Clear(); RenderExplorer(); }, "QuietIconButton");
+            clear.VerticalAlignment = VerticalAlignment.Center;
+            Act(clear, null);
+            clear.Margin = new Thickness(4, 0, 0, 0);
+        }
+
+        var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition());
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        row.Children.Add(lead);
+        Grid.SetColumn(actions, 1);
+        actions.Margin = new Thickness(12, 0, 0, 0);
+        row.Children.Add(actions);
+        void Fit(double width)
+        {
+            if (width <= 0) return;
+            actions.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            double room = width - actions.DesiredSize.Width + actions.Margin.Left - 12;
+            bool under = room < CarHeadMinName;
+            Grid.SetRow(actions, under ? 1 : 0);
+            Grid.SetColumn(actions, under ? 0 : 1);
+            actions.Margin = under ? new Thickness(0, 8, 0, -ActionLineGap) : new Thickness(12, 0, 0, 0);
+            foreach (FrameworkElement child in actions.Children)
+                child.Margin = new Thickness(child.Margin.Left, 0, child.Margin.Right, under ? ActionLineGap : 0);
+            double avail = under ? width : room;
+            if (counts.Visibility != Visibility.Visible) counts.Visibility = Visibility.Visible;
+            identity.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            double need = identity.DesiredSize.Width;
+            if (picture is not null)
+            {
+                double free = avail - picture.Width - picture.Margin.Right;
+                var shown = free >= need ? Visibility.Visible : Visibility.Collapsed;
+                if (picture.Visibility != shown) picture.Visibility = shown;
+            }
+            if (need > avail) counts.Visibility = Visibility.Collapsed;
+        }
+        row.SizeChanged += (_, e) => { if (e.WidthChanged) Fit(e.NewSize.Width); };
+        var tile = new Tile { Style = Ui.Res<Style>("Inset"), MinHeight = CarHeadHeight, Padding = new Thickness(4, 6, 8, 6), Child = row };
+        tile.SetResourceReference(Border.BackgroundProperty, "SurfaceAlt");
+        return tile;
     }
 
     private IEnumerable<(SetupNode, int, bool, bool, bool, int)> TreeItems(SetupCar car, SetupSearch? search, SetupNode target, HashSet<SetupNode> sel, DateTime since)
@@ -1066,8 +1135,6 @@ internal sealed class SetupManagerSection : StackPanel
         RenderCars();
         RenderExplorer();
     }
-
-    private const double BannerHeight = 150;
 
     private static string Describe(List<SetupNode> nodes)
     {
@@ -1400,8 +1467,16 @@ internal sealed class SetupManagerSection : StackPanel
             RenderAll();
             return Task.CompletedTask;
         });
+        yield return ("setups-downloads", () =>
+        {
+            S.InboxFolded = false;
+            RenderInbox();
+            if (_inbox.Visibility != Visibility.Visible) throw new InvalidOperationException("The Downloads button didn't open the files found.");
+            return Task.CompletedTask;
+        });
         yield return ("setups-gtp-hidden", () =>
         {
+            S.InboxFolded = true;
             S.SetClassHidden("GTP", true);
             _classFilter.Remove("GTP");
             RenderAll();

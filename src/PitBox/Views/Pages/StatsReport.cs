@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Media;
 using PitBox.Config;
 using PitBox.Services;
@@ -33,7 +34,61 @@ internal static class StatsReport
         })!;
         string last = r.Last is { } when ? "Last driven " + Dates.Day(when.ToLocalTime()) : "";
         var summary = StatsSections.Chart("Report card", $"{r.Car} · {place}" + (last.Length > 0 ? " · " + last : ""), metrics);
-        return StatsSections.Stack(summary, OffTracks(r, names), Notes(r, names, service, changed));
+        var laps = StatsLayout.Pair(OffTracks(r, names), TimeLoss(r, names), 1050, gap: 26)!;
+        return StatsSections.Stack(summary, laps, Notes(r, names, service, changed));
+    }
+
+    private static FrameworkElement TimeLoss(ComboReport r, TurnNames names)
+    {
+        var stack = new StackPanel();
+        if (r.TheoreticalBest is { } ideal && r.Best is { } best)
+        {
+            var line = new TextBlock { Style = Ui.Res<Style>("Body"), Margin = new Thickness(0, 0, 0, 12), ToolTip = "Your best clean sector times added up" };
+            line.Inlines.Add(new System.Windows.Documents.Run("Theoretical best ") { FontWeight = FontWeights.SemiBold });
+            line.Inlines.Add(new System.Windows.Documents.Run(StatFormat.LapTime(ideal)));
+            var gap = new System.Windows.Documents.Run($"   {(best - ideal).ToString("0.000", CultureInfo.CurrentCulture)} {Units.S} under your best lap");
+            gap.SetResourceReference(TextElement.ForegroundProperty, "TextMuted");
+            line.Inlines.Add(gap);
+            stack.Children.Add(line);
+        }
+        var corners = ComboInsights.ByTurn(r.Loss, p => names.Where(p)).Take(HotspotsShown).ToList();
+        if (r.LossLapCount == 0) stack.Children.Add(StatsSections.Empty(r.TracedLaps == 0 ? "No recorded laps here yet." : "Needs 2 or more clean recorded laps."));
+        else if (corners.Count == 0)
+            stack.Children.Add(StatsSections.Empty($"No corner costs more than {CornerLoss.LeastLoss.ToString("0.00", CultureInfo.CurrentCulture)} {Units.S} on average."));
+        else
+        {
+            double most = corners[0].Lost;
+            var grid = new Grid { VerticalAlignment = VerticalAlignment.Top };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, MinWidth = 44 });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MaxWidth = 260 });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            for (int i = 0; i < corners.Count; i++)
+            {
+                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                var where = new TextBlock { Text = corners[i].Where, Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 18, 6) };
+                var track = new Grid { Height = 5, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 14, 6) };
+                track.SetResourceReference(Panel.BackgroundProperty, "MeterTrack");
+                track.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(corners[i].Lost, GridUnitType.Star) });
+                track.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(0, most - corners[i].Lost), GridUnitType.Star) });
+                var bar = new Border { MinWidth = 2 };
+                bar.SetResourceReference(Border.BackgroundProperty, "Danger");
+                track.Children.Add(bar);
+                var lost = new TextBlock { Text = $"+{corners[i].Lost.ToString("0.00", CultureInfo.CurrentCulture)} {Units.S}", Style = Ui.Res<Style>("Muted"), Margin = new Thickness(0, 0, 0, 6) };
+                Typography.SetNumeralAlignment(lost, FontNumeralAlignment.Tabular);
+                Grid.SetRow(where, i);
+                Grid.SetRow(track, i);
+                Grid.SetRow(lost, i);
+                Grid.SetColumn(track, 1);
+                Grid.SetColumn(lost, 2);
+                grid.Children.Add(where);
+                grid.Children.Add(track);
+                grid.Children.Add(lost);
+            }
+            stack.Children.Add(grid);
+        }
+        string caption = r.LossLapCount == 0 ? "Compared with your best recorded lap"
+            : $"Average time lost to your best lap, from your {SimRacing.Race.RaceFormat.Count(r.LossLapCount, "most recent clean recorded lap")}";
+        return StatsSections.Chart("Where you lose time", caption, stack);
     }
 
     private static FrameworkElement OffTracks(ComboReport r, TurnNames names)
@@ -42,6 +97,21 @@ internal static class StatsReport
             : $"Where all four wheels left the track, from your {SimRacing.Race.RaceFormat.Count(r.TracedLaps, "most recent recorded lap")}";
         if (r.OffTracks.Count == 0)
             return StatsSections.Chart("Off-tracks", caption, StatsSections.Empty(r.TracedLaps == 0 ? "No recorded laps here yet." : "None on these laps."));
+        var chart = StatsSections.Chart("Off-tracks", caption, OffTrackBody(r, names));
+        if (r.OffTrackTrend is { } trend)
+        {
+            string Rate(double v) => v.ToString("0.0", CultureInfo.CurrentCulture);
+            chart.Children.Add(new TextBlock
+            {
+                Text = $"Per {SimRacing.Race.RaceFormat.Count(ComboInsights.PerLaps, "lap")}: {Rate(trend.Recent)} in your last {trend.RecentLaps}, {Rate(trend.Earlier)} in the {trend.EarlierLaps} before",
+                Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 8, 0, 0),
+            });
+        }
+        return chart;
+    }
+
+    private static FrameworkElement OffTrackBody(ComboReport r, TurnNames names)
+    {
         var hotspots = SimRacing.Race.TrackLimits.Hotspots(r.OffTracks, p => names.Where(p)).Take(HotspotsShown).ToList();
         var list = new Grid { VerticalAlignment = VerticalAlignment.Top };
         list.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -70,7 +140,7 @@ internal static class StatsReport
             row.Children.Add(list);
             body = row;
         }
-        return StatsSections.Chart("Off-tracks", caption, body);
+        return body;
     }
 
     private static FrameworkElement Notes(ComboReport r, TurnNames names, SessionStatsService service, Action changed)

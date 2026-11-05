@@ -17,7 +17,7 @@ internal sealed class ShakersSection : Tile
 {
     private readonly AppServices _app;
     private readonly StackPanel _stack = new();
-    private readonly ContentControl _status = new();
+    private readonly ContentControl _status = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
     private ShakerHost? _subscribed;
     private List<AudioDevice>? _devices;
     private string _builtFor = "";
@@ -33,6 +33,8 @@ internal sealed class ShakersSection : Tile
         Child = _stack;
         Build();
     }
+
+    public FrameworkElement TitleTools => _status;
 
     private ShakerHost? Host => _app.Plugins.Find(PluginIds.SimRacing) is SimRacingPlugin plugin ? plugin.Shakers : null;
 
@@ -89,14 +91,13 @@ internal sealed class ShakersSection : Tile
             _devices = _app.Demo ? new List<AudioDevice>() : SafeList();
             _listedAt = Environment.TickCount64;
         }
-        _stack.Children.Add(_status);
         ShowStatus();
 
         var outputs = Group("Output", first: true, columns: 2);
         var choices = new List<Choice> { new(null, "Choose an output…") };
         choices.AddRange(_devices.Select(d => new Choice(d.Id, d.Name)));
         if (S.DeviceId is { } id && _devices.All(d => d.Id != id)) choices.Add(new Choice(id, $"{S.DeviceName ?? "Saved output"} (not connected)"));
-        var output = Ui.SettingRow("Device", "The sound output your shaker's amplifier is plugged into. Pick one that nothing else plays through.",
+        var output = Line("Device", "The sound output your shaker's amplifier is plugged into. Pick one that nothing else plays through.",
             Ui.Combo(choices, S.DeviceId, c =>
             {
                 if (c.Id == S.DeviceId) return;
@@ -104,17 +105,17 @@ internal sealed class ShakersSection : Tile
                 S.DeviceName = c.Id is null ? null : c.Text;
                 Changed();
                 Dispatcher.BeginInvoke(Build);
-            }, 220));
+            }, 240));
         Ui.Anchor(output, "simracing.shakers");
         outputs.Children.Add(output);
         var channels = new[] { ShakerChannel.Both, ShakerChannel.Left, ShakerChannel.Right };
-        outputs.Children.Add(Ui.SettingRow("Channel", "Left or right for one shaker on each side of a stereo amplifier.",
+        outputs.Children.Add(Line("Channel", "Left or right for one shaker on each side of a stereo amplifier.",
             Ui.Segmented(new[] { "Both", "Left", "Right" }, Array.IndexOf(channels, S.Channel), i => { S.Channel = channels[i]; Changed(); }, "shaker-channel")));
-        outputs.Children.Add(Ui.SettingRow("Volume", null, Ui.SliderWithValue(0, 100, S.Volume, "{0:0}%", v => { S.Volume = (int)v; Changed(); }, 120)));
+        outputs.Children.Add(Line("Volume", null, Ui.SliderWithValue(0, 100, S.Volume, "{0:0}%", v => { S.Volume = (int)v; Changed(); }, 240)));
 
         var sources = Group("Sources");
         var modes = new[] { ShakerMode.Effects, ShakerMode.GameAudio, ShakerMode.Off };
-        sources.Children.Add(Ui.SettingRow("In supported games", "iRacing and the games below. Off leaves the shakers to a game's own bass shaker output.",
+        sources.Children.Add(Line("In supported games", "iRacing and the games below. Off leaves the shakers to a game's own bass shaker output.",
             Ui.Segmented(new[] { "Effects", "Game audio", "Off" }, Array.IndexOf(modes, S.Mode), i =>
             {
                 S.Mode = modes[i];
@@ -183,19 +184,19 @@ internal sealed class ShakersSection : Tile
         _stack.Children.Add(effects);
 
         var pitch = Group("Engine pitch");
-        pitch.Children.Add(Ui.SettingRow("Lowest", "At idle, and for shifts and ABS.",
+        pitch.Children.Add(Line("Lowest", "At idle, and for shifts and ABS.",
             Ui.SliderWithValue(ShakerSettings.MinHz, ShakerSettings.MaxHz, S.EngineLowHz, v => $"{v:0} {Units.Hz}", v =>
             {
                 S.EngineLowHz = (int)v;
                 S.EngineHighHz = Math.Max(S.EngineHighHz, S.EngineLowHz);
                 Changed();
-            }, 120)));
-        pitch.Children.Add(Ui.SettingRow("Highest", "At the red line and on the rev limiter.",
+            }, 240)));
+        pitch.Children.Add(Line("Highest", "At the red line and on the rev limiter.",
             Ui.SliderWithValue(ShakerSettings.MinHz, ShakerSettings.MaxHz, S.EngineHighHz, v => $"{v:0} {Units.Hz}", v =>
             {
                 S.EngineHighHz = Math.Max((int)v, S.EngineLowHz);
                 Changed();
-            }, 120)));
+            }, 240)));
     }
 
     private const double EffectMin = 200;
@@ -261,13 +262,56 @@ internal sealed class ShakersSection : Tile
         return flow;
     }
 
-    private FrameworkElement[] AddGameAudio() =>
-    [
-        Ui.SettingRow("Game audio strength", null,
-            Ui.SliderWithValue(0, 100, S.GameAudioStrength, v => v <= 0 ? "Off" : $"{v:0}%", v => { S.GameAudioStrength = (int)v; Changed(); }, 120)),
-        Ui.SettingRow("Rumble below", "Only game sound below this pitch reaches the shakers.",
-            Ui.SliderWithValue(ShakerSettings.MinCutoffHz, ShakerSettings.MaxHz, S.GameAudioCutoffHz, v => $"{v:0} {Units.Hz}", v => { S.GameAudioCutoffHz = (int)v; Changed(); }, 120)),
-    ];
+    private FrameworkElement[] AddGameAudio()
+    {
+        var strength = Ui.SliderWithValue(0, 100, S.GameAudioStrength, v => v <= 0 ? "Off" : $"{v:0}%", v => { S.GameAudioStrength = (int)v; Changed(); }, 160);
+        var cutoff = Ui.SliderWithValue(ShakerSettings.MinCutoffHz, ShakerSettings.MaxHz, S.GameAudioCutoffHz, v => $"{v:0} {Units.Hz}", v => { S.GameAudioCutoffHz = (int)v; Changed(); }, 160);
+        Ui.NameFor(strength, "Game audio strength");
+        Ui.NameFor(cutoff, "Rumble below");
+        var row = new Grid { Height = 40 };
+        foreach (var w in new[] { GridLength.Auto, GridLength.Auto, new GridLength(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto, GridLength.Auto })
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = w });
+        void Put(FrameworkElement e, int column, double right)
+        {
+            e.VerticalAlignment = VerticalAlignment.Center;
+            e.Margin = new Thickness(0, 0, right, 0);
+            Grid.SetColumn(e, column);
+            row.Children.Add(e);
+        }
+        Put(Label("Game audio strength"), 0, 14);
+        Put(strength, 1, 14);
+        Put(Label("Rumble below"), 3, 14);
+        var note = TextFit.TipWhenTrimmed(new TextBlock { Text = "Only game sound below this pitch reaches the shakers.", Style = Ui.Res<Style>("Caption"), TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap });
+        Put(note, 4, 14);
+        Put(cutoff, 5, 0);
+        return [row];
+    }
+
+    private static TextBlock Label(string text) => new() { Text = text, Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold };
+
+    private static SettingRowGrid Line(string title, string? description, FrameworkElement control)
+    {
+        Ui.NameFor(control, title);
+        var row = new SettingRowGrid { Margin = new Thickness(0, 4, 0, 4) };
+        row.ColumnDefinitions.Add(new ColumnDefinition());
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.RowDefinitions.Add(new RowDefinition { Height = new GridLength(28) });
+        row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var label = Label(title);
+        label.VerticalAlignment = VerticalAlignment.Center;
+        label.Margin = new Thickness(0, 0, 14, 0);
+        row.Children.Add(label);
+        control.VerticalAlignment = VerticalAlignment.Center;
+        control.HorizontalAlignment = HorizontalAlignment.Right;
+        Grid.SetColumn(control, 1);
+        row.Children.Add(control);
+        if (description is null) return row;
+        var text = TextFit.TipWhenTrimmed(new TextBlock { Text = description, Style = Ui.Res<Style>("Caption"), TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap, Margin = new Thickness(0, 2, 0, 0) });
+        Grid.SetRow(text, 1);
+        Grid.SetColumnSpan(text, 2);
+        row.Children.Add(text);
+        return row;
+    }
 
     private TextBox GamesBox()
     {
@@ -333,8 +377,8 @@ internal sealed class ShakersSection : Tile
             : host?.WaitingFor is { } waiting ? ($"“{waiting.Name}” is running but sends no telemetry", "ApricotSoft", "ApricotDeep")
             : (Waiting(), "SlateSoft", "SlateDeep");
         var chip = Ui.Chip(text, soft, deep);
-        chip.HorizontalAlignment = HorizontalAlignment.Left;
-        chip.Margin = new Thickness(0, 0, 0, 6);
+        chip.Margin = new Thickness(0);
+        chip.VerticalAlignment = VerticalAlignment.Center;
         _status.Content = chip;
     }
 

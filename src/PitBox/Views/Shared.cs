@@ -283,9 +283,9 @@ internal sealed class Collapsible : StackPanel
 
 internal static class Ui
 {
-    public const double HeaderGap = 16;
+    public const double HeaderGap = 4;
 
-    public const double HeaderIndent = 6, HeaderTop = 0;
+    public const double HeaderIndent = 6, HeaderTop = -6;
 
     public static Thickness HeaderMargin => new(HeaderIndent, HeaderTop, 0, HeaderGap);
 

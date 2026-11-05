@@ -31,8 +31,11 @@ internal sealed class GrrPage : UserControl, IPage, IScreenshotStates, ISectione
         Content = _scroll;
         _dashboard = new GrrDashboardSection(app, window, leagueTabs: false) { ThemeToggled = ToggleTheme };
         ApplyTheme();
-        var header = Ui.SplitRow(_title, _dashboard.Tools!);
-        header.Margin = Ui.HeaderMargin;
+        var tools = _dashboard.Tools!;
+        tools.Margin = new Thickness(13, 0, 0, 0);
+        tools.HorizontalAlignment = HorizontalAlignment.Right;
+        DockPanel.SetDock(tools, Dock.Right);
+        var header = new DockPanel { LastChildFill = true, Margin = Ui.HeaderMargin, Children = { tools, _title } };
         _body.Children.Add(header);
         Ui.Anchor(_dashboard, GrrParts.Anchor);
         _body.Children.Add(_dashboard);

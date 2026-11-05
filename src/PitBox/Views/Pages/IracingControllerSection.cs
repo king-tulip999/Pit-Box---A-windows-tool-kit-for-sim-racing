@@ -42,6 +42,10 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
     private FrameworkElement? _where, _modes;
     private KeybindsBoard? _keybinds;
 
+    private readonly StackPanel _titleTools = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+
+    public FrameworkElement TitleTools => _titleTools;
+
     public IracingControllerSection(AppServices app, MainWindow window)
     {
         _app = app;
@@ -117,6 +121,7 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
     private void Build()
     {
         Children.Clear();
+        _titleTools.Children.Clear();
         if (Session is null)
         {
             Children.Add(NotFound());
@@ -125,35 +130,40 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
         if (!_ws.Demo && LayoutGuard.CaptureIfEmpty(Session, S.SavedLayout)) _app.Save();
 
         var tabs = Ui.PageTabs(Tabs, _tabIndex, i => { _tabIndex = i; ShowTab(); Motion.FadeIn(_tab); }, "TiTab");
-        tabs.HorizontalAlignment = HorizontalAlignment.Left;
         tabs.VerticalAlignment = VerticalAlignment.Center;
-        var tools = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        (_tabTools.Parent as Panel)?.Children.Remove(_tabTools);
-        tools.Children.Add(_tabTools);
+        _titleTools.Children.Add(tabs);
         _modes = null;
         if (_ws.Modes.Count > 1)
         {
             var modes = Ui.Combo(_ws.Modes.Select(m => new Choice(m.File, m.Label + " graphics")), Session.RendererFile, c => _ = SwitchMode(c.Id!), 138);
             modes.ToolTip = "Which display mode's graphics file to show (iRacing keeps one per mode)";
             modes.VerticalAlignment = VerticalAlignment.Center;
-            modes.Margin = new Thickness(Ui.ButtonGap, 0, Ui.InlineGap, 0);
-            tools.Children.Add(modes);
+            modes.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0);
+            _titleTools.Children.Add(modes);
             _modes = modes;
         }
         if (!_ws.Demo && _ws.Folder is { } folder)
-            tools.Children.Add(Ui.IconButton("I.Folder", "Open the iRacing folder", () => Ui.OpenUrl(folder)));
-        tools.Children.Add(Ui.IconButton("I.Refresh", "Read the files again", () => _ = Reload()));
-        var bar = Ui.SplitRow(tabs, tools, stackLeft: true);
-        bar.Margin = new Thickness(0, 0, 0, 10);
-        Children.Add(bar);
+        {
+            var open = Ui.IconButton("I.Folder", "Open the iRacing folder", () => Ui.OpenUrl(folder));
+            open.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0);
+            open.VerticalAlignment = VerticalAlignment.Center;
+            _titleTools.Children.Add(open);
+        }
+        var refresh = Ui.IconButton("I.Refresh", "Read the files again", () => _ = Reload());
+        refresh.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0);
+        refresh.VerticalAlignment = VerticalAlignment.Center;
+        _titleTools.Children.Add(refresh);
 
-        var where = TextFit.TipWhenTrimmed(new TextBlock { Style = Ui.Res<Style>("Caption"), Margin = new Thickness(2, 0, 0, 8), TextTrimming = TextTrimming.CharacterEllipsis });
+        var where = TextFit.TipWhenTrimmed(new TextBlock { Style = Ui.Res<Style>("Caption"), Margin = new Thickness(2, 0, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
         if (_ws.Demo) where.Inlines.Add(new System.Windows.Documents.Run("Demo settings (nothing is read from or written to the PC) · "));
         else where.Inlines.Add(TextCase.Verbatim(new System.Windows.Documents.Run(_ws.Folder + " · ")));
         where.Inlines.Add(new System.Windows.Documents.Run($"{Session.Settings.Count} settings in "));
         where.Inlines.Add(TextCase.Verbatim(new System.Windows.Documents.Run(string.Join(", ", Session.FileNames))));
-        Children.Add(where);
-        _where = where;
+        (_tabTools.Parent as Panel)?.Children.Remove(_tabTools);
+        var bar = Ui.SplitRow(where, _tabTools, stackLeft: true);
+        bar.Margin = new Thickness(0, 0, 0, 8);
+        Children.Add(bar);
+        _where = bar;
 
         Ui.PendingBar(_pending);
         _pending.Margin = new Thickness(0, 12, 0, 0);
@@ -201,7 +211,7 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
         _simCheckedAt = long.MinValue / 2;
         UpdatePending();
         _keybinds = null;
-        var hidden = _tabIndex == 1 ? Visibility.Collapsed : Visibility.Visible;
+        var hidden = _tabIndex == 1 ? Visibility.Hidden : Visibility.Visible;
         if (_where is not null) _where.Visibility = hidden;
         if (_modes is not null) _modes.Visibility = hidden;
         switch (_tabIndex)
@@ -391,12 +401,20 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
         var layout = _ws.ChangedOnDisk() ? new List<LayoutGuard.Difference>() : LayoutGuard.Differences(Session!, S.SavedLayout);
         int problems = report.Findings.Count + (report.TelemetryLarge ? 1 : 0) + (layout.Count > 0 ? 1 : 0);
 
-        var tiles = RaceParts.Tiles(4,
-            RaceParts.Tile(Number(problems), problems == 1 ? "thing to look at" : "things to look at", problems == 0 ? "Sage" : "Warn", problems == 0 ? "SageDeep" : "WarnDeep"),
-            RaceParts.Tile(Number(report.Unusual.Count), "changed from iRacing's default", "Slate", "SlateDeep"),
-            RaceParts.Tile(Number(report.Passed.Count), "checks passed", "Sage", "SageDeep"),
-            RaceParts.Tile(backupCount is { } n ? Number(n) : RaceFormat.Missing, backupCount == 1 ? "backup" : "backups", "Accent", "AccentText"));
-        _tab.Children.Add(new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Child = tiles });
+        var line = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
+        void Figure(string value, string label, string brush)
+        {
+            var number = RaceParts.Big(value, 20, brush);
+            number.VerticalAlignment = VerticalAlignment.Center;
+            number.Margin = new Thickness(0, 0, 5, 0);
+            var text = new TextBlock { Text = label, Style = Ui.Res<Style>("Muted"), VerticalAlignment = VerticalAlignment.Center };
+            line.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 22, 0), Children = { number, text } });
+        }
+        Figure(Number(problems), problems == 1 ? "thing to look at" : "things to look at", problems == 0 ? "SageDeep" : "WarnDeep");
+        Figure(Number(report.Unusual.Count), "changed from iRacing's default", "SlateDeep");
+        Figure(Number(report.Passed.Count), "checks passed", "SageDeep");
+        Figure(backupCount is { } n ? Number(n) : RaceFormat.Missing, backupCount == 1 ? "backup" : "backups", "AccentText");
+        _tab.Children.Add(new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(16, 0, 16, 0), MinHeight = 40, Margin = new Thickness(0, 0, 0, 8), Child = line });
 
         if (layout.Count > 0)
             _tab.Children.Add(FindingCard(Rating.Concerning, "iRacing changed your triple-screen layout",

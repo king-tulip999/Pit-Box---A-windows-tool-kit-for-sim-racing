@@ -63,19 +63,10 @@ internal static class StatsSessions
             {
                 if (index++ == filter.CascadeFrom) cascadeRow = row + 1;
                 var local = s.StartUtc.ToLocalTime();
-                if (day != local.Date)
-                {
-                    day = local.Date;
-                    row++;
-                    table.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                    var dayText = new TextBlock { Text = Dates.Weekday(local) + " " + Dates.Short(local), Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(8, row == 1 ? 5 : 13, 0, 4) };
-                    dayText.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
-                    Grid.SetRow(dayText, row);
-                    Grid.SetColumnSpan(dayText, span);
-                    table.Children.Add(dayText);
-                }
+                bool newDay = day != local.Date;
+                day = local.Date;
                 row++;
-                table.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                table.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto, MinHeight = RowHeight });
                 bool raced = RaceParts.Raced(s);
                 string place = RaceParts.Place(s);
                 if (raced)
@@ -99,7 +90,13 @@ internal static class StatsSessions
                 Grid.SetColumnSpan(rule, span);
                 table.Children.Add(hit);
                 table.Children.Add(rule);
-                Cell(table, row, 0, Caption(Dates.Time(local)));
+                if (newDay)
+                {
+                    var dayText = new TextBlock { Text = Dates.Weekday(local) + " " + Dates.Short(local), Style = Ui.Res<Style>("Caption"), FontSize = 10.5, FontWeight = FontWeights.Bold };
+                    dayText.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
+                    Cell(table, row, 0, new StackPanel { Children = { dayText, Caption(Dates.Time(local)) } });
+                }
+                else Cell(table, row, 0, Caption(Dates.Time(local)));
                 Cell(table, row, 1, raced ? Finish(s, place) : TypeMark(s.Type));
                 var names = new StackPanel { Children = { Body(s.Car), Body(s.Place, "TextMuted", 9.5) } };
                 var carPicture = CarPictures.Beside(names, s.Car, 21, 8);
@@ -145,7 +142,7 @@ internal static class StatsSessions
     }
 
     private const int Columns = 10;
-    private const double CarTrackMax = 440, CascadeStepMs = 22, MaxCascadeMs = 420;
+    private const double RowHeight = 44, CarTrackMax = 440, CascadeStepMs = 22, MaxCascadeMs = 420;
 
     internal static string NoTraceReason(SessionSummary s, Config.SessionStatsSettings settings, DateTime nowUtc)
     {
@@ -174,8 +171,8 @@ internal static class StatsSessions
 
     private static FrameworkElement Finish(SessionSummary s, string place)
     {
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 4) };
-        row.Children.Add(RaceParts.Big("P" + s.FinishPos!.Value.ToString(CultureInfo.CurrentCulture), 27, place + "Text"));
+        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        row.Children.Add(RaceParts.Big("P" + s.FinishPos!.Value.ToString(CultureInfo.CurrentCulture), 25, place + "Text"));
         if (s.StartPos is { } start)
         {
             int gained = start - s.FinishPos.Value;
@@ -209,7 +206,7 @@ internal static class StatsSessions
 
     private static void Cell(Grid table, int row, int col, FrameworkElement element, bool right = false)
     {
-        element.Margin = new Thickness(col == 0 ? 6 : 13, 7, col == Columns - 1 ? 6 : 0, 7);
+        element.Margin = new Thickness(col == 0 ? 6 : 13, row == 0 ? 7 : 3, col == Columns - 1 ? 6 : 0, row == 0 ? 7 : 3);
         element.VerticalAlignment = VerticalAlignment.Center;
         element.IsHitTestVisible = element.ToolTip is not null || element is StackPanel { Children.Count: > 0 } panel && panel.Children.OfType<FrameworkElement>().Any(c => c.ToolTip is not null);
         if (right) element.HorizontalAlignment = HorizontalAlignment.Right;

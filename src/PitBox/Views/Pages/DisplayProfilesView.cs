@@ -26,23 +26,20 @@ internal sealed class DisplayProfilesView : Tile
         Margin = new Thickness(0, 0, 0, Ui.PanelSpacing);
 
         var stack = new StackPanel();
-        var head = new Grid();
-        head.ColumnDefinitions.Add(new ColumnDefinition());
-        head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var title = Ui.Text("Saved profiles", "H2");
         title.VerticalAlignment = VerticalAlignment.Center;
+        title.HorizontalAlignment = HorizontalAlignment.Left;
         Ui.AddInfo(title, "Saved setups like “Desk” and “Sim rig”: which displays are on, arrangement, resolution, refresh rate, main display, HDR, taskbar, wallpapers and audio devices. Give each a keybind to switch between them.");
-        head.Children.Add(title);
-        var save = Ui.LabeledButton("I.Save", "Save current setup", SaveCurrentAsync, "PrimaryButton");
-        Grid.SetColumn(save, 1);
-        head.Children.Add(save);
-        stack.Children.Add(head);
+        stack.Children.Add(title);
+        SaveCurrent = Ui.LabeledButton("I.Save", "Save current setup", SaveCurrentAsync, "PrimaryButton");
         stack.Children.Add(_grid);
         stack.Children.Add(_empty);
         Child = stack;
         _grid.SizeChanged += (_, e) => FitColumns(e.NewSize.Width - CardGap);
         Ui.Anchor(this, "displays.profiles");
     }
+
+    public Button SaveCurrent { get; }
 
     public void Refresh()
     {
@@ -67,57 +64,59 @@ internal sealed class DisplayProfilesView : Tile
     private FrameworkElement ProfileTile(DisplayProfile profile, bool isActive)
     {
         var stack = new StackPanel();
-        var top = new Grid();
+        var top = new Grid { MinHeight = 28 };
         top.ColumnDefinitions.Add(new ColumnDefinition());
         top.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        top.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        top.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        var name = Ui.Text(profile.Name, "H3");
-        name.TextWrapping = TextWrapping.Wrap;
-        name.HorizontalAlignment = HorizontalAlignment.Left;
-        name.VerticalAlignment = VerticalAlignment.Center;
-        name.Margin = new Thickness(0, 0, 8, 0);
-        top.Children.Add(name);
-        var tags = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
+        var title = new TrimRow { VerticalAlignment = VerticalAlignment.Center };
+        title.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = profile.Name, Style = Ui.Res<Style>("H3"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) }));
         if (isActive)
         {
             var activeTag = Ui.Chip("Active", "AccentSoft", "AccentText");
-            activeTag.Margin = new Thickness(0, 0, 8, 0);
+            activeTag.Margin = new Thickness(0, 0, 6, 0);
             activeTag.VerticalAlignment = VerticalAlignment.Center;
-            tags.Children.Add(activeTag);
+            title.Children.Add(activeTag);
         }
         if (profile.Hotkey is { } hk)
         {
             var keys = Ui.Chip(PitBox.Hotkeys.Hotkey.Display(hk));
-            keys.Margin = new Thickness(0);
+            keys.Margin = new Thickness(0, 0, 6, 0);
             keys.VerticalAlignment = VerticalAlignment.Center;
-            tags.Children.Add(keys);
+            title.Children.Add(keys);
         }
-        if (tags.Children.Count > 0)
-        {
-            Grid.SetRow(tags, 1);
-            Grid.SetColumnSpan(tags, 2);
-            top.Children.Add(tags);
-        }
+        top.Children.Add(title);
+        var tools = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         var changes = _app.DisplayProfiles.Preview(profile);
         if (!isActive || changes.Count > 0)
         {
             var apply = Ui.LabeledButton("I.Zap", isActive ? "Reapply" : "Apply", () => _ = _app.DisplayProfiles.ApplyAsync(profile));
             if (isActive) apply.ToolTip = "Something changed since it was applied";
-            apply.VerticalAlignment = VerticalAlignment.Top;
-            Grid.SetColumn(apply, 1);
-            top.Children.Add(apply);
+            apply.Margin = new Thickness(0, 0, Ui.ButtonGap, 0);
+            tools.Children.Add(apply);
         }
-        else
-            top.MinHeight = 28;
+        var edit = Ui.IconButton("I.Pencil", "Edit", () => _ = EditAsync(profile, isNew: false));
+        edit.Margin = new Thickness(0, 0, Ui.ButtonGap, 0);
+        tools.Children.Add(edit);
+        var more = Ui.IconButton("I.More", "More for this profile", () => { });
+        more.Click += (_, _) =>
+        {
+            var menu = new ContextMenu { PlacementTarget = more, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
+            Ui.DropBelow(menu);
+            var update = new MenuItem { Header = "Overwrite with current", ToolTip = "Save the setup that's on right now (layout, wallpapers and audio devices) into this profile" };
+            update.Click += (_, _) => UpdateToCurrent(profile);
+            menu.Items.Add(update);
+            menu.IsOpen = true;
+        };
+        tools.Children.Add(more);
+        Grid.SetColumn(tools, 1);
+        top.Children.Add(tools);
         stack.Children.Add(top);
 
         var previewBox = new Tile { Style = Ui.Res<Style>("Inset"), Margin = new Thickness(0, 8, 0, 0), Padding = new Thickness(5) };
         if (profile.Layout is null)
-            previewBox.Child = new TextBlock { Text = "Leaves the arrangement as it is", Style = Ui.Res<Style>("Caption"), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 32, 0, 32) };
+            previewBox.Child = new TextBlock { Text = "Leaves the arrangement as it is", Style = Ui.Res<Style>("Caption"), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 18, 0, 18) };
         else
         {
-            var preview = new MonitorLayoutView { Height = 89 };
+            var preview = new MonitorLayoutView { Height = 60 };
             var tiles = ProfileLayout.Tiles(_app, profile.Layout);
             var unnumbered = tiles.Where(t => !int.TryParse(t.Label, out _)).ToList();
             preview.SetTiles(tiles.Select(t => unnumbered.Contains(t) ? t with { Label = SimRacing.Race.RaceFormat.Missing, Detail = t.Label } : t).ToList());
@@ -127,7 +126,7 @@ internal sealed class DisplayProfilesView : Tile
         }
         stack.Children.Add(previewBox);
 
-        var chips = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
+        var chips = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
         if (profile.Hdr != HdrMode.Unchanged) chips.Children.Add(Ui.Chip(profile.Hdr == HdrMode.On ? "HDR on" : "HDR off"));
         if (profile.Taskbar != TaskbarMode.Unchanged) chips.Children.Add(Ui.Chip(profile.Taskbar == TaskbarMode.MainOnly ? "Taskbar: main display only" : "Taskbar: every display"));
         if (profile.Wallpapers.Count > 0) chips.Children.Add(Ui.Chip(SimRacing.Race.RaceFormat.Count(profile.Wallpapers.Count, "wallpaper")));
@@ -141,25 +140,7 @@ internal sealed class DisplayProfilesView : Tile
         else
             stack.Children.Add(new TextBlock { Text = "Matches the current setup", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(5, 9, 0, 3) });
 
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 6) };
-        var edit = Ui.LabeledButton("I.Pencil", "Edit", () => _ = EditAsync(profile, isNew: false), "GhostButton");
-        edit.Margin = Ui.AfterButton;
-        actions.Children.Add(edit);
-        var more = Ui.IconButton("I.More", "More for this profile", () => { });
-        more.Click += (_, _) =>
-        {
-            var menu = new ContextMenu { PlacementTarget = more, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
-            Ui.DropBelow(menu);
-            var update = new MenuItem { Header = "Overwrite with current", ToolTip = "Save the setup that's on right now (layout, wallpapers and audio devices) into this profile" };
-            update.Click += (_, _) => UpdateToCurrent(profile);
-            menu.Items.Add(update);
-            menu.IsOpen = true;
-        };
-        actions.Children.Add(more);
-
-        var card = new DockPanel { Margin = new Thickness(11, 10, 11, 5) };
-        DockPanel.SetDock(actions, Dock.Bottom);
-        card.Children.Add(actions);
+        var card = new DockPanel { Margin = new Thickness(11, 9, 11, 9) };
         card.Children.Add(stack);
         var body = new Grid { ClipToBounds = true };
         body.Children.Add(card);

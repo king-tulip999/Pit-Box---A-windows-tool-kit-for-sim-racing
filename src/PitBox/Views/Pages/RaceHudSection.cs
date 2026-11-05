@@ -34,7 +34,9 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     private readonly MainWindow _window;
     private readonly Border _body = new();
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(250) };
-    private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap };
+    private readonly TextBlock _status = TextFit.TipWhenTrimmed(new TextBlock { TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap, MaxWidth = 300 });
+    private readonly StackPanel _titleTools = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+    private readonly ContentControl _layoutSlot = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
     private Border _statusChip = new();
     private (string, string, string) _statusShown;
     private Border _segments = new();
@@ -54,27 +56,25 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         _window = window;
         _timer.Tick += (_, _) => { Preview.Advance(Host); RefreshStatus(); _tick?.Invoke(); };
 
-        var top = new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing) };
-        var topStack = new StackPanel();
-        var onOff = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        onOff.Children.Add(_statusChip);
+        _status.Style = Ui.Res<Style>("Caption");
+        _status.VerticalAlignment = VerticalAlignment.Center;
+        _status.Margin = new Thickness(0, 0, 10, 0);
+        _titleTools.Children.Add(_status);
+        _titleTools.Children.Add(_statusChip);
+        _arrange.Margin = new Thickness(Ui.GroupGap, 0, 0, 0);
+        _titleTools.Children.Add(_arrange);
         var power = Ui.Switch(S.Enabled, on => Host?.SetEnabled(on));
         ToggleCards.Row(power, ToggleCards.RowTitle("Show the overlay"), null);
-        power.Margin = new Thickness(13, 0, 0, 0);
+        power.Margin = new Thickness(Ui.GroupGap, 0, 0, 0);
         power.VerticalAlignment = VerticalAlignment.Center;
-        onOff.Children.Add(power);
-        _status.Style = Ui.Res<Style>("Body");
-        _status.VerticalAlignment = VerticalAlignment.Center;
-        _status.TextWrapping = TextWrapping.Wrap;
+        power.HorizontalAlignment = HorizontalAlignment.Left;
+        _titleTools.Children.Add(power);
         System.Windows.Automation.AutomationProperties.SetName(power, "iRacing Overlay");
-        topStack.Children.Add(Ui.SplitRow(_status, onOff, 13, stackLeft: true));
-        top.Child = topStack;
-        Children.Add(top);
 
         _segments = Ui.PageTabs(Tabs, 0, i => { _tab = i; Build(); Motion.FadeIn(_body); }, "hudtabs");
         _segments.HorizontalAlignment = HorizontalAlignment.Left;
         _segments.VerticalAlignment = VerticalAlignment.Center;
-        var tabRow = Ui.SplitRow(_segments, _arrange);
+        var tabRow = Ui.SplitRow(_segments, _layoutSlot, 19);
         tabRow.Margin = new Thickness(0, 0, 0, 10);
         Children.Add(tabRow);
         Children.Add(_body);
@@ -82,6 +82,8 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         RefreshStatus();
         RefreshArrange();
     }
+
+    public FrameworkElement TitleTools => _titleTools;
 
     public bool Done => _steps >= 2;
 
@@ -291,6 +293,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         _alertGroups = null;
         _widgets = null;
         _layoutPick = null;
+        _layoutSlot.Content = null;
         _body.Child = _tab switch
         {
             AlertsTabIndex => AlertsTab(),
@@ -323,7 +326,6 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     {
         var root = new StackPanel();
 
-        var layouts = new StackPanel();
         var pick = _layoutPick = Ui.Combo(S.Layouts.Select(l => new Choice(l.Name, l.Name)), ShownLayout, c =>
         {
             if (c.Id == ShownLayout) return;
@@ -331,7 +333,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             if (Host is null) { S.ActiveLayout = c.Id!; _app.Save(); }
             RefreshStatus();
             _widgets?.FollowLayout();
-        }, 211);
+        }, 160);
         _builtLayouts = LayoutsSignature();
         var add = Ui.LabeledButton("I.Plus", "New layout", () => { }, "GhostButton");
         add.Click += (_, _) => NewLayoutBox(add, S, S.Layout(ShownLayout), AddLayout);
@@ -343,19 +345,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             foreach (var w in copy.Widgets) w.Id = HudWidgetConfig.NewId(w.Kind);
             AddLayout(copy);
         });
-        var reset = Ui.LabeledButton("I.Undo", "Reset to default", async () =>
-        {
-            string name = ShownLayout;
-            if (!await _window.Confirm($"Reset “{name}” to the default layout?", "Its widgets, their places and settings go back to how the overlay starts. Duplicate it first to keep this version.", "Reset", danger: true)) return;
-            if (Host is { } h) h.ResetLayout(name);
-            else { S.ResetToDefault(name, HudPresets.DefaultLayouts()[0]); _app.Save(); }
-            _app.Hotkeys.RegisterAll();
-            Build();
-        });
-        reset.IsEnabled = S.Layout(ShownLayout) is { } shown && !HudPresets.IsDefault(shown);
-        reset.ToolTip = reset.IsEnabled ? "This layout back to the overlay's default widgets and places" : "This layout is the default already";
-        ToolTipService.SetShowOnDisabled(reset, true);
-        var rename = Ui.IconButton("I.Pencil", "Rename this layout", RenameLayout);
+        var rename = Ui.IconButton("I.Pencil", "Rename or reset this layout", EditLayout);
         var delete = Ui.IconButton("I.Trash", "Delete this layout", async () =>
         {
             string name = ShownLayout;
@@ -374,19 +364,15 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             ToolTipService.SetShowOnDisabled(rename, true);
             ToolTipService.SetShowOnDisabled(delete, true);
         }
-        var row = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
+        var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
         var layoutLabel = Ui.Text("Layout", "H3");
         layoutLabel.VerticalAlignment = VerticalAlignment.Center;
-        layoutLabel.Margin = new Thickness(0, 0, 13, 0);
+        layoutLabel.Margin = new Thickness(0, 0, 10, 0);
         row.Children.Add(layoutLabel);
         row.Children.Add(pick);
-        foreach (var b in new[] { rename, dup }) { b.Margin = new Thickness(5, 0, 0, 0); row.Children.Add(b); }
+        foreach (var b in new[] { rename, dup, delete }) { b.Margin = new Thickness(5, 0, 0, 0); row.Children.Add(b); }
         add.Margin = new Thickness(5, 0, 0, 0);
         row.Children.Add(add);
-        reset.Margin = new Thickness(5, 0, 0, 0);
-        row.Children.Add(reset);
-        delete.Margin = new Thickness(Ui.PanelSpacing, 0, 0, 0);
-        row.Children.Add(delete);
 
         var rules = new StackPanel();
         var addRule = Ui.LabeledButton("I.Plus", "Add rule", () =>
@@ -417,16 +403,18 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             S.AutoSwitch = on;
             Changed();
             RefreshStatus();
-            rules.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+            if (_rulesCard is not null) _rulesCard.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
             RefreshRuleCount();
         });
         System.Windows.Automation.AutomationProperties.SetName(useRules, "Switch layouts automatically");
         var switchLabel = ToggleCards.RowTitle("Switch layouts automatically");
         Ui.AddInfo(switchLabel, "Rules pick a layout by session, class, car and track. The most specific matching rule wins, then the higher one; with none, the layout picked on the left shows.");
-        _ruleCount.Margin = new Thickness(0);
-        ToggleCards.Row(useRules, switchLabel, null, _ruleCount);
+        switchLabel.TextWrapping = TextWrapping.NoWrap;
+        ToggleCards.Row(useRules, switchLabel, null, trailing: _ruleCount);
         useRules.VerticalAlignment = VerticalAlignment.Center;
-        var switchRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { useRules } };
+        useRules.HorizontalAlignment = HorizontalAlignment.Left;
+        useRules.Margin = new Thickness(Ui.GroupGap, 0, 0, 0);
+        row.Children.Add(useRules);
         _rules.Fill();
         _rulesEmpty = Caption("No rules yet: the layout picked above always shows.", 0);
         _rulesEmpty.VerticalAlignment = VerticalAlignment.Center;
@@ -438,14 +426,14 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         rules.Children.Add(ruleBar);
         _rules.View.Margin = new Thickness(0, 6, 0, 0);
         rules.Children.Add(_rules.View);
-        rules.Visibility = S.AutoSwitch ? Visibility.Visible : Visibility.Collapsed;
-        rules.Margin = new Thickness(0, 3, 0, 0);
         RefreshRuleCount();
-        layouts.Children.Add(Ui.SplitRow(row, switchRow, 13));
-        rules.Margin = new Thickness(0, 10, 0, 0);
-        layouts.Children.Add(rules);
-        root.Children.Add(_rulesCard = new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Padding = new Thickness(13, 10, 13, 10), Child = layouts });
-        Ui.Anchor(_rulesCard, LayoutsAnchor);
+        root.Children.Add(_rulesCard = new Tile
+        {
+            Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Padding = new Thickness(13, 10, 13, 10), Child = rules,
+            Visibility = S.AutoSwitch ? Visibility.Visible : Visibility.Collapsed,
+        });
+        Ui.Anchor(row, LayoutsAnchor);
+        _layoutSlot.Content = row;
 
         _widgets = new RaceHudWidgets(_app, this, inPage: true);
         root.Children.Add(_widgets.Root);
@@ -609,7 +597,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         Build();
     }
 
-    private void RenameLayout()
+    private void EditLayout()
     {
         string old = ShownLayout;
         var box = new TextBox { Text = old, Width = 259, MaxLength = Ui.NameLength };
@@ -621,7 +609,19 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             Build();
             return true;
         });
-        _ = _window.ShowModal(Ui.Dialog(_window, "Rename layout", "Rules that pick it follow the new name.", Ui.FieldRow("Name", box), buttons, error, 389));
+        var reset = Ui.LabeledButton("I.Undo", "Reset to default", async () =>
+        {
+            _window.CloseModal(false);
+            if (!await _window.Confirm($"Reset “{old}” to the default layout?", "Its widgets, their places and settings go back to how the overlay starts. Duplicate it first to keep this version.", "Reset", danger: true)) return;
+            if (Host is { } h) h.ResetLayout(old);
+            else { S.ResetToDefault(old, HudPresets.DefaultLayouts()[0]); _app.Save(); }
+            _app.Hotkeys.RegisterAll();
+            Build();
+        });
+        reset.IsEnabled = S.Layout(old) is { } shown && !HudPresets.IsDefault(shown);
+        reset.ToolTip = reset.IsEnabled ? "This layout back to the overlay's default widgets and places" : "This layout is the default already";
+        ToolTipService.SetShowOnDisabled(reset, true);
+        _ = _window.ShowModal(Ui.Dialog(_window, "Edit layout", "Rules that pick it follow a new name.", Ui.FieldRow("Name", box), buttons, error, 430, reset));
         box.Focus();
         box.SelectAll();
     }

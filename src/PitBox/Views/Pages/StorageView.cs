@@ -20,7 +20,6 @@ internal sealed class StorageView : ContentControl
         _window = window;
         Grid.SetIsSharedSizeScope(_body, true);
         Content = _body;
-        Ui.Anchor(this, "settings.storage");
         _body.Children.Add(Ui.Text("Measuring…", "Caption"));
         IsVisibleChanged += (_, e) => { if (e.NewValue is true) _ = LoadAsync(); };
     }

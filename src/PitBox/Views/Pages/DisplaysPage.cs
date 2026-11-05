@@ -144,9 +144,14 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
 
     private void BuildPage()
     {
-        var titles = new StackPanel { Margin = Ui.HeaderMargin };
-        titles.Children.Add(Ui.PageTitle("Displays"));
-        _body.Children.Add(titles);
+        var header = new Grid { Margin = Ui.HeaderMargin };
+        header.ColumnDefinitions.Add(new ColumnDefinition());
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.Children.Add(Ui.PageTitle("Displays"));
+        _profiles.SaveCurrent.VerticalAlignment = VerticalAlignment.Center;
+        Grid.SetColumn(_profiles.SaveCurrent, 1);
+        header.Children.Add(_profiles.SaveCurrent);
+        _body.Children.Add(header);
         _body.Children.Add(_profiles);
 
         var arrange = new StackPanel();

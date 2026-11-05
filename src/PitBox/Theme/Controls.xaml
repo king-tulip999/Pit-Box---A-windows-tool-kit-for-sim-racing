@@ -62,7 +62,7 @@
         <Setter Property="th:TextCase.Tight" Value="True" />
         <Setter Property="th:TextCase.KeepName" Value="True" />
         <Setter Property="FontFamily" Value="{DynamicResource RaceFont}" />
-        <Setter Property="FontSize" Value="34" />
+        <Setter Property="FontSize" Value="28" />
         <Setter Property="FontWeight" Value="ExtraBold" />
         <Setter Property="FontStyle" Value="{DynamicResource HeadingStyle}" />
         <Setter Property="Foreground" Value="{DynamicResource Heading}" />

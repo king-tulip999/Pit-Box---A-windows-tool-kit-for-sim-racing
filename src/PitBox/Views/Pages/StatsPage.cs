@@ -52,13 +52,24 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
             Back();
         };
         var header = new StackPanel { Margin = Ui.HeaderMargin };
-        var left = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
+        var left = new Grid { VerticalAlignment = VerticalAlignment.Center };
         var title = Ui.PageTitle("Session Stats");
-        title.Margin = new Thickness(0, 0, 23, 0);
+        title.HorizontalAlignment = HorizontalAlignment.Left;
         left.Children.Add(title);
-        left.Children.Add(_driverPlate);
+        _crumbs.HorizontalAlignment = HorizontalAlignment.Left;
+        _crumbs.ClipToBounds = true;
         left.Children.Add(_crumbs);
-        header.Children.Add(Ui.SplitRow(left, _tools, 13, stackLeft: true));
+        if (title.Children[0] is FrameworkElement titleText)
+            title.SizeChanged += (_, _) =>
+            {
+                double at = Math.Ceiling(titleText.DesiredSize.Width) + 23;
+                if (Math.Abs(_crumbs.Margin.Left - at) > 0.5) _crumbs.Margin = new Thickness(at, 0, 0, 0);
+            };
+        _driverPlate.Margin = new Thickness(0, 0, 16, 0);
+        _tools.Children.Add(_driverPlate);
+        _tools.Margin = new Thickness(13, 0, 0, 0);
+        DockPanel.SetDock(_tools, Dock.Right);
+        header.Children.Add(new DockPanel { LastChildFill = true, Children = { _tools, left } });
         _body.Children.Add(header);
         _body.Children.Add(_progress);
         _body.Children.Add(_content);
@@ -174,12 +185,19 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
             _crumbs.Children.Add(button);
         }
         Crumb("Overview", () => { _analysisLaps = null; _sessionId = null; Refresh(restoreOffset: true); _window.RecordHistory(); });
-        string name = session is null ? "Session" : $"{Dates.Short(session.StartUtc.ToLocalTime())} {StatsSessions.TypeName(session.Type)} · {session.Place}";
-        if (_analysisLaps is null) Crumb(name, null);
+        string when = session is null ? "Session" : $"{Dates.Short(session.StartUtc.ToLocalTime())} {StatsSessions.TypeName(session.Type)}";
+        if (_analysisLaps is null) Crumb(session is null ? when : $"{when} · {session.Place}", null);
         else
         {
-            Crumb(name, () => { _analysisLaps = null; Refresh(); _window.RecordHistory(); });
+            Crumb(when, () => { _analysisLaps = null; Refresh(); _window.RecordHistory(); });
             Crumb("Lap analysis", null);
+            if (session is null) return;
+            var about = TextFit.TipWhenTrimmed(new TextBlock
+            {
+                Text = $"{session.Car} · {session.Place} · {Dates.Day(session.StartUtc.ToLocalTime())}", Style = Ui.Res<Style>("Caption"),
+                TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 640, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 0, 0, 0),
+            });
+            _crumbs.Children.Add(about);
         }
     }
 
@@ -983,40 +1001,41 @@ internal static class StatsSections
 
     private static FrameworkElement Hero(StatsCharts.Data charts, StatQuery q, string range, List<(StatDef Def, StatResult Result)> headline, StatGrid racecraft, FrameworkElement? lastRace)
     {
-        var block = new Grid { MinHeight = 172, ClipToBounds = true };
+        var block = new Grid { MinHeight = 128, ClipToBounds = true };
         block.Children.Add(new Slant("Place4Wash", 0, 0, 0.58, 0, 0.44, 1, 0, 1));
         block.Children.Add(new Slant("Place4Faint", 0.58, 0, 0.64, 0, 0.5, 1, 0.44, 1));
-        var best = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(23, 18, 23, 16), HorizontalAlignment = HorizontalAlignment.Left };
+        var best = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(23, 12, 23, 10), HorizontalAlignment = HorizontalAlignment.Left };
         best.Children.Add(Scoped("Personal best", "all time, in the car and track you drove last"));
         if (charts.Bests.FirstOrDefault() is { } pb)
         {
-            var carZone = RaceParts.CarOnStripe(pb.Car, "Place4", 172, 128, 330, carArea: CarArea);
+            var carZone = RaceParts.CarOnStripe(pb.Car, "Place4", 128, 104, 268, carArea: CarArea);
             var outline = new Border
             {
                 Width = OutlineWidth, Height = OutlineHeight, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top,
-                Margin = new Thickness(0, 16, CarArea, 0), IsHitTestVisible = false,
+                Margin = new Thickness(0, 12, CarArea, 0), IsHitTestVisible = false,
                 Child = new TrackSketch(pb.Track, pb.Config, "Place4Text", 4, lap: true) { PlayOnLoad = true, TrackId = pb.TrackId, TrackName = pb.TrackName },
             };
             block.Children.Add(carZone);
             block.Children.Add(outline);
-            var lap = RaceParts.BigFigure(StatFormat.LapTime(pb.Best), 58, "Place4Text");
+            var lap = RaceParts.BigFigure(StatFormat.LapTime(pb.Best), 54, "Place4Text");
             lap.HorizontalAlignment = HorizontalAlignment.Left;
-            lap.Margin = new Thickness(0, 2, 0, 0);
-            best.Children.Add(lap);
-            var carName = new TextBlock { Text = pb.Car, Style = Ui.Res<Style>("H3"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) };
+            lap.VerticalAlignment = VerticalAlignment.Center;
+            var carName = new TextBlock { Text = pb.Car, Style = Ui.Res<Style>("H3"), TextWrapping = TextWrapping.Wrap };
             var trackName = new TextBlock { Text = pb.Config.Length > 0 ? $"{pb.Track} · {pb.Config}" : pb.Track, Style = Ui.Res<Style>("Muted"), TextWrapping = TextWrapping.Wrap };
-            best.Children.Add(carName);
-            best.Children.Add(trackName);
+            var names = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(22, 4, 0, 0), MaxWidth = 340, Children = { carName, trackName } };
+            var figures = new DockPanel { Margin = new Thickness(0, 1, 0, 0), Children = { lap, names } };
+            DockPanel.SetDock(lap, Dock.Left);
+            best.Children.Add(figures);
             carZone.KeepClearOf(best);
             block.SizeChanged += (_, e) =>
             {
                 var shown = e.NewSize.Width - best.ActualWidth >= CarRoom ? Visibility.Visible : Visibility.Collapsed;
                 if (carZone.Car is { } shownCar && shownCar.Visibility != shown) shownCar.Visibility = shown;
-                double text = best.Margin.Left + new FrameworkElement[] { best.Children[0] as FrameworkElement ?? lap, lap, carName, trackName }.Max(t => t.ActualWidth);
+                double text = best.Margin.Left + new FrameworkElement[] { best.Children[0] as FrameworkElement ?? figures, figures }.Max(t => t.ActualWidth);
                 var map = e.NewSize.Width - text - CarArea >= OutlineWidth + 16 ? Visibility.Visible : Visibility.Collapsed;
                 if (outline.Visibility != map) outline.Visibility = map;
             };
-            var facts = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
+            var facts = new WrapPanel { Margin = new Thickness(0, 2, 0, 0) };
             void Fact(FrameworkElement element) { element.Margin = new Thickness(0, 0, 8, 3); element.VerticalAlignment = VerticalAlignment.Center; facts.Children.Add(element); }
             if (pb.InRange && q.From > 0)
             {
@@ -1062,7 +1081,7 @@ internal static class StatsSections
     internal const double CardWidth = 300, CardGap = 16;
     private const double CarRoom = 300;
     private const double CarArea = 380;
-    private const double OutlineWidth = 200, OutlineHeight = 120;
+    private const double OutlineWidth = 170, OutlineHeight = 104;
 
     private static TextBlock Scoped(string title, string scope)
     {

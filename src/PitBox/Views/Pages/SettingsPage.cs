@@ -182,12 +182,13 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         var plugins = PluginManager.InNavOrder(_app.Plugins.All, U.NavOrder).ToList();
         var jump = Ui.LabeledButton("I.Plug", "Choose tools", () => _ = ShowTools(), "GhostButton");
         window.Children.Add(Ui.Divider());
-        var row = Ui.SettingRow("Tools", $"{plugins.Count(_app.Plugins.IsEnabled)} of {plugins.Count} on.", jump);
+        var row = Ui.SettingRow("Tools", null, jump);
+        Beside(row, $"{plugins.Count(_app.Plugins.IsEnabled)} of {plugins.Count} on");
         Ui.Anchor(row, "settings.plugins");
         window.Children.Add(row);
         window.Children.Add(Ui.Divider());
-        var setup = Ui.SettingRow("Setup", "Sets which tools are on from what you use Pit-Box for.",
-            Ui.LabeledButton("I.Wand", "Run setup", () => _window.ShowSetup(firstRun: false), "GhostButton"));
+        var setup = Ui.SettingRow("Setup", null,
+            Ui.LabeledButton("I.Wand", "Run setup", () => _window.ShowSetup(firstRun: false), "GhostButton"), more: "Sets which tools are on from what you use Pit-Box for.");
         Ui.Anchor(setup, "settings.setup");
         window.Children.Add(setup);
     }
@@ -239,12 +240,10 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
             RunStartupTask(null);
         bool on = _startupState?.Enabled == true;
 
-        string? description = _app.Demo ? "Not available in demo mode."
-            : on ? "Runs as administrator without a UAC prompt (a Windows scheduled task)."
-            : null;
         var toggle = Ui.Switch(on, SetStartup);
         toggle.IsEnabled = !_app.Demo && !_startupBusy;
-        startup.Children.Add(Ui.SettingRow("Start with Windows", description, toggle));
+        startup.Children.Add(_app.Demo ? TickRow("Start with Windows", toggle, "Not available in demo mode", trailing: true)
+            : TickRow("Start with Windows", toggle, more: on ? "Runs as administrator without a UAC prompt (a Windows scheduled task)." : null));
 
         if (_startupState?.PointsElsewhere == true)
         {
@@ -268,9 +267,9 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         }
 
         startup.Children.Add(Ui.Divider());
-        startup.Children.Add(Ui.SettingRow("Start in background",
-            "Opens in the tray; keybinds, fans and the overlay run as normal.",
-            Ui.Switch(U.StartMinimized, v => { U.StartMinimized = v; _app.Save(); })));
+        startup.Children.Add(Ui.SettingRow("Start in background", null,
+            Ui.Switch(U.StartMinimized, v => { U.StartMinimized = v; _app.Save(); }),
+            more: "Opens in the tray; keybinds, fans and the overlay run as normal."));
     }
 
     private async void MoveToProgramFiles()
@@ -327,11 +326,11 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
 
     private void BuildWindow(StackPanel window)
     {
-        window.Children.Add(Ui.SettingRow("Close in background",
-            U.CloseToTray
+        window.Children.Add(Ui.SettingRow("Close in background", null,
+            Ui.Switch(U.CloseToTray, v => { U.CloseToTray = v; _app.Save(); Build(); }),
+            more: U.CloseToTray
                 ? "X hides to the tray; Pit-Box keeps running (keybinds, fans, overlay)."
-                : "X quits Pit-Box.",
-            Ui.Switch(U.CloseToTray, v => { U.CloseToTray = v; _app.Save(); Build(); })));
+                : "X quits Pit-Box."));
         window.Children.Add(Ui.Divider());
         var pages = _app.NavPages().Prepend((Key: UiSettings.LastUsedPage, Title: "Last page used")).ToList();
         var start = new ComboBox { MinWidth = 162, VerticalAlignment = VerticalAlignment.Center };
@@ -353,9 +352,9 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         Ui.Anchor(onTop, "settings.ontop");
         window.Children.Add(onTop);
         window.Children.Add(Ui.Divider());
-        window.Children.Add(Ui.SettingRow("Notifications", "Warnings always show.",
-            Ui.Switch(_app.Config.ShowNotifications, v => { _app.Config.ShowNotifications = v; _app.Save(); }),
-            new Ui.SettingDefault(() => _app.Config.ShowNotifications, () => { _app.Config.ShowNotifications = true; _app.Save(); Build(); }, "On")));
+        window.Children.Add(TickRow("Notifications",
+            Ui.Switch(_app.Config.ShowNotifications, v => { _app.Config.ShowNotifications = v; _app.Save(); }), "Warnings always show.",
+            fallback: new Ui.SettingDefault(() => _app.Config.ShowNotifications, () => { _app.Config.ShowNotifications = true; _app.Save(); Build(); }, "On")));
         window.Children.Add(Ui.Divider());
         var quit = Ui.LabeledButton("I.Power", "Quit Pit-Box", () => _ = _window.RequestQuitAsync(), "GhostButton");
         quit.ToolTip = "Closes Pit-Box: keybinds, the overlay and the tray icon stop";
@@ -379,11 +378,9 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
             : "Windows' “Animation effects” setting is off, so animations stay off.";
         var anim = Ui.Switch(U.Animations, v => { U.Animations = v; _app.Save(); NavIcon.RefreshAll(); Motion.Refresh(); });
         anim.IsEnabled = SystemParameters.ClientAreaAnimation;
-        look.Children.Add(Ui.SettingRow("Animations", animationNote, anim,
-            SystemParameters.ClientAreaAnimation ? new Ui.SettingDefault(() => U.Animations, () => { U.Animations = true; _app.Save(); NavIcon.RefreshAll(); Motion.Refresh(); Build(); }, "On") : null));
+        look.Children.Add(TickRow("Animations", anim, SystemParameters.ClientAreaAnimation ? "Off in the tray" : "Off in Windows", more: animationNote,
+            fallback: SystemParameters.ClientAreaAnimation ? new Ui.SettingDefault(() => U.Animations, () => { U.Animations = true; _app.Save(); NavIcon.RefreshAll(); Motion.Refresh(); Build(); }, "On") : null));
     }
-
-    private TextBlock? _rateNote;
 
     private void BuildPerformance()
     {
@@ -401,11 +398,8 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
             SensorRate.Custom => "Custom: pick your own interval, 0.25 to 5 s.",
             _ => "Balanced: every second. The normal rate.",
         })).ToList());
-        _rateNote = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) };
-        FillRateNote();
-        var rateRow = RowWithNote("Sensor update rate", _rateNote, new Border(),
-            $"How often temperatures, loads, clocks and fan speeds are read for every page. Fan control still checks its curves and the failsafe at least every {PerformanceSettings.FanLoopMs / 1000} {Units.S}, and the overlay uses its own rate while it's showing. Applies at once.");
-        ControlBelow(rateRow, rate);
+        var rateRow = BesideRow("Sensor update rate", rate,
+            $"Sensors are read every {PerformanceSettings.Describe(p.IntervalMs)}. How often temperatures, loads, clocks and fan speeds are read for every page. Fan control still checks its curves and the failsafe at least every {PerformanceSettings.FanLoopMs / 1000} {Units.S}, and the overlay uses its own rate while it's showing. Applies at once.");
         Ui.Anchor(rateRow, "settings.sensorrate");
         section.Children.Add(rateRow);
 
@@ -415,7 +409,6 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
             custom.ValueChanged += v =>
             {
                 _app.SetPerformance(SensorRate.Custom, (int)Math.Round(v));
-                FillRateNote();
             };
             section.Children.Add(Ui.SettingRow("Custom interval", $"From {PerformanceSettings.MinMs} {Units.Ms} to {PerformanceSettings.MaxMs / 1000} {Units.S}.", custom));
         }
@@ -427,15 +420,14 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
                 "Standard: the same rate whether the window is open or not.",
                 $"Reduced: while the window is in the tray or minimized, sensors are read every {PerformanceSettings.ReducedHiddenMs / 1000} {Units.S} at most.",
             });
-        var backgroundRow = Ui.SettingRow("Background usage", "Fewer sensor reads while the window is hidden.", new Border(),
+        var backgroundRow = Ui.SettingRow("Background usage", null, background,
             new Ui.SettingDefault(() => _app.Config.Performance.Background == BackgroundUsage.Reduced, () => { _app.SetPerformance(_app.Config.Performance.Rate, background: BackgroundUsage.Reduced); Build(); }, "Reduced"),
             $"Reduced reads sensors at most every {PerformanceSettings.ReducedHiddenMs / 1000} s while the window is in the tray or minimized (pages already pause then). Fan control, the overlays, keybinds and window profiles keep working as normal.");
-        ControlBelow(backgroundRow, background);
         Ui.Anchor(backgroundRow, "settings.background");
         section.Children.Add(backgroundRow);
 
         section.Children.Add(Ui.Divider());
-        var lightRow = Ui.SettingRow("Lighter drawing while iRacing runs", "Keeps pages quick mid-race.",
+        var lightRow = Ui.SettingRow("Lighter drawing while iRacing runs", null,
             Ui.Switch(p.LightWhileRacing, v => { p.LightWhileRacing = v; _app.Save(); _app.WatchSim(); }),
             new Ui.SettingDefault(() => p.LightWhileRacing, () => { p.LightWhileRacing = true; _app.Save(); _app.WatchSim(); Build(); }, "On"),
             "Pit-Box's window draws without the graphics card the sim keeps busy, and its animations pause, so pages open quickly mid-race. Back to normal when iRacing closes.");
@@ -443,29 +435,58 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         section.Children.Add(lightRow);
     }
 
-    private void FillRateNote()
+    private static SettingRowGrid TickRow(string title, CheckBox toggle, string? beside = null, bool trailing = false, string? more = null, Ui.SettingDefault? fallback = null)
     {
-        if (_rateNote is null) return;
-        int ms = _app.Config.Performance.IntervalMs;
-        _rateNote.Text = $"Sensors are read every {PerformanceSettings.Describe(ms)}.";
-    }
-
-    private static void ControlBelow(Grid row, FrameworkElement control)
-    {
-        control.HorizontalAlignment = HorizontalAlignment.Left;
-        control.VerticalAlignment = VerticalAlignment.Top;
-        control.Margin = new Thickness(0, 8, 0, 0);
-        Grid.SetRow(control, 1);
-        Grid.SetColumn(control, 0);
-        Grid.SetColumnSpan(control, 3);
-        row.Children.Add(control);
-    }
-
-    private static Grid RowWithNote(string title, TextBlock note, UIElement control, string? more = null)
-    {
-        var grid = Ui.SettingRow(title, null, control, more: more);
-        ((StackPanel)grid.Children[0]).Children.Add(note);
+        var grid = new SettingRowGrid { Margin = new Thickness(0, 8, 0, 8) };
+        Ui.NameFor(toggle, title);
+        var heading = ToggleCards.RowTitle(title);
+        heading.VerticalAlignment = VerticalAlignment.Center;
+        if (more is not null) Ui.AddInfo(heading, more);
+        FrameworkElement head = heading;
+        FrameworkElement? reset = null;
+        if (fallback is not null)
+        {
+            head = Ui.Marked(heading, out var dot);
+            reset = Ui.WithReset(grid, new Border(), dot, fallback) as FrameworkElement;
+        }
+        FrameworkElement? end = reset;
+        if (beside is not null)
+        {
+            var note = new TextBlock { Text = beside, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.NoWrap, VerticalAlignment = VerticalAlignment.Center };
+            if (trailing) end = reset is null ? note : new StackPanel { Orientation = Orientation.Horizontal, Children = { note, reset } };
+            else
+            {
+                note.Margin = new Thickness(9, 1, 0, 0);
+                head = new StackPanel { Orientation = Orientation.Horizontal, Children = { head, note } };
+            }
+        }
+        ToggleCards.Row(toggle, head, null, trailing: end);
+        grid.Children.Add(toggle);
         return grid;
+    }
+
+    private static SettingRowGrid BesideRow(string title, FrameworkElement control, string more)
+    {
+        var grid = new SettingRowGrid { Margin = new Thickness(0, 8, 0, 8) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Ui.NameFor(control, title);
+        var heading = new TextBlock { Text = title, Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
+        Ui.AddInfo(heading, more);
+        control.VerticalAlignment = VerticalAlignment.Center;
+        control.HorizontalAlignment = HorizontalAlignment.Right;
+        Grid.SetColumn(control, 1);
+        grid.Children.Add(heading);
+        grid.Children.Add(control);
+        return grid;
+    }
+
+    private static void Beside(Grid row, string text)
+    {
+        if (row.Children[0] is not StackPanel { Children.Count: > 0 } text0 || text0.Children[0] is not TextBlock heading) return;
+        var note = new System.Windows.Documents.Run("  " + text) { FontSize = 12, FontWeight = FontWeights.Normal };
+        note.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "TextMuted");
+        heading.Inlines.Add(note);
     }
 
     private TextBlock _diagStatus = new();
@@ -620,12 +641,38 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         Ui.Anchor(fileRow, "settings.folder");
         section.Children.Add(fileRow);
         section.Children.Add(Ui.Divider());
-        section.Children.Add(new TextBlock { Text = "Storage", Style = Ui.Res<Style>("H3"), Margin = new Thickness(0, 4, 0, 6) });
-        section.Children.Add(new StorageView(_app, _window));
+        section.Children.Add(StorageFold());
         section.Children.Add(Ui.Divider());
         section.Children.Add(ResetRow());
         section.Children.Add(Ui.Divider());
         BuildDiagnostics(section);
+    }
+
+    private Action? _openStorage;
+
+    private FrameworkElement StorageFold()
+    {
+        var holder = new ContentControl { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 2, 0, 4) };
+        var chevron = Ui.FoldChevron(false);
+        var label = new StackPanel { Orientation = Orientation.Horizontal };
+        label.Children.Add(chevron);
+        label.Children.Add(new TextBlock { Text = "Storage", Style = Ui.Res<Style>("H3"), VerticalAlignment = VerticalAlignment.Center });
+        var toggle = new Button { Style = Ui.Res<Style>("QuietButton"), Content = label, HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(5, 3, 6, 3), Margin = new Thickness(-5, 2, 0, 2) };
+        ClickGuard.SetAllowRepeat(toggle, true);
+        System.Windows.Automation.AutomationProperties.SetName(toggle, "Storage");
+        void Set(bool open)
+        {
+            if (open && holder.Content is null) holder.Content = new StorageView(_app, _window);
+            holder.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+            Ui.SetFold(chevron, open);
+        }
+        toggle.Click += (_, _) => Set(holder.Visibility != Visibility.Visible);
+        _openStorage = () => Set(true);
+        var stack = new StackPanel();
+        stack.Children.Add(toggle);
+        stack.Children.Add(holder);
+        Ui.Anchor(stack, "settings.storage");
+        return stack;
     }
 
     private void ExportSettings()
@@ -866,6 +913,11 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         yield return ("data-section", () =>
         {
             ShowSection("data");
+            return Task.CompletedTask;
+        });
+        yield return ("storage-open", () =>
+        {
+            _openStorage?.Invoke();
             return Task.CompletedTask;
         });
         yield return ("confirm-delete", () =>

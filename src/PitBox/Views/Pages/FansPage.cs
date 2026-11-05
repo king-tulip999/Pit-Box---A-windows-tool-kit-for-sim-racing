@@ -146,22 +146,38 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         header.Children.Add(masterSwitch);
         _body.Children.Add(header);
 
-        var emergencyRow = Ui.SettingRow("Emergency temperature", null,
-            Ui.SliderWithValue(70, 105, _app.Config.Fans.EmergencyTempC, "{0:0} °C", v => { _app.Config.Fans.EmergencyTempC = (int)v; _app.FanSettingsChanged(); }, 220),
-            more: "At this temperature every controlled fan runs at 100% until it's 5 °C cooler. Watches the CPU, the GPU and every curve's sensor.");
+        var emergencyTitle = Ui.Text("Emergency temperature", "H3");
+        emergencyTitle.VerticalAlignment = VerticalAlignment.Center;
+        emergencyTitle.Margin = new Thickness(0, 0, 13, 0);
+        Ui.AddInfo(emergencyTitle, "At this temperature every controlled fan runs at 100% until it's 5 °C cooler. Watches the CPU, the GPU and every curve's sensor.");
+        var emergencySlider = Ui.SliderWithValue(70, 105, _app.Config.Fans.EmergencyTempC, "{0:0} °C", v => { _app.Config.Fans.EmergencyTempC = (int)v; _app.FanSettingsChanged(); }, 220);
+        emergencySlider.VerticalAlignment = VerticalAlignment.Center;
+        System.Windows.Automation.AutomationProperties.SetName(emergencySlider, "Emergency temperature");
+        var emergencyRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { emergencyTitle, emergencySlider } };
         Ui.Anchor(emergencyRow, "fans.failsafe");
-        var presetLine = Hairline.Rule(new Border { Margin = new Thickness(0, 2, 0, 0) });
+        var presetLine = Hairline.Rule(new Border { Margin = new Thickness(24, 10, 24, 10) }, Orientation.Vertical);
         presetLine.SetResourceReference(Border.BackgroundProperty, "Line");
-        var masterBox = new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Padding = new Thickness(16, 5, 16, 5),
-            Child = new StackPanel { Children = { new SettingsFlow { Children = { emergencyRow } }, presetLine, _presetBar } } };
+        _presetBar.VerticalAlignment = VerticalAlignment.Center;
+        var masterRow = new Grid { Height = 46 };
+        masterRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        masterRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        masterRow.ColumnDefinitions.Add(new ColumnDefinition());
+        masterRow.Children.Add(emergencyRow);
+        Grid.SetColumn(presetLine, 1);
+        masterRow.Children.Add(presetLine);
+        Grid.SetColumn(_presetBar, 2);
+        masterRow.Children.Add(_presetBar);
+        var masterBox = new Tile { Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Padding = new Thickness(16, 0, 16, 0), Child = masterRow };
         _body.Children.Add(masterBox);
 
         _body.Children.Add(_banners);
         _tabs = Ui.PageTabs(new[] { "Fans", "Curves" }, 0, SwitchTab, "fantabs");
-        _tabs.Margin = new Thickness(0, 0, 0, Ui.PanelSpacing);
-        _body.Children.Add(_tabs);
+        _fanTools.HorizontalAlignment = HorizontalAlignment.Right;
+        _fanTools.VerticalAlignment = VerticalAlignment.Center;
+        _fanTools.Margin = new Thickness(0, 0, 0, 3);
+        var tabRow = new Grid { Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Children = { _tabs, _fanTools } };
+        _body.Children.Add(tabRow);
         _body.Children.Add(_fansView);
-        _fansView.Children.Add(_fanTools);
         _fansView.Children.Add(_fanMessage);
         _fansView.Children.Add(_fanGrid);
         Ui.Anchor(_presetBar, "fans.presets");
@@ -206,6 +222,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
     private void ShowTab(int index)
     {
         _fansView.Visibility = index == 0 ? Visibility.Visible : Visibility.Collapsed;
+        _fanTools.Visibility = _fansView.Visibility;
         if (_curvesCard is not null) _curvesCard.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
         Ui.SetSegment(_tabs, index);
     }
@@ -213,7 +230,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
     public void ShowAnchor(DependencyObject target)
     {
         if (_curvesCard is not null && (ReferenceEquals(_curvesCard, target) || _curvesCard.IsAncestorOf(target))) ShowTab(1);
-        else if (_fansView.IsAncestorOf(target)) ShowTab(0);
+        else if (_fansView.IsAncestorOf(target) || ReferenceEquals(_fanTools, target) || _fanTools.IsAncestorOf(target)) ShowTab(0);
     }
 
     private void EditCurve(string name)
@@ -271,7 +288,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         if (signature == _presetSignature)
             return;
         _presetSignature = signature;
-        var row = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
+        var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         var label = Ui.Text("Preset", "H3");
         label.VerticalAlignment = VerticalAlignment.Center;
         label.Margin = new Thickness(0, 0, 13, 0);
@@ -298,7 +315,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         presetTools.Children.Add(Ui.IconButton("I.Pencil", $"Edit “{Fans.ActivePreset}”", () => _ = EditPresetAsync()));
         row.Children.Add(presetTools);
 
-        _presetBar.Padding = new Thickness(0, 9, 0, 9);
+        _presetBar.Padding = new Thickness(0);
         _presetBar.Child = row;
 
         var tools = new StackPanel { Orientation = Orientation.Horizontal };
@@ -323,7 +340,6 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         resetAll.Margin = new Thickness(6, 0, 0, 0);
         tools.Children.Add(resetAll);
         tools.HorizontalAlignment = HorizontalAlignment.Right;
-        tools.Margin = new Thickness(0, 0, 0, Ui.PanelSpacing);
         _fanTools.Content = tools;
     }
 
@@ -543,22 +559,23 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
             : new FanSpinner(Ui.Res<Geometry>("I.Fan"), Ui.Res<Brush>("IconInk"), 28);
         left.Children.Add(new Tile { Width = 44, Height = 44, CornerRadius = ThemeManager.Round(14), Background = Ui.Res<Brush>("IconWell"), Child = spinner, VerticalAlignment = VerticalAlignment.Center });
         var names = new StackPanel { Margin = new Thickness(13, 0, 13, 0), VerticalAlignment = VerticalAlignment.Center };
-        names.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = _app.FanName(fan), Style = Ui.Res<Style>("H2"), TextWrapping = TextWrapping.Wrap }));
+        names.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = _app.FanName(fan), Style = Ui.Res<Style>("H2"), TextWrapping = TextWrapping.NoWrap, TextTrimming = TextTrimming.CharacterEllipsis }));
         string about = !fan.Controllable ? $"{fan.Hardware} · read only" : CalibrationSummary(hw) is { } calibrated ? $"{fan.Hardware} · {calibrated}" : fan.Hardware;
         names.Children.Add(new TextBlock { Text = about, ToolTip = about, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 2, 0, 0), TextWrapping = TextWrapping.NoWrap, TextTrimming = TextTrimming.CharacterEllipsis });
         Grid.SetColumn(names, 1);
         left.Children.Add(names);
-        var bar = new SegmentMeter(hw.IsPump ? "Slate" : "Sage") { Height = 10, Tiered = true, Smooth = true, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(57, 0, 16, 0),
+        var bar = new SegmentMeter(hw.IsPump ? "Slate" : "Sage") { Height = 10, Tiered = true, Smooth = true, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 16, 0),
             ToolTip = $"Speed now. Amber above {SegmentMeter.WarnFrom * 100:0}%, red above {SegmentMeter.HotFrom * 100:0}%." };
-        var output = RaceParts.LiveFigure("–", 46, "Heading");
-        var percent = RaceParts.Big("%", 22, "AccentText");
-        percent.HorizontalAlignment = HorizontalAlignment.Left;
-        var rpm = RaceParts.Big("–", 14, "Text", heavy: false);
-        rpm.HorizontalAlignment = HorizontalAlignment.Left;
-        rpm.Margin = new Thickness(0, -3, 4, 0);
+        var output = RaceParts.LiveFigure("–", 36, "Heading");
+        output.VerticalAlignment = VerticalAlignment.Bottom;
+        var percent = RaceParts.Big("%", 18, "AccentText");
+        percent.VerticalAlignment = VerticalAlignment.Bottom;
+        percent.Margin = new Thickness(2, 0, 9, 4);
+        var rpm = RaceParts.Big("–", 13, "Text", heavy: false);
+        rpm.VerticalAlignment = VerticalAlignment.Bottom;
+        rpm.Margin = new Thickness(0, 0, 0, 6);
         System.Windows.Documents.Typography.SetNumeralAlignment(rpm, FontNumeralAlignment.Tabular);
-        var side = new StackPanel { Margin = new Thickness(3, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Children = { percent, rpm } };
-        var readout = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Children = { output, side } };
+        var readout = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Children = { output, percent, rpm } };
         Grid.SetColumn(readout, 2);
         left.Children.Add(readout);
         var parts = _cards[fan.ControlId] = new FanCardParts { Spinner = spinner, Rpm = rpm, Output = output, Bar = bar };
@@ -639,7 +656,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
                     UpdateCurvePreview(fan.ControlId, preview, _app.Hardware.Catalog);
                 }
                 body.Children.Add(limits);
-                expandHost.Content = new StackPanel { Margin = new Thickness(57, 0, 0, 3), Children = { line, body } };
+                expandHost.Content = new StackPanel { Margin = new Thickness(FanTextIndent, 0, 0, 3), Children = { line, body } };
             }
             var seg = Ui.Segmented(new[] { "Auto", "Curve", "Fixed" }, (int)entry.Mode, i =>
             {
@@ -695,10 +712,12 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         root.Children.Add(left);
         right.HorizontalAlignment = HorizontalAlignment.Right;
         root.Children.Add(Ui.SplitRow(bar, right, 0, stackLeft: true));
-        ((FrameworkElement)root.Children[^1]).Margin = new Thickness(0, 12, 0, 0);
+        ((FrameworkElement)root.Children[^1]).Margin = new Thickness(FanTextIndent, 0, 0, 0);
         root.Children.Add(expandHost);
-        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(16, 16, 13, 16), Child = root };
+        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(14, 12, 13, 9), Child = root };
     }
+
+    private const double FanTextIndent = 56;
 
     private const double LimitSlider = 200;
 

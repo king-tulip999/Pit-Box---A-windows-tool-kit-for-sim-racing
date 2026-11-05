@@ -253,10 +253,10 @@ internal static class StatsSessionView
         return page;
     }
 
-    private const double BannerHeight = 196;
+    private const double BannerHeight = 118;
     private const double CarArea = 420;
     private const double CarRoom = 300;
-    private const double MapWidth = 170, MapHeight = 120;
+    private const double MapWidth = 150, MapHeight = 96;
 
     private static FrameworkElement Banner(SessionDetail d, List<LapRow> cleanLaps, int sectors, double?[] bestSector, bool imperial)
     {
@@ -272,7 +272,7 @@ internal static class StatsSessionView
         var top = new Grid { MinHeight = BannerHeight, ClipToBounds = true };
         top.Children.Add(new Slant(place + "Wash", 0, 0, 0.7, 0, 0.52, 1, 0, 1));
         top.Children.Add(new Slant(place + "Faint", 0.7, 0, 0.76, 0, 0.58, 1, 0.52, 1));
-        var carZone = RaceParts.CarOnStripe(s.Car, place, BannerHeight, 150, 380, carArea: CarArea);
+        var carZone = RaceParts.CarOnStripe(s.Car, place, BannerHeight, 104, 264, carArea: CarArea);
         top.Children.Add(carZone);
         var outline = new Border
         {
@@ -288,19 +288,19 @@ internal static class StatsSessionView
             top.Children.Add(ribbon);
         }
 
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(24, 18, 24, 18), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
-        if (raced) row.Children.Add(RaceParts.Position(s.FinishPos!.Value, place, 150, "Finished"));
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(24, 10, 24, 10), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
+        if (raced) row.Children.Add(RaceParts.Position(s.FinishPos!.Value, place, 104, "Finished"));
         else
         {
             var lead = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             lead.Children.Add(new TextBlock { Text = "Fastest clean lap", Style = Ui.Res<Style>("Caption") });
-            lead.Children.Add(RaceParts.BigFigure(s.Best is { } fastest ? StatFormat.LapTime(fastest) : SimRacing.Race.RaceFormat.Missing, 58, place + "Text").Also(t => t.HorizontalAlignment = HorizontalAlignment.Left));
+            lead.Children.Add(RaceParts.BigFigure(s.Best is { } fastest ? StatFormat.LapTime(fastest) : SimRacing.Race.RaceFormat.Missing, 50, place + "Text").Also(t => t.HorizontalAlignment = HorizontalAlignment.Left));
             row.Children.Add(lead);
         }
-        var meta = new StackPanel { Margin = new Thickness(raced ? 22 : 30, 10, 0, 0), VerticalAlignment = VerticalAlignment.Center, MaxWidth = 520 };
-        meta.Children.Add(RaceParts.Big(s.Car, 30, "Heading", heavy: false).Also(t => { t.TextWrapping = TextWrapping.Wrap; t.HorizontalAlignment = HorizontalAlignment.Left; }));
+        var meta = new StackPanel { Margin = new Thickness(raced ? 22 : 30, 2, 0, 0), VerticalAlignment = VerticalAlignment.Center, MaxWidth = 520 };
+        meta.Children.Add(RaceParts.Big(s.Car, 28, "Heading", heavy: false).Also(t => { t.TextWrapping = TextWrapping.Wrap; t.HorizontalAlignment = HorizontalAlignment.Left; }));
         meta.Children.Add(new TextBlock { Text = $"{s.Place} · {Dates.Weekday(local)} {Dates.ShortTime(local)}", Style = Ui.Res<Style>("Muted"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) });
-        var chips = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
+        var chips = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
         chips.Children.Add(RaceParts.Chip(StatsSessions.TypeMark(s.Type)));
         if (s.CarClass.Length > 0) chips.Children.Add(RaceParts.Labeled("Class", s.CarClass));
         if (s.Type == "Race") foreach (var chip in RaceParts.Ratings(s)) chips.Children.Add(chip);

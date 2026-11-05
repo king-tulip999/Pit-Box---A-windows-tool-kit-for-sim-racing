@@ -147,7 +147,7 @@ internal sealed class FovSection : StackPanel
         Ui.Anchor(_compareCard, "simracing.compare");
         right.Children.Add(_compareCard);
         _measureCard = Card("Measure your rig", _measure);
-        ((Tile)_measureCard).Padding = new Thickness(13, 10, 13, 10);
+        ((Tile)_measureCard).Padding = new Thickness(9, 10, 9, 10);
         Grid.SetColumn(right, 2);
         _bottom.Children.Add(right);
         Children.Add(_bottom);
@@ -200,13 +200,13 @@ internal sealed class FovSection : StackPanel
         Grid.SetColumn(right, bottomWide ? 2 : 0);
         Grid.SetRow(right, bottomWide ? 0 : 1);
         right.Margin = new Thickness(0, bottomWide ? 0 : Ui.PanelSpacing, 0, 0);
-        ArrangeTools();
         if (numbersMoved) Recalculate();
     }
 
-    private readonly StackPanel _tools = new();
-    private readonly ComboBox _presets = new() { ToolTip = "Popular setups" };
-    private readonly DockPanel _toolRow = new() { LastChildFill = false };
+    private readonly StackPanel _tools = new() { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+    private readonly ComboBox _presets = new() { ToolTip = "Popular setups", Width = 160 };
+
+    public FrameworkElement TitleTools => _tools;
 
     private void BuildTools()
     {
@@ -223,30 +223,15 @@ internal sealed class FovSection : StackPanel
         _tools.Children.Add(_presets);
         var units = Ui.Segmented(new[] { Units.Cm, Units.In }, Imperial ? 1 : 0, i => { S.Imperial = i == 1; _app.Save(); BuildInputs(); Recalculate(); }, "Units", new[] { "Centimeters", "Inches" });
         units.ToolTip = "Units for distances and sizes";
-        DockPanel.SetDock(units, Dock.Left);
-        _toolRow.Children.Add(units);
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal };
+        units.Margin = new Thickness(Ui.GroupGap, 0, 0, 0);
+        _tools.Children.Add(units);
         _undoButton = Ui.IconButton("I.Undo", "Undo last change", Undo);
         _undoButton.IsEnabled = false;
-        buttons.Children.Add(_undoButton);
-        buttons.Children.Add(Ui.IconButton("I.Refresh", "Reset to defaults", () => Change(() => S.Current = new FovSetup(), rebuild: true)));
-        DockPanel.SetDock(buttons, Dock.Right);
-        _toolRow.Children.Add(buttons);
-        _tools.Children.Add(_toolRow);
-        ArrangeTools();
-    }
-
-    private void ArrangeTools()
-    {
-        bool column = _mode == 2;
-        _tools.Orientation = column ? Orientation.Vertical : Orientation.Horizontal;
-        _tools.HorizontalAlignment = column ? HorizontalAlignment.Stretch : HorizontalAlignment.Right;
-        _tools.Margin = new Thickness(column ? 5 : 0, 0, 6, 12);
-        _presets.Width = column ? double.NaN : 230;
-        _toolRow.Margin = column ? new Thickness(0, 6, 0, 0) : new Thickness(6, 0, 0, 0);
-        _toolRow.HorizontalAlignment = column ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
-        var units = (FrameworkElement)_toolRow.Children[0];
-        units.Margin = new Thickness(0, 0, column ? 0 : 6, 0);
+        _undoButton.Margin = new Thickness(Ui.GroupGap, 0, 0, 0);
+        _tools.Children.Add(_undoButton);
+        var reset = Ui.IconButton("I.Refresh", "Reset to defaults", () => Change(() => S.Current = new FovSetup(), rebuild: true));
+        reset.Margin = new Thickness(5, 0, 0, 0);
+        _tools.Children.Add(reset);
     }
 
     private void Change(Action mutate, bool rebuild = false)
@@ -478,7 +463,6 @@ internal sealed class FovSection : StackPanel
         var r = FovCalculator.Calculate(C);
 
         _numbers.Children.Clear();
-        _numbers.Children.Add(_tools);
         var numbers = _mode == 2 ? (Panel)_numbers : new UniformGrid { Columns = 3, Margin = new Thickness(-5, 0, -5, 0) };
         const string HorizontalGames = "Games that take a horizontal FOV: iRacing, AMS2, LFS, RaceRoom";
         const string VerticalGames = "Games that take a vertical FOV: AC, ACC, LMU, rF2, AMS1, BeamNG";
@@ -486,8 +470,8 @@ internal sealed class FovSection : StackPanel
         numbers.Children.Add(Number("Vertical FOV", $"{r.VerticalFov:0.0}°", r.Triple && C.MixedSides ? $"Center · sides {r.VerticalFovSide:0.0}°" : "For vertical-FOV games", "I.Sliders", "SlateSoft", "SlateDeep", VerticalGames));
         bool offIdeal = r.Triple && !C.AutoAngle && Math.Abs(r.SideAngle - r.OptimalSideAngle) >= 3;
         var third = r.Triple
-            ? Number("Side angle", $"{r.SideAngle:0.0}°", C.AutoAngle ? $"Turned in from flat · {180 - r.SideAngle:0.0}° between screens" : $"Your angle · ideal is {r.OptimalSideAngle:0.0}°", "I.Rotate", "ApricotSoft", "ApricotDeep",
-                offIdeal ? $"{Math.Abs(r.SideAngle - r.OptimalSideAngle):0.0}° {(r.SideAngle > r.OptimalSideAngle ? "more" : "less")} than the angle that faces you square-on. Side angle → Ideal uses it." : null, warn: offIdeal)
+            ? Number("Side angle", $"{r.SideAngle:0.0}°", C.AutoAngle ? $"{180 - r.SideAngle:0.0}° between screens" : $"Your angle · ideal is {r.OptimalSideAngle:0.0}°", "I.Rotate", "ApricotSoft", "ApricotDeep",
+                offIdeal ? $"{Math.Abs(r.SideAngle - r.OptimalSideAngle):0.0}° {(r.SideAngle > r.OptimalSideAngle ? "more" : "less")} than the angle that faces you square-on. Side angle → Ideal uses it." : "Turned in from flat", warn: offIdeal)
             : Number("Detail", $"{r.PixelsPerDegree:0.0}", "Pixels per degree (horizontal)", "I.Rotate", "ApricotSoft", "ApricotDeep");
         numbers.Children.Add(third);
         if (_shownTriple is { } before && before != r.Triple) Motion.FadeIn(third, 200);
@@ -522,7 +506,8 @@ internal sealed class FovSection : StackPanel
     private void FillIracing(FovResult r)
     {
         _iracing.Children.Clear();
-        _iracing.Children.Add(Heading("iRacing settings"));
+        var head = Heading("iRacing settings");
+        _iracing.Children.Add(head);
         var folder = _iracingFolder;
         double target = FovExchange.IracingFov(r);
         string status = folder is null
@@ -536,7 +521,7 @@ internal sealed class FovSection : StackPanel
         var write = Ui.LabeledButton("I.Download", "Write into iRacing", () => _ = ExportIntoIracing(), "PrimaryButton");
         write.ToolTip = $"FOV {target:0.#}° into app.ini and the screen setup into rendererDX11Monitor.ini (iRacing must be closed)";
         write.IsEnabled = folder is not null;
-        statusText.Margin = new Thickness(0, 8, 0, 10);
+        statusText.Margin = new Thickness(0, 0, 0, 8);
         _iracing.Children.Add(statusText);
         string[] steps =
         {
@@ -544,16 +529,8 @@ internal sealed class FovSection : StackPanel
             "Adjust the rig above until it matches your seat and screens.",
             "Write with iRacing closed; its files are backed up first (iRacing Controller → Health and backups). Or save copies and copy them in yourself.",
         };
-        for (int i = 0; i < steps.Length; i++)
-        {
-            var line = new DockPanel { Margin = new Thickness(0, 0, 0, 3) };
-            var n = new TextBlock { Text = $"{i + 1}.", Width = 15, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>("AccentText") };
-            DockPanel.SetDock(n, Dock.Left);
-            line.Children.Add(n);
-            line.Children.Add(new TextBlock { Text = steps[i], Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap });
-            _iracing.Children.Add(line);
-        }
-        var buttons = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
+        head.Children.Add(HudSettings.HelpTip.For(string.Join("\n", steps.Select((step, i) => $"{i + 1}. {step}")), "iRacing settings"));
+        var buttons = new WrapPanel();
         Button B(string icon, string label, Action run, string style, string tip)
         {
             var b = Ui.LabeledButton(icon, label, run, style);
@@ -794,15 +771,17 @@ internal sealed class FovSection : StackPanel
         Panel grid = _mode == 2 ? new StackPanel { Margin = new Thickness(-6, 0, -6, 0) } : new UniformGrid { Columns = 3, Margin = new Thickness(-6, 0, -6, 0) };
         void M(string label, string value, string? help)
         {
-            var cell = new StackPanel { Margin = new Thickness(6, 3, 6, 3), ToolTip = help };
-            cell.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), TextTrimming = TextTrimming.CharacterEllipsis }));
-            cell.Children.Add(new TextBlock { Text = value, FontSize = 12, FontWeight = FontWeights.SemiBold });
+            var cell = new DockPanel { Margin = new Thickness(6, 2, 6, 2), ToolTip = help, Background = Brushes.Transparent };
+            var shown = new TextBlock { Text = value, FontSize = 12, FontWeight = FontWeights.SemiBold, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            DockPanel.SetDock(shown, Dock.Right);
+            cell.Children.Add(shown);
+            cell.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap, VerticalAlignment = VerticalAlignment.Center }));
             grid.Children.Add(cell);
         }
         if (r.Triple)
         {
-            M("Outer edge to outer edge", Len(r.TapeOuterEdgesCm), "Tape across the front, from the far edge of the left side screen's picture to the far edge of the right one's. Angle the side screens until it reads this.");
-            M("Eyes to far edge of a side screen", Len(r.TapeEyeToSideEdgeCm), "From between your eyes (driving position) to the outer edge of a side screen's picture: a second check of the angle.");
+            M("Outer edges", Len(r.TapeOuterEdgesCm), "Outer edge to outer edge: tape across the front, from the far edge of the left side screen's picture to the far edge of the right one's. Angle the side screens until it reads this.");
+            M("Eyes to side edge", Len(r.TapeEyeToSideEdgeCm), "Eyes to the far edge of a side screen: from between your eyes (driving position) to the outer edge of a side screen's picture, a second check of the angle.");
             M("Rig width × depth", $"{ToLen(r.RigWidthCm):0} × {ToLen(r.RigDepthCm):0} {LenUnit}", "Outer bezel to outer bezel; front of the side screens to the deepest point of the center screen.");
         }
         else
@@ -810,11 +789,12 @@ internal sealed class FovSection : StackPanel
             M("Picture width", Len(r.Centre.WidthCm), "Across the lit picture" + (r.Centre.RadiusCm is null ? "." : ", following the curve."));
             M("Rig width", Len(r.RigWidthCm, 0), "Outer bezel to outer bezel.");
         }
-        M("Footprint (estimate)", $"{ToLen(r.FootprintWidthCm):0} × {ToLen(r.FootprintDepthCm):0} {LenUnit}",
-            r.Triple ? "Width plus ~1.75 cm of frame per side; depth plus ~8 cm of panel and ~4.5 cm for a triple stand." : "Width plus ~1.75 cm of frame per side; depth includes ~8 cm of panel.");
-        string Size(ScreenSize s) => $"{ToLen(s.WidthCm):0.0} × {ToLen(s.HeightCm):0.0} {LenUnit} ({s.Aspect:0.00}:1)";
-        M(r.Triple ? "Center picture" : "Picture", Size(r.Centre), r.Centre.RadiusCm is { } rad ? $"{rad * 10:0}R curve" : null);
-        if (r.Triple && C.MixedSides) M("Side picture", Size(r.Side), null);
+        M("Footprint", $"{ToLen(r.FootprintWidthCm):0} × {ToLen(r.FootprintDepthCm):0} {LenUnit}",
+            r.Triple ? "An estimate: width plus ~1.75 cm of frame per side; depth plus ~8 cm of panel and ~4.5 cm for a triple stand." : "An estimate: width plus ~1.75 cm of frame per side; depth includes ~8 cm of panel.");
+        string Size(ScreenSize s) => $"{ToLen(s.WidthCm):0.0} × {ToLen(s.HeightCm):0.0} {LenUnit}";
+        string Aspect(ScreenSize s) => $"{s.Aspect:0.00}:1";
+        M(r.Triple ? "Center picture" : "Picture", Size(r.Centre), Aspect(r.Centre) + (r.Centre.RadiusCm is { } rad ? $" · {rad * 10:0}R curve" : ""));
+        if (r.Triple && C.MixedSides) M("Side picture", Size(r.Side), Aspect(r.Side));
         M("Pixel density", $"{r.PixelsPerDegree:0.0} px / °", "Horizontal pixels per degree of view at the center. Higher = sharper detail at this distance.");
         _measure.Children.Add(grid);
     }
@@ -941,7 +921,9 @@ internal sealed class FovSection : StackPanel
         Ui.NameFor(control, label);
         if (ToggleCards.IsSwitch(control))
         {
-            grid.Children.Add(ToggleCards.Row((CheckBox)control, ToggleCards.RowTitle(label), help));
+            var title = ToggleCards.RowTitle(label);
+            if (help is not null) Ui.AddInfo(title, help);
+            grid.Children.Add(ToggleCards.Row((CheckBox)control, title, null));
             return grid;
         }
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
@@ -982,27 +964,27 @@ internal sealed class FovSection : StackPanel
     {
         if (!_figures.TryGetValue(title + icon, out var figure))
         {
-            var stack = new StackPanel();
+            var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             var head = new StackPanel { Orientation = Orientation.Horizontal };
             head.Children.Add(new Tile
             {
-                Width = 19, Height = 19, CornerRadius = ThemeManager.Round(7), Background = Ui.Res<Brush>(soft),
-                Child = new Icon { Data = Ui.Res<Geometry>(icon), Width = 11, Height = 11, Foreground = Ui.Res<Brush>(deep) },
+                Width = 15, Height = 15, CornerRadius = ThemeManager.Round(7), Background = Ui.Res<Brush>(soft),
+                Child = new Icon { Data = Ui.Res<Geometry>(icon), Width = 9, Height = 9, Foreground = Ui.Res<Brush>(deep) },
             });
             head.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
             stack.Children.Add(head);
-            var number = new TextBlock { FontSize = 22.5, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 3, 0, 0), HorizontalAlignment = HorizontalAlignment.Left };
+            var number = new TextBlock { FontSize = 20, FontWeight = FontWeights.SemiBold, LineHeight = 23, LineStackingStrategy = LineStackingStrategy.BlockLineHeight, HorizontalAlignment = HorizontalAlignment.Left };
             System.Windows.Documents.Typography.SetNumeralAlignment(number, FontNumeralAlignment.Tabular);
             stack.Children.Add(number);
             var noteHost = new Border();
             stack.Children.Add(noteHost);
-            figure = new Figure(new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(13, 10, 13, 10), Margin = new Thickness(5, 0, 5, 10), Child = stack }, number, noteHost);
+            figure = new Figure(new Tile { Style = Ui.Res<Style>("Card"), Height = 64, Padding = new Thickness(9, 0, 9, 0), Margin = new Thickness(5, 0, 5, 6), Child = stack }, number, noteHost);
             _figures[title + icon] = figure;
         }
         (figure.Tile.Parent as Panel)?.Children.Remove(figure.Tile);
         figure.Value.SetResourceReference(TextBlock.ForegroundProperty, warn ? "WarnDeep" : "Text");
         TextCase.Set(figure.Value, value);
-        var noteText = new TextBlock { Text = note, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap };
+        var noteText = TextFit.TipWhenTrimmed(new TextBlock { Text = note, Style = Ui.Res<Style>("Caption"), TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap });
         figure.Note.Child = warn ? Ui.IconText("I.Alert", noteText, "WarnDeep") : noteText;
         figure.Tile.ToolTip = tip;
         if (warn) figure.Tile.BorderBrush = Ui.Res<Brush>("Warn");

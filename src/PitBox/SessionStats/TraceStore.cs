@@ -4,6 +4,8 @@ namespace PitBox.SessionStats;
 
 internal sealed record TraceInfo(long Session, int Lap, double LapTime, string Car, string Track, string Config, long StartUtc, bool Clean);
 
+internal sealed record RecentTraces(List<double> OffTracks, List<int> OffTracksPerLap, List<LapTrace> Clean);
+
 internal sealed record TraceRetention(int KeepDays, int LapsPerSession, bool KeepBests);
 
 internal sealed class TraceStore : IDisposable
@@ -162,20 +164,23 @@ internal sealed class TraceStore : IDisposable
         _db.Query("SELECT session_id, lap, lap_time FROM traces WHERE car = ?1 AND track = ?2 AND track_config = ?3 AND clean = 1 ORDER BY lap_time LIMIT 1", car, track, config)
             is { Count: > 0 } r ? ((long)r[0][0]!, Convert.ToInt32(r[0][1]), Convert.ToDouble(r[0][2])) : null;
 
-    public (List<double> Pcts, int Laps) OffTracksAt(string car, string track, string config, int most)
+    public RecentTraces Recent(string car, string track, string config, int most, int cleanKept, (long Session, int Lap)? skip)
     {
-        var found = new List<double>();
-        int laps = 0;
-        foreach (var r in _db.Query("SELECT data FROM traces WHERE car = ?1 AND track = ?2 AND track_config = ?3 ORDER BY start_utc DESC, lap DESC LIMIT ?4", car, track, config, most))
+        var found = new RecentTraces(new List<double>(), new List<int>(), new List<LapTrace>());
+        foreach (var r in _db.Query("SELECT data, clean, session_id, lap FROM traces WHERE car = ?1 AND track = ?2 AND track_config = ?3 ORDER BY start_utc DESC, lap DESC LIMIT ?4",
+            car, track, config, most))
         {
             if (r[0] is not byte[] data) continue;
             LapTrace t;
             try { t = LapTrace.Decode(data); }
             catch (Exception ex) when (ex is InvalidDataException or EndOfStreamException) { continue; }
-            laps++;
-            found.AddRange(OffTrackStarts(t).Select(d => d / t.LengthM));
+            var starts = OffTrackStarts(t);
+            found.OffTracksPerLap.Add(starts.Count);
+            found.OffTracks.AddRange(starts.Select(d => d / t.LengthM));
+            bool skipped = skip is { } s && s.Session == (long)r[2]! && s.Lap == Convert.ToInt32(r[3]);
+            if (Convert.ToInt64(r[1]) != 0 && !skipped && found.Clean.Count < cleanKept) found.Clean.Add(t);
         }
-        return (found, laps);
+        return found;
     }
 
     internal static List<double> OffTrackStarts(LapTrace t)

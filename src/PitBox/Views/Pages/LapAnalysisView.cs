@@ -164,7 +164,6 @@ internal static class LapAnalysisView
             e.VerticalAlignment = VerticalAlignment.Center;
             right.Children.Add(e);
         }
-        page.Children.Add(Banner(data, s));
         var toolbar = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(16, 10, 16, 10), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Child = Ui.SplitRow(chips, right, 13) };
         page.Children.Add(toolbar);
 
@@ -224,50 +223,6 @@ internal static class LapAnalysisView
         page.Children.Add(new LapReplayView(data, s, settings, memory, actions.Save));
         s.ResetZoom();
         return page;
-    }
-
-    private const double BannerHeight = 150;
-    private const double CarArea = 340;
-
-    private static FrameworkElement Banner(AnalysisData data, AnalysisState s)
-    {
-        var session = data.Session;
-        string place = RaceParts.Place(session);
-        var local = session.StartUtc.ToLocalTime();
-        var top = new Grid { MinHeight = BannerHeight, ClipToBounds = true };
-        top.Children.Add(new Slant(place + "Wash", 0, 0, 0.66, 0, 0.5, 1, 0, 1));
-        top.Children.Add(new Slant(place + "Faint", 0.66, 0, 0.72, 0, 0.56, 1, 0.5, 1));
-        var carZone = RaceParts.CarOnStripe(session.Car, place, BannerHeight, 116, 300, carArea: CarArea);
-        top.Children.Add(carZone);
-
-        var left = new StackPanel { Margin = new Thickness(22, 16, 22, 16), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
-        var title = RaceParts.Big("Lap analysis", 26, "Heading", heavy: false);
-        title.HorizontalAlignment = HorizontalAlignment.Left;
-        left.Children.Add(title);
-        left.Children.Add(new TextBlock { Text = $"{session.Car} · {session.Place} · {Dates.Day(local)}", Style = Ui.Res<Style>("Muted"), TextWrapping = TextWrapping.Wrap });
-        var plates = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
-        double fastest = data.Laps.Count > 0 ? data.Laps.Min(l => l.Time) : 0;
-        foreach (var lap in data.Laps)
-        {
-            var line = s.Lines.FirstOrDefault(l => ReferenceEquals(l.Trace, lap.Trace));
-            var plate = new StackPanel { Margin = new Thickness(0, 0, 26, 4) };
-            var time = RaceParts.BigFigure(StatFormat.LapTime(lap.Time), 34, lap.Time == fastest ? line?.BrushKey ?? place + "Text" : "Heading");
-            time.HorizontalAlignment = HorizontalAlignment.Left;
-            var mark = RaceParts.FigureMark(time, 4, line?.BrushKey ?? place, 10);
-            plate.Children.Add(new DockPanel { LastChildFill = true, Children = { mark, time } });
-            string gap = lap.Time == fastest || data.Laps.Count == 1 ? "" : " · " + StatFormat.Value(StatKind.LapDelta, lap.Time - fastest, false);
-            plate.Children.Add(new TextBlock { Text = $"Lap {lap.Lap.ToString(CultureInfo.CurrentCulture)}{gap}", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(14, 0, 0, 0) });
-            plates.Children.Add(plate);
-        }
-        left.Children.Add(plates);
-        top.Children.Add(left);
-        carZone.KeepClearOf(left);
-        top.SizeChanged += (_, e) =>
-        {
-            var shown = e.NewSize.Width - left.ActualWidth >= 260 ? Visibility.Visible : Visibility.Collapsed;
-            if (carZone.Car is { } shownCar && shownCar.Visibility != shown) shownCar.Visibility = shown;
-        };
-        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Child = top, ClipToBounds = true, Margin = new Thickness(0, 0, 0, Ui.PanelSpacing) };
     }
 
     internal static string SharedLabel(SharedLapInfo lap, string car) =>
