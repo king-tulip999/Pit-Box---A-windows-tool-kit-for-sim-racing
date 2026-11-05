@@ -35,14 +35,15 @@ public partial class MainWindow : Window
     {
         _app = app;
         InitializeComponent();
-        SidebarHost.Content = new Grid { Children = { new GlassPane(Backdrop), _sidebar } };
-        _sidebar.PageClicked += Navigate;
-        _sidebar.SectionClicked += OpenSection;
-        _sidebar.PagesMoved += keys => SetNavOrder(keys);
-        _sidebar.SectionsMoved += (key, order) => { if (_nav.ContainsKey(key) && EnsurePage(key) is ISectionedPage page) page.MoveSections(order); };
+        Nav.Picked += OpenNavItem;
+        Nav.GroupsMoved += MoveNavGroups;
+        Nav.ItemsMoved += MoveNavItems;
         _searchButton = Ui.IconButton("I.Search", "Search settings and keybinds (Ctrl+F)", OpenSearch);
         System.Windows.Automation.AutomationProperties.SetName(_searchButton, "Search");
-        Width = 1280 + SidebarDips;
+        Width = DefaultWindowWidth;
+        PageArea.SizeChanged += (_, _) => PlaceNav();
+        TitleLeft.SizeChanged += (_, _) => PlaceNav();
+        Nav.SizeChanged += (_, _) => FitThemeLogo();
         Topmost = _app.Config.Ui.AlwaysOnTop;
         ApplySavedBounds();
         LocationChanged += (_, _) => RememberBounds();
@@ -138,7 +139,7 @@ public partial class MainWindow : Window
             key = key is not null && key.Length == 0 && _app.Config.Ui.LastPage is { } last && _nav.ContainsKey(last) ? last : FirstPage;
         if (_current == key)
         {
-            SyncSidebar();
+            SyncNav();
             return;
         }
 
@@ -149,7 +150,7 @@ public partial class MainWindow : Window
         _current = key;
         Show(page);
         WatchSections(page as ISectionedPage);
-        SyncSidebar();
+        SyncNav();
         if (_app.Config.Ui.LastPage != key)
         {
             _app.Config.Ui.LastPage = key;
@@ -175,11 +176,9 @@ public partial class MainWindow : Window
 
     internal string FirstPage => _nav.Keys.FirstOrDefault(k => k != "settings") ?? "settings";
 
-    private readonly Sidebar _sidebar = new();
+    internal FrameworkElement NavView => Nav;
 
-    internal FrameworkElement SidebarView => _sidebar;
-
-    internal void SetSidebarAccent(ResourceDictionary? theme) => _sidebar.UseAccent(theme);
+    internal void SetNavAccent(ResourceDictionary? theme) => Nav.UseAccent(theme);
 
     private ISectionedPage? _watched;
 
@@ -195,13 +194,89 @@ public partial class MainWindow : Window
 
     private void OnSectionsChanged()
     {
-        SyncSidebar();
+        SyncNav();
         RecordHistory();
     }
 
-    private void SyncSidebar(bool animate = true) => _sidebar.Select(_current, SectionsOf, _app.Config.Ui.SidebarAllOpen, animate && !_themeRebuild);
+    private void SyncNav()
+    {
+        BuildNavBar();
+        Nav.Select(_current, CurrentSectioned?.CurrentSection);
+    }
 
-    internal void RefreshSidebar() => SyncSidebar();
+    internal static readonly string[] SystemPages = ["displays", PluginIds.WindowProfilesPage, PluginIds.OverlayPage, "fans"];
+
+    internal const string SystemGroup = "system";
+
+    private List<NavGroup> NavGroups()
+    {
+        var groups = new List<NavGroup>();
+        var system = new List<NavItem>();
+        int systemAt = -1;
+        foreach (var (key, title) in _nav)
+        {
+            if (key == "settings") continue;
+            if (SystemPages.Contains(key))
+            {
+                if (systemAt < 0) systemAt = groups.Count;
+                system.Add(new NavItem(key, key, null, title));
+                continue;
+            }
+            groups.Add(PageGroup(key, title));
+        }
+        if (system.Count == 1) groups.Insert(systemAt, new NavGroup(system[0].Key, system[0].Title, system, Movable: false));
+        else if (system.Count > 1) groups.Insert(systemAt, new NavGroup(SystemGroup, "System tools", system, Movable: true));
+        return groups;
+    }
+
+    private NavGroup PageGroup(string key, string title)
+    {
+        if (SectionsOf(key) is { Sections.Count: > 1 } list)
+            return new NavGroup(key, title, list.Sections.Select(s => new NavItem(s.Id, key, s.Id, s.Title)).ToList(), list.Movable);
+        return new NavGroup(key, title, [new NavItem(key, key, null, title)], Movable: false);
+    }
+
+    private void BuildNavBar() =>
+        Nav.Build(NavGroups(), PageGroup("settings", "Settings"), _searchButton, _searchHost, _updateBadge);
+
+    private void OpenNavItem(NavItem item)
+    {
+        if (item.Section is { } section) OpenSection(item.Page, section);
+        else Navigate(item.Page);
+    }
+
+    private void MoveNavGroups(IReadOnlyList<string> keys)
+    {
+        var groups = NavGroups();
+        SetNavOrder(keys.SelectMany(k => groups.FirstOrDefault(g => g.Key == k) is { } g && (g.Key == SystemGroup || g.Items.All(i => i.Section is null)) ? g.Items.Select(i => i.Page) : new[] { k }).ToList());
+    }
+
+    private void MoveNavItems(string group, IReadOnlyList<string> keys)
+    {
+        if (group == SystemGroup)
+        {
+            var order = _nav.Keys.ToList();
+            var slots = order.Select((k, i) => (k, i)).Where(p => SystemPages.Contains(p.k)).Select(p => p.i).ToList();
+            for (int i = 0; i < slots.Count && i < keys.Count; i++) order[slots[i]] = keys[i];
+            SetNavOrder(order);
+            return;
+        }
+        if (_nav.ContainsKey(group) && EnsurePage(group) is ISectionedPage page)
+        {
+            page.MoveSections(keys);
+            SyncNav();
+        }
+    }
+
+    private void PlaceNav()
+    {
+        double width = PageArea.ActualWidth;
+        if (width <= 0) return;
+        double frame = Math.Min(Ui.PageWidth, width), body = Math.Round((width - frame) / 2) + Ui.PageSide;
+        double afterBrand = TitleLeft.Margin.Left + TitleLeft.ActualWidth + BrandGap;
+        Nav.Margin = new Thickness(Math.Max(body + Ui.HeaderIndent, afterBrand) - TitleNav.Lead, 0, 0, 0);
+        FitThemeLogo();
+    }
 
     internal SectionList? SectionsOf(string key)
     {
@@ -218,9 +293,7 @@ public partial class MainWindow : Window
         CurrentSectioned?.ShowSection(section);
     }
 
-    internal static double SidebarDips => Sidebar.PanelWidth + 13;
-
-    internal const double MinWindowWidth = 1280, MinWindowHeight = 720;
+    internal const double MinWindowWidth = 1280, MinWindowHeight = 720, DefaultWindowWidth = MinWindowWidth;
 
     private void StepPage(int by)
     {
@@ -405,19 +478,7 @@ public partial class MainWindow : Window
         Item("settings", "Settings", () => new SettingsPage(_app, this));
         var titles = _nav.Select(n => (n.Key, n.Value)).ToList();
         _app.NavPages = () => titles;
-        BuildSidebar();
-    }
-
-    private void BuildSidebar()
-    {
-        var keys = _nav.Keys.ToList();
-        var pages = new List<SidebarPage>();
-        foreach (var plugin in _app.Plugins.Active)
-            foreach (var page in plugin.Pages.Where(p => _nav.ContainsKey(p.Key)))
-                pages.Add(new SidebarPage(page.Key, page.Title));
-        pages = pages.OrderBy(p => keys.IndexOf(p.Key)).ToList();
-        _sidebar.Build(pages, new SidebarPage("settings", "Settings"), _searchButton, _searchHost, null, _updateBadge);
-        SyncSidebar(animate: false);
+        SyncNav();
     }
 
     internal void SetNavOrder(IReadOnlyList<string> keys)
@@ -610,8 +671,9 @@ public partial class MainWindow : Window
     private const double TitleButtonHeight = 28;
 
     private readonly Button _searchButton;
-    private readonly Button _updateBadge = new() { Visibility = Visibility.Collapsed, HorizontalAlignment = HorizontalAlignment.Stretch };
-    private readonly Border _searchHost = new() { Visibility = Visibility.Collapsed };
+    private readonly Button _updateBadge = new() { Visibility = Visibility.Collapsed };
+    private readonly Border _searchHost = new() { Visibility = Visibility.Collapsed, Width = SearchWidth };
+    private const double SearchWidth = 260;
     private SettingsSearchBox? _search;
 
     internal void OpenSearch()
@@ -812,12 +874,6 @@ public partial class MainWindow : Window
     private void ApplySavedBounds()
     {
         if (!Remembers || _app.Config.Ui.Window is not { Width: > 0, Height: > 0 } b) return;
-        if (_app.Config.Ui.SidebarVersion < 1)
-        {
-            _app.Config.Ui.SidebarVersion = 1;
-            if (!b.Maximized) b.Width = Math.Min(b.Width + SidebarDips, SystemParameters.VirtualScreenWidth);
-            _app.Save();
-        }
         double width = Math.Max(MinWidth, b.Width), height = Math.Max(MinHeight, b.Height);
         var titleBar = new Rect(b.Left + 40, b.Top, Math.Max(1, width - 80), 40);
         var primary = System.Windows.Forms.Screen.PrimaryScreen;
@@ -1088,11 +1144,14 @@ public partial class MainWindow : Window
         double height = Theme.Brand.CrispSize(TitleButtonHeight, VisualTreeHelper.GetDpi(this).PixelsPerDip) ?? TitleButtonHeight;
         Ui.FitWordmark(Wordmark, height);
         double ruleY = ContentArea.RowDefinitions[0].Height.Value - TitleRule.Height + Math.Floor(TitleRule.Height / 2);
-        TitleLeft.Margin = new Thickness(SidebarHost.Margin.Left, Math.Round((ruleY - Ui.WordmarkCapHeight(height)) / 2), 0, 0);
-        TitleLeft.Width = Sidebar.PanelWidth;
+        TitleLeft.Margin = new Thickness(BrandInset, Math.Round((ruleY - Ui.WordmarkCapHeight(height)) / 2), 0, 0);
+        Nav.Height = Math.Max(1, ruleY);
+        PlaceNav();
         ShowThemeLink(ThemeManager.Current.Link);
         FitThemeLogo();
     }
+
+    private const double BrandInset = 13, BrandGap = 28;
 
     private double _logoTarget = -1;
 
@@ -1114,7 +1173,7 @@ public partial class MainWindow : Window
     {
         if (ThemeLogo.Visibility != Visibility.Visible || !IsLoaded) return;
         double width = ThemeLogo.ActualWidth > 0 ? ThemeLogo.ActualWidth : 96;
-        double free = TitleBar.ActualWidth - CaptionButtons.ActualWidth - ThemeLogo.Margin.Right - width;
+        double free = TitleBar.ActualWidth - Nav.Margin.Left - Nav.ActualWidth - CaptionButtons.ActualWidth - ThemeLogo.Margin.Right - width;
         double target = Math.Clamp((free - 24) / 120, 0, 1);
         ThemeLogo.IsHitTestVisible = target > 0.5;
         if (Math.Abs(target - _logoTarget) < 0.01) return;

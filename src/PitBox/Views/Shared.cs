@@ -306,7 +306,7 @@ internal static class Ui
     public const double CardRowHeight = 68, CardTitleSize = 32.5;
 
 
-    public const double PageWidth = 1393;
+    public const double PageWidth = MainWindow.MinWindowWidth, PageSide = 23;
 
     public static ContentFrame PageFrame(UIElement body, double width = PageWidth) => new() { Child = body, DesignWidth = width, Centered = true };
 
@@ -944,7 +944,7 @@ internal static class Ui
         return new Tile { Style = Res<Style>("Segmented"), Child = panel };
     }
 
-    internal static readonly Thickness SegmentRowMargin = new(-2, 0, -2, 0);
+    internal static readonly Thickness SegmentRowMargin = new(-2);
 
     public static Border PageTabs(IReadOnlyList<string> options, int selected, Action<int> onChange, string group)
     {
@@ -1376,7 +1376,8 @@ internal static class Sticky
             {
                 double top = within.TransformToVisual(sv).Transform(new Point(0, 0)).Y;
                 double room = within.ActualHeight - column.ActualHeight;
-                if (room > 0 && column.ActualHeight + gap * 2 <= sv.ViewportHeight) offset = Math.Clamp(gap - top, 0, room);
+                double stick = column.ActualHeight + gap * 2 <= sv.ViewportHeight ? gap : sv.ViewportHeight - gap - column.ActualHeight;
+                if (room > 0) offset = Math.Clamp(stick - top, 0, room);
                 if (offset > 0)
                 {
                     double scale = VisualTreeHelper.GetDpi(column).DpiScaleY;

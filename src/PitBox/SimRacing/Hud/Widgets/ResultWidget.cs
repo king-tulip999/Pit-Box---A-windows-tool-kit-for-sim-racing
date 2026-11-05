@@ -111,9 +111,9 @@ internal sealed class ResultWidget : HudWidget
 
     private static void Number(HudPainter p, string text, float px, Color color, float x, float centerY, float width, HAlign align = HAlign.Left)
     {
-        float h = p.DisplaySize("8", px, false).Height;
+        float h = p.DisplaySize("8", px).Height;
         float left = align == HAlign.Right ? x - width : align == HAlign.Center ? x - width / 2 : x;
-        p.Display(text, px, color, new RectangleF(left, centerY - h / 2, width, h), align, VAlign.Center, false);
+        p.Display(text, px, color, new RectangleF(left, centerY - h / 2, width, h), align, VAlign.Center);
     }
 
     private static void LapStrip(HudPainter p, RectangleF area, FinishCard card, Color tier)
@@ -165,8 +165,8 @@ internal sealed class ResultWidget : HudWidget
         p.Slant(hero, HudPalette.Alpha(r.Tier, 56), 0, 0, 0.57f, 0, 0.43f, 1, 0, 1);
         string pos = RaceFormat.Pos(r.Finish);
         float posPx = 84 * d;
-        var posSize = p.DisplaySize(pos, posPx, false);
-        p.Display(pos, posPx, r.Tier, new RectangleF(pad - 2 * d, y + 13 * d, posSize.Width + 2, posSize.Height), HAlign.Left, VAlign.Top, false);
+        var posSize = p.DisplaySize(pos, posPx);
+        p.Display(pos, posPx, r.Tier, new RectangleF(pad - 2 * d, y + 13 * d, posSize.Width + 2, posSize.Height), HAlign.Left, VAlign.Top);
         var label = p.Label;
         Label(p, r.Overall ? "Overall" : "Finished", pad + posSize.Width + 6 * d, y + 19 * d, w / 3, p.P.Muted, label);
         if (Has("gain") && !r.Overall && card.Gained is { } gained)
@@ -295,7 +295,7 @@ internal sealed class ResultWidget : HudWidget
         if (from.Length > 0) Label(p, from, X(54), Y(110), 104 * k, r.Ink, p.Font(11 * k, true), HAlign.Center);
         if (HudArt.Car(card.Car) is { } picture) p.Picture(picture, new RectangleF(X(150), Y(58), 196 * k, 72 * k));
         string name = r.Name.ToUpperInvariant();
-        float namePx = 26 * k, nameW = p.DisplaySize(name, namePx, false).Width;
+        float namePx = 26 * k, nameW = p.DisplaySize(name, namePx).Width;
         if (nameW > 230 * k) { namePx *= 230 * k / nameW; nameW = 230 * k; }
         Number(p, name, namePx, p.P.Heading, X(136), Y(22), 236 * k);
         if (card.Awards.Count > 0)
@@ -333,12 +333,12 @@ internal sealed class ResultWidget : HudWidget
         float pad = 12 * k, w = b.Width, colX = w - 90 * k;
         var label = p.Font(10.5f * k, true);
         string pos = RaceFormat.Pos(r.Finish);
-        float fullH = p.DisplaySize("P8", 100 * k, false).Height, block = 2 * pad + fullH;
+        float fullH = p.DisplaySize("P8", 100 * k).Height, block = 2 * pad + fullH;
         p.Fill(new RectangleF(0, 0, w, block), r.Tier);
         float room = colX - 10 * k - 2 * pad, px = 100 * k;
-        float posW = p.DisplaySize(pos, px, false).Width;
+        float posW = p.DisplaySize(pos, px).Width;
         if (posW > room) px *= room / posW;
-        p.Display(pos, px, r.Ink, new RectangleF(pad - 2 * k, 0, room + 2 * k, block), HAlign.Left, VAlign.Center, false);
+        p.Display(pos, px, r.Ink, new RectangleF(pad - 2 * k, 0, room + 2 * k, block), HAlign.Left, VAlign.Center);
         p.Fill(new RectangleF(colX - 10 * k, pad, 1, block - 2 * pad), HudPalette.Alpha(r.Ink, 77));
         float lh = p.LineHeight(label);
         if (!r.Overall && card.Gained is { } gained)
@@ -373,10 +373,10 @@ internal sealed class ResultWidget : HudWidget
         float W = 460;
         var label = p.Font(10.5f * k, true);
         string pos = RaceFormat.Pos(r.Finish);
-        float blockW = Math.Max(76 * k, p.DisplaySize(pos, 44 * k, false).Width + 20 * k);
+        float blockW = Math.Max(76 * k, p.DisplaySize(pos, 44 * k).Width + 20 * k);
         var block = new RectangleF(X(12), Y(12), blockW, 50 * k);
         p.Fill(block, r.Tier);
-        p.Display(pos, 44 * k, r.Ink, block, HAlign.Center, VAlign.Center, false);
+        p.Display(pos, 44 * k, r.Ink, block, HAlign.Center, VAlign.Center);
         float textX = block.Right + 12 * k, textW = X(W - 70) - textX;
         var nameFont = p.Font(20 * k, true);
         p.Text(r.Name, nameFont, p.P.Heading, new RectangleF(textX, Y(26) - p.LineHeight(nameFont) / 2, textW, p.LineHeight(nameFont)), HAlign.Left, VAlign.Center);

@@ -474,7 +474,7 @@ internal sealed class GrrDashboardSection : StackPanel
             if (me.Row.Poles is { } poles) record.Children.Add(Stat("Poles", $"{poles}"));
             if (me.Row.Starts is { } st) record.Children.Add(Stat("Starts", $"{st}"));
             if (data.LastEvent is { } e && GrrLeagueData.ResultOf(e, driver) is { } r)
-                record.Children.Add(Stat("Last race", GrrParts.Position(r.Position, false, 13, prefix: true, plain: "Heading"), data.RoundFor(e)?.Number is { } n ? $"Round {n}" : e.Track));
+                record.Children.Add(Stat("Last race", $"P{r.Position}",data.RoundFor(e)?.Number is { } n ? $"Round {n}" : e.Track));
             if (record.Children.Count > 0)
             {
                 body.Children.Add(Hairline.Rule(new Border { Background = Ui.Res<Brush>("Line"), Margin = new Thickness(0, 2, 0, 10) }));

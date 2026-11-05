@@ -71,11 +71,10 @@ internal static class ToggleCards
             text.Children.Add(line);
         }
         if (below is not null) text.Children.Add(below);
-        bool oneLine = below is null && string.IsNullOrEmpty(caption);
         var lamp = new Lamp
         {
-            VerticalAlignment = oneLine ? VerticalAlignment.Center : VerticalAlignment.Top,
-            Margin = new Thickness(0, oneLine ? 0 : 2, heading is null ? 0 : 9, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, heading is null ? 0 : 10, 0),
         };
         var row = new DockPanel { LastChildFill = true, Background = Brushes.Transparent };
         DockPanel.SetDock(lamp, Dock.Left);
@@ -99,10 +98,10 @@ internal static class ToggleCards
         return box;
     }
 
-    public static DockPanel WithLamp(Lamp lamp, UIElement text, bool top = false)
+    public static DockPanel WithLamp(Lamp lamp, UIElement text)
     {
-        lamp.VerticalAlignment = top ? VerticalAlignment.Top : VerticalAlignment.Center;
-        lamp.Margin = new Thickness(0, top ? 2 : 0, 8, 0);
+        lamp.VerticalAlignment = VerticalAlignment.Center;
+        lamp.Margin = new Thickness(0, 0, 8, 0);
         DockPanel.SetDock(lamp, Dock.Left);
         return new DockPanel { LastChildFill = true, Children = { lamp, text } };
     }
@@ -114,7 +113,7 @@ internal static class ToggleCards
         return Compact(box, title);
     }
 
-    public static CheckBox Dress(CheckBox box, FrameworkElement heading, string? caption, FrameworkElement? below = null, Action<TextBlock>? captionText = null, FrameworkElement? trailing = null, bool centerLamp = false)
+    public static CheckBox Dress(CheckBox box, FrameworkElement heading, string? caption, FrameworkElement? below = null, Action<TextBlock>? captionText = null, FrameworkElement? trailing = null)
     {
         bool tall = !string.IsNullOrEmpty(caption);
         var top = new Grid();
@@ -137,7 +136,7 @@ internal static class ToggleCards
             Grid.SetColumn(text, 1);
             Grid.SetRow(text, 1);
             top.Children.Add(text);
-            if (centerLamp) Grid.SetRowSpan(lamp, 2);
+            Grid.SetRowSpan(lamp, 2);
         }
         if (trailing is not null)
         {

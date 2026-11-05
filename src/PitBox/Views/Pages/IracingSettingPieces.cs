@@ -13,7 +13,7 @@ namespace PitBox.Views.Pages;
 
 internal sealed partial class IracingControllerSection
 {
-    private const double LevelCell = 66, LevelGap = 3, LevelLabelMax = 480, TileMin = 200, ItemMin = 300, ItemGap = 26, TrayChips = 6, TrayChipText = 260;
+    private const double LevelCell = 66, LevelGap = 3, LevelLabelMax = 480, CellMin = 260, CellHeight = 36, DetailMinHeight = 76, ItemMin = 300, ItemGap = 26, TrayChips = 6, TrayChipText = 260;
 
     private IEnumerable<FrameworkElement> Pieces(List<Setting> settings, bool span)
     {
@@ -22,9 +22,13 @@ internal sealed partial class IracingControllerSection
         var switches = settings.Where(s => SettingShapes.Of(s.Def) == SettingShape.Switch).ToList();
         if (switches.Count > 0)
         {
-            var grid = new EvenGrid { MinItemWidth = TileMin, Margin = new Thickness(0, 2, 0, 8) };
-            foreach (var s in switches) grid.Children.Add(SwitchTile(s));
-            yield return grid;
+            var detail = new SwitchDetail(FillDetail);
+            var grid = new EvenGrid { MinItemWidth = CellMin, ColumnSteps = new[] { 1, 2, 3 }, ColumnGap = ItemGap, RowGap = 0 };
+            foreach (var s in switches) grid.Children.Add(SwitchCell(s, detail));
+            var frame = new Border { Child = grid, BorderThickness = new Thickness(0, 1, 0, 0), Margin = new Thickness(0, 2, 0, 0) };
+            frame.SetResourceReference(Border.BorderBrushProperty, "Line");
+            yield return frame;
+            yield return detail.Box;
         }
         var items = settings.Where(s => SettingShapes.Of(s.Def) is SettingShape.Slider or SettingShape.Choice).ToList();
         if (items.Count > 0)
@@ -175,19 +179,26 @@ internal sealed partial class IracingControllerSection
         return host;
     }
 
-    private Border SwitchTile(Setting s)
+    private static bool Risky(Setting s) => !string.IsNullOrWhiteSpace(s.Def.Danger) && s.IsModified;
+
+    private Border SwitchCell(Setting s, SwitchDetail detail)
     {
-        var host = new Border();
-        var head = new ContentControl { Focusable = false, IsTabStop = false };
+        var host = new Border { Padding = new Thickness(8, 0, 4, 0), BorderThickness = new Thickness(0, 0, 0, 1) };
+        host.SetResourceReference(Border.BorderBrushProperty, "Line");
+        Ui.HoverHighlight(host);
+        var head = new ContentControl { Focusable = false, IsTabStop = false, HorizontalContentAlignment = HorizontalAlignment.Stretch };
         var actions = new ContentControl { Focusable = false, IsTabStop = false };
-        var notes = new StackPanel();
         Action refill = () => { };
         var toggle = Ui.Switch(s.IsOn(s.Draft), on => Apply(s, on != s.Def.Invert ? "1" : "0", refill));
+        ToggleCards.Row(toggle, head, null, trailing: actions);
         AutomationProperties.SetName(toggle, s.Def.Label);
-        CardTop.Align(ToggleCards.Dress(toggle, head, s.Def.Help.Length > 0 ? s.Def.Help : null, notes, help => Ui.Highlight(help, s.Def.Help, _words), actions));
+        AutomationProperties.SetHelpText(toggle, s.Def.Help);
+        toggle.MinHeight = CellHeight;
         var grid = new Grid();
         grid.Children.Add(toggle);
         host.Child = grid;
+        host.MouseEnter += (_, _) => detail.Show(s);
+        toggle.GotKeyboardFocus += (_, _) => detail.Show(s);
         bool wasChanged = s.IsChanged;
         var edge = AddUnsavedEdge(grid, host, s, false);
         void Fill()
@@ -195,9 +206,10 @@ internal sealed partial class IracingControllerSection
             bool grow = !wasChanged;
             wasChanged = s.IsChanged;
             toggle.IsChecked = s.IsOn(s.Draft);
-            var title = ToggleCards.Title(s.Def.Label, false);
+            var title = TextFit.TipWhenTrimmed(new TextBlock { Style = Ui.Res<Style>("Body"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
+            title.SetResourceReference(TextBlock.ForegroundProperty, Risky(s) ? "Danger" : "Heading");
             Ui.Highlight(title, s.Def.Label, _words);
-            var line = new WrapPanel();
+            var line = new TrimRow { VerticalAlignment = VerticalAlignment.Center };
             line.Children.Add(title);
             if (s.IsChanged)
             {
@@ -205,23 +217,78 @@ internal sealed partial class IracingControllerSection
                 line.Children.Add(chip);
                 if (grow) Reveal.PopIn(chip);
             }
-            var marked = Ui.Marked(line, out var dot);
-            dot.Visibility = s.IsModified ? Visibility.Visible : Visibility.Collapsed;
-            if (dot is FrameworkElement d && Session!.DefaultOf(s) is { } std) d.ToolTip = "Changed from iRacing's default (" + s.Show(std) + ")";
-            head.Content = marked;
-            notes.Children.Clear();
-            Notes(s, notes);
-            notes.Margin = new Thickness(0, notes.Children.Count > 0 ? 4 : 0, 0, 0);
+            if (s.IsModified)
+            {
+                var dot = Ui.ChangedDot();
+                dot.Margin = new Thickness(6, 0, 0, 0);
+                dot.VerticalAlignment = VerticalAlignment.Center;
+                if (Session!.DefaultOf(s) is { } std) dot.ToolTip = "Changed from iRacing's default (" + s.Show(std) + ")";
+                line.Children.Add(dot);
+            }
+            head.Content = line;
             var buttons = ItemActions(s, Fill);
             actions.Content = buttons.Children.Count > 0 ? buttons : null;
             toggle.ToolTip = Details(s);
             ToolTipService.SetInitialShowDelay(toggle, 700);
             grid.Opacity = s.IsInert ? 0.6 : 1;
             ShowEdge(edge, s, grow);
+            detail.Refresh(s);
         }
         refill = Fill;
         Fill();
         return host;
+    }
+
+    private void FillDetail(Setting s, StackPanel text)
+    {
+        var name = new TextBlock { Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
+        name.SetResourceReference(TextBlock.ForegroundProperty, Risky(s) ? "Danger" : "Heading");
+        Ui.Highlight(name, s.Def.Label, _words);
+        text.Children.Add(name);
+        if (s.Def.Help.Length > 0)
+        {
+            var help = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) };
+            Ui.Highlight(help, s.Def.Help, _words);
+            text.Children.Add(help);
+        }
+        Notes(s, text);
+    }
+
+    private sealed class SwitchDetail
+    {
+        private readonly StackPanel _text = new();
+        private readonly Action<Setting, StackPanel> _fill;
+        private Setting? _shown;
+
+        public Border Box { get; }
+
+        public SwitchDetail(Action<Setting, StackPanel> fill)
+        {
+            _fill = fill;
+            Box = new Border { Child = _text, Padding = new Thickness(12, 9, 12, 9), Margin = new Thickness(0, 10, 0, 8), MinHeight = DetailMinHeight };
+            Box.SetResourceReference(Border.BackgroundProperty, "SurfaceAlt");
+            Box.SetResourceReference(Border.BorderBrushProperty, "Line");
+            Box.SetResourceReference(Border.BorderThicknessProperty, "HairlineEdge");
+            _text.Children.Add(new TextBlock { Text = "Point at a setting to see what it does.", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap });
+        }
+
+        public void Show(Setting s)
+        {
+            if (ReferenceEquals(_shown, s)) return;
+            _shown = s;
+            Fill();
+        }
+
+        public void Refresh(Setting s)
+        {
+            if (ReferenceEquals(_shown, s)) Fill();
+        }
+
+        private void Fill()
+        {
+            _text.Children.Clear();
+            _fill(_shown!, _text);
+        }
     }
 
     private Border ChoiceItem(Setting s)
@@ -453,7 +520,7 @@ internal sealed partial class IracingControllerSection
 
         private static TextBlock Number(string brush)
         {
-            var number = RaceParts.LiveFigure("", 26, brush, italic: false, heavy: false);
+            var number = RaceParts.LiveFigure("", 26, brush, heavy: false);
             number.HorizontalAlignment = HorizontalAlignment.Left;
             return number;
         }

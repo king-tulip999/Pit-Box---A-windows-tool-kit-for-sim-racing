@@ -603,7 +603,7 @@ internal sealed class OverlayPage : UserControl, IPage
     private Tile MetricCard(string group, List<OverlayMetricEntry> entries)
     {
         var name = new TextBlock { Text = group, Style = Ui.Res<Style>("Eyebrow"), VerticalAlignment = VerticalAlignment.Center };
-        var count = RaceParts.LiveFigure("", 10.5, "TextFaint", italic: false, heavy: false);
+        var count = RaceParts.LiveFigure("", 10.5, "TextFaint", heavy: false);
         count.Margin = new Thickness(7, 0, 0, 0);
         count.VerticalAlignment = VerticalAlignment.Center;
         var allLamp = new PitBox.Controls.Lamp();

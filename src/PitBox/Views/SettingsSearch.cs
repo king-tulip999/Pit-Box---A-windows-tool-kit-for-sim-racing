@@ -33,9 +33,8 @@ internal static class SettingsIndex
         new("Fans and calibration", "Each fan's mode, name, limits and calibration.", "Fans", "fans", "fans.fans", "fan rpm calibrate minimum maximum rename start stop step up down ramp limits"),
         new("Hidden fans", "Fans you've hidden from the page and overlay.", "Fans", "fans", "fans.hidden", "fan hide"),
 
-        new("Show every tool's sections", "List the sections of every tool in the sidebar, not only the open tool's.", "Settings", "settings", "settings.sidebaropen", "sidebar sections open expand all tabs lists always"),
-        new("Search settings", "Find any setting and jump to it: the search button beside Settings in the sidebar (Ctrl+F).", "Settings", "settings", "settings.sidebaropen", "search find settings ctrl+f lookup"),
-        new("Sidebar", "Drag tools, and the sections under the open tool, in the sidebar to reorder them (Alt+Up / Down with the keyboard).", "Settings", "settings", "settings.sidebaropen", "sidebar navigation tabs menu rearrange reorder order move pages tools sections home landing"),
+        new("Search settings", "Find any setting and jump to it: the search button beside Settings in the title bar (Ctrl+F).", "Settings", "settings", "settings.startpage", "search find settings ctrl+f lookup"),
+        new("Page order", "Drag the pages in the title bar, or the entries in their menus, to reorder them (Alt+arrow keys with the keyboard).", "Settings", "settings", "settings.startpage", "sidebar navigation tabs menu rearrange reorder order move pages tools sections home landing title bar"),
         new("Tool info", "What each tool reads, runs in the background and changes on your PC: the info icon beside each plugin.", "Settings", "settings", "settings.plugins", "info reads background changes privacy what does it do"),
         new("Arrange fans", "Drag the fan rows on Fan Control into a new order.", "Fans", "fans", "fans.actions", "move order drag rearrange fan cards"),
         new("Calibrate all fans", "Measure every fan that reports its speed, one after another.", "Fans", "fans", "fans.actions", "calibrate calibration measure rpm all fans batch"),
@@ -59,7 +58,7 @@ internal static class SettingsIndex
         new("iRacing Setup Manager", "Your iRacing car setups by car: search, rename, move, import, share packs for league mates and setups found in Downloads.", "Sim Racing Tools", "simracing", "simracing.setups", "setups sto setup files car garage share pack zip league downloads import export folders"),
         new("Trading Paints", "Start the Trading Paints Downloader, with Pit-Box or with iRacing.", "Sim Racing Tools", "simracing", "simracing.tradingpaints", "paints liveries downloader iracing launch"),
         new("Car pictures in your paint", "Show your own paint on the car pictures in Session Stats, results and setups (Trading Paints card).", "Sim Racing Tools", "simracing", "simracing.tradingpaints", "livery paint skin car picture image render stats"),
-        new("Sim Racing Tools on / off", "Turn each Sim Racing tool on or off under Settings → Tools; drag them in the sidebar to reorder.", "Settings", "settings", "settings.plugins", "panels hide show arrange order reorder layout tools sim racing"),
+        new("Sim Racing Tools on / off", "Turn each Sim Racing tool on or off under Settings → Tools; drag them in the Sim Racing Tools menu to reorder.", "Settings", "settings", "settings.plugins", "panels hide show arrange order reorder layout tools sim racing"),
         new("iRacing keybinds", "iRacing's own keyboard keys, changed from Pit-Box (iRacing Controller → Keybinds).", "Sim Racing Tools", "simracing", Pages.IracingControllerSection.KeybindsAnchor, "iracing keys keybinds controls.cfg black box replay camera hotkeys"),
         new("Garage 61", "Start the Garage 61 Telemetry Agent, with Pit-Box or with iRacing.", "Sim Racing Tools", "simracing", "simracing.garage61", "garage61 telemetry laps agent iracing launch data"),
 

@@ -227,11 +227,11 @@ internal static class RaceParts
 
     public static bool Raced(SessionSummary s) => s.Type == "Race" && s.Finished && s.FinishPos is > 0;
 
-    public static TextBlock Big(string text, double size, string brush, bool italic = false, bool heavy = true)
+    public static TextBlock Big(string text, double size, string brush, bool heavy = true)
     {
         var t = new TextBlock
         {
-            Text = text, FontSize = size, FontStyle = italic ? FontStyles.Italic : FontStyles.Normal,
+            Text = text, FontSize = size,
             FontWeight = heavy ? FontWeights.ExtraBold : FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center,
         };
         t.SetResourceReference(TextBlock.FontFamilyProperty, "RaceFont");
@@ -240,16 +240,16 @@ internal static class RaceParts
         return t;
     }
 
-    public static TextBlock BigFigure(string text, double size, string brush, bool italic = true)
+    public static TextBlock BigFigure(string text, double size, string brush)
     {
-        var t = Big(text, size, brush, italic);
+        var t = Big(text, size, brush);
         FigureLines(t, size);
         return t;
     }
 
-    public static TextBlock LiveFigure(string text, double size, string brush, bool italic = true, bool heavy = true)
+    public static TextBlock LiveFigure(string text, double size, string brush, bool heavy = true)
     {
-        var t = Big(text, size, brush, italic, heavy);
+        var t = Big(text, size, brush, heavy);
         FigureLines(t, size);
         System.Windows.Documents.Typography.SetNumeralAlignment(t, FontNumeralAlignment.Tabular);
         return t;
@@ -306,7 +306,7 @@ internal static class RaceParts
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(18, 4, 11, 4) };
         row.Children.Add(Glyph(RaceResult.Icon(award), 13, "OnAccent"));
-        var name = Big(RaceResult.Name(award), 13.5, "OnAccent", italic: false, heavy: false);
+        var name = Big(RaceResult.Name(award), 13.5, "OnAccent", heavy: false);
         name.Margin = new Thickness(5, 0, 0, 0);
         row.Children.Add(name);
         var grid = new Grid { ToolTip = RaceResult.Why(award), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom };
@@ -346,7 +346,7 @@ internal static class RaceParts
     public static Border Labeled(string label, string value, string? tip = null)
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal };
-        row.Children.Add(Big(label, 12.5, "TextMuted", italic: false, heavy: false));
+        row.Children.Add(Big(label, 12.5, "TextMuted", heavy: false));
         row.Children.Add(ChipDivider());
         row.Children.Add(new TextBlock { Text = value, Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center }
             .Also(t => t.SetResourceReference(TextBlock.ForegroundProperty, "Text")));
@@ -376,7 +376,7 @@ internal static class RaceParts
     private static Border Rating(string label, double? value, double? delta, Func<double, string> format, string tip)
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal };
-        row.Children.Add(Big(label, 12.5, "TextMuted", italic: false, heavy: false));
+        row.Children.Add(Big(label, 12.5, "TextMuted", heavy: false));
         row.Children.Add(ChipDivider());
         var shown = new TextBlock { Text = value is { } v ? format(v) : RaceFormat.Missing, Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center };
         shown.SetResourceReference(TextBlock.ForegroundProperty, value is null ? "TextFaint" : "Text");
@@ -468,13 +468,13 @@ internal static class RaceParts
     public static FrameworkElement Position(int finish, string place, double size, string label)
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Top };
-        var number = Big("P" + finish.ToString(CultureInfo.CurrentCulture), size, place + "Text", italic: true);
+        var number = Big("P" + finish.ToString(CultureInfo.CurrentCulture), size, place + "Text");
         number.VerticalAlignment = VerticalAlignment.Top;
         number.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
         number.LineHeight = size * 0.86;
         row.Children.Add(number);
         var side = new StackPanel { Margin = new Thickness(size * 0.06, size * 0.05, 0, 0) };
-        side.Children.Add(Big(label, Math.Max(11.5, size * 0.1), "TextMuted", italic: false, heavy: false).Also(t => t.Margin = new Thickness(size * 0.12, 0, 0, 0)));
+        side.Children.Add(Big(label, Math.Max(11.5, size * 0.1), "TextMuted", heavy: false));
         row.Children.Add(side);
         return row;
     }
@@ -486,9 +486,9 @@ internal static class RaceParts
         int gained = start - finish;
         stack.Children.Add(Big(Signed(gained), size, GainBrush(gained)).Also(t => t.HorizontalAlignment = HorizontalAlignment.Right));
         var path = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, ToolTip = "Started → finished" };
-        path.Children.Add(Big("P" + start, 12.5, "TextMuted", italic: false, heavy: false));
+        path.Children.Add(Big("P" + start, 12.5, "TextMuted", heavy: false));
         path.Children.Add(Glyph("I.ArrowRight", 11, "TextMuted").Also(g => g.Margin = new Thickness(4, 0, 4, 0)));
-        path.Children.Add(Big("P" + finish, 12.5, "TextMuted", italic: false, heavy: false));
+        path.Children.Add(Big("P" + finish, 12.5, "TextMuted", heavy: false));
         stack.Children.Add(path);
         return stack;
     }
@@ -510,7 +510,7 @@ internal static class RaceParts
         var climb = Climb(s, 28);
         climb.Margin = new Thickness(0, 14, 16, 0);
         hero.Children.Add(climb);
-        var cls = Big(s.CarClass, 12.5, "TextMuted", italic: false, heavy: false);
+        var cls = Big(s.CarClass, 12.5, "TextMuted", heavy: false);
         cls.HorizontalAlignment = HorizontalAlignment.Right;
         cls.VerticalAlignment = VerticalAlignment.Bottom;
         cls.Margin = new Thickness(0, 0, 16, 14);
@@ -525,7 +525,7 @@ internal static class RaceParts
         var who = new StackPanel { Margin = new Thickness(16, 8, 16, 0) };
         if (d.Driver.Length > 0)
         {
-            var driver = Big(d.Driver, 26, "Heading", italic: false, heavy: false);
+            var driver = Big(d.Driver, 26, "Heading", heavy: false);
             driver.TextTrimming = TextTrimming.CharacterEllipsis;
             who.Children.Add(TextFit.TipWhenTrimmed(driver));
         }

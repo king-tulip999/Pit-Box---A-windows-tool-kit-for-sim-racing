@@ -297,7 +297,7 @@ internal sealed class SetupScreen : UserControl
 
     private CheckBox GoalCard(string id, string title, string caption)
     {
-        var card = ToggleCards.Dress(Ui.Switch(_picked.Contains(id), _ => Pick(id)), ToggleCards.Title(title, false), caption, centerLamp: true);
+        var card = ToggleCards.Dress(Ui.Switch(_picked.Contains(id), _ => Pick(id)), ToggleCards.Title(title, false), caption);
         card.Margin = new Thickness(0, 0, 7, 7);
         return card;
     }

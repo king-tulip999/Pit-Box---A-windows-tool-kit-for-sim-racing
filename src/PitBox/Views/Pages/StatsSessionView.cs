@@ -298,7 +298,7 @@ internal static class StatsSessionView
             row.Children.Add(lead);
         }
         var meta = new StackPanel { Margin = new Thickness(raced ? 22 : 30, 10, 0, 0), VerticalAlignment = VerticalAlignment.Center, MaxWidth = 520 };
-        meta.Children.Add(RaceParts.Big(s.Car, 30, "Heading", italic: false, heavy: false).Also(t => { t.TextWrapping = TextWrapping.Wrap; t.HorizontalAlignment = HorizontalAlignment.Left; }));
+        meta.Children.Add(RaceParts.Big(s.Car, 30, "Heading", heavy: false).Also(t => { t.TextWrapping = TextWrapping.Wrap; t.HorizontalAlignment = HorizontalAlignment.Left; }));
         meta.Children.Add(new TextBlock { Text = $"{s.Place} · {Dates.Weekday(local)} {Dates.ShortTime(local)}", Style = Ui.Res<Style>("Muted"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) });
         var chips = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
         chips.Children.Add(RaceParts.Chip(StatsSessions.TypeMark(s.Type)));

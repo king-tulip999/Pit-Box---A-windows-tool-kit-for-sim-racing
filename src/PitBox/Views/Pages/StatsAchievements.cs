@@ -64,7 +64,7 @@ internal static class StatsAchievements
             pips.Children.Add(pip);
         }
         var value = new TextBlock { Text = state.Value is { } v ? SessionStats.Achievements.Format(family, v) : SimRacing.Race.RaceFormat.Missing, Style = Ui.Res<Style>("BigValue"),
-            FontSize = 20, FontWeight = FontWeights.ExtraBold, FontStyle = FontStyles.Italic };
+            FontSize = 20, FontWeight = FontWeights.ExtraBold };
         value.SetResourceReference(TextBlock.FontFamilyProperty, "RaceFont");
         value.SetResourceReference(TextBlock.ForegroundProperty, all ? gold : state.Earned > 0 ? "Heading" : "TextFaint");
         var label = new TextBlock { Text = family.Name, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 2, 0, 0), TextWrapping = TextWrapping.Wrap };

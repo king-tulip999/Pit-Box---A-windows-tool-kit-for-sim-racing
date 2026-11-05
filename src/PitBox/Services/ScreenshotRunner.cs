@@ -159,12 +159,29 @@ internal static class ScreenshotRunner
 
             var only = Arg("--pages")?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             IReadOnlyList<string> pages = only is null ? window.NavKeys : window.NavKeys.Where(k => only.Contains(k, StringComparer.OrdinalIgnoreCase)).ToList();
-            if (only is not null && pages.Count == 0)
-                RecordError(new ArgumentException($"--pages: none of '{string.Join(",", only)}' is a page ({string.Join(", ", window.NavKeys)})"));
+            var views = only?.Where(o => !pages.Contains(o, StringComparer.OrdinalIgnoreCase)).ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>();
+            var viewPages = window.NavKeys.Where(k => !pages.Contains(k) && views.Any(v => v.StartsWith(k + "-", StringComparison.OrdinalIgnoreCase))).ToList();
+            if (only is not null && pages.Count == 0 && viewPages.Count == 0)
+                RecordError(new ArgumentException($"--pages: none of '{string.Join(",", only)}' is a page ({string.Join(", ", window.NavKeys)}) or a page-view"));
+            var matchedViews = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             int n = 1;
-            foreach (var page in pages)
+            foreach (var page in window.NavKeys.Where(k => pages.Contains(k) || viewPages.Contains(k)))
             {
-                try
+                bool whole = pages.Contains(page);
+                if (!whole)
+                {
+                    try
+                    {
+                        KeepOnScreen(window);
+                        window.Navigate(page);
+                        await SettleAsync(window, Wait(1400), page);
+                    }
+                    catch (Exception ex)
+                    {
+                        RecordError(ex);
+                    }
+                }
+                else try
                 {
                     KeepOnScreen(window);
                     window.Navigate(page);
@@ -191,6 +208,12 @@ internal static class ScreenshotRunner
                     int state = 0;
                     foreach (var (name, enter) in states.ScreenshotStates())
                     {
+                        if (!whole && !views.Contains($"{page}-{name}"))
+                        {
+                            state++;
+                            continue;
+                        }
+                        matchedViews.Add($"{page}-{name}");
                         try
                         {
                             await enter();
@@ -209,13 +232,15 @@ internal static class ScreenshotRunner
                 n++;
             }
 
+            foreach (var missing in views.Where(v => !matchedViews.Contains(v)))
+                RecordError(new ArgumentException($"--pages: '{missing}' is not a page or a page-view"));
             await LintSizesAsync(window, pages);
             if (Environment.GetCommandLineArgs().Contains("--sizes", StringComparer.OrdinalIgnoreCase))
                 await CaptureSizesAsync(window, folder);
             if (only is null) await CheckSearchAsync(window, folder, n);
             if (only is null) SaveTrayIcons(folder);
             if (only is null) SaveTrayMenu(window, folder);
-            if (!Quick)
+            if (!Quick && pages.Count > 0)
             {
                 await CaptureUpdateButtonAsync(window, folder);
                 if (only is null) await CaptureNavIconsAsync(window, folder);
@@ -651,7 +676,7 @@ internal static class ScreenshotRunner
     }
 
     private static (double W, double H) BaseSize =>
-        Arg("--window")?.Split('x') is [var w, var h] && double.TryParse(w, out double width) && double.TryParse(h, out double height) ? (width, height) : (1280 + MainWindow.SidebarDips, 820);
+        Arg("--window")?.Split('x') is [var w, var h] && double.TryParse(w, out double width) && double.TryParse(h, out double height) ? (width, height) : (MainWindow.DefaultWindowWidth, 820);
 
     private static string? Arg(string name)
     {

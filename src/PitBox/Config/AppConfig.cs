@@ -86,7 +86,7 @@ public enum UpdateCheck { OnStart, Daily, Weekly, Manual }
 
 public sealed class UpdateSettings
 {
-    public UpdateCheck Check { get; set; } = UpdateCheck.Daily;
+    public UpdateCheck Check { get; set; } = UpdateCheck.OnStart;
     public DateTime? LastCheckUtc { get; set; }
 
     public string? NotifiedVersion { get; set; }
@@ -179,8 +179,6 @@ public sealed class UiSettings
 
     public Dictionary<string, string> PageSections { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
-
-    public bool SidebarAllOpen { get; set; }
 
     public int SidebarVersion { get; set; }
 

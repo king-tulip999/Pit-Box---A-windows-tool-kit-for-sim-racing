@@ -98,7 +98,7 @@ internal static class ControlSweep
         try
         {
             window.WindowStartupLocation = WindowStartupLocation.Manual;
-            (window.Left, window.Top, window.Width, window.Height) = (0, 0, 1280 + MainWindow.SidebarDips, 820);
+            (window.Left, window.Top, window.Width, window.Height) = (0, 0, MainWindow.DefaultWindowWidth, 820);
             window.Show();
             await Task.Delay(1500);
             var only = Arg("--pages")?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -250,8 +250,8 @@ internal static class ControlSweep
                 yield return (window.SetupContent, "setup");
                 break;
             case "shell":
-                yield return (window.SidebarHost, "sidebar");
                 yield return (window.TitleBar, "title bar");
+                yield return (window.NavView, "navigation");
                 break;
             case "page":
                 yield return (window.PageContent, "page");

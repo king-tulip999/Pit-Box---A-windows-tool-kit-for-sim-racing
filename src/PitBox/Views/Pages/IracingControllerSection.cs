@@ -1362,7 +1362,7 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var (soft, deep) = b.Kind switch { BackupKind.Manual => Hues.Accent, BackupKind.Auto => Hues.Named("Slate"), _ => Hues.Named("Gold") };
-        var number = RaceParts.Big("#" + b.Number.ToString(CultureInfo.CurrentCulture), 15, deep, italic: true);
+        var number = RaceParts.Big("#" + b.Number.ToString(CultureInfo.CurrentCulture), 15, deep);
         number.HorizontalAlignment = HorizontalAlignment.Center;
         var badge = new Border { Width = 46, Height = 34, Margin = new Thickness(0, 0, 13, 0), Child = number };
         badge.SetResourceReference(Border.BackgroundProperty, soft);

@@ -100,8 +100,8 @@ internal sealed class GoalsWidget : HudWidget
     private static void Count(HudPainter p, GoalProgress g, float x, float baseline, float px, Color color, Font slash, string separator)
     {
         string number = Shown(g);
-        var size = p.DisplaySize(number, px, false);
-        p.Display(number, px, color, new RectangleF(x, baseline - size.Height, size.Width + 2, size.Height), HAlign.Left, VAlign.Top, false);
+        var size = p.DisplaySize(number, px);
+        p.Display(number, px, color, new RectangleF(x, baseline - size.Height, size.Width + 2, size.Height), HAlign.Left, VAlign.Top);
         float sx = x + size.Width + 3 * p.Density;
         p.Text(separator + g.Target.ToString(CultureInfo.InvariantCulture), slash, p.P.Muted,
             new RectangleF(sx, baseline - p.Ascent(slash), p.Measure(separator + g.Target, slash) + 4, p.LineHeight(slash)), HAlign.Left, VAlign.Top, false);

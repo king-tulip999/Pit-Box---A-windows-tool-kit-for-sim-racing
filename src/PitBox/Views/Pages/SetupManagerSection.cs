@@ -783,14 +783,14 @@ internal sealed class SetupManagerSection : StackPanel
 
         var title = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         var nameRow = new TrimRow { HorizontalAlignment = HorizontalAlignment.Left };
-        var name = RaceParts.Big(car.Name, 30, "Heading", italic: false, heavy: false);
+        var name = RaceParts.Big(car.Name, 30, "Heading", heavy: false);
         name.VerticalAlignment = VerticalAlignment.Center;
         name.TextTrimming = TextTrimming.CharacterEllipsis;
         TextFit.TipWhenTrimmed(name);
         nameRow.Children.Add(name);
         var tag = new Grid { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 3, 0, 0) };
         tag.Children.Add(new Slant("Accent", 0.12, 0, 1, 0, 0.88, 1, 0, 1));
-        var tagText = RaceParts.Big(car.Class, 13, "OnAccent", italic: false, heavy: false);
+        var tagText = RaceParts.Big(car.Class, 13, "OnAccent", heavy: false);
         tagText.Margin = new Thickness(14, 2, 14, 3);
         tag.Children.Add(tagText);
         nameRow.Children.Add(tag);

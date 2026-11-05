@@ -71,7 +71,7 @@ internal sealed class KeybindsBoard : StackPanel
 
     private static TextBlock SetNumber()
     {
-        var number = RaceParts.LiveFigure("", 38, "Heading", italic: false);
+        var number = RaceParts.LiveFigure("", 38, "Heading");
         number.HorizontalAlignment = HorizontalAlignment.Left;
         number.VerticalAlignment = VerticalAlignment.Bottom;
         return number;
@@ -249,7 +249,7 @@ internal sealed class KeybindsBoard : StackPanel
         badge.SetResourceReference(Border.BackgroundProperty, "SurfaceAlt");
         grid.Children.Add(badge);
         var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 16, 0) };
-        var title = RaceParts.Big(name, 28, "Heading", italic: false, heavy: false);
+        var title = RaceParts.Big(name, 28, "Heading", heavy: false);
         title.HorizontalAlignment = HorizontalAlignment.Left;
         title.TextTrimming = TextTrimming.CharacterEllipsis;
         title.MaxWidth = 300;
@@ -303,7 +303,7 @@ internal sealed class KeybindsBoard : StackPanel
         var top = new DockPanel();
         if (changed > 0)
         {
-            var count = RaceParts.Big(changed.ToString(CultureInfo.CurrentCulture), 20, "AccentText", italic: true, heavy: false);
+            var count = RaceParts.Big(changed.ToString(CultureInfo.CurrentCulture), 20, "AccentText", heavy: false);
             count.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
             count.LineHeight = 22;
             var label = new TextBlock { Text = "changed from default", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 1, 0, 0) };

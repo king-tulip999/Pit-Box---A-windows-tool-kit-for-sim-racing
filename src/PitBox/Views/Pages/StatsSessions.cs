@@ -175,11 +175,11 @@ internal static class StatsSessions
     private static FrameworkElement Finish(SessionSummary s, string place)
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 4) };
-        row.Children.Add(RaceParts.Big("P" + s.FinishPos!.Value.ToString(CultureInfo.CurrentCulture), 27, place + "Text", italic: true));
+        row.Children.Add(RaceParts.Big("P" + s.FinishPos!.Value.ToString(CultureInfo.CurrentCulture), 27, place + "Text"));
         if (s.StartPos is { } start)
         {
             int gained = start - s.FinishPos.Value;
-            var gain = RaceParts.Big(RaceParts.Signed(gained), 14, RaceParts.GainBrush(gained), italic: true);
+            var gain = RaceParts.Big(RaceParts.Signed(gained), 14, RaceParts.GainBrush(gained));
             gain.Margin = new Thickness(6, 4, 0, 0);
             row.Children.Add(gain);
             row.ToolTip = $"Started P{start}, finished P{s.FinishPos}";

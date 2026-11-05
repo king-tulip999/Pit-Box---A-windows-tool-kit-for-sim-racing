@@ -380,8 +380,8 @@ internal sealed class InputsWidget : HudWidget
     private void GearBlock(HudPainter p, HudView v, RectangleF r, in Live live)
     {
         float gearPx = S(52);
-        float gearH = p.DisplaySize("8", gearPx, false).Height;
-        p.Display(GearText(v.Frame.Gear), gearPx, GearColor(p, live), new RectangleF(r.X, r.Y + S(26) - gearH / 2, r.Width, gearH), HAlign.Center, VAlign.Center, false);
+        float gearH = p.DisplaySize("8", gearPx).Height;
+        p.Display(GearText(v.Frame.Gear), gearPx, GearColor(p, live), new RectangleF(r.X, r.Y + S(26) - gearH / 2, r.Width, gearH), HAlign.Center, VAlign.Center);
         if (_speed) SpeedLine(p, v, new RectangleF(r.X, r.Y + S(50), r.Width, S(24)), p.Font(S(18), true), p.Font(S(10.5f), true));
         if (_rpm)
         {
@@ -401,14 +401,14 @@ internal sealed class InputsWidget : HudWidget
         var tile = new RectangleF(0, oy, S(56), S(BarH));
         var tileColor = live.Limiter ? FlashOn(p, live.Now, LimiterHz) ? p.P.Danger : p.P.SurfaceAlt : shifting ? p.P.Danger : p.P.SurfaceAlt;
         p.Fill(tile, tileColor);
-        p.Display(GearText(v.Frame.Gear), S(48), live.Abs ? GearColor(p, live) : p.P.Heading, tile, HAlign.Center, VAlign.Center, false);
+        p.Display(GearText(v.Frame.Gear), S(48), live.Abs ? GearColor(p, live) : p.P.Heading, tile, HAlign.Center, VAlign.Center);
         float x = tile.Right + S(10);
         float speedLeft = _speed ? right - S(SpeedW - 12) : right + S(12);
         if (_speed)
         {
             string value = v.Frame.Speed is { } ms ? PooledText.Number("", RaceFormat.SpeedValue(ms, v.Units), "0", CultureInfo.InvariantCulture) : RaceFormat.Missing;
-            float numberH = p.DisplaySize("888", S(30), false).Height;
-            p.Display(value, S(30), p.P.Heading, new RectangleF(speedLeft, oy + S(36) - numberH, right - speedLeft, numberH), HAlign.Right, VAlign.Bottom, false);
+            float numberH = p.DisplaySize("888", S(30)).Height;
+            p.Display(value, S(30), p.P.Heading, new RectangleF(speedLeft, oy + S(36) - numberH, right - speedLeft, numberH), HAlign.Right, VAlign.Bottom);
             var unit = p.Font(S(10.5f), true);
             p.Text(RaceFormat.SpeedUnit(v.Units), unit, p.P.Muted, new RectangleF(speedLeft, oy + S(56) - p.Ascent(unit), right - speedLeft, p.LineHeight(unit)), HAlign.Right, VAlign.Top, false);
         }

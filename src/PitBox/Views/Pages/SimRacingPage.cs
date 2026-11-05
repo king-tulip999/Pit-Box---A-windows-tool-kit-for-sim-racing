@@ -29,7 +29,7 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
     private readonly SectionView _view;
     private bool _shown;
     private ContentFrame _frame = null!;
-    private const double SetupsWidth = 1680;
+    private const double SetupsWidth = Ui.PageWidth;
 
     public event Action? SectionsChanged;
 

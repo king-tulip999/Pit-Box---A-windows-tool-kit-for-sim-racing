@@ -21,15 +21,14 @@
             </Grid.RowDefinitions>
 
             <!-- every theme: contour lines (Assets/BackdropLines.png, a mask recoloured per theme),
-                 behind the whole window; the sidebar shows a blurred copy (GlassPane) -->
+                 behind the whole window -->
             <v:TopographyBackdrop x:Name="Backdrop" Grid.RowSpan="2" />
 
             <!-- title bar (draggable; buttons opt out of the caption area) -->
             <DockPanel x:Name="TitleBar" Grid.Row="0" LastChildFill="False">
-                <!-- left: the brand wordmark (not a button); the update badge lives in the sidebar footer above Settings.
-                     Centred over the sidebar and between the window top and the title rule (FitBrand). -->
+                <!-- the brand wordmark (not a button), between the window top and the title rule (FitBrand) -->
                 <Grid x:Name="TitleLeft" DockPanel.Dock="Left" Margin="13,6,0,0" VerticalAlignment="Top">
-                    <StackPanel x:Name="Brand" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Top">
+                    <StackPanel x:Name="Brand" Orientation="Horizontal" VerticalAlignment="Top">
                         <TextBlock x:Name="Wordmark" Foreground="{DynamicResource Heading}" />
                     </StackPanel>
                 </Grid>
@@ -61,19 +60,14 @@
                 </Button>
             </DockPanel>
 
-            <!-- the accent line between the title bar and the page: solid at the left edge, fading out to the right -->
+            <!-- the accent line between the title bar and the page, fading out to the right -->
             <v:DividerLine x:Name="TitleRule" Grid.Row="0" VerticalAlignment="Bottom" Margin="0,0,23,0" FromStart="True" />
 
-            <!-- the sidebar (Views/Sidebar.cs: every tool, the open tool's sections, Settings) beside the page, left or right
-                 (UiSettings.SidebarRight) -->
+            <!-- the pages, lined up with the page titles (PlaceNav); groups open a menu of their pages or sections -->
+            <v:TitleNav x:Name="Nav" Grid.Row="0" VerticalAlignment="Top" HorizontalAlignment="Left" />
+
             <Grid x:Name="Body" Grid.Row="1">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <ContentControl x:Name="SidebarHost" Grid.Column="0" Focusable="False" Margin="13,11,0,13" />
-                <Grid x:Name="PageArea" Grid.Column="1" ClipToBounds="True">
+                <Grid x:Name="PageArea" ClipToBounds="True">
                     <ContentControl x:Name="PageContent" Focusable="False" />
                 </Grid>
             </Grid>

@@ -551,9 +551,9 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         var bar = new SegmentMeter(hw.IsPump ? "Slate" : "Sage") { Height = 10, Tiered = true, Smooth = true, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(57, 0, 16, 0),
             ToolTip = $"Speed now. Amber above {SegmentMeter.WarnFrom * 100:0}%, red above {SegmentMeter.HotFrom * 100:0}%." };
         var output = RaceParts.LiveFigure("–", 46, "Heading");
-        var percent = RaceParts.Big("%", 22, "AccentText", italic: true);
+        var percent = RaceParts.Big("%", 22, "AccentText");
         percent.HorizontalAlignment = HorizontalAlignment.Left;
-        var rpm = RaceParts.Big("–", 14, "Text", italic: true, heavy: false);
+        var rpm = RaceParts.Big("–", 14, "Text", heavy: false);
         rpm.HorizontalAlignment = HorizontalAlignment.Left;
         rpm.Margin = new Thickness(0, -3, 4, 0);
         System.Windows.Documents.Typography.SetNumeralAlignment(rpm, FontNumeralAlignment.Tabular);

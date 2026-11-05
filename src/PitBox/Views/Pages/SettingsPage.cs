@@ -347,19 +347,6 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         Ui.Anchor(startRow, "settings.startpage");
         window.Children.Add(startRow);
         window.Children.Add(Ui.Divider());
-        void SetAllOpen(bool on)
-        {
-            if (U.SidebarAllOpen == on) return;
-            U.SidebarAllOpen = on;
-            _app.Save();
-            _window.RefreshSidebar();
-        }
-        var allOpenRow = Ui.SettingRow("Show every tool's sections", "Off: only the open tool lists its sections in the sidebar. Drag tools and their sections in the sidebar to reorder them.",
-            Ui.Switch(U.SidebarAllOpen, SetAllOpen),
-            new Ui.SettingDefault(() => !U.SidebarAllOpen, () => { SetAllOpen(false); Build(); }, "Off"));
-        Ui.Anchor(allOpenRow, "settings.sidebaropen");
-        window.Children.Add(allOpenRow);
-        window.Children.Add(Ui.Divider());
         var onTop = Ui.SettingRow("Keep on top", null,
             Ui.Switch(U.AlwaysOnTop, v => { U.AlwaysOnTop = v; _window.Topmost = v; _app.Save(); }),
             new Ui.SettingDefault(() => !U.AlwaysOnTop, () => { U.AlwaysOnTop = false; _window.Topmost = false; _app.Save(); Build(); }, "Off"));
@@ -879,19 +866,6 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         yield return ("data-section", () =>
         {
             ShowSection("data");
-            return Task.CompletedTask;
-        });
-        yield return ("sidebar-all-open", () =>
-        {
-            U.SidebarAllOpen = true;
-            _window.RefreshSidebar();
-            return Task.CompletedTask;
-        });
-        yield return ("sidebar-open-tool-only", () =>
-        {
-            U.SidebarAllOpen = false;
-            _window.RefreshSidebar();
-            ShowSection("app");
             return Task.CompletedTask;
         });
         yield return ("confirm-delete", () =>

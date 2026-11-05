@@ -241,7 +241,7 @@ internal static class LapAnalysisView
         top.Children.Add(carZone);
 
         var left = new StackPanel { Margin = new Thickness(22, 16, 22, 16), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
-        var title = RaceParts.Big("Lap analysis", 26, "Heading", italic: false, heavy: false);
+        var title = RaceParts.Big("Lap analysis", 26, "Heading", heavy: false);
         title.HorizontalAlignment = HorizontalAlignment.Left;
         left.Children.Add(title);
         left.Children.Add(new TextBlock { Text = $"{session.Car} · {session.Place} · {Dates.Day(local)}", Style = Ui.Res<Style>("Muted"), TextWrapping = TextWrapping.Wrap });

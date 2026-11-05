@@ -159,7 +159,7 @@ internal static class SettingRows
             var rb = new RadioButton
             {
                 Content = stack, Style = Ui.Res<Style>("Segment"), GroupName = name, IsChecked = i == selected, Height = double.NaN,
-                Padding = new Thickness(7, 0, 7, 5), Margin = new Thickness(2, 0, 2, 4), ToolTip = tips[i],
+                Padding = new Thickness(7, 0, 7, 5), Margin = new Thickness(2, 2, 2, 6), ToolTip = tips[i],
             };
             System.Windows.Automation.AutomationProperties.SetName(rb, labels[i]);
             void Dim() => picture.Opacity = rb.IsChecked == true ? 1 : UnpickedPicture;

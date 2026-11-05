@@ -62,7 +62,7 @@ internal sealed class GrrPage : UserControl, IPage, IScreenshotStates, ISectione
         _theme = _app.Config.Grr.PageTheme && _app.Config.Ui.Theme != GrrTheme.Id ? Theme.ThemeManager.Build(GrrTheme.Spec) : null;
         if (_theme is not null) Resources.MergedDictionaries.Add(_theme);
         _dashboard.PageTheme = _theme;
-        if (_shown) _window.SetSidebarAccent(_theme);
+        if (_shown) _window.SetNavAccent(_theme);
     }
 
     private void ToggleTheme()
@@ -118,7 +118,7 @@ internal sealed class GrrPage : UserControl, IPage, IScreenshotStates, ISectione
     public void OnShown()
     {
         _shown = true;
-        _window.SetSidebarAccent(_theme);
+        _window.SetNavAccent(_theme);
         _app.Grr.Changed -= OnGrrChanged;
         _app.Grr.Changed += OnGrrChanged;
         if (Signature() != _signature) Changed();
@@ -128,7 +128,7 @@ internal sealed class GrrPage : UserControl, IPage, IScreenshotStates, ISectione
     public void OnHidden()
     {
         _shown = false;
-        _window.SetSidebarAccent(null);
+        _window.SetNavAccent(null);
         _app.Grr.Changed -= OnGrrChanged;
         _dashboard.OnHidden();
     }
