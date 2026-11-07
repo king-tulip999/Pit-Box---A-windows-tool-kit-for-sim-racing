@@ -82,6 +82,8 @@ internal static class ThemeManager
 
         res["CardEdge"] = res["LineStrong"];
 
+        res["Well"] = Freeze(new SolidColorBrush(Mix(p["SurfaceAlt"], p["Bg"], 0.45)));
+
         var tints = ToolTints(p, spec.Dark);
         for (int i = 0; i < tints.Count; i++)
         {

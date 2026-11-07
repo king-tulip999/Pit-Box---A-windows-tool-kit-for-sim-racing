@@ -45,7 +45,7 @@ internal sealed class SharpText : IDisposable
         {
             _d2d = D2D1.D2D1CreateFactory<ID2D1Factory>(Vortice.Direct2D1.FactoryType.SingleThreaded);
             _dwrite = DWrite.DWriteCreateFactory<IDWriteFactory>(Vortice.DirectWrite.FactoryType.Shared);
-            _rendering = _dwrite.CreateCustomRenderingParams(1.8f, 1f, 0f, PixelGeometry.Flat, RenderingMode.NaturalSymmetric);
+            _rendering = _dwrite.CreateCustomRenderingParams(1.8f, 1f, 0f, PixelGeometry.Flat, RenderingMode.Natural);
             _crisp = _dwrite.CreateCustomRenderingParams(1.8f, 1f, 0f, PixelGeometry.Flat, RenderingMode.Natural);
             _fonts = OverlayFonts.Collection(_dwrite);
             return true;

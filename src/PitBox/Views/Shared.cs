@@ -1047,8 +1047,22 @@ internal static class Ui
         void Fit()
         {
             if (grid.ActualWidth <= 0) return;
-            bool spare = grid.ActualWidth > SettingLabelMax + SettingControlLane + 0.5;
-            if (rest.Width.IsStar != spare)
+            bool fill = grid.Parent is SettingsFlow { FillRows: true };
+            bool spare = !fill && grid.ActualWidth > SettingLabelMax + SettingControlLane + 0.5;
+            if (fill)
+            {
+                var label = grid.ColumnDefinitions[0];
+                if (!double.IsPositiveInfinity(label.MaxWidth))
+                {
+                    label.MaxWidth = double.PositiveInfinity;
+                    label.Width = new GridLength(1, GridUnitType.Star);
+                    lane.Width = GridLength.Auto;
+                    lane.MaxWidth = double.PositiveInfinity;
+                    lane.SharedSizeGroup = SettingLaneGroup;
+                    rest.Width = new GridLength(0);
+                }
+            }
+            else if (rest.Width.IsStar != spare)
             {
                 rest.Width = spare ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
                 lane.Width = spare ? GridLength.Auto : new GridLength(1000, GridUnitType.Star);

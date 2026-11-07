@@ -294,7 +294,7 @@ internal sealed class GrrDashboardSection : StackPanel
     {
         var pick = Ui.LabeledButton("I.Plus", "Choose leagues", () => _ = GrrParts.EditAsync(_app, _window), "PrimaryButton");
         var empty = Ui.EmptyState("I.Flag", "No league picked",
-            "Pick the GRR series you race in. Each one gets its own section in the sidebar with its next race, standings, results and schedule.", pick);
+            "Pick the GRR series you race in. Each one gets its own entry in the GRR menu with its next race, standings, results and schedule.", pick);
         return new Tile { Style = Ui.Res<Style>("Card"), Child = empty };
     }
 

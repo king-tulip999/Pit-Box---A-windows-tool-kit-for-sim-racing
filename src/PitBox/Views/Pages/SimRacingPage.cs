@@ -410,7 +410,7 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, ICa
             if (PitBox.Plugins.BuiltIn.SimRacingPlugin.FeatureOn(_app, "tradingpaints") || PitBox.Plugins.BuiltIn.SimRacingPlugin.FeatureOn(_app, "garage61"))
                 throw new InvalidOperationException("A companion app stayed on with its panel hidden.");
             if (Sections.Any(s => s.Id == "companions") || _view.Current is "companions")
-                throw new InvalidOperationException("A tool that was turned off is still in the sidebar.");
+                throw new InvalidOperationException("A tool that was turned off is still in the title bar.");
             return Task.CompletedTask;
         });
         yield return ("companions-turned-on", () =>

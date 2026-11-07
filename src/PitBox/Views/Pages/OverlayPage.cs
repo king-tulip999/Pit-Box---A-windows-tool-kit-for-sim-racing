@@ -18,8 +18,8 @@ internal sealed class OverlayPage : UserControl, IPage
     private readonly MainWindow _window;
     private readonly bool _embedded;
     private readonly StackPanel _body;
-    private readonly DockPanel _left = new() { LastChildFill = true };
-    private readonly StackPanel _right = new(), _wide = new();
+    private readonly DockPanel _left = new() { LastChildFill = true }, _right = new() { LastChildFill = true };
+    private readonly StackPanel _wide = new();
     private StackPanel _position = new();
     private readonly Image _preview = new() { Stretch = Stretch.Uniform, StretchDirection = StretchDirection.DownOnly, SnapsToDevicePixels = true, ToolTip = "Drag a value or a group name to change the order" };
     private readonly Canvas _scene = new() { ClipToBounds = true };
@@ -36,7 +36,7 @@ internal sealed class OverlayPage : UserControl, IPage
     private readonly OverlayPreviewMotion _motion;
     private readonly Dictionary<OverlayMetric, (Grid Row, TextBlock Label)> _metricRows = new();
     private (Grid Row, TextBlock Label)? _litRow;
-    private bool _glideNext, _growNext;
+    private bool _growNext;
     private System.Windows.Media.Imaging.WriteableBitmap? _previewBits;
     private double _previewDpi;
     private readonly Image _closeUp = new() { Stretch = Stretch.None, HorizontalAlignment = HorizontalAlignment.Left, SnapsToDevicePixels = true };
@@ -219,9 +219,9 @@ internal sealed class OverlayPage : UserControl, IPage
         _wide.Children.Clear();
         BuildLayouts();
         BuildPreview();
-        BuildLook();
         BuildPosition();
         BuildMetrics();
+        BuildLook();
     }
 
     private readonly ContentControl _statusChip = new() { Focusable = false, VerticalAlignment = VerticalAlignment.Center };
@@ -382,18 +382,15 @@ internal sealed class OverlayPage : UserControl, IPage
     private void PlacePreview()
     {
         if (_scene.ActualWidth <= 0) return;
-        _preview.MaxWidth = _scene.ActualWidth;
-        _preview.MaxHeight = _scene.ActualHeight;
-        var (monitorW, monitorH) = OverlayController.MonitorSize(L);
-        var (fx, fy) = OverlayController.FractionOf(L, monitorW, monitorH, _overlaySize.W, _overlaySize.H);
+        _preview.MaxWidth = Math.Min(_scene.ActualWidth * PreviewRoom, _overlaySize.W > 0 ? _overlaySize.W * PreviewScale : double.PositiveInfinity);
+        _preview.MaxHeight = Math.Min(_scene.ActualHeight * PreviewRoom, _overlaySize.H > 0 ? _overlaySize.H * PreviewScale : double.PositiveInfinity);
         var (maxX, maxY) = Room();
-        var from = new Point(Canvas.GetLeft(_preview), Canvas.GetTop(_preview));
-        Canvas.SetLeft(_preview, Math.Round(fx * maxX));
-        Canvas.SetTop(_preview, Math.Round(fy * maxY));
-        if (!_glideNext) return;
-        _glideNext = false;
-        _motion.Glide(from);
+        Canvas.SetLeft(_preview, Math.Round(maxX / 2));
+        Canvas.SetTop(_preview, Math.Round(maxY / 2));
     }
+
+    private const double PreviewScale = 0.75;
+    private const double PreviewRoom = 0.8;
 
     private (string? Group, OverlayMetric? Metric) _lit;
 
@@ -493,60 +490,76 @@ internal sealed class OverlayPage : UserControl, IPage
         BuildSettings();
     }
 
-    private void BuildGeneral(SettingsFlow general)
+    private List<FrameworkElement> GeneralRows()
     {
         var hotkey = HotkeyEditor("overlay", () => O.Hotkey, hk => O.Hotkey = hk);
         Ui.SettingDefault D(Func<bool> same, Action reset, string shown) => new(same, () => { reset(); Changed(); BuildSettings(); }, shown);
-        general.Children.Add(Ui.Text("Data and keybinds", "H2"));
-        general.Children.Add(Anchored(Ui.SettingRow("Update rate", "All layouts. Sensors follow Settings → Performance.",
+        var general = new List<FrameworkElement>();
+        general.Add(Anchored(Ui.SettingRow("Update rate", "All layouts. Sensors follow Settings → Performance.",
             Ui.Segmented(new[] { "4 " + Units.Hz, "2 " + Units.Hz, "1 " + Units.Hz }, O.UpdateIntervalMs switch { <= 250 => 0, >= 1000 => 2, _ => 1 },
                 i => { O.UpdateIntervalMs = i switch { 0 => 250, 2 => 1000, _ => 500 }; _refresh.Interval = TimeSpan.FromMilliseconds(RefreshMs); Changed(); }, "Rate",
                 new[] { "Smoothest numbers, slightly more CPU", "Redraws twice a second", "The lightest; numbers jump less" }),
             D(() => O.UpdateIntervalMs == 500, () => O.UpdateIntervalMs = 500, "2 " + Units.Hz)), "overlay.rate"));
-        general.Children.Add(Ui.SettingRow("FPS statistics", "Averages and 1% low, per game session.", ResetButton()));
-        general.Children.Add(Anchored(Ui.SettingRow("Show / hide", null, hotkey), "overlay.hotkey"));
-        general.Children.Add(Anchored(Ui.SettingRow("Reset FPS statistics", null,
+        general.Add(Ui.SettingRow("FPS statistics", "Averages and 1% low, per game session.", ResetButton()));
+        general.Add(Anchored(Ui.SettingRow("Show / hide", null, hotkey), "overlay.hotkey"));
+        general.Add(Anchored(Ui.SettingRow("Reset FPS statistics", null,
             HotkeyEditor("overlay.fps", () => O.ResetFpsHotkey, hk => O.ResetFpsHotkey = hk)), "overlay.fpshotkey"));
+        return general;
     }
 
     private void BuildLook()
     {
         var std = new OverlayLayout();
         Ui.SettingDefault D(Func<bool> same, Action reset, string shown) => new(same, () => { reset(); Changed(); BuildSettings(); }, shown);
-        var general = new SettingsFlow { MaxColumns = 1 };
-        general.Children.Add(Ui.Text("Look", "H2"));
-        general.Children.Add(Anchored(Ui.SettingRow("Style", null,
+        var general = new List<FrameworkElement>();
+        general.Add(Anchored(Ui.SettingRow("Style", null,
             Ui.Segmented(new[] { "Expanded", "Compact" }, (int)L.Style, i => Morphing(() => { L.Style = (OverlayStyle)i; Changed(); }), "Style",
                 new[] { "One row per group (CPU, GPU, FPS…), easy to read at a glance", "Everything on one line: takes the least room over your game" }),
             D(() => L.Style == std.Style, () => L.Style = std.Style, std.Style.ToString())), "overlay.style"));
-        general.Children.Add(Anchored(Ui.SettingRow("Text size", null, MarksStartSize(Ui.SliderWithValue(60, 200, L.FontScale, "{0:0}%", v => { _growNext = true; L.FontScale = (int)v; Changed(); }, 105, 5)),
+        general.Add(Anchored(Ui.SettingRow("Text size", null, MarksStartSize(Ui.SliderWithValue(60, 200, L.FontScale, "{0:0}%", v => { _growNext = true; L.FontScale = (int)v; Changed(); }, 105, 5)),
             D(() => L.FontScale == std.FontScale, () => L.FontScale = std.FontScale, std.FontScale + "%")), "overlay.font"));
-        general.Children.Add(Anchored(Ui.SettingRow("Background", null, Ui.SliderWithValue(0, 100, L.BackgroundOpacity, "{0:0}%", v => Fading(() => { L.BackgroundOpacity = (int)v; Changed(); }), 105, 5),
+        general.Add(Anchored(Ui.SettingRow("Background", null, Ui.SliderWithValue(0, 100, L.BackgroundOpacity, "{0:0}%", v => Fading(() => { L.BackgroundOpacity = (int)v; Changed(); }), 105, 5),
             D(() => L.BackgroundOpacity == std.BackgroundOpacity, () => L.BackgroundOpacity = std.BackgroundOpacity, std.BackgroundOpacity + "%")), "overlay.opacity"));
-        general.Children.Add(Anchored(Ui.SettingRow("Frame-time graph", null,
+        general.Add(Anchored(Ui.SettingRow("Frame-time graph", null,
             Ui.Switch(L.ShowGraph, v => { L.ShowGraph = v; Changed(); RenderPreview(); }),
             D(() => L.ShowGraph == std.ShowGraph, () => L.ShowGraph = std.ShowGraph, std.ShowGraph ? "On" : "Off")), "overlay.graph"));
-        var data = new SettingsFlow { MaxColumns = 1 };
-        BuildGeneral(data);
-        var halves = new Grid();
-        halves.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        halves.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Ui.PanelSpacing * 2) });
-        halves.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        Grid.SetColumn(data, 2);
-        halves.Children.Add(general);
-        halves.Children.Add(data);
-        _wide.Children.Add(Card(halves));
+        var data = GeneralRows();
+        var heads = new Grid { Margin = new Thickness(0, 0, 0, 4) };
+        heads.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        heads.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(LookColumnGap) });
+        heads.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var dataHead = Ui.Text("Data and keybinds", "H2");
+        Grid.SetColumn(dataHead, 2);
+        heads.Children.Add(Ui.Text("Look", "H2"));
+        heads.Children.Add(dataHead);
+        var rows = new SettingsFlow { MaxColumns = 2, ColumnGap = LookColumnGap, FillRows = true };
+        for (int r = 0; r < Math.Max(general.Count, data.Count); r++)
+        {
+            rows.Children.Add(r < general.Count ? general[r] : new SettingRowGrid());
+            rows.Children.Add(r < data.Count ? data[r] : new SettingRowGrid());
+        }
+        var stack = new StackPanel { Children = { heads, rows } };
+        var wide = new Grid();
+        wide.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) });
+        wide.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(LookColumnGap) });
+        wide.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var position = Detached(_position);
+        Grid.SetColumn(position, 2);
+        wide.Children.Add(stack);
+        wide.Children.Add(position);
+        _wide.Children.Add(Card(wide));
     }
+
+    private const double LookColumnGap = 38;
 
     private void BuildPosition()
     {
         var position = new SettingsFlow();
         position.Children.Add(Ui.Text("Position", "H2"));
         _builtMonitors = MonitorSignature();
-        var map = new OverlayPlacementMap(() => L, () => { _glideNext = true; Changed(); }) { Margin = new Thickness(0, 10, 0, 0) };
+        var map = new OverlayPlacementMap(() => L, Changed) { Margin = new Thickness(0, 10, 0, 0) };
         position.Children.Add(Anchored(map, "overlay.position"));
         _position = position;
-        _right.Children.Add(Card(position));
     }
 
     private void BuildMetrics()
@@ -555,7 +568,7 @@ internal sealed class OverlayPage : UserControl, IPage
         _litRow = null;
         _lit = default;
         _motion.Spotlight(null, null);
-        var metrics = new StackPanel { Margin = new Thickness(0, 11, 0, 0) };
+        var metrics = new StackPanel();
         var head = new DockPanel { LastChildFill = false };
         var rename = Ui.LabeledButton("I.Pencil", "Rename items…", () => _ = RenameItemsAsync());
         rename.ToolTip = "Your own names for the groups and values the overlay shows (e.g. GPU → 7900 XTX). The layout's own name is under the pencil next to Layout.";
@@ -567,20 +580,63 @@ internal sealed class OverlayPage : UserControl, IPage
         metrics.Children.Add(head);
         var groups = L.GroupOrder().Select(g => (Group: g, Entries: L.Metrics.Where(m => OverlayLayout.GroupOf(m.Metric) == g).ToList())).ToList();
         var sizes = groups.Select(g => g.Entries.Count + 1.0).ToArray();
+        int[]? packed = null;
+        int packedFor = 0;
         var cards = new MasonryPanel
         {
-            MinColumnWidth = MetricCardWidth, MaxColumns = 4, Gap = 8, Margin = new Thickness(0, 10, 0, 0),
-            ColumnOf = (columns, index) => index < sizes.Length ? SplitInOrder(sizes, columns)[index] : null,
+            MinColumnWidth = MetricCardWidth, MaxColumns = 3, Gap = 8, Margin = new Thickness(0, 10, 0, 0),
+            ColumnOf = (columns, index) =>
+            {
+                if (index >= sizes.Length) return null;
+                if (packed is null || packedFor != columns) { packed = BalancedColumns(sizes, columns); packedFor = columns; }
+                return packed[index];
+            },
         };
         foreach (var (group, entries) in groups)
             cards.Children.Add(MetricCard(group, entries));
         metrics.Children.Add(cards);
         Ui.Anchor(metrics, "overlay.metrics");
-        _position.Children.Add(Ui.Divider());
-        _position.Children.Add(metrics);
+        _right.Children.Add(Card(metrics));
     }
 
-    private const double MetricCardWidth = 130;
+    internal static int[] BalancedColumns(IReadOnlyList<double> sizes, int columns)
+    {
+        var best = SplitInOrder(sizes, columns);
+        if (sizes.Count == 0 || columns <= 1 || Math.Pow(columns, sizes.Count) > 200000) return best;
+        double bestTall = Tallest(best, sizes, columns);
+        var pick = new int[sizes.Count];
+        var sums = new double[columns];
+        void Place(int i)
+        {
+            if (i == sizes.Count)
+            {
+                if (sums.Any(v => v == 0)) return;
+                double tall = sums.Max();
+                if (tall < bestTall - 1e-6) { bestTall = tall; pick.CopyTo(best, 0); }
+                return;
+            }
+            for (int c = 0; c < columns; c++)
+            {
+                if (sums[c] + sizes[i] >= bestTall - 1e-6) continue;
+                pick[i] = c;
+                sums[c] += sizes[i];
+                Place(i + 1);
+                sums[c] -= sizes[i];
+                if (sums[c] == 0) break;
+            }
+        }
+        Place(0);
+        return best;
+    }
+
+    private static double Tallest(int[] columnOf, IReadOnlyList<double> sizes, int columns)
+    {
+        var sums = new double[columns];
+        for (int i = 0; i < sizes.Count; i++) sums[columnOf[i]] += sizes[i];
+        return sums.Max();
+    }
+
+    private const double MetricCardWidth = 150;
 
     internal static int[] SplitInOrder(IReadOnlyList<double> sizes, int columns)
     {
@@ -972,7 +1028,7 @@ internal sealed class OverlayPage : UserControl, IPage
             double wasWidth = _overlaySize.W;
             _overlaySize = (w / dpi, h / dpi);
             if (_growNext && wasWidth > 0)
-                _motion.Grow(wasWidth / _overlaySize.W, L.Corner is OverlayCorner.TopRight or OverlayCorner.BottomRight, L.Corner is OverlayCorner.BottomLeft or OverlayCorner.BottomRight);
+                _motion.Grow(wasWidth / _overlaySize.W);
             _growNext = false;
         }
         catch

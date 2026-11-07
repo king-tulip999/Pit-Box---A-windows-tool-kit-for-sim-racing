@@ -695,13 +695,13 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             Style = Ui.Res<Style>("Card"), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing),
             Child = new StackPanel { Children = { Ui.Text("Keybinds", "H3"), keys } },
         });
-        root.Children.Add(Group("Look", null,
+        root.Children.Add(Group("Look", null, LookRows(a, changed, rebuild, (t, d, c, f) => Ui.SettingRow(t, d, c, f is null ? null : D(f.Value.Same, f.Value.Reset, f.Value.Shown))).Concat(new UIElement[] {
             Ui.SettingRow("Background", null, Ui.SliderWithValue(0, 100, a.Background, "{0:0}%", v => { a.Background = (int)v; changed(); }),
                 D(() => a.Background == stdLook.Background, () => a.Background = stdLook.Background, stdLook.Background + "%")),
             Ui.SettingRow("Corners", null, Ui.SliderWithValue(0, 16, a.Corner, "{0:0} px", v => { a.Corner = (int)v; changed(); }),
                 D(() => a.Corner == stdLook.Corner, () => a.Corner = stdLook.Corner, stdLook.Corner + " px")),
             Ui.SettingRow("Outline", null, Ui.Switch(a.Outline, on => { a.Outline = on; changed(); }),
-                D(() => a.Outline == stdLook.Outline, () => a.Outline = stdLook.Outline, stdLook.Outline ? "On" : "Off"))));
+                D(() => a.Outline == stdLook.Outline, () => a.Outline = stdLook.Outline, stdLook.Outline ? "On" : "Off")) }).ToArray()));
         var grid = Ui.SliderWithValue(RaceHudSettings.MinGrid, RaceHudSettings.MaxGrid, S.GridSize, "{0:0} px", v =>
         {
             S.GridSize = (int)v;
@@ -714,6 +714,117 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             Ui.SettingRow("Grid", app.Demo ? "The grid is shown over your screens while you adjust it (not with demo data)." : "Shown over your screens while you adjust it.", grid)));
 
         return root;
+    }
+
+    private const string PresetColors = "Preset";
+
+    internal static IEnumerable<UIElement> LookRows(HudAppearance a, Action changed, Action rebuild, Func<string, string?, FrameworkElement, (Func<bool> Same, Action Reset, string Shown)?, UIElement> row)
+    {
+        bool preset = HudThemes.Known(a.Colors) is not null;
+        string mode = preset ? PresetColors : a.Colors;
+        var modes = new[]
+        {
+            new Choice(HudAppearance.DefaultColors, "Default"),
+            new Choice(HudAppearance.AppColors, "Same as the app theme"),
+            new Choice(PresetColors, "Theme"),
+            new Choice(HudAppearance.CustomColors, "Custom"),
+        };
+        var pick = Ui.Combo(modes, mode, c =>
+        {
+            if (c.Id == PresetColors) a.Colors = HudThemes.Known(a.Colors) ?? HudThemes.Presets.First().Name;
+            else if (c.Id == HudAppearance.CustomColors)
+            {
+                if (a.Colors != HudAppearance.CustomColors) a.Custom = HudThemes.StartingColors(a);
+                a.Colors = HudAppearance.CustomColors;
+            }
+            else a.Colors = c.Id!;
+            changed();
+            rebuild();
+        }, 194);
+        yield return row("Colors", a.Colors == HudAppearance.AppColors ? "Every widget. Changes with the app theme." : "Every widget.", pick,
+            (() => a.Colors == HudAppearance.DefaultColors, () => a.Colors = HudAppearance.DefaultColors, "Default"));
+        if (preset)
+        {
+            var theme = new Button { Style = Ui.Res<Style>("MenuButton"), MinWidth = 194, HorizontalContentAlignment = HorizontalAlignment.Stretch };
+            void Face()
+            {
+                var name = TextFit.TipWhenTrimmed(new TextBlock { Text = a.Colors, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(6, 0, 0, 0) });
+                theme.Content = Ui.MenuFace(name, ThemeMenu.PresetSpec(a.Colors) is { } spec ? ThemeMenu.Dots(spec) : null);
+                System.Windows.Automation.AutomationProperties.SetName(theme, "Theme: " + a.Colors);
+            }
+            theme.Click += (_, _) => ThemeMenu.OpenPresetMenu(theme, a.Colors, name =>
+            {
+                a.Colors = name;
+                Face();
+                changed();
+            });
+            Face();
+            yield return row("Theme", null, theme, null);
+        }
+        if (a.Colors != HudAppearance.CustomColors) yield break;
+        var custom = a.Custom;
+        foreach (var (label, get, set) in new (string, Func<string>, Action<string>)[]
+        {
+            ("Panel", () => custom.Background, v => custom.Background = v),
+            ("Text", () => custom.Text, v => custom.Text = v),
+            ("Edges", () => custom.Edges, v => custom.Edges = v),
+            ("Accent", () => custom.Accent, v => custom.Accent = v),
+            ("Good", () => custom.Success, v => custom.Success = v),
+            ("Warning", () => custom.Warning, v => custom.Warning = v),
+            ("Danger", () => custom.Error, v => custom.Error = v),
+        })
+            yield return row(label, null, HexField(get, v => { set(v); changed(); }), null);
+    }
+
+    private static StackPanel HexField(Func<string> get, Action<string> set)
+    {
+        var swatch = new Border { Width = 28, Height = 28, BorderThickness = Hairline.Edges(), Margin = new Thickness(0, 0, 8, 0), Cursor = System.Windows.Input.Cursors.Hand, ToolTip = "Pick a color" };
+        swatch.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
+        swatch.MouseEnter += (_, _) => swatch.SetResourceReference(Border.BorderBrushProperty, "Accent");
+        swatch.MouseLeave += (_, _) => swatch.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
+        System.Windows.Automation.AutomationProperties.SetName(swatch, "Pick a color");
+        Motion.Pressable(swatch);
+        var box = new TextBox { Width = 96, Text = get(), MaxLength = 7, VerticalContentAlignment = VerticalAlignment.Center };
+        void Show() => swatch.Background = CustomPalette.Parse(get()) is { } c ? new SolidColorBrush(c) : null;
+        void Commit()
+        {
+            if (CustomPalette.Parse(box.Text) is { } c)
+            {
+                string hex = Palettes.ToHex(c);
+                if (!string.Equals(hex, get(), StringComparison.OrdinalIgnoreCase)) set(hex);
+            }
+            box.Text = get();
+            Show();
+        }
+        swatch.MouseLeftButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            if (PickColor(swatch, get()) is not { } picked) return;
+            box.Text = picked;
+            Commit();
+        };
+        box.LostKeyboardFocus += (_, _) => Commit();
+        box.KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) Commit(); };
+        Show();
+        return new StackPanel { Orientation = Orientation.Horizontal, Children = { swatch, box } };
+    }
+
+    private sealed class DialogOwner(IntPtr handle) : System.Windows.Forms.IWin32Window
+    {
+        public IntPtr Handle => handle;
+    }
+
+    private static string? PickColor(FrameworkElement near, string current)
+    {
+        if (!External.Allowed("color dialog")) return null;
+        var start = CustomPalette.Parse(current);
+        using var dialog = new System.Windows.Forms.ColorDialog { FullOpen = true, AnyColor = true };
+        if (start is { } c) dialog.Color = System.Drawing.Color.FromArgb(c.R, c.G, c.B);
+        var owner = Window.GetWindow(near) is { } window ? new System.Windows.Interop.WindowInteropHelper(window).Handle : IntPtr.Zero;
+        var result = owner == IntPtr.Zero ? dialog.ShowDialog() : dialog.ShowDialog(new DialogOwner(owner));
+        if (result != System.Windows.Forms.DialogResult.OK) return null;
+        var chosen = dialog.Color;
+        return $"#{chosen.R:X2}{chosen.G:X2}{chosen.B:X2}";
     }
 
     internal static string ShortKeybindLabel(string label)

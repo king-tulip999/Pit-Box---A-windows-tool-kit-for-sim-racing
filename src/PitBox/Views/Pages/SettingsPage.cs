@@ -206,7 +206,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         try
         {
             await _window.ShowModal(Ui.Dialog(_window, "Tools",
-                "A tool that's off has no page, keybind, tray item or background work; its settings are kept. Drag tools in the sidebar to reorder them.",
+                "A tool that's off has no page, keybind, tray item or background work; its settings are kept. Drag tools in the title bar to reorder them.",
                 host, close, null, ToolsDialogWidth, ToolChooser.BulkButtons(_app, () => { })));
         }
         finally { _app.Plugins.Changed -= Refill; }
@@ -1007,7 +1007,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         }
         if (!await _window.Confirm("Reset Pit-Box to defaults?",
                 "Everything goes back to how it was on first install: window profiles and groups, display profiles, " +
-                "fan curves and calibration, overlay layouts, page layouts, the sidebar order and these settings. Pit-Box then restarts.\n\n" +
+                "fan curves and calibration, overlay layouts, page layouts, the page order and these settings. Pit-Box then restarts.\n\n" +
                 "Kept: a copy of your current settings (config.before-reset-….json in the settings folder, rename it to config.json to go back), " +
                 "iRacing backups, the PawnIO driver and the Start with Windows task. Changes already made to Windows (displays, sound) aren't undone.",
                 "Reset and restart", danger: true))

@@ -22,6 +22,7 @@ internal sealed class SettingsFlow : StackPanel
     public double MinColumnWidth { get; init; } = 275;
     public int MaxColumns { get; init; } = 3;
     public double ColumnGap { get; init; } = 26;
+    public bool FillRows { get; init; }
 
     private const double RuleSpace = 4;
 

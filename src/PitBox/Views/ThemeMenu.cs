@@ -47,6 +47,38 @@ internal static class ThemeMenu
         menu.IsOpen = true;
     }
 
+    public static ThemeSpec? PresetSpec(string? name) =>
+        name is null ? null
+        : CustomPalette.Preset(name) is not null ? Themes.ForSet(AppTheme.Custom, name)
+        : ThemeSets.Teams.Known(name) is { } team ? Themes.ForSet(AppTheme.Teams, team)
+        : null;
+
+    public static void OpenPresetMenu(FrameworkElement anchor, string? current, Action<string> use)
+    {
+        var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom, MinWidth = Math.Max(220, anchor.ActualWidth) };
+        Ui.DropBelow(menu);
+        bool Picked(string name) => string.Equals(current, name, StringComparison.OrdinalIgnoreCase);
+        void Families(string[] families, (string Name, string Family, ThemeColors Colors)[] presets, AppTheme theme)
+        {
+            foreach (var family in families)
+            {
+                var group = new MenuItem { Header = family };
+                foreach (var (name, _, _) in presets.Where(p => p.Family == family))
+                {
+                    var item = new MenuItem { Header = Header(name, Themes.ForSet(theme, name)), IsChecked = Picked(name) };
+                    item.Click += (_, _) => use(name);
+                    group.IsChecked |= item.IsChecked;
+                    group.Items.Add(item);
+                }
+                menu.Items.Add(group);
+            }
+        }
+        Families(CustomPalette.Families, CustomPalette.Presets, AppTheme.Custom);
+        menu.Items.Add(new Separator());
+        Families(ThemeSets.Teams.Families, ThemeSets.Teams.Presets, AppTheme.Teams);
+        menu.IsOpen = true;
+    }
+
     private static void AddPicks(MenuItem into, ThemeSet set, Func<string, bool> isChecked, Action<string> pick)
     {
         if (into.Items.Count > 0) into.Items.Add(new Separator());

@@ -10,7 +10,7 @@ internal static class Palettes
         ["TileRaised"] = Hex("#2C2C2C"), ["SidebarBg"] = Hex("#191919"), ["Hover"] = Hex("#2A2A2A"), ["HoverRaised"] = Hex("#343434"),
         ["TileEdge"] = Hex("#313131"),
         ["Line"] = Hex("#2E2E2E"), ["LineStrong"] = Hex("#3C3C3C"),
-        ["Heading"] = Hex("#EDEDED"), ["Text"] = Hex("#CFCFCF"), ["TextMuted"] = Hex("#9A9A9A"), ["TextFaint"] = Hex("#8E8E8E"),
+        ["Heading"] = Hex("#EDEDED"), ["Text"] = Hex("#CFCFCF"), ["TextMuted"] = Hex("#ABABAB"), ["TextFaint"] = Hex("#9E9E9E"),
         ["Accent"] = Hex("#DB156B"), ["AccentHover"] = Hex("#B8115A"), ["AccentPressed"] = Hex("#9A0E4B"), ["AccentEdge"] = Hex("#DB156B"),
         ["OnAccent"] = Hex("#FFFFFF"), ["AccentSoft"] = Hex("#3D0E24"), ["AccentText"] = Hex("#F5559A"),
         ["Selected"] = Hex("#353535"), ["SelectedHover"] = Hex("#3D3D3D"), ["SelectedEdge"] = Hex("#4A4A4A"),

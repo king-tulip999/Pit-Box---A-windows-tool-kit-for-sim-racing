@@ -91,7 +91,7 @@ internal sealed class HudWebRenderer : IDisposable
             {
                 if (Math.Abs(config.Opacity - client.ToldOpacity) <= 0.01) continue;
                 client.ToldOpacity = config.Opacity;
-                look ??= string.Create(CultureInfo.InvariantCulture, $"{{\"type\":\"look\",\"opacity\":{Math.Clamp(config.Opacity / 100, 0, 1):0.###}}}");
+                look ??= string.Create(CultureInfo.InvariantCulture, $"{{\"type\":\"look\",\"opacity\":{Math.Clamp(config.Opacity / 100.0, 0, 1):0.###}}}");
                 client.Say(look);
             }
             bool due = Stopwatch.GetElapsedTime(t.LastDraw, now).TotalMilliseconds >= 1000.0 / hz - 4;

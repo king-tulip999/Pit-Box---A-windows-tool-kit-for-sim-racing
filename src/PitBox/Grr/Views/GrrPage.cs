@@ -159,7 +159,7 @@ internal sealed class GrrPage : UserControl, IPage, IScreenshotStates, ISectione
         yield return ("grr-sidebar-gt", () =>
         {
             ShowSection("gt");
-            if (CurrentSection != "gt") throw new InvalidOperationException("Picking GT League in the sidebar didn't show it.");
+            if (CurrentSection != "gt") throw new InvalidOperationException("Picking GT League in the GRR menu didn't show it.");
             return Task.CompletedTask;
         });
         yield return ("grr-narrow", () => { _body.MaxWidth = 616; _body.HorizontalAlignment = HorizontalAlignment.Left; _scroll.ScrollToTop(); return Task.CompletedTask; });

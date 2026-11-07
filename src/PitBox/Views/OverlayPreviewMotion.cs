@@ -24,7 +24,6 @@ internal sealed class OverlayPreviewMotion
     private readonly Canvas _layer = new() { IsHitTestVisible = false };
     private readonly Border _ring = new() { IsHitTestVisible = false, Visibility = Visibility.Collapsed };
     private readonly Border _startSize = new() { IsHitTestVisible = false, Visibility = Visibility.Collapsed };
-    private readonly TranslateTransform _move = new();
     private readonly ScaleTransform _grow = new();
     private int _generation;
     private bool _holding;
@@ -46,7 +45,7 @@ internal sealed class OverlayPreviewMotion
         _scene = scene;
         _preview = preview;
         _hits = hits;
-        _preview.RenderTransform = new TransformGroup { Children = { _grow, _move } };
+        _preview.RenderTransform = _grow;
         Hairline.Frame(_startSize);
         _ring.SetResourceReference(Border.BackgroundProperty, "AccentText");
         _ring.Opacity = HoverWash;
@@ -149,20 +148,10 @@ internal sealed class OverlayPreviewMotion
         _layer.Children.Add(old);
     }
 
-    public void Glide(Point from)
-    {
-        if (!Motion.Flourish) return;
-        var to = new Point(Canvas.GetLeft(_preview), Canvas.GetTop(_preview));
-        if (double.IsNaN(from.X) || double.IsNaN(to.X) || (Math.Abs(from.X - to.X) < 1 && Math.Abs(from.Y - to.Y) < 1)) return;
-        var duration = TimeSpan.FromMilliseconds(380);
-        _move.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(from.X - to.X, 0, duration) { EasingFunction = Motion.Ease, FillBehavior = FillBehavior.Stop });
-        _move.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(from.Y - to.Y, 0, duration) { EasingFunction = Motion.Ease, FillBehavior = FillBehavior.Stop });
-    }
-
-    public void Grow(double ratio, bool right, bool bottom)
+    public void Grow(double ratio)
     {
         if (!Motion.Flourish || double.IsNaN(ratio) || Math.Abs(ratio - 1) < 0.005) return;
-        _preview.RenderTransformOrigin = new Point(right ? 1 : 0, bottom ? 1 : 0);
+        _preview.RenderTransformOrigin = new Point(0.5, 0.5);
         var duration = TimeSpan.FromMilliseconds(220);
         _grow.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(ratio, 1, duration) { EasingFunction = Motion.Ease, FillBehavior = FillBehavior.Stop });
         _grow.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(ratio, 1, duration) { EasingFunction = Motion.Ease, FillBehavior = FillBehavior.Stop });

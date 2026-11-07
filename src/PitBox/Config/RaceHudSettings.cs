@@ -16,7 +16,7 @@ public enum HudAnchor { TopLeft, Top, TopRight, Left, Center, Right, BottomLeft,
 
 public sealed class RaceHudSettings
 {
-    public const int CurrentVersion = 3;
+    public const int CurrentVersion = 4;
 
     public int Version { get; set; }
 
@@ -184,9 +184,10 @@ public sealed class RaceHudSettings
             Layouts.AddRange(defaults());
             Rules.AddRange(defaultRules());
         }
-        bool before2 = Version < 2, before3 = Version < 3;
+        bool before2 = Version < 2, before3 = Version < 3, before4 = Version < 4;
         Version = CurrentVersion;
         Appearance ??= new();
+        if (before4) { Appearance.Colors = HudAppearance.DefaultColors; Appearance.Custom = new(); }
         if (WebPort is < MinWebPort or > MaxWebPort) WebPort = DefaultWebPort;
         var builtIn = defaults();
         if (!Layouts.Any(l => l is not null && IsDefaultName(l.Name ?? ""))) Layouts.Add(builtIn[0]);
@@ -445,6 +446,12 @@ public sealed class HudLayoutRule
 
 public sealed class HudAppearance
 {
+    public const string DefaultColors = "Default", AppColors = "App", CustomColors = "Custom";
+
+    public string Colors { get; set; } = DefaultColors;
+
+    public ThemeColors Custom { get; set; } = new();
+
     public int Background { get; set; } = 75;
 
     public int FontScale { get; set; } = 100;
@@ -459,6 +466,15 @@ public sealed class HudAppearance
 
     public void Clamp()
     {
+        Colors = Colors?.Trim() switch
+        {
+            null or "" => DefaultColors,
+            var c when string.Equals(c, DefaultColors, StringComparison.OrdinalIgnoreCase) => DefaultColors,
+            var c when string.Equals(c, AppColors, StringComparison.OrdinalIgnoreCase) => AppColors,
+            var c when string.Equals(c, CustomColors, StringComparison.OrdinalIgnoreCase) => CustomColors,
+            var c => SimRacing.Hud.HudThemes.Known(c) ?? DefaultColors,
+        };
+        Custom = SimRacing.Hud.HudThemes.Cleaned(Custom);
         Background = Math.Clamp(Background, 0, 100);
         FontScale = 100;
         Density = HudDensity.Compact;

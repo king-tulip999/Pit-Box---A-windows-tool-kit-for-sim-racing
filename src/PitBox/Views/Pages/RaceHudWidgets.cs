@@ -392,8 +392,10 @@ internal sealed partial class RaceHudWidgets
         Panel.SetZIndex(previewColumn, 1);
         previewColumn.Children.Add(new DockPanel { Margin = new Thickness(0, 3, 0, 6), Children = { title, hint } });
         previewColumn.Children.Add(PreviewBlock(w));
+        var (panels, grid, sideCards) = WidgetPanels(w, def);
+        var beside = new StackPanel();
+        previewColumn.Children.Add(beside);
         var tabs = Settings(w, def);
-        var panels = WidgetPanels(w, def);
         panels.Margin = new Thickness(0, Ui.PanelSpacing, 0, 0);
         var top = new Grid();
         top.ColumnDefinitions.Add(new ColumnDefinition());
@@ -417,6 +419,13 @@ internal sealed partial class RaceHudWidgets
             Grid.SetRow(panels, now ? 1 : 2);
             Grid.SetRowSpan(previewColumn, now ? 3 : 1);
             previewColumn.Margin = new Thickness(now ? Ui.PanelSpacing : 0, 0, 0, 0);
+            foreach (var card in sideCards)
+                if (card.Parent is Panel holder) holder.Children.Remove(card);
+            foreach (var card in now ? sideCards : sideCards.OrderBy(c => c == sideCards[^1] ? 0 : 1).ToArray())
+            {
+                card.Margin = new Thickness(0, now ? 14 : 0, 0, 0);
+                (now ? beside : (Panel)grid).Children.Add(card);
+            }
             tabs.Margin = new Thickness(0, now ? 0 : 16, 0, 0);
             if (_previewWell is not null) DrawPreview(w);
         }
@@ -460,7 +469,7 @@ internal sealed partial class RaceHudWidgets
 
     private const double PanelMinWidth = 330;
 
-    private FrameworkElement WidgetPanels(HudWidgetConfig w, HudWidgetDef def)
+    private (FrameworkElement Body, MasonryPanel Grid, FrameworkElement[] Side) WidgetPanels(HudWidgetConfig w, HudWidgetDef def)
     {
         static Tile Card(string title, IEnumerable<FrameworkElement> rows)
         {
@@ -487,7 +496,9 @@ internal sealed partial class RaceHudWidgets
         if (Layout is { } owner) when.Add(SettingRows.Row("Keybind", null, true, KeybindBox(owner, w)));
 
         var look = new List<FrameworkElement>();
-        look.Add(SettingRows.Row("Opacity", null, true, Ui.SliderWithValue(20, 100, w.Opacity, "{0:0}%", v => { w.Opacity = (int)v; Changed(); }, 110, 5)));
+        foreach (var colorRow in RaceHudSection.LookRows(S.Appearance, () => { Changed(); if (_preview is not null) DrawPreview(w); }, () => _list.Dispatcher.BeginInvoke(Fill, System.Windows.Threading.DispatcherPriority.Background), (t, d, c, _) => SettingRows.Row(t, d, true, c)))
+            look.Add((FrameworkElement)colorRow);
+        look.Add(SettingRows.Row("Opacity", null, true, Ui.SliderWithValue(20, 100, w.Opacity, "{0:0}%", v => { w.Opacity = (int)v; Changed(); if (_preview is not null) DrawPreview(w); }, 110, 5)));
         var background = Ui.SliderWithValue(0, 100, w.Background ?? S.Appearance.Background, "{0:0}%", v => { w.Background = (int)v; Changed(); if (_preview is not null) DrawPreview(w); }, 110, 5);
         var backgroundRow = SettingRows.Row("Background", null, true, background);
         backgroundRow.Visibility = w.Background is not null ? Visibility.Visible : Visibility.Collapsed;
@@ -539,10 +550,12 @@ internal sealed partial class RaceHudWidgets
 
         var panels = new MasonryPanel { MinColumnWidth = PanelMinWidth, MaxColumns = 4, Gap = 14 };
         panels.Children.Add(Card("When shown", when));
+        var lookCard = Card("Panel and redraw", look);
+        var placeCard = Card("Placement", place);
         panels.Children.Add(web);
-        panels.Children.Add(Card("Panel and redraw", look));
-        panels.Children.Add(Card("Placement", place));
-        return new StackPanel { Children = { panels, ActionsRow(w) } };
+        panels.Children.Add(lookCard);
+        panels.Children.Add(placeCard);
+        return (new StackPanel { Children = { panels, ActionsRow(w) } }, panels, new FrameworkElement[] { lookCard, placeCard, web });
     }
 
     private List<FrameworkElement> BrowserSourceRows(HudWidgetConfig w)
@@ -890,6 +903,7 @@ internal sealed partial class RaceHudWidgets
             try { _previewTarget.WritePixels(new Int32Rect(0, 0, bitmap.Width, bitmap.Height), data.Scan0, data.Stride * bitmap.Height, data.Stride); }
             finally { bitmap.UnlockBits(data); }
             if (_preview.Source != _previewTarget) _preview.Source = _previewTarget;
+            _preview.Opacity = w.Opacity / 100.0;
             _preview.Width = bitmap.Width / k;
             _preview.Height = bitmap.Height / k;
             string size = Math.Abs(scale - 1) < 0.01 ? "actual size" : $"{scale * 100:0}% of its size";

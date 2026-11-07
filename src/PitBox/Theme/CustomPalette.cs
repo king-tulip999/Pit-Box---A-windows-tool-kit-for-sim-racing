@@ -200,8 +200,15 @@ internal static class CustomPalette
         p["Heading"] = p["BtnHoverFg"] = p["LogoFg"] = text;
         p["Text"] = p["TooltipText"] = p["BtnFg"] = M(bg, text, 0.93);
         p["IconInk"] = M(bg, text, 0.85);
-        p["TextMuted"] = M(bg, text, 0.66);
-        p["TextFaint"] = M(bg, text, 0.56);
+        var grounds = new[] { bg, card, p["TileRaised"], p["HoverRaised"], p["Selected"] };
+        Color ReadableMix(double from)
+        {
+            for (double t = from; t < 0.93; t += 0.01)
+                if (grounds.All(g => ThemeManager.Contrast(M(bg, text, t), g) >= 4.5)) return M(bg, text, t);
+            return M(bg, text, 0.93);
+        }
+        p["TextMuted"] = ReadableMix(0.66);
+        p["TextFaint"] = ReadableMix(0.56);
 
         var onAccent = ThemeManager.Contrast(Colors.White, accent) >= 3 ? Light(accent, 0.96) : Dark(accent, 0.85);
         var accentText = ReadableOn(accent, bg);

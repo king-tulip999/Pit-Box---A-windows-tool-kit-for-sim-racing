@@ -70,6 +70,7 @@ internal sealed class OverlayPlacementMap : Grid
             {
                 var slot = Hairline.Frame(new Border { Width = MiniWidth, Height = MiniHeight, IsHitTestVisible = false });
                 slot.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
+                slot.SetResourceReference(Border.BackgroundProperty, "Well");
                 _slots.Add(slot);
                 _canvas.Children.Add(slot);
             }

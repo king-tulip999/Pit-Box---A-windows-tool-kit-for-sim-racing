@@ -41,13 +41,13 @@ internal sealed class HudPalette
         set => Volatile.Write(ref _themeAccent, value?.ToArgb() ?? 0);
     }
 
-    public static HudPalette Of(HudAppearance look) => Default;
+    public static HudPalette Of(HudAppearance look) => HudThemes.For(look);
 
     public static HudPalette Default { get; } = new HudPalette
     {
         Dark = true,
-        Bg = Hex(0x1E1E1E), Surface = Hex(0x2A2A2A), SurfaceAlt = Hex(0x303030), Text = Hex(0xE2E2E2), Heading = Hex(0xF5F5F5),
-        Muted = Hex(0x9A9A9A), Faint = Hex(0x767676), Line = Hex(0x333333), LineStrong = Hex(0x3C3C3C),
+        Bg = Hex(0x1E1E1E), Surface = Hex(0x161616), SurfaceAlt = Hex(0x303030), Text = Hex(0xE2E2E2), Heading = Hex(0xF5F5F5),
+        Muted = Hex(0xB8B8B8), Faint = Hex(0x969696), Line = Hex(0x333333), LineStrong = Hex(0x3C3C3C),
         Accent = Hex(0xDB156B), AccentText = Hex(0xF5559A), AccentSoft = Hex(0x3A3A3A), OnAccent = Color.White,
         Good = Hex(0x7FC48E), GoodText = Hex(0x9ED4A8), GoodSoft = Hex(0x24352A), Warn = Hex(0xE8B04A), WarnText = Hex(0xF2CC80), WarnSoft = Hex(0x3A3020),
         Danger = Hex(0xE5484D), DangerText = Hex(0xF07C7F), DangerSoft = Hex(0x42201F), Gold = Hex(0xFACC15), Slate = Hex(0x7A7A7A), Plum = Hex(0xA855F7), Silver = Hex(0xC9CED6), Bronze = Hex(0xD99A63),
