@@ -50,7 +50,7 @@ public static class TipPlacement
         var owner = _owner;
         if (owner is not null)
         {
-            try { scale = VisualTreeHelper.GetDpi(owner).DpiScaleY; } catch { scale = 1; }
+            try { scale = VisualTreeHelper.GetDpi(owner).DpiScaleY * Views.WindowScale.Of(owner); } catch { scale = 1; }
             var expected = new Size(owner.ActualWidth * scale, owner.ActualHeight * scale);
             if (Math.Abs(expected.Width - target.Width) > 2 || Math.Abs(expected.Height - target.Height) > 2) owner = null;
         }

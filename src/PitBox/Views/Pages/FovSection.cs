@@ -726,6 +726,7 @@ internal sealed class FovSection : StackPanel
             Margin = new Thickness(6, 3, 6, 13),
             Child = stack,
         };
+        WindowScale.Follow(popup);
         popup.IsOpen = true;
     }
 

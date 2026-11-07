@@ -41,6 +41,10 @@ public partial class MainWindow : Window
         _searchButton = Ui.IconButton("I.Search", "Search settings and keybinds (Ctrl+F)", OpenSearch);
         System.Windows.Automation.AutomationProperties.SetName(_searchButton, "Search");
         Width = DefaultWindowWidth;
+        Root.LayoutTransform = WindowScale.Transform;
+        WindowScale.Publish();
+        WindowScale.Changed += FitToScale;
+        SizeChanged += (_, _) => FitScale();
         PageArea.SizeChanged += (_, _) => PlaceNav();
         TitleLeft.SizeChanged += (_, _) => PlaceNav();
         Nav.SizeChanged += (_, _) => FitThemeLogo();
@@ -67,6 +71,11 @@ public partial class MainWindow : Window
             if (OverlaysDrawing) _trimTimer.Start();
             else TrimWhileHidden();
         };
+        _settleCollect.Tick += (_, _) =>
+        {
+            _settleCollect.Stop();
+            if (OnScreen) Dispatcher.BeginInvoke(new Action(CollectSettled), DispatcherPriority.ContextIdle);
+        };
 
         MinButton.Click += (_, _) => WindowState = WindowState.Minimized;
         MaxButton.Click += (_, _) => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
@@ -79,8 +88,7 @@ public partial class MainWindow : Window
         Loaded += (_, _) => FitThemeLogo();
         SourceInitialized += (_, _) =>
         {
-            Hairline.Use(VisualTreeHelper.GetDpi(this).DpiScaleX);
-            FitTextToDpi(VisualTreeHelper.GetDpi(this).DpiScaleX);
+            FitToScale();
             SquareCorners();
             ApplyBackdrop();
             (PresentationSource.FromVisual(this) as HwndSource)?.AddHook(WatchSizeMove);
@@ -162,6 +170,7 @@ public partial class MainWindow : Window
         if (_themeRebuild) SettlePages();
         else Crossfade(leaving, page);
         RecordHistory();
+        ScheduleSettleCollect();
     }
 
     private FrameworkElement EnsurePage(string key)
@@ -196,6 +205,7 @@ public partial class MainWindow : Window
     {
         SyncNav();
         RecordHistory();
+        ScheduleSettleCollect();
     }
 
     private void SyncNav()
@@ -586,11 +596,29 @@ public partial class MainWindow : Window
     private void CompactMemory()
     {
         if (OnScreen) return;
+        CollectAll();
+        try { using var me = System.Diagnostics.Process.GetCurrentProcess(); SetProcessWorkingSetSize(me.Handle, -1, -1); }
+        catch (Exception ex) { App.LogError(ex); }
+    }
+
+    private readonly DispatcherTimer _settleCollect = new(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(8) };
+
+    private void ScheduleSettleCollect()
+    {
+        _settleCollect.Stop();
+        _settleCollect.Start();
+    }
+
+    private void CollectSettled()
+    {
+        if (OnScreen) CollectAll();
+    }
+
+    private static void CollectAll()
+    {
         GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
         GC.WaitForPendingFinalizers();
         GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
-        try { using var me = System.Diagnostics.Process.GetCurrentProcess(); SetProcessWorkingSetSize(me.Handle, -1, -1); }
-        catch (Exception ex) { App.LogError(ex); }
     }
 
     [DllImport("kernel32.dll")]
@@ -733,6 +761,7 @@ public partial class MainWindow : Window
     private void OnStateChanged()
     {
         Root.Margin = WindowState == WindowState.Maximized ? new Thickness(6) : new Thickness(0);
+        FitScale();
         MaxIcon.Kind = WindowState == WindowState.Maximized ? CaptionKind.Restore : CaptionKind.Maximize;
         MaxButton.ToolTip = WindowState == WindowState.Maximized ? "Restore" : "Maximize";
     }
@@ -857,16 +886,47 @@ public partial class MainWindow : Window
     protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
     {
         base.OnDpiChanged(oldDpi, newDpi);
-        Hairline.Use(newDpi.DpiScaleX);
-        FitTextToDpi(newDpi.DpiScaleX);
+        FitToScale();
+    }
+
+    private void FitScale()
+    {
+        if (ScreenshotRunner.DrawsAt96 || ActualWidth <= 0) return;
+        WindowScale.Set(WindowScale.For(ActualWidth - Root.Margin.Left - Root.Margin.Right, ActualHeight - Root.Margin.Top - Root.Margin.Bottom));
+    }
+
+    private bool _scaleSettling;
+
+    private void FitToScale()
+    {
+        WindowScale.ClosePopups(this);
+        FitTextToDpi(VisualTreeHelper.GetDpi(this).DpiScaleX * WindowScale.Current);
+        if (PanelGrid.LiveResize) { _scaleSettling = true; return; }
+        SettleScale();
+    }
+
+    private void SettleScale()
+    {
+        _scaleSettling = false;
+        WindowScale.Publish();
+        double dpi = VisualTreeHelper.GetDpi(this).DpiScaleX, zoom = WindowScale.Current;
+        Hairline.Use(dpi * WindowScale.Banded);
+        if (System.Windows.Shell.WindowChrome.GetWindowChrome(this) is { } chrome)
+        {
+            if (chrome.IsFrozen) System.Windows.Shell.WindowChrome.SetWindowChrome(this, chrome = (System.Windows.Shell.WindowChrome)chrome.Clone());
+            chrome.CaptionHeight = CaptionHeight * zoom;
+        }
         FitBrand();
     }
+
+    private const double CaptionHeight = 44;
 
     private void FitTextToDpi(double scale)
     {
         bool scaled = scale > 1.01 && !ScreenshotRunner.DrawsAt96;
         TextOptions.SetTextFormattingMode(this, scaled ? TextFormattingMode.Ideal : TextFormattingMode.Display);
         TextOptions.SetTextRenderingMode(this, scaled ? TextRenderingMode.Grayscale : TextRenderingMode.ClearType);
+        TextOptions.SetTextHintingMode(this, WindowScale.Current > 1 && !ScreenshotRunner.DrawsAt96 ? TextHintingMode.Fixed : TextHintingMode.Auto);
     }
 
     private bool Remembers => !_app.Demo && !ScreenshotRunner.Active;
@@ -942,7 +1002,11 @@ public partial class MainWindow : Window
     {
         const int WM_ENTERSIZEMOVE = 0x0231, WM_EXITSIZEMOVE = 0x0232;
         if (msg == WM_ENTERSIZEMOVE) PanelGrid.LiveResize = true;
-        else if (msg == WM_EXITSIZEMOVE) PanelGrid.LiveResize = false;
+        else if (msg == WM_EXITSIZEMOVE)
+        {
+            PanelGrid.LiveResize = false;
+            if (_scaleSettling) SettleScale();
+        }
         return IntPtr.Zero;
     }
 
@@ -1141,7 +1205,7 @@ public partial class MainWindow : Window
 
     private void FitBrand()
     {
-        double height = Theme.Brand.CrispSize(TitleButtonHeight, VisualTreeHelper.GetDpi(this).PixelsPerDip) ?? TitleButtonHeight;
+        double height = Theme.Brand.CrispSize(TitleButtonHeight, VisualTreeHelper.GetDpi(this).PixelsPerDip * WindowScale.Current) ?? TitleButtonHeight;
         Ui.FitWordmark(Wordmark, height);
         double ruleY = ContentArea.RowDefinitions[0].Height.Value - TitleRule.Height + Math.Floor(TitleRule.Height / 2);
         TitleLeft.Margin = new Thickness(BrandInset, Math.Round((ruleY - Ui.WordmarkCapHeight(height)) / 2), 0, 0);

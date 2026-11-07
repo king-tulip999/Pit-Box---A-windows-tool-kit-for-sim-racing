@@ -150,6 +150,7 @@ internal static class TraceSettings
         delete.Margin = new Thickness(0, 5, 0, 0);
         body.Children.Add(delete);
 
+        WindowScale.Follow(popup);
         popup.IsOpen = true;
         _ = FillUsage(stats, usage);
     }

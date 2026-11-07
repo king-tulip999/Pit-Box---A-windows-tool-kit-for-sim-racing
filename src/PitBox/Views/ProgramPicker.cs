@@ -68,6 +68,7 @@ internal static class ProgramPicker
         }
         search.TextChanged += (_, _) => Fill();
         Fill();
+        WindowScale.Follow(popup);
         popup.IsOpen = true;
         search.Focus();
         _ = LoadAsync();

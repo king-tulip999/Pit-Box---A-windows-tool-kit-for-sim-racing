@@ -55,6 +55,7 @@ internal sealed class HudQuickEditor : Window, IHudEditorHost
         ResizeMode = ResizeMode.CanResize;
         WindowChrome.SetWindowChrome(this, new WindowChrome { CaptionHeight = 0, ResizeBorderThickness = new Thickness(6), GlassFrameThickness = new Thickness(0), CornerRadius = new CornerRadius(0), UseAeroCaptionButtons = false });
         UseLayoutRounding = true;
+        Resources[WindowScale.Key] = Transform.Identity;
         SetResourceReference(FontFamilyProperty, "UiFont");
         SetResourceReference(ForegroundProperty, "Text");
         FontSize = 11;

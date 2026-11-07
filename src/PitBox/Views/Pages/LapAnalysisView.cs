@@ -352,6 +352,7 @@ internal static class LapAnalysisView
             content.Content = stack;
         }
         Fill();
+        WindowScale.Follow(popup);
         popup.IsOpen = true;
     }
 

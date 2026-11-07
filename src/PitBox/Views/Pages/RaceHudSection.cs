@@ -585,6 +585,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             if (e.Key == System.Windows.Input.Key.Escape) { box.IsOpen = false; e.Handled = true; }
         };
         box.Opened += (_, _) => { name.Focus(); name.SelectAll(); };
+        WindowScale.Follow(box);
         box.IsOpen = true;
     }
 

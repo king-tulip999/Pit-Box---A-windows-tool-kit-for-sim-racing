@@ -36,7 +36,7 @@ public static class Hairline
     public static double ScaleOf(Visual visual)
     {
         if (Services.ScreenshotRunner.DrawsAt96) return 1;
-        try { return VisualTreeHelper.GetDpi(visual).DpiScaleX; }
+        try { return VisualTreeHelper.GetDpi(visual).DpiScaleX * Views.WindowScale.Of(visual); }
         catch (InvalidOperationException) { return Scale; }
     }
 

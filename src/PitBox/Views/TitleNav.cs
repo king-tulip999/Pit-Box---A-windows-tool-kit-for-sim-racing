@@ -177,6 +177,7 @@ internal sealed class TitleNav : Grid
         };
         _menu = popup;
         _menuEntry = entry;
+        WindowScale.Follow(popup);
         popup.IsOpen = true;
         Paint(entry);
         if (keyboard && list.Children.OfType<FrameworkElement>().FirstOrDefault(r => r.Tag is true) is { } current) current.Focus();

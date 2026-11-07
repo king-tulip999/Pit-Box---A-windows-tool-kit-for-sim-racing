@@ -450,6 +450,7 @@ internal sealed class SetupManagerSection : StackPanel
         var host = new StackPanel { MinWidth = Math.Max(211, _class.ActualWidth) };
         FillClassMenu(host);
         popup.Child = new Tile { Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(4), Margin = new Thickness(0, 3, 6, 13), Child = host };
+        WindowScale.Follow(popup);
         popup.IsOpen = true;
     }
 

@@ -47,14 +47,15 @@ internal static class MonkeyRunner
         try { _log?.WriteLine(text); } catch (IOException) { }
     }
 
-    public static async void Run(MainWindow window, string folder, int seed, double minutes)
+    public static async void Run(MainWindow window, string folder, int seed, double minutes, bool full = false)
     {
         Active = true;
         Directory.CreateDirectory(folder);
         _log = new StreamWriter(Path.Combine(folder, "steps.txt")) { AutoFlush = true };
         External.Gate = what => { Log("  blocked: " + what); return false; };
         var rnd = new Random(seed);
-        Log($"seed {seed}, {minutes} min");
+        _full = full;
+        Log($"seed {seed}, {minutes} min{(full ? ", full screen" : "")}");
         var app = AppServices.Current!;
         StartWatchdog(folder);
         HitchWatch.Start(window.Dispatcher, 150, () => $"step {_step} on {window.CurrentPage}");
@@ -64,6 +65,7 @@ internal static class MonkeyRunner
             window.WindowStartupLocation = WindowStartupLocation.Manual;
             (window.Left, window.Top, window.Width, window.Height) = (0, 0, 1280, 820);
             window.Show();
+            if (full) window.WindowState = WindowState.Maximized;
             await Task.Delay(1500);
             window.Navigate(window.FirstPage);
             await Settle();
@@ -75,7 +77,7 @@ internal static class MonkeyRunner
             {
                 _step++;
                 var clock = System.Diagnostics.Stopwatch.StartNew();
-                try { await StepAsync(window, app, rnd); }
+                try { await StepAsync(window, app, rnd); CheckPopupScale(); }
                 catch (Exception ex) { RecordError(ex); }
                 if (clock.Elapsed.TotalMilliseconds >= 300) Log($"  slow: {clock.Elapsed.TotalMilliseconds:0} ms");
                 await Task.Delay(rnd.Next(20, 160));
@@ -303,8 +305,17 @@ internal static class MonkeyRunner
             return;
         }
         window.WindowState = WindowState.Normal;
-        window.Width = rnd.Next((int)MainWindow.MinWindowWidth, 2561);
-        window.Height = rnd.Next((int)MainWindow.MinWindowHeight, 1441);
+        if (_full)
+        {
+            (window.Left, window.Top) = (0, 0);
+            window.Width = rnd.Next(2560, (int)SystemParameters.WorkArea.Width + 1);
+            window.Height = rnd.Next(1440, (int)Math.Max(1441, SystemParameters.WorkArea.Height + 1));
+        }
+        else
+        {
+            window.Width = rnd.Next((int)MainWindow.MinWindowWidth, 2561);
+            window.Height = rnd.Next((int)MainWindow.MinWindowHeight, 1441);
+        }
         Log($"{_step} window {window.Width}x{window.Height}");
     }
 
@@ -319,6 +330,28 @@ internal static class MonkeyRunner
 
     private static int TickHandlers(AppServices app) =>
         typeof(AppServices).GetField("Tick", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(app) is Delegate d ? d.GetInvocationList().Length : 0;
+
+    private static bool _full;
+    private static readonly HashSet<string> _popupProblems = new(StringComparer.Ordinal);
+
+    private static void CheckPopupScale()
+    {
+        foreach (PresentationSource source in PresentationSource.CurrentSources)
+        {
+            if (source.RootVisual is not FrameworkElement { IsVisible: true } root || root.GetType().Name != "PopupRoot" || root.ActualWidth <= 0
+                || root.Parent is not Popup { IsOpen: true, Child: FrameworkElement { ActualWidth: > 0 } child } popup) continue;
+            if (Window.GetWindow(popup.PlacementTarget ?? (DependencyObject)popup) is { } owner && owner is not MainWindow) continue;
+            Rect box;
+            try { box = child.TransformToAncestor(root).TransformBounds(new Rect(child.RenderSize)); }
+            catch (InvalidOperationException) { continue; }
+            double scale = box.Width / child.ActualWidth, wanted = WindowScale.Current;
+            string what = Describe(child);
+            if (Math.Abs(scale - wanted) > 0.01 && _popupProblems.Add("scale " + what))
+                Problem($"a popup is drawn at {scale:0.###}x while the window is at {wanted:0.###}x: {what}");
+            if ((box.Right > root.ActualWidth + 1 || box.Bottom > root.ActualHeight + 1) && _popupProblems.Add("cut " + what))
+                Problem($"a popup is cut off ({box.Width:0}x{box.Height:0} in a {root.ActualWidth:0}x{root.ActualHeight:0} window): {what}");
+        }
+    }
 
     private static List<(Popup Popup, FrameworkElement Target)> Orphans()
     {

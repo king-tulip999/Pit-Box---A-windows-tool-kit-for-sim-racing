@@ -199,7 +199,8 @@ public partial class App : Application
         if (monkeyDir is not null)
         {
             MonkeyRunner.Run(window, monkeyDir, int.TryParse(ArgValue(e.Args, "--seed"), out int seed) ? seed : Environment.TickCount,
-                double.TryParse(ArgValue(e.Args, "--minutes"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double minutes) ? minutes : 10);
+                double.TryParse(ArgValue(e.Args, "--minutes"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double minutes) ? minutes : 10,
+                e.Args.Contains("--full", StringComparer.OrdinalIgnoreCase));
             return;
         }
         if (perfFile is not null)

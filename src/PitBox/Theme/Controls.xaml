@@ -1117,6 +1117,7 @@
 
     <!-- ============================================================ menus (context menus, button menus, submenus) -->
     <Style TargetType="ContextMenu">
+        <Setter Property="LayoutTransform" Value="{DynamicResource WindowScaleTransform}" />
         <Setter Property="OverridesDefaultStyle" Value="True" />
         <!-- a menu inherits fonts from its anchor; the same weight whatever it opens from -->
         <Setter Property="FontWeight" Value="SemiBold" />
@@ -1218,6 +1219,7 @@
 
     <!-- ============================================================ tooltip -->
     <Style TargetType="ToolTip">
+        <Setter Property="LayoutTransform" Value="{DynamicResource WindowScaleTransform}" />
         <Setter Property="ContentTemplateSelector" Value="{StaticResource CasedTip}" />
         <Setter Property="Background" Value="{DynamicResource TooltipBg}" />
         <Setter Property="Foreground" Value="{DynamicResource TooltipText}" />

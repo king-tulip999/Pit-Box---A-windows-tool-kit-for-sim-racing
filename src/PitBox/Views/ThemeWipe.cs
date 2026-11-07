@@ -27,8 +27,9 @@ internal sealed class ThemeWipe : IFrameStep
         if (!Motion.Flourish || !content.IsVisible || content.ActualWidth < 1 || content.ActualHeight < 1) return;
         _running?.End();
         var dpi = VisualTreeHelper.GetDpi(content);
-        var bitmap = new RenderTargetBitmap((int)Math.Ceiling(content.ActualWidth * dpi.DpiScaleX), (int)Math.Ceiling(content.ActualHeight * dpi.DpiScaleY),
-            dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
+        double zoom = WindowScale.Of(content);
+        var bitmap = new RenderTargetBitmap((int)Math.Ceiling(content.ActualWidth * dpi.DpiScaleX * zoom), (int)Math.Ceiling(content.ActualHeight * dpi.DpiScaleY * zoom),
+            dpi.PixelsPerInchX * zoom, dpi.PixelsPerInchY * zoom, PixelFormats.Pbgra32);
         bitmap.Render(content);
         bitmap.Freeze();
         var shot = new Image { Source = bitmap, Stretch = Stretch.Fill, Width = content.ActualWidth, Height = content.ActualHeight, IsHitTestVisible = false,

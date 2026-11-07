@@ -85,6 +85,7 @@ public sealed class HotkeyBox : TextBox
             : Hotkey is null
             ? "Press the key combination to use.\nClick anywhere else to cancel."
             : $"Press the new keys to replace {PitBox.Hotkeys.Hotkey.Display(Hotkey)}.\nEsc deletes this keybind · click anywhere else to cancel.";
+        Views.WindowScale.Follow(_hint);
         _hint.IsOpen = true;
         Listen(true);
         if (NumpadByPosition) ComponentDispatcher.ThreadPreprocessMessage += OnRawKey;
