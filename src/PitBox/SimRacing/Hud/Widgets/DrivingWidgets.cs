@@ -527,6 +527,7 @@ internal sealed class FuelWidget : HudWidget
             p.Item("gridCols", cols[c], hb);
         }
         float y = box.Y + headH;
+        RectangleF? planRow = null;
         for (int i = 0; i < fit; i++)
         {
             var (label, rate) = RowRate(rows[i], v, plan);
@@ -535,7 +536,7 @@ internal sealed class FuelWidget : HudWidget
             var fill = HudPalette.Mix(p.P.Surface, p.P.Bg, i % 2 == 1 ? 0.85 : 0.35);
             if (plan_) fill = HudPalette.Mix(fill, p.P.PickTint, 0.22);
             p.Fill(row, p.Solid(fill, 185), p.CornerRadius(2));
-            if (plan_ && p.P.HighlightEdge is { } edge) p.Outline(row, edge);
+            if (plan_) planRow = row;
             p.Text(label, p.Label, plan_ ? p.P.AccentText : p.LabelColor, new RectangleF(row.X + 6 * p.Density, row.Y, labelW, row.Height), HAlign.Left, VAlign.Center, false);
             p.Item("gridRows", rows[i], new RectangleF(row.X, row.Y, labelW, row.Height));
             for (int c = 0; c < cols.Count; c++)
@@ -568,6 +569,7 @@ internal sealed class FuelWidget : HudWidget
             }
             y += rowH;
         }
+        if (planRow is { } picked && p.P.HighlightEdge is { } edge) p.Outline(picked, edge);
     }
 
     private static void PlanBand(HudPainter p, HudView v, RectangleF band, FuelPlan? plan, int measured)
