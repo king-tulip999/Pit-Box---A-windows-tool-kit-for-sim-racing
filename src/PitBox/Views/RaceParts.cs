@@ -423,7 +423,7 @@ internal static class RaceParts
         });
         if (centred)
         {
-            stack.Margin = new Thickness(12);
+            stack.Margin = new Thickness(12, 12, 12, 8);
             stack.VerticalAlignment = VerticalAlignment.Center;
         }
         var cell = Hairline.Frame(new Border { Child = stack, ToolTip = tip }, Sides.Left);

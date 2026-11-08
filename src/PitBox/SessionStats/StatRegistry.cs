@@ -63,7 +63,6 @@ internal static class StatRegistry
 
         new("pace.laps", Pace, "Laps", StatKind.Count, "SELECT SUM(laps) FROM s") { ZeroWhenEmpty = true },
         new("pace.distance", Pace, "Distance", StatKind.Distance, "SELECT SUM(distance_km) FROM s") { ZeroWhenEmpty = true },
-        new("pace.top", Pace, "Top speed", StatKind.Speed, $"SELECT MAX(l.top_speed), {Combo} FROM l JOIN s ON s.id = l.session_id"),
 
         new("race.starts", Racing, "Starts", StatKind.Count, "SELECT COUNT(*) FROM s WHERE session_type = 'Race' AND start_pos > 0"),
         new("race.finishes", Racing, "Finishes", StatKind.Count, "SELECT COUNT(*) FROM s WHERE session_type = 'Race' AND finished = 1"),
@@ -203,6 +202,11 @@ internal static class TimeRanges
 internal static class StatFormat
 {
     private static readonly CultureInfo C = CultureInfo.CurrentCulture;
+    private static readonly System.Text.RegularExpressions.Regex DroppedYear = new(@"(?<=\S)  (?=\d{2}\b)", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    public static string Config(string config) => DroppedYear.Replace(config, " '");
+
+    public static string TrackAndConfig(string track, string config) => config.Length > 0 ? $"{track} · {Config(config)}" : track;
 
     public static string Value(StatKind kind, double v, bool imperial) => kind switch
     {

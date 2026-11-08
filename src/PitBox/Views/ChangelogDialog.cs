@@ -33,7 +33,7 @@ internal static class ChangelogDialog
         string subtitle = justUpdated
             ? (since is { } from ? $"Pit-Box {UpdateService.Tag(from)} → {UpdateService.Tag(updates.Installed)}" : $"Pit-Box {UpdateService.Tag(updates.Installed)}")
             : "Every release up to the one you have, newest first.";
-        var shown = window.ShowModal(Ui.Dialog(window, title, subtitle, body, buttons, null, 518));
+        var shown = window.ShowModal(Ui.Dialog(window, title, subtitle, body, buttons, null, 760));
         close.Focus();
         _ = Fill(body, updates, since, justUpdated, url => page = url);
         return shown;

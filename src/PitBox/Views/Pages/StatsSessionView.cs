@@ -416,7 +416,7 @@ internal static class StatsSessionView
             if (c.Rubber.Length > 0) Add("I.Wheel", "Rubber", char.ToUpperInvariant(c.Rubber[0]) + c.Rubber[1..], "Rubber on the racing line at the start");
         }
         if (strip.Children.Count == 0) return null;
-        var block = new StackPanel { Margin = new Thickness(0, 5, 0, 0) };
+        var block = new StackPanel();
         var rule = Hairline.Rule(new Border { Margin = new Thickness(0, 0, 0, 11) });
         rule.SetResourceReference(Border.BackgroundProperty, "Line");
         block.Children.Add(rule);

@@ -96,7 +96,7 @@ internal static class GoldenRun
         foreach (var (s, laps) in sessions)
         {
             sb.Append(I, $"session {s.SessionType} #{s.SessionNum} car={s.Car} class={s.CarClass} track={s.Track} / {s.TrackConfig}\n");
-            sb.Append(I, $"  laps={s.Laps} incidents={s.Incidents?.ToString(I) ?? "-"} start={s.StartPos?.ToString(I) ?? "-"} finish={s.FinishPos?.ToString(I) ?? "-"} finished={s.Finished}\n");
+            sb.Append(I, $"  laps={s.Laps} incidents={s.Incidents?.ToString(I) ?? "-"} start={s.StartPos?.ToString(I) ?? "-"} finish={s.FinishPos?.ToString(I) ?? "-"} finished={s.Finished} led={s.LapsLed?.ToString(I) ?? "-"} field={s.Field?.ToString(I) ?? "-"}\n");
             sb.Append(I, $"  drive={F(s.DriveS, "0")}s garage={F(s.GarageS, "0")}s stint={F(s.LongestStintS, "0")}s pits={s.PitStops} pit={F(s.PitS, "0.0")}s km={F(s.DistanceKm, "0.0")} tank={F(s.TankL, "0.0")}\n");
             foreach (var l in laps)
                 sb.Append(I, $"  lap {l.Lap} {F(l.Time)} {(l.Clean ? "clean" : "dirty")} flags={l.Flags} run={l.Run?.ToString(I) ?? "-"} fuel={F(l.FuelUsed, "0.00")} sectors={(l.Sectors is { } sec ? string.Join(",", sec.Select(x => x.ToString("0.000", I))) : "-")}\n");

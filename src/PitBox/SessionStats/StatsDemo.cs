@@ -74,6 +74,7 @@ internal static class StatsDemo
                 Rubber = kind == "Race" ? "moderately high usage" : "moderate usage", SimStart = $"{start:yyyy-MM-dd} {13 + more.Next(0, 5):00}:{more.Next(0, 4) * 15:00}",
                 TankL = car.Tank, Tyres = DemoTyres(more, lapCount, pitLap),
                 Tier = league && kind == "Race" ? "AM" : "", TierPos = league && finished ? Math.Max(1, (finish + 1) / 2) : null,
+                Field = kind == "Race" ? field : null, LapsLed = kind == "Race" ? (finished && finish <= 2 ? more.Next(1, lapCount / 2) : 0) : null,
                 PitStops = kind == "Race" && lapCount > 18 ? 1 : 0, PitS = kind == "Race" && lapCount > 18 ? 38 + rnd.NextDouble() * 12 : 0,
             };
             store.Save(row, laps);

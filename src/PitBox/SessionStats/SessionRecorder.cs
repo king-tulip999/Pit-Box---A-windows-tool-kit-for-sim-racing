@@ -13,7 +13,7 @@ internal sealed class SessionRow
     public double? TrackKm;
     public bool DynamicWeather, Finished, Official;
     public int Laps;
-    public int? Incidents, StartPos, FinishPos, TierPos, IrStart, IrDelta, RaceWeek;
+    public int? Incidents, StartPos, FinishPos, TierPos, IrStart, IrDelta, RaceWeek, LapsLed, Field;
     public string Tier = "";
     public double? SrStart, SrDelta, NightS, TrackTempMin, TrackTempMax;
     public int LeagueId, SessionNum, SeasonId, PitStops;
@@ -71,7 +71,8 @@ internal sealed class SessionRecorder
     private double _stint, _pitStart;
     private bool _onPitRoad, _sawStall, _wasDriving, _leftPits;
     private int _run, _lapRun;
-    private int? _lapsAtCheckered;
+    private int? _lapsAtCheckered, _lineLap;
+    private SessionInfo? _fieldInfo;
     private (LapRow Lap, double Cross, double? Before, LapTrace? Trace)? _pending;
     private bool _officialTimes;
     private readonly TyreWearTracker _tyres = new();
@@ -167,7 +168,8 @@ internal sealed class SessionRecorder
         _stint = 0;
         _onPitRoad = _wasDriving = _leftPits = false;
         _run = 0;
-        _lapsAtCheckered = null;
+        _lapsAtCheckered = _lineLap = null;
+        _fieldInfo = null;
         _officialTimes = false;
         _tyres.Reset();
         if (row is null) return null;
@@ -260,6 +262,11 @@ internal sealed class SessionRecorder
     {
         int me = f.PlayerCarIdx;
         if ((uint)me >= TelemetryFrame.MaxCars) return;
+        if (!ReferenceEquals(f.Session, _fieldInfo))
+        {
+            _fieldInfo = f.Session;
+            if (ClassField(f.Session, me) is > 0 and var field) row.Field = Math.Max(row.Field ?? 0, field);
+        }
         if (f.Session.GridClassPositions.TryGetValue(me, out var grid) && grid > 0) row.StartPos = grid;
         bool over = f.Phase is SessionPhase.Checkered or SessionPhase.CoolDown;
         var result = over && f.LapCompleted is { } done && f.Session.ResultOf(f.SessionNum, me) is { ClassPosition: > 0 } r && r.LapsComplete >= done ? r : null;
@@ -284,10 +291,25 @@ internal sealed class SessionRecorder
             }
         }
         if (f.Phase == SessionPhase.Checkered) _lapsAtCheckered ??= f.LapCompleted;
+        if ((f.Phase == SessionPhase.Racing || f.Phase == SessionPhase.Checkered && !row.Finished) && f.LapCompleted is { } lap)
+        {
+            row.LapsLed ??= 0;
+            if (_lineLap is { } before && lap > before && pos == 1) row.LapsLed++;
+            _lineLap = lap;
+        }
         var surface = f.CarSurface[me] != TrackSurface.NotInWorld ? f.CarSurface[me] : f.PlayerSurface ?? TrackSurface.NotInWorld;
         if (!row.Finished && surface != TrackSurface.NotInWorld
             && (f.Phase == SessionPhase.CoolDown || _lapsAtCheckered is { } at && f.LapCompleted > at))
             row.Finished = true;
+    }
+
+    internal static int ClassField(SessionInfo info, int me)
+    {
+        if (!info.ByCar.TryGetValue(me, out var mine)) return 0;
+        int n = 0;
+        foreach (var d in info.Drivers)
+            if (d.Races && d.ClassId == mine.ClassId) n++;
+        return n;
     }
 
     private void Lap(TelemetryFrame f, SessionRow row, bool driving, double dt)

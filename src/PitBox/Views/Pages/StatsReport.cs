@@ -18,7 +18,7 @@ internal static class StatsReport
     {
         bool imperial = service.Settings.Imperial;
         var names = r.Map is { } map ? TurnNames.From(map, null) : TurnNames.None;
-        string place = r.Config.Length > 0 ? $"{r.Track} · {r.Config}" : r.Track;
+        string place = StatFormat.TrackAndConfig(r.Track, r.Config);
         (StatDef, StatResult) M(string id, string label, StatKind kind, double? value) =>
             (new StatDef("combo." + id, StatRegistry.CarsTracks, label, kind), value is { } v ? new StatResult(StatFormat.Value(kind, v, imperial)) : StatResult.None);
         var metrics = StatsSections.Metrics(new[]
@@ -212,7 +212,7 @@ internal static class StatsReport
             delete = new Button { Content = "Delete", Style = Ui.Res<Style>("DangerButton") };
             delete.Click += (_, _) => { hud.Notes.Remove(note); window.CloseModal(true); };
         }
-        string subtitle = r.Config.Length > 0 ? $"{r.Track} · {r.Config}" : r.Track;
+        string subtitle = StatFormat.TrackAndConfig(r.Track, r.Config);
         var shown = window.ShowModal(Ui.Dialog(window, note is null ? "Add note" : "Edit note", subtitle, content, buttons, error, 518, delete));
         box.Focus();
         if (await shown) changed();
