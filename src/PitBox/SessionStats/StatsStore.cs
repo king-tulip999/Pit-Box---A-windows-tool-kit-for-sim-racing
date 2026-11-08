@@ -51,7 +51,7 @@ internal sealed class StatsStore : IDisposable
         AddColumns("laps", "sectors TEXT", "flags INTEGER", "lap_incidents INTEGER", "run INTEGER", "setup TEXT");
         AddColumns("sessions", "air_temp REAL", "wind_kph REAL", "wind_dir REAL", "humidity REAL", "pressure REAL", "air_density REAL", "skies INTEGER",
             "rain_max REAL", "wetness_max INTEGER", "rubber TEXT NOT NULL DEFAULT ''", "sim_start TEXT NOT NULL DEFAULT ''",
-            "track_id INTEGER", "track_name TEXT NOT NULL DEFAULT ''", "tank_l REAL", "tyre_wear TEXT");
+            "track_id INTEGER", "track_name TEXT NOT NULL DEFAULT ''", "tank_l REAL", "tyre_wear TEXT", "tier TEXT NOT NULL DEFAULT ''", "tier_pos INTEGER");
         RelinkRatings();
     }
 
@@ -198,13 +198,13 @@ internal sealed class StatsStore : IDisposable
         var live = _db.Query("SELECT time FROM laps WHERE session_id = ?1 ORDER BY lap", id).Select(r => Convert.ToDouble(r[0])).ToList();
         if (EarlierLaps(laps.Select(l => l.Time).ToList(), live) == 0) return false;
         foreach (var key in _liveIds.Where(kv => kv.Value.Id == id).Select(kv => kv.Key).ToList()) _liveIds.Remove(key);
-        var kept = _db.Query("SELECT finish_pos, finished, incidents, end_utc, garage_s FROM sessions WHERE id = ?1", id)[0];
+        var kept = _db.Query("SELECT finish_pos, finished, incidents, end_utc, garage_s, tier_pos FROM sessions WHERE id = ?1", id)[0];
         row.Id = id;
         UpdateRow(row);
         _db.Run("""
             UPDATE sessions SET finish_pos = COALESCE(finish_pos, ?2), finished = MAX(finished, ?3), incidents = COALESCE(MAX(incidents, ?4), incidents, ?4),
-            end_utc = MAX(end_utc, ?5), garage_s = MAX(garage_s, ?6) WHERE id = ?1
-            """, id, kept[0], kept[1], kept[2], kept[3], kept[4]);
+            end_utc = MAX(end_utc, ?5), garage_s = MAX(garage_s, ?6), tier_pos = CASE WHEN ?2 IS NULL THEN tier_pos ELSE ?7 END WHERE id = ?1
+            """, id, kept[0], kept[1], kept[2], kept[3], kept[4], kept[5]);
         _db.Run("DELETE FROM laps WHERE session_id = ?1", id);
         InsertLaps(id, laps, 0);
         LinkRatings(row);
@@ -230,12 +230,17 @@ internal sealed class StatsStore : IDisposable
             rubber = CASE WHEN rubber = '' THEN ?11 ELSE rubber END, sim_start = CASE WHEN sim_start = '' THEN ?12 ELSE sim_start END,
             track_id = COALESCE(track_id, ?13), track_name = CASE WHEN track_name = '' THEN ?14 ELSE track_name END,
             tank_l = COALESCE(tank_l, ?15), tyre_wear = COALESCE(tyre_wear, ?16),
-            start_pos = COALESCE(start_pos, ?17), finish_pos = COALESCE(finish_pos, ?18), finished = MAX(finished, ?19)
+            start_pos = COALESCE(start_pos, ?17), finish_pos = COALESCE(finish_pos, ?18), finished = MAX(finished, ?19),
+            tier = CASE WHEN tier = '' THEN ?20 ELSE tier END, tier_pos = COALESCE(tier_pos, ?21)
             WHERE id = ?1
             """, existing.Id, r.AirTemp, r.WindKph, r.WindDir, r.Humidity, r.Pressure, r.AirDensity, r.Skies, r.RainMax, r.WetnessMax,
-            r.Rubber, r.SimStart, r.TrackId, r.TrackName, r.TankL, TyreWear.Text(r.Tyres), r.StartPos, r.FinishPos, r.Finished ? 1 : 0);
+            r.Rubber, r.SimStart, r.TrackId, r.TrackName, r.TankL, TyreWear.Text(r.Tyres), r.StartPos, r.FinishPos, r.Finished ? 1 : 0, r.Tier, r.TierPos);
         return true;
     }
+
+    public const string TierBackfill = "tier_backfill_results";
+
+    public void ClearTierPositions() => _db.Run("UPDATE sessions SET tier_pos = NULL WHERE tier <> ''");
 
     public (int? Id, string Name) TrackIdentity(long session) =>
         _db.Query("SELECT track_id, track_name FROM sessions WHERE id = ?1", session) is { Count: > 0 } r
@@ -343,7 +348,7 @@ internal sealed class StatsStore : IDisposable
         league_id, subsession, session_num, season_id, race_week, official, drive_s, garage_s, longest_stint_s, rain_s, night_s,
         track_temp_min, track_temp_max, distance_km, pit_stops, pit_s, source,
         air_temp, wind_kph, wind_dir, humidity, pressure, air_density, skies, rain_max, wetness_max, rubber, sim_start, track_id, track_name,
-        tank_l, tyre_wear
+        tank_l, tyre_wear, tier, tier_pos
         """;
 
     private static object?[] Values(SessionRow r) => new object?[]
@@ -353,7 +358,7 @@ internal sealed class StatsStore : IDisposable
         r.LeagueId, r.SubSession, r.SessionNum, r.SeasonId, r.RaceWeek, r.Official, r.DriveS, r.GarageS, r.LongestStintS, r.RainS, r.NightS,
         r.TrackTempMin, r.TrackTempMax, r.DistanceKm, r.PitStops, r.PitS, r.Source,
         r.AirTemp, r.WindKph, r.WindDir, r.Humidity, r.Pressure, r.AirDensity, r.Skies, r.RainMax, r.WetnessMax, r.Rubber, r.SimStart, r.TrackId, r.TrackName,
-        r.TankL, TyreWear.Text(r.Tyres),
+        r.TankL, TyreWear.Text(r.Tyres), r.Tier, r.TierPos,
     };
 
     private long InsertRow(SessionRow r)
@@ -419,12 +424,13 @@ internal sealed class StatsStore : IDisposable
             rubber = CASE WHEN rubber = '' THEN ?28 ELSE rubber END, sim_start = CASE WHEN sim_start = '' THEN ?29 ELSE sim_start END,
             track_id = COALESCE(track_id, ?30), track_name = CASE WHEN track_name = '' THEN ?31 ELSE track_name END,
             tank_l = COALESCE(tank_l, ?32),
-            tyre_wear = CASE WHEN ?33 IS NULL THEN tyre_wear WHEN tyre_wear IS NULL THEN ?33 ELSE tyre_wear || ';' || ?33 END
+            tyre_wear = CASE WHEN ?33 IS NULL THEN tyre_wear WHEN tyre_wear IS NULL THEN ?33 ELSE tyre_wear || ';' || ?33 END,
+            tier = CASE WHEN ?34 = '' THEN tier ELSE ?34 END, tier_pos = CASE WHEN ?7 IS NULL THEN tier_pos ELSE ?35 END
             WHERE id = ?1
             """, id, Unix(r.StartUtc), Unix(r.EndUtc), lapCount, r.Incidents, r.StartPos, r.FinishPos, r.Finished,
             r.DriveS, r.GarageS, r.LongestStintS, r.RainS, r.NightS, r.TrackTempMin, r.TrackTempMax, r.DistanceKm, r.PitStops, r.PitS,
             r.AirTemp, r.WindKph, r.WindDir, r.Humidity, r.Pressure, r.AirDensity, r.Skies, r.RainMax, r.WetnessMax, r.Rubber, r.SimStart,
-            r.TrackId, r.TrackName, r.TankL, TyreWear.Text(r.Tyres, lapOffset));
+            r.TrackId, r.TrackName, r.TankL, TyreWear.Text(r.Tyres, lapOffset), r.Tier, r.TierPos);
     }
 
     private static readonly string RatedPick = $"SELECT id, session_type, ir_start, sr_start, official FROM sessions WHERE driver_id = ?1 AND category = ?2 AND id <> ?3 AND ir_start > {RaceResult.PlaceholderIRating}";
@@ -569,7 +575,8 @@ internal sealed class StatsStore : IDisposable
     private const string SummarySql = """
         SELECT s.id, s.start_utc, s.session_type, s.car, s.car_class, s.track, s.track_config, s.laps,
         (SELECT MIN(time) FROM laps WHERE session_id = s.id AND clean = 1), s.incidents, s.start_pos, s.finish_pos, s.finished,
-        s.weather, s.track_km, s.ir_delta, s.sr_delta, s.drive_s, s.official, s.league_id, s.source, s.ir_start, s.sr_start, s.pit_stops, s.track_id, s.track_name
+        s.weather, s.track_km, s.ir_delta, s.sr_delta, s.drive_s, s.official, s.league_id, s.source, s.ir_start, s.sr_start, s.pit_stops, s.track_id, s.track_name,
+        s.tier, s.tier_pos
         FROM sessions s
         """;
 
@@ -577,7 +584,7 @@ internal sealed class StatsStore : IDisposable
         (long)r[0]!, FromUnix((long)r[1]!), (string)r[2]!, (string)r[3]!, (string)r[4]!, (string)r[5]!, (string)r[6]!, Convert.ToInt32(r[7]), D(r[8]),
         I(r[9]), I(r[10]), I(r[11]), Convert.ToInt64(r[12]) != 0, (string)r[13]!, D(r[14]), I(r[15]), D(r[16]), Convert.ToDouble(r[17]), Convert.ToInt64(r[18]) != 0,
         Convert.ToInt32(r[19]), (string)r[20]!, I(r[21]) is { } ir && RaceResult.KnownRating(ir) ? ir : null,
-        RaceResult.KnownRating(I(r[21])) ? D(r[22]) : null, Convert.ToInt32(r[23]), I(r[24]), r[25] as string ?? "");
+        RaceResult.KnownRating(I(r[21])) ? D(r[22]) : null, Convert.ToInt32(r[23]), I(r[24]), r[25] as string ?? "", r[26] as string ?? "", I(r[27]));
 
     public void Dispose() => _db.Dispose();
 }
@@ -587,7 +594,13 @@ internal sealed record SessionConditions(double? AirTemp, double? TrackTempMin, 
 
 internal sealed record SessionSummary(long Id, DateTime StartUtc, string Type, string Car, string CarClass, string Track, string Config, int Laps, double? Best,
     int? Incidents, int? StartPos, int? FinishPos, bool Finished, string Weather, double? TrackKm, int? IrDelta, double? SrDelta, double DriveS, bool Official,
-    int LeagueId, string Source, int? IrStart = null, double? SrStart = null, int PitStops = 0, int? TrackId = null, string TrackName = "")
+    int LeagueId, string Source, int? IrStart = null, double? SrStart = null, int PitStops = 0, int? TrackId = null, string TrackName = "", string Tier = "", int? TierPos = null)
 {
     public string Place => Config.Length > 0 ? $"{Track} · {Config}" : Track;
+
+    public bool HasTier => Tier.Length > 0 && TierPos is > 0;
+
+    public int? ShownPos => HasTier ? TierPos : FinishPos;
+
+    public string? ClassPlace => HasTier && FinishPos is > 0 ? $"P{FinishPos} in class" : null;
 }

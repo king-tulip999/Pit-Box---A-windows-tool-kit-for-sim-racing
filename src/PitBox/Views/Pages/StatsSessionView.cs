@@ -34,7 +34,7 @@ internal static class StatsSessionView
             return page;
         }
 
-        var chartCard = Card(StatsSections.Chart("Lap times", "Every lap in order; hollow = not clean (an incident, the pit lane or off track), arrow = slower than the scale shows", new LapTimeChart(laps) { Height = 178, HorizontalAlignment = HorizontalAlignment.Left, MaxWidth = laps.Count < 10 ? 140 + 64 * laps.Count : double.PositiveInfinity }));
+        var chartCard = Card(StatsSections.Chart("Lap times", "Every lap in order; hollow = not clean (an incident, the pit lane or off track), arrow = slower than the scale shows", new LapTimeChart(laps) { Height = 178, HorizontalAlignment = laps.Count < 10 ? HorizontalAlignment.Left : HorizontalAlignment.Stretch, Width = laps.Count < 10 ? 140 + 64 * laps.Count : double.NaN }));
 
         double? sessionBest = cleanLaps.Select(l => (double?)l.Time).Min();
         var bestSoFar = new double?[sectors];
@@ -242,14 +242,11 @@ internal static class StatsSessionView
         page.Children.Add(chartCard);
         if (StatsSessionTools.Sectors(laps) is { } sectorCard)
         {
-            sectorCard.VerticalAlignment = VerticalAlignment.Top;
-            page.Children.Add(new BesidePanel { Gap = Ui.PanelSpacing, SecondMin = 420, Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Children = { lapsCard, sectorCard } });
+            sectorCard.Margin = new Thickness(0, 0, 0, Ui.PanelSpacing);
+            page.Children.Add(sectorCard);
         }
-        else
-        {
-            lapsCard.Margin = new Thickness(0, 0, 0, Ui.PanelSpacing);
-            page.Children.Add(lapsCard);
-        }
+        lapsCard.Margin = new Thickness(0, 0, 0, Ui.PanelSpacing);
+        page.Children.Add(lapsCard);
         return page;
     }
 
@@ -289,7 +286,7 @@ internal static class StatsSessionView
         }
 
         var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(24, 10, 24, 10), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
-        if (raced) row.Children.Add(RaceParts.Position(s.FinishPos!.Value, place, 104, "Finished"));
+        if (raced) row.Children.Add(RaceParts.CentredPosition(s.ShownPos!.Value, place, 104, "Finished", s.HasTier ? s.Tier : null, s.ClassPlace));
         else
         {
             var lead = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
@@ -318,7 +315,7 @@ internal static class StatsSessionView
         };
 
         var tiles = new List<FrameworkElement>();
-        void Tile(string value, string label, string? tip = null, string brush = "Heading", double size = 26) => tiles.Add(RaceParts.Tile(value, label, place, brush, size, tip));
+        void Tile(string value, string label, string? tip = null, string brush = "Heading", double size = 26) => tiles.Add(RaceParts.Tile(value, label, place, brush, size, tip, centred: true));
         if (raced && s.StartPos is { } start)
         {
             int gained = start - s.FinishPos!.Value;
@@ -344,7 +341,7 @@ internal static class StatsSessionView
         stack.Children.Add(top);
         stack.Children.Add(RaceParts.Tiles(tiles.Count, tiles.ToArray<FrameworkElement?>()));
         if (ConditionsStrip(s, d.Conditions, imperial) is { } strip)
-            stack.Children.Add(new Border { Padding = new Thickness(19, 0, 19, 8), Child = strip });
+            stack.Children.Add(new Border { Padding = new Thickness(19, 0, 19, 11), Child = strip });
         return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Child = stack, ClipToBounds = true, Margin = new Thickness(0, 0, 0, Ui.PanelSpacing) };
     }
 
@@ -371,48 +368,6 @@ internal static class StatsSessionView
         }
     }
 
-    private sealed class BesidePanel : Panel
-    {
-        public double Gap { get; init; } = 19;
-        public double SecondMin { get; init; } = 400;
-        private bool _side;
-        private double _firstWidth;
-
-        protected override Size MeasureOverride(Size available)
-        {
-            var (first, second) = (InternalChildren[0], InternalChildren[1]);
-            double width = double.IsInfinity(available.Width) ? 4000 : available.Width;
-            first.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-            double want = first.DesiredSize.Width;
-            _side = want + Gap + SecondMin <= width;
-            if (_side)
-            {
-                _firstWidth = want;
-                second.Measure(new Size(width - want - Gap, double.PositiveInfinity));
-                return new Size(width, Math.Max(first.DesiredSize.Height, second.DesiredSize.Height));
-            }
-            first.Measure(new Size(width, double.PositiveInfinity));
-            second.Measure(new Size(width, double.PositiveInfinity));
-            return new Size(width, first.DesiredSize.Height + Gap + second.DesiredSize.Height);
-        }
-
-        protected override Size ArrangeOverride(Size final)
-        {
-            var (first, second) = (InternalChildren[0], InternalChildren[1]);
-            if (_side)
-            {
-                first.Arrange(new Rect(0, 0, _firstWidth, first.DesiredSize.Height));
-                second.Arrange(new Rect(_firstWidth + Gap, 0, Math.Max(0, final.Width - _firstWidth - Gap), second.DesiredSize.Height));
-            }
-            else
-            {
-                first.Arrange(new Rect(0, 0, final.Width, first.DesiredSize.Height));
-                second.Arrange(new Rect(0, first.DesiredSize.Height + Gap, final.Width, second.DesiredSize.Height));
-            }
-            return final;
-        }
-    }
-
     private static string? SimTime(string text) =>
         DateTime.TryParseExact(text, "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var t)
             ? Dates.ShortTime(t) : null;
@@ -425,10 +380,10 @@ internal static class StatsSessionView
 
     private static FrameworkElement? ConditionsStrip(SessionSummary s, SessionConditions? c, bool imperial)
     {
-        var strip = new WrapPanel();
+        var strip = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Center };
         void Add(string icon, string label, string value, string tip)
         {
-            var cell = new DockPanel { Margin = new Thickness(0, 0, 23, 10), MinWidth = 97, ToolTip = tip };
+            var cell = new DockPanel { Margin = new Thickness(11.5, 5, 11.5, 5), MinWidth = 97, ToolTip = tip };
             var glyph = new Icon { Data = Ui.Res<Geometry>(icon), Width = 16, Height = 16, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
             glyph.SetResourceReference(Control.ForegroundProperty, "AccentText");
             cell.Children.Add(glyph);

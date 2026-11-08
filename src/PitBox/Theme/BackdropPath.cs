@@ -6,6 +6,17 @@ namespace PitBox.Theme;
 internal static class BackdropLook
 {
     public const double LineContrast = 13.86;
+    public const int MaxDecodeWidth = 2560;
+    public const int DecodeStep = 320;
+    public const double PictureAspect = 16.0 / 9.0;
+
+    public static int DecodeWidthFor(double pixelWidth, double pixelHeight)
+    {
+        double needed = Math.Max(pixelWidth, pixelHeight * PictureAspect);
+        if (!(needed > 0) || double.IsInfinity(needed)) return MaxDecodeWidth;
+        int stepped = (int)Math.Ceiling(needed / DecodeStep) * DecodeStep;
+        return Math.Clamp(stepped, DecodeStep, MaxDecodeWidth);
+    }
 
     public static double Luminance(Color c) => 0.2126 * c.R + 0.7152 * c.G + 0.0722 * c.B;
 

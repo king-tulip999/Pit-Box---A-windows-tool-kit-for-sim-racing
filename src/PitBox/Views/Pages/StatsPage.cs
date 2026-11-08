@@ -839,7 +839,10 @@ internal static class StatsSections
         void Group(string title, IEnumerable<(StatDef, StatResult)> stats)
         {
             var list = stats.ToList();
-            if (list.Count > 0) groups.Children.Add(Chart(title, null, Metrics(list)!));
+            if (list.Count == 0) return;
+            var group = Chart(title, null, Metrics(list, centred: true)!);
+            ((TextBlock)group.Children[0]).HorizontalAlignment = HorizontalAlignment.Center;
+            groups.Children.Add(group);
         }
         Group("Results", Many("race.starts", "race.finishes", "race.wins", "race.podiums", "race.top5", "race.league"));
         Group("Positions and ratings", Many("race.avgstart", "race.avgfinish", "race.gained", "race.irating", "race.sr"));
@@ -938,19 +941,19 @@ internal static class StatsSections
         return stack;
     }
 
-    internal static FrameworkElement? Metrics(IEnumerable<(StatDef Def, StatResult Result)> stats, double size = 18)
+    internal static FrameworkElement? Metrics(IEnumerable<(StatDef Def, StatResult Result)> stats, double size = 18, bool centred = false)
     {
-        var grid = new StatGrid { MinTileWidth = 134, Gap = 0, RowGap = 13 };
+        var grid = new StatGrid { MinTileWidth = 134, Gap = 0, RowGap = 13, CentreLastRow = centred };
         foreach (var (def, result) in stats)
         {
-            var element = Metric(def, result, size);
+            var element = Metric(def, result, size, centred: centred);
             if (def.Kind == StatKind.Text && !result.NoData && result.Value.Length > 10) StatGrid.SetSpan(element, 2);
             grid.Children.Add(element);
         }
         return grid.Children.Count == 0 ? null : grid;
     }
 
-    private static FrameworkElement Metric(StatDef def, StatResult result, double size, string? hue = null)
+    private static FrameworkElement Metric(StatDef def, StatResult result, double size, string? hue = null, bool centred = false)
     {
         var tone = StatsUi.ToneOf(def, result);
         bool name = def.Kind == StatKind.Text && !result.NoData && result.Value.Length > 10;
@@ -985,14 +988,24 @@ internal static class StatsSections
             figure.HorizontalAlignment = HorizontalAlignment.Left;
             shown = figure;
         }
-        var bar = RaceParts.FigureMark(shown, 3, result.NoData ? "Line" : tone?.Deep ?? hue ?? "Place4", 8);
-        var stack = new StackPanel { Children = { new DockPanel { LastChildFill = true, Children = { bar, shown } }, label } };
+        var figureRow = new DockPanel { LastChildFill = true };
+        if (!centred) figureRow.Children.Add(RaceParts.FigureMark(shown, 3, result.NoData ? "Line" : tone?.Deep ?? hue ?? "Place4", 8));
+        figureRow.Children.Add(shown);
+        var stack = new StackPanel { Children = { figureRow, label } };
         label.Margin = new Thickness(11, 2, 0, 0);
         if (result.Detail is { Length: > 0 } detail && !result.NoData)
         {
             var line = TextFit.TipWhenTrimmed(new TextBlock { Text = detail, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(11, 2, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis });
             line.SetResourceReference(TextBlock.ForegroundProperty, "TextFaint");
             stack.Children.Add(line);
+        }
+        if (centred)
+        {
+            stack.HorizontalAlignment = HorizontalAlignment.Center;
+            foreach (FrameworkElement part in stack.Children) part.HorizontalAlignment = HorizontalAlignment.Center;
+            label.Margin = new Thickness(0, 2, 0, 0);
+            if (stack.Children.Count > 2) ((FrameworkElement)stack.Children[2]).Margin = new Thickness(0, 2, 0, 0);
+            return new Border { Padding = new Thickness(10, 2, 10, 2), Child = stack, ToolTip = StatsUi.TipOf(def, result, full: name), Background = Brushes.Transparent };
         }
         var cell = Hairline.Frame(new Border { Padding = new Thickness(11, 2, 10, 2), Child = stack, ToolTip = StatsUi.TipOf(def, result, full: name) }, Sides.Left);
         cell.SetResourceReference(Border.BorderBrushProperty, "Line");
@@ -1054,16 +1067,24 @@ internal static class StatsSections
         else best.Children.Add(Ui.EmptyState("I.Stats", "No clean laps yet", "None in this range."));
         block.Children.Add(best);
 
-        var right = new StackPanel { Children = { block } };
+        var right = new Grid();
+        void Row(UIElement element, bool fill = false)
+        {
+            right.RowDefinitions.Add(new RowDefinition { Height = fill ? new GridLength(1, GridUnitType.Star) : GridLength.Auto });
+            Grid.SetRow(element, right.RowDefinitions.Count - 1);
+            right.Children.Add(element);
+        }
+        Row(block);
         if (headline.Count > 0)
-            right.Children.Add(RaceParts.Tiles(headline.Count, headline.Select(h => RaceParts.Tile(h.Result.NoData ? "No data" : h.Result.Value, h.Def.Label, "Place4",
-                h.Result.NoData ? "TextFaint" : "Heading", h.Result.NoData ? 16 : 30, StatsUi.TipOf(h.Def, h.Result, false))).ToArray<FrameworkElement?>()));
+            Row(RaceParts.Tiles(headline.Count, headline.Select(h => RaceParts.Tile(h.Result.NoData ? "No data" : h.Result.Value, h.Def.Label, "Place4",
+                h.Result.NoData ? "TextFaint" : "Heading", h.Result.NoData ? 16 : 30, StatsUi.TipOf(h.Def, h.Result, false), centred: true)).ToArray<FrameworkElement?>()));
         if (racecraft.Children.Count > 0)
         {
             var rule = Hairline.Rule(new Border());
             rule.SetResourceReference(Border.BackgroundProperty, "Line");
-            right.Children.Add(rule);
-            right.Children.Add(new Border { Padding = new Thickness(23, 18, 23, 21), Child = racecraft });
+            Row(rule);
+            racecraft.VerticalAlignment = VerticalAlignment.Center;
+            Row(new Border { Padding = new Thickness(23, 18, 23, 21), Child = racecraft }, fill: true);
         }
         var hero = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Child = right, ClipToBounds = true };
         if (lastRace is not Border card) return hero;
@@ -1256,6 +1277,7 @@ internal sealed class StatGrid : Panel
     public double? RowGap { get; init; }
     public int Columns { get; init; } = int.MaxValue;
     public bool FillLastRow { get; init; }
+    public bool CentreLastRow { get; init; }
 
     private readonly List<(UIElement Child, int Row, int Col, int Span)> _places = new();
     private readonly List<double> _rows = new();
@@ -1315,11 +1337,20 @@ internal sealed class StatGrid : Panel
     protected override Size ArrangeOverride(Size final)
     {
         if (Math.Abs(final.Width - _measuredWidth) > 0.5) Place(final.Width, measure: false);
-        double cell = CellWidth(final.Width, ColumnsFor(final.Width));
+        int columns = ColumnsFor(final.Width);
+        double cell = CellWidth(final.Width, columns);
         var tops = new double[_rows.Count];
         for (int r = 1; r < tops.Length; r++) tops[r] = tops[r - 1] + _rows[r - 1] + Between;
+        int lastRow = _rows.Count - 1;
+        double lastShift = 0;
+        if (CentreLastRow && lastRow > 0)
+        {
+            int used = 0;
+            foreach (var place in _places) if (place.Row == lastRow) used += place.Span;
+            lastShift = Math.Max(0, columns - used) * (cell + Gap) / 2;
+        }
         foreach (var (child, row, col, span) in _places)
-            child.Arrange(new Rect(col * (cell + Gap), tops[row], cell * span + Gap * (span - 1), _rows[row]));
+            child.Arrange(new Rect(col * (cell + Gap) + (row == lastRow ? lastShift : 0), tops[row], cell * span + Gap * (span - 1), _rows[row]));
         return final;
     }
 }

@@ -11,24 +11,43 @@ namespace PitBox.Views;
 
 internal sealed class TopographyBackdrop : Grid
 {
-    public const int DecodeWidth = 2560;
     public const string LineKey = "TextMuted";
 
-    private static BitmapSource? _mask;
-    private static readonly object MaskGate = new();
+    private static BitmapSource? _picture;
+    private static int _pictureWidth;
+    private static Color _pictureLine;
+    private static double _pictureAlpha = -1;
+    private static readonly object PictureGate = new();
 
-    public static void Preload()
+    public static void Preload(Config.WindowBounds? saved) => LoadInBackground(StartWidth(saved), null);
+
+    private static void LoadInBackground(int width, Action? done)
     {
         var thread = new Thread(() =>
         {
-            LoadMask();
+            lock (PictureGate)
+                if (_picture is null || _pictureWidth != width) Decode(width);
+            done?.Invoke();
             System.Windows.Threading.Dispatcher.FromThread(Thread.CurrentThread)?.InvokeShutdown();
         }) { IsBackground = true, Name = "Pit-Box backdrop" };
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
     }
 
+    private static int StartWidth(Config.WindowBounds? saved)
+    {
+        var primary = System.Windows.Forms.Screen.PrimaryScreen;
+        if (primary is not { Bounds.Width: > 0 } screen || SystemParameters.PrimaryScreenWidth <= 0) return BackdropLook.MaxDecodeWidth;
+        if (saved is { Maximized: true }) return BackdropLook.DecodeWidthFor(screen.Bounds.Width, screen.Bounds.Height);
+        double toPixels = screen.Bounds.Width / SystemParameters.PrimaryScreenWidth;
+        double width = saved is { Width: > 0 } ? Math.Max(saved.Width, MainWindow.MinWindowWidth) : 1472;
+        double height = saved is { Height: > 0 } ? Math.Max(saved.Height, MainWindow.MinWindowHeight) : 820;
+        return BackdropLook.DecodeWidthFor(width * toPixels, height * toPixels);
+    }
+
     private readonly Image _image = new() { Stretch = Stretch.UniformToFill, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+    private readonly System.Windows.Threading.DispatcherTimer _resized = new(System.Windows.Threading.DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(400) };
+    private int _width;
 
     public TopographyBackdrop()
     {
@@ -36,13 +55,40 @@ internal sealed class TopographyBackdrop : Grid
         ClipToBounds = true;
         RenderOptions.SetBitmapScalingMode(_image, BitmapScalingMode.HighQuality);
         Children.Add(_image);
-        Loaded += (_, _) => { ThemeManager.Changed -= Apply; ThemeManager.Changed += Apply; Apply(); };
-        Unloaded += (_, _) => ThemeManager.Changed -= Apply;
+        _resized.Tick += (_, _) => { _resized.Stop(); Refit(); };
+        SizeChanged += (_, _) => { _resized.Stop(); _resized.Start(); };
+        Loaded += (_, _) => { ThemeManager.Changed -= Apply; ThemeManager.Changed += Apply; _width = WantedWidth(); Apply(); };
+        Unloaded += (_, _) => { ThemeManager.Changed -= Apply; _resized.Stop(); };
+    }
+
+    protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+    {
+        base.OnDpiChanged(oldDpi, newDpi);
+        _resized.Stop();
+        _resized.Start();
     }
 
     public static Color Bg => ThemeManager.ColorOf("Bg", Colors.Black);
 
     public static Color Line => ThemeManager.ColorOf(LineKey, Colors.Gray);
+
+    private int WantedWidth()
+    {
+        if (Window.GetWindow(this) is not { ActualWidth: > 0 } window || PresentationSource.FromVisual(this)?.CompositionTarget is not { } target)
+            return BackdropLook.MaxDecodeWidth;
+        var pixels = target.TransformToDevice.Transform(new Point(window.ActualWidth, window.ActualHeight));
+        return BackdropLook.DecodeWidthFor(pixels.X, pixels.Y);
+    }
+
+    private void Refit()
+    {
+        if (!IsLoaded) return;
+        int wanted = WantedWidth();
+        if (wanted == _width) return;
+        _width = wanted;
+        var ui = Dispatcher;
+        LoadInBackground(wanted, () => ui.BeginInvoke(new Action(() => { if (IsLoaded && _width == wanted) Apply(); })));
+    }
 
     private void Apply()
     {
@@ -52,49 +98,56 @@ internal sealed class TopographyBackdrop : Grid
         var fill = new SolidColorBrush(bg);
         fill.Freeze();
         Background = fill;
-        _image.Source = Picture(line, alpha);
+        _image.Source = Picture(_width > 0 ? _width : BackdropLook.MaxDecodeWidth, line, alpha);
     }
 
-    private static ImageSource? Picture(Color line, double alpha)
+    private static BitmapSource? Picture(int width, Color line, double alpha)
     {
-        if (!LoadMask() || _mask is not { } mask) return null;
+        lock (PictureGate)
+        {
+            if ((_picture is null || _pictureWidth != width) && !Decode(width)) return null;
+            if (_picture is { } picture && (_pictureLine != line || _pictureAlpha != alpha))
+            {
+                _picture = Indexed(picture, line, alpha);
+                (_pictureLine, _pictureAlpha) = (line, alpha);
+            }
+            return _picture;
+        }
+    }
+
+    private static BitmapSource Indexed(BitmapSource source, Color line, double alpha)
+    {
         var colors = new Color[256];
         for (int i = 0; i < colors.Length; i++)
             colors[i] = Color.FromArgb((byte)Math.Round(i * alpha), line.R, line.G, line.B);
-        int width = mask.PixelWidth, height = mask.PixelHeight;
+        int width = source.PixelWidth, height = source.PixelHeight;
         var bytes = new byte[width * height];
-        mask.CopyPixels(bytes, width, 0);
+        source.CopyPixels(bytes, width, 0);
         var picture = BitmapSource.Create(width, height, 96, 96, PixelFormats.Indexed8, new BitmapPalette(colors), bytes, width);
         picture.Freeze();
         return picture;
     }
 
-    private static bool LoadMask()
+    private static bool Decode(int width)
     {
-        lock (MaskGate)
+        try
         {
-            if (_mask is not null) return true;
-            try
-            {
-                var source = new BitmapImage();
-                source.BeginInit();
-                source.UriSource = new Uri("pack://application:,,,/Assets/BackdropLines.png");
-                source.DecodePixelWidth = DecodeWidth;
-                source.CacheOption = BitmapCacheOption.OnLoad;
-                source.EndInit();
-                var gray = new FormatConvertedBitmap(source, PixelFormats.Gray8, null, 0);
-                var bytes = new byte[gray.PixelWidth * gray.PixelHeight];
-                gray.CopyPixels(bytes, gray.PixelWidth, 0);
-                var mask = BitmapSource.Create(gray.PixelWidth, gray.PixelHeight, 96, 96, PixelFormats.Gray8, null, bytes, gray.PixelWidth);
-                mask.Freeze();
-                _mask = mask;
-                return true;
-            }
-            catch (Exception ex)
-            {
-                App.LogError(ex);
-                return false;
-            }
+            var source = new BitmapImage();
+            source.BeginInit();
+            source.UriSource = new Uri("pack://application:,,,/Assets/BackdropLines.png");
+            source.DecodePixelWidth = width;
+            source.CacheOption = BitmapCacheOption.OnLoad;
+            source.EndInit();
+            var gray = new FormatConvertedBitmap(source, PixelFormats.Gray8, null, 0);
+            gray.Freeze();
+            _picture = Indexed(gray, Colors.Black, 0);
+            (_pictureWidth, _pictureLine, _pictureAlpha) = (width, Colors.Black, 0);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.LogError(ex);
+            return false;
         }
     }
 }

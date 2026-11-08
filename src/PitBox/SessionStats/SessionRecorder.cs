@@ -13,7 +13,8 @@ internal sealed class SessionRow
     public double? TrackKm;
     public bool DynamicWeather, Finished, Official;
     public int Laps;
-    public int? Incidents, StartPos, FinishPos, IrStart, IrDelta, RaceWeek;
+    public int? Incidents, StartPos, FinishPos, TierPos, IrStart, IrDelta, RaceWeek;
+    public string Tier = "";
     public double? SrStart, SrDelta, NightS, TrackTempMin, TrackTempMax;
     public int LeagueId, SessionNum, SeasonId, PitStops;
     public long SubSession;
@@ -262,11 +263,26 @@ internal sealed class SessionRecorder
         if (f.Session.GridClassPositions.TryGetValue(me, out var grid) && grid > 0) row.StartPos = grid;
         bool over = f.Phase is SessionPhase.Checkered or SessionPhase.CoolDown;
         var result = over && f.LapCompleted is { } done && f.Session.ResultOf(f.SessionNum, me) is { ClassPosition: > 0 } r && r.LapsComplete >= done ? r : null;
-        if (result is not null) row.FinishPos = result.ClassPosition;
+        bool proAm = f.Session.HasProAm && f.Session.ByCar.ContainsKey(me);
+        if (proAm) row.Tier = SimRacing.Race.ProAm.Tier(SimRacing.Race.ProAm.IsPro(f.Session, me));
+        if (result is not null)
+        {
+            row.FinishPos = result.ClassPosition;
+            if (proAm && f.Session.Results.TryGetValue(f.SessionNum, out var results) && SimRacing.Race.ProAm.TierPosition(f.Session, me, result.ClassPosition, results) is > 0 and var final) row.TierPos = final;
+        }
         int pos = f.CarClassPosition[me] > 0 ? f.CarClassPosition[me] : f.PlayerClassPosition is > 0 and var classPos ? classPos : 0;
         if (pos <= 0) return;
         if (row.StartPos is null && f.Phase == SessionPhase.Racing) row.StartPos = pos;
-        if (f.Phase == SessionPhase.Racing || over && result is null) row.FinishPos = pos;
+        if (f.Phase == SessionPhase.Racing || over && result is null)
+        {
+            row.FinishPos = pos;
+            if (proAm)
+            {
+                int tier = SimRacing.Race.ProAm.TierPosition(f.Session, me, pos, f.CarClassPosition);
+                if (tier == 0 && f.Session.Results.TryGetValue(f.SessionNum, out var results)) tier = SimRacing.Race.ProAm.TierPosition(f.Session, me, pos, results);
+                row.TierPos = tier > 0 ? tier : null;
+            }
+        }
         if (f.Phase == SessionPhase.Checkered) _lapsAtCheckered ??= f.LapCompleted;
         var surface = f.CarSurface[me] != TrackSurface.NotInWorld ? f.CarSurface[me] : f.PlayerSurface ?? TrackSurface.NotInWorld;
         if (!row.Finished && surface != TrackSurface.NotInWorld

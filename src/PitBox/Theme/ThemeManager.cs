@@ -20,6 +20,7 @@ internal static class ThemeManager
     public static Dictionary<string, Color> Resolve(ThemeSpec spec)
     {
         var all = new Dictionary<string, Color>(spec.Colors) { ["Transparent"] = Colors.Transparent };
+        if (spec.Dark) Firm(all);
         all["BtnOutline"] = all[spec.Outline];
         for (bool progress = true; progress;)
         {
@@ -33,6 +34,53 @@ internal static class ThemeManager
         }
         all.Remove("Transparent");
         return all;
+    }
+
+    private static readonly string[] DeepGrounds = { "Bg", "SidebarBg", "SurfaceAlt", "SegmentBg", "LogoBg", "BgGlow" };
+    private static readonly string[] PanelGrounds = { "Panel", "Surface", "LiftedBg" };
+    private static readonly string[] RaisedGrounds = { "TileRaised", "IconWell", "Hover", "HoverRaised", "Selected", "SelectedHover", "BtnBg", "BtnHover", "TooltipBg", "MeterTrack", "GridLine", "QuietBg" };
+    private static readonly string[] Bright = { "SageDeep", "WarnDeep", "DangerDeep", "GoldDeep", "ApricotDeep", "CoralDeep", "SlateDeep", "PlumDeep" };
+
+    private static void Firm(Dictionary<string, Color> all)
+    {
+        static Color Toward(Color c, Color to, double t) => Color.FromArgb(c.A, (byte)Math.Round(c.R + (to.R - c.R) * t), (byte)Math.Round(c.G + (to.G - c.G) * t), (byte)Math.Round(c.B + (to.B - c.B) * t));
+        void Shift(IEnumerable<string> keys, Color to, double t)
+        {
+            foreach (var key in keys)
+                if (all.TryGetValue(key, out var c)) all[key] = Toward(c, to, t);
+        }
+        Shift(DeepGrounds, Colors.Black, 0.42);
+        Shift(PanelGrounds, Colors.Black, 0.36);
+        Shift(RaisedGrounds, Colors.Black, 0.2);
+        Shift(all.Keys.Where(k => k.EndsWith("Soft", StringComparison.Ordinal)).ToList(), Colors.Black, 0.15);
+        if (!all.TryGetValue("Heading", out var heading) || !all.TryGetValue("Text", out var text) || !all.TryGetValue("Panel", out var panel)) return;
+        heading = all["Heading"] = Toward(heading, Colors.White, 0.45);
+        text = all["Text"] = Toward(text, heading, 0.55);
+        foreach (var key in new[] { "BtnFg", "TooltipText", "BtnHoverFg" })
+            if (all.TryGetValue(key, out var fg) && fg.A == 255) all[key] = Toward(fg, heading, 0.5);
+        var grounds = new[] { "Bg", "Panel", "TileRaised", "HoverRaised", "Selected" }.Where(all.ContainsKey).Select(k => all[k]).Where(c => c.A == 255).ToArray();
+        double Worst(Color c, Color[] under) => under.Min(g => Contrast(c, g));
+        Color Lift(Color c, Color to, Color[] under, double target)
+        {
+            for (double t = 0; t <= 1.0001; t += 0.02)
+            {
+                var candidate = Toward(c, to, t);
+                if (Worst(candidate, under) >= target) return candidate;
+            }
+            return to;
+        }
+        if (all.TryGetValue("TextFaint", out var faint)) all["TextFaint"] = faint = Lift(faint, text, grounds, 5.5);
+        if (all.TryGetValue("TextMuted", out var muted)) all["TextMuted"] = Lift(muted, text, grounds, Math.Max(6.9, all.ContainsKey("TextFaint") ? Worst(faint, grounds) + 1.4 : 0));
+        var soft = all.TryGetValue("AccentSoft", out var accentSoft) && accentSoft.A == 255 ? new[] { panel, accentSoft } : new[] { panel };
+        if (all.TryGetValue("AccentText", out var accentText)) all["AccentText"] = Lift(accentText, Colors.White, soft, 6);
+        if (all.TryGetValue("EyebrowText", out var eyebrow)) all["EyebrowText"] = Lift(eyebrow, Colors.White, new[] { panel }, 6);
+        foreach (var key in Bright)
+            if (all.TryGetValue(key, out var c) && c.A == 255) all[key] = Lift(c, Colors.White, new[] { panel }, 6.5);
+        if (all.TryGetValue("LineStrong", out var strong)) all["LineStrong"] = Lift(Toward(strong, text, 0.1), text, new[] { panel }, 3);
+        foreach (var key in new[] { "Line", "TileEdge" })
+            if (all.TryGetValue(key, out var line) && line.A == 255) all[key] = Toward(line, text, 0.06);
+        if (all.TryGetValue("InputEdge", out var input) && input.A == 255)
+            all["InputEdge"] = Lift(input, text, all.TryGetValue("BtnBg", out var btn) && btn.A == 255 ? new[] { panel, btn } : new[] { panel }, 3.5);
     }
 
     private static ResourceDictionary? _applied;

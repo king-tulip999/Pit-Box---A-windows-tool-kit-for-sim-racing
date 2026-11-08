@@ -172,16 +172,17 @@ internal static class StatsSessions
     private static FrameworkElement Finish(SessionSummary s, string place)
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal };
-        row.Children.Add(RaceParts.Big("P" + s.FinishPos!.Value.ToString(CultureInfo.CurrentCulture), 25, place + "Text"));
+        row.Children.Add(RaceParts.Big("P" + s.ShownPos!.Value.ToString(CultureInfo.CurrentCulture), 25, place + "Text"));
         if (s.StartPos is { } start)
         {
-            int gained = start - s.FinishPos.Value;
+            int gained = start - s.FinishPos!.Value;
             var gain = RaceParts.Big(RaceParts.Signed(gained), 14, RaceParts.GainBrush(gained));
             gain.Margin = new Thickness(6, 4, 0, 0);
             row.Children.Add(gain);
-            row.ToolTip = $"Started P{start}, finished P{s.FinishPos}";
+            row.ToolTip = s.HasTier ? $"Started P{start} in class, finished P{s.FinishPos} in class, P{s.TierPos} {s.Tier}" : $"Started P{start}, finished P{s.FinishPos}";
         }
-        return row;
+        if (!s.HasTier) return row;
+        return new StackPanel { Children = { row, Body($"{s.Tier} · P{s.FinishPos} in class", "TextMuted", 9.5) } };
     }
 
     private static FrameworkElement Awards(IReadOnlyList<Award> awards, string place)

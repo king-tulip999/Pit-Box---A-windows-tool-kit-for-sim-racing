@@ -2,30 +2,49 @@ namespace PitBox.SessionStats;
 
 internal readonly record struct Streak(int Current, int Best);
 
-internal sealed record RaceStreaks(Streak Clean, Streak Finished, Streak TopFive, int Races);
+internal sealed record RaceStreaks(Streak Clean, Streak Finished, Streak TopFive, Streak Weeks, Streak IRating, int Races);
 
 internal static class RaceStreakReader
 {
-    internal static RaceStreaks Streaks(IReadOnlyList<(bool Finished, int? Incidents, int? Position)> races)
+    private static readonly DateTime FirstRaceWeek = new(1970, 1, 6, 0, 0, 0, DateTimeKind.Utc);
+
+    private const long WeekTicks = TimeSpan.TicksPerDay * 7;
+
+    internal static long RaceWeek(DateTime utc)
     {
-        static Streak Run(IEnumerable<bool> hits)
-        {
-            int run = 0, best = 0;
-            foreach (bool hit in hits)
-            {
-                run = hit ? run + 1 : 0;
-                best = Math.Max(best, run);
-            }
-            return new Streak(run, best);
-        }
-        return new RaceStreaks(
-            Run(races.Select(r => r.Finished && r.Incidents == 0)),
-            Run(races.Select(r => r.Finished)),
-            Run(races.Select(r => r.Finished && r.Position is >= 1 and <= 5)),
-            races.Count);
+        long ticks = (utc - FirstRaceWeek).Ticks;
+        return ticks >= 0 ? ticks / WeekTicks : (ticks - WeekTicks + 1) / WeekTicks;
     }
 
-    public static RaceStreaks Read(StatsStore store) =>
-        Streaks(store.Db.Query("SELECT finished, incidents, finish_pos FROM sessions WHERE session_type = 'Race' AND start_pos > 0 ORDER BY start_utc, id")
-            .Select(r => (Convert.ToInt64(r[0] ?? 0L) != 0, r[1] is null ? (int?)null : Convert.ToInt32(r[1]), r[2] is null ? (int?)null : Convert.ToInt32(r[2]))).ToList());
+    internal static Streak Run(IEnumerable<bool> hits)
+    {
+        int run = 0, best = 0;
+        foreach (bool hit in hits)
+        {
+            run = hit ? run + 1 : 0;
+            best = Math.Max(best, run);
+        }
+        return new Streak(run, best);
+    }
+
+    internal static Streak Weeks(IEnumerable<DateTime> startsUtc, DateTime nowUtc)
+    {
+        var weeks = startsUtc.Select(RaceWeek).Distinct().Order().ToList();
+        if (weeks.Count == 0) return default;
+        int run = 1, best = 1;
+        for (int i = 1; i < weeks.Count; i++)
+        {
+            run = weeks[i] == weeks[i - 1] + 1 ? run + 1 : 1;
+            best = Math.Max(best, run);
+        }
+        return new Streak(weeks[^1] >= RaceWeek(nowUtc) - 1 ? run : 0, best);
+    }
+
+    internal static RaceStreaks Streaks(IReadOnlyList<RaceRow> races, DateTime nowUtc) => new(
+        Run(races.Select(r => r.Clean)),
+        Run(races.Select(r => r.Finished)),
+        Run(races.Select(r => r.TopFive)),
+        Weeks(races.Select(r => r.StartUtc), nowUtc),
+        Run(races.Where(r => r.IrDelta is not null).Select(r => r.IrDelta > 0)),
+        races.Count);
 }

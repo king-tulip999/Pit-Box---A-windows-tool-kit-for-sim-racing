@@ -6,12 +6,16 @@ using PitBox.Theme;
 
 namespace PitBox.Views.Pages;
 
-internal sealed record AchievementsData(RaceStreaks Streaks, List<AchievementState> Achievements)
+internal sealed record AchievementsData(RaceStreaks Streaks, List<AchievementState> Achievements, List<AchievementState> Season, DateTime SeasonStartUtc)
 {
     public static AchievementsData Read(StatsStore store)
     {
-        var streaks = RaceStreakReader.Read(store);
-        return new(streaks, SessionStats.Achievements.Evaluate(SessionStats.Achievements.Read(store, streaks)));
+        var now = DateTime.UtcNow;
+        var races = SessionStats.Achievements.ReadRaces(store);
+        var all = SessionStats.Achievements.Read(store, races, now);
+        var seasonStart = TimeRanges.SeasonStart(now, store.LatestOfficialWeek());
+        return new(all.Streaks, SessionStats.Achievements.Evaluate(all),
+            SessionStats.Achievements.Evaluate(SessionStats.Achievements.SeasonGoals, SessionStats.Achievements.ForSeason(races, seasonStart, now)), seasonStart);
     }
 }
 
@@ -20,22 +24,46 @@ internal static class StatsAchievements
     public static FrameworkElement Card(AchievementsData data)
     {
         var s = data.Streaks;
-        string Run(Streak k) => SimRacing.Race.RaceFormat.Count(k.Current, "race");
-        (StatDef, StatResult) M(string id, string label, Streak k) =>
-            (new StatDef("streak." + id, StatRegistry.Racing, label, StatKind.Text) { Help = "Races in a row, up to your latest" },
-                s.Races == 0 ? StatResult.None : new StatResult(Run(k), "best " + Run(new Streak(k.Best, k.Best))));
-        var streaks = StatsSections.Metrics(new[] { M("clean", "Clean races in a row", s.Clean), M("finish", "Finishes in a row", s.Finished), M("top5", "Top fives in a row", s.TopFive) })!;
+        string Run(Streak k, string noun) => SimRacing.Race.RaceFormat.Count(k.Current, noun);
+        (StatDef, StatResult) M(string id, string label, Streak k, string noun, string help) =>
+            (new StatDef("streak." + id, StatRegistry.Racing, label, StatKind.Text) { Help = help },
+                s.Races == 0 ? StatResult.None : new StatResult(Run(k, noun), "best " + Run(new Streak(k.Best, k.Best), noun)));
+        const string upToLatest = "Races in a row, up to your latest";
+        var streaks = StatsSections.Metrics(new[]
+        {
+            M("clean", "Clean races in a row", s.Clean, "race", upToLatest),
+            M("finish", "Finishes in a row", s.Finished, "race", upToLatest),
+            M("top5", "Top fives in a row", s.TopFive, "race", upToLatest),
+            M("weeks", "Race weeks in a row", s.Weeks, "week", "Race weeks start Tuesday 00:00 UTC; ends when a week goes by without a race"),
+            M("irating", "iRating gains in a row", s.IRating, "race", "Official races only"),
+        })!;
 
         int earned = data.Achievements.Sum(a => a.Earned);
-        var badges = new StatGrid { MinTileWidth = 150, Gap = 0, RowGap = 13 };
-        foreach (var state in data.Achievements) badges.Children.Add(Badge(state));
+        int seasonEarned = data.Season.Sum(a => a.Earned), seasonTiers = data.Season.Sum(a => a.Family.Tiers.Length);
+        var parts = new List<FrameworkElement?>
+        {
+            StatsSections.Chart("Streaks", "Official and league races, all time", streaks),
+            StatsSections.Chart("This season", $"Since {Services.Dates.Day(data.SeasonStartUtc.ToLocalTime())} · {seasonEarned} of {seasonTiers} earned · starts over each season", Badges(data.Season)),
+        };
+        foreach (var group in SessionStats.Achievements.Groups)
+        {
+            var states = data.Achievements.Where(a => a.Family.Group == group).ToList();
+            string caption = group == SessionStats.Achievements.Groups[0]
+                ? $"All time · {earned} of {SessionStats.Achievements.TierCount} earned · official and league races"
+                : $"{states.Sum(a => a.Earned)} of {states.Sum(a => a.Family.Tiers.Length)} earned";
+            parts.Add(StatsSections.Chart(group, caption, Badges(states)));
+        }
 
-        var card = StatsSections.Section("Streaks and achievements", null, null,
-            StatsSections.Stack(
-                StatsSections.Chart("Streaks", "Official and unofficial races, all time", streaks),
-                StatsSections.Chart("Achievements", $"All time · {earned} of {SessionStats.Achievements.TierCount} earned", badges)));
+        var card = StatsSections.Section("Streaks and achievements", null, null, StatsSections.Stack(parts.ToArray()));
         Ui.Anchor(card, "stats.achievements");
         return card;
+    }
+
+    private static StatGrid Badges(IEnumerable<AchievementState> states)
+    {
+        var grid = new StatGrid { MinTileWidth = 150, Gap = 0, RowGap = 13 };
+        foreach (var state in states) grid.Children.Add(Badge(state));
+        return grid;
     }
 
     private static FrameworkElement Bar(double fraction, string brush)
@@ -74,7 +102,7 @@ internal static class StatsAchievements
         var meter = Bar(state.Fraction, all ? gold : "Accent");
         var stack = new StackPanel { Children = { pips, value, label, line, meter } };
         string tiers = string.Join(", ", family.Tiers.Select(t => SessionStats.Achievements.Format(family, t)));
-        var cell = Hairline.Frame(new Border { Padding = new Thickness(11, 2, 10, 2), Child = stack, ToolTip = $"{family.Name}: {tiers}" }, Sides.Left);
+        var cell = Hairline.Frame(new Border { Padding = new Thickness(11, 2, 10, 2), Child = stack, ToolTip = family.Help is { } help ? $"{family.Name}: {tiers}\n{help}" : $"{family.Name}: {tiers}" }, Sides.Left);
         cell.SetResourceReference(Border.BorderBrushProperty, "Line");
         return cell;
     }

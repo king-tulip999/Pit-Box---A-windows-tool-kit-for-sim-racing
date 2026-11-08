@@ -157,7 +157,7 @@ public partial class App : Application
             config.Ui.Animations = false;
         }
         PerfProbe.Mark("config");
-        if (!(config.Ui.StartMinimized && withTray)) TopographyBackdrop.Preload();
+        if (!(config.Ui.StartMinimized && withTray)) TopographyBackdrop.Preload(config.Ui.Window);
         Grr.GrrResources.Install();
         if (Plugins.PluginStates.IsEnabled(config.Plugins, Grr.GrrPlugin.PluginId, Grr.GrrPlugin.OnByDefault))
             Theme.Themes.Register(Grr.GrrTheme.Spec);

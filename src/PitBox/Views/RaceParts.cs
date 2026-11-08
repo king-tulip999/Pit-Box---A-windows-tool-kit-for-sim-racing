@@ -223,7 +223,7 @@ internal sealed record RaceCardData(SessionSummary Session, IReadOnlyList<(doubl
 
 internal static class RaceParts
 {
-    public static string Place(SessionSummary s) => RaceLook.Key(s.Type == "Race" && s.Finished ? s.FinishPos : null);
+    public static string Place(SessionSummary s) => RaceLook.Key(s.Type == "Race" && s.Finished ? s.ShownPos : null);
 
     public static bool Raced(SessionSummary s) => s.Type == "Race" && s.Finished && s.FinishPos is > 0;
 
@@ -407,14 +407,25 @@ internal static class RaceParts
 
     public const string ConsistencyTip = "70% how even your clean laps were (laps more than 7% off your middle lap time left out), 30% the share of clean laps";
 
-    public static FrameworkElement Tile(string value, string label, string bar, string valueBrush = "Heading", double size = 30, string? tip = null)
+    public static FrameworkElement Tile(string value, string label, string bar, string valueBrush = "Heading", double size = 30, string? tip = null, bool centred = false)
     {
         var stack = new StackPanel { Margin = new Thickness(16, 12, 12, 12) };
         var number = LiveFigure(value, size, valueBrush);
         number.HorizontalAlignment = HorizontalAlignment.Left;
-        var mark = FigureMark(number, 3, bar, 9);
-        stack.Children.Add(new DockPanel { LastChildFill = true, Children = { mark, number } });
-        stack.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(12, 2, 0, 0) });
+        var figureRow = new DockPanel { LastChildFill = true, HorizontalAlignment = centred ? HorizontalAlignment.Center : HorizontalAlignment.Stretch };
+        if (!centred) figureRow.Children.Add(FigureMark(number, 3, bar, 9));
+        figureRow.Children.Add(number);
+        stack.Children.Add(figureRow);
+        stack.Children.Add(new TextBlock
+        {
+            Text = label, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap,
+            Margin = centred ? new Thickness(0, 2, 0, 0) : new Thickness(12, 2, 0, 0), TextAlignment = centred ? TextAlignment.Center : TextAlignment.Left,
+        });
+        if (centred)
+        {
+            stack.Margin = new Thickness(12);
+            stack.VerticalAlignment = VerticalAlignment.Center;
+        }
         var cell = Hairline.Frame(new Border { Child = stack, ToolTip = tip }, Sides.Left);
         cell.SetResourceReference(Border.BorderBrushProperty, "Line");
         return cell;
@@ -465,7 +476,7 @@ internal static class RaceParts
         return brush;
     }
 
-    public static FrameworkElement Position(int finish, string place, double size, string label)
+    public static FrameworkElement Position(int finish, string place, double size, string label, string? tier = null, string? sub = null)
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Top };
         var number = Big("P" + finish.ToString(CultureInfo.CurrentCulture), size, place + "Text");
@@ -475,7 +486,27 @@ internal static class RaceParts
         row.Children.Add(number);
         var side = new StackPanel { Margin = new Thickness(size * 0.06, size * 0.05, 0, 0) };
         side.Children.Add(Big(label, Math.Max(11.5, size * 0.1), "TextMuted", heavy: false));
+        if (tier is not null) side.Children.Add(Big(tier, Math.Max(14, size * 0.2), place + "Text").Also(t => t.Margin = new Thickness(0, size * 0.04, 0, 0)));
+        if (sub is not null) side.Children.Add(Big(sub, Math.Max(11.5, size * 0.1), "TextMuted", heavy: false));
         row.Children.Add(side);
+        return row;
+    }
+
+    public static FrameworkElement CentredPosition(int finish, string place, double size, string label, string? tier = null, string? sub = null)
+    {
+        var row = (StackPanel)Position(finish, place, size, label, tier, sub);
+        row.VerticalAlignment = VerticalAlignment.Center;
+        var number = (TextBlock)row.Children[0];
+        var shift = new TranslateTransform();
+        row.RenderTransform = shift;
+        void Centre()
+        {
+            var ink = VisualTreeHelper.GetContentBounds(number);
+            if (ink.IsEmpty) return;
+            double offset = Math.Round(number.ActualHeight / 2 - (ink.Top + ink.Height / 2));
+            if (shift.Y != offset) shift.Y = offset;
+        }
+        number.SizeChanged += (_, _) => number.Dispatcher.BeginInvoke(Centre, System.Windows.Threading.DispatcherPriority.Loaded);
         return row;
     }
 
@@ -497,13 +528,13 @@ internal static class RaceParts
     {
         var s = d.Session;
         string place = Place(s);
-        int finish = s.FinishPos ?? 0;
+        int finish = s.ShownPos ?? 0;
         var stack = new StackPanel();
 
         var hero = new Grid { Height = 146 };
         hero.Children.Add(new Slant(place + "Wash", 0, 0, 1, 0, 1, 0.55, 0, 1));
         hero.Children.Add(new Slant(place + "Faint", 0, 0, 0.62, 0, 0.3, 1, 0, 1));
-        var position = Position(finish, place, 112, label);
+        var position = Position(finish, place, 112, label, s.HasTier ? s.Tier : null, s.ClassPlace);
         position.Margin = new Thickness(16, 22, 0, 0);
         position.HorizontalAlignment = HorizontalAlignment.Left;
         hero.Children.Add(position);
