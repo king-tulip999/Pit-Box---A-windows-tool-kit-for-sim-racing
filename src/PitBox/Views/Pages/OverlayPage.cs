@@ -947,7 +947,7 @@ internal sealed class OverlayPage : UserControl, IPage
 
     private static readonly (OverlayMetric Metric, string Tag)[] TagDefaults =
     {
-        (OverlayMetric.AverageFps, "avg"), (OverlayMetric.OnePercentLow, "1%"), (OverlayMetric.GpuHotSpot, "hotspot"), (OverlayMetric.GpuFan, "fan"),
+        (OverlayMetric.AverageFps, "avg"), (OverlayMetric.OnePercentLow, "1%"), (OverlayMetric.GpuHotSpot, "hot"), (OverlayMetric.GpuFan, "fan"),
         (OverlayMetric.AverageGpuTemp, "avg"), (OverlayMetric.AverageCpuTemp, "avg"),
         (OverlayMetric.Fps, ""), (OverlayMetric.GpuTemp, ""), (OverlayMetric.GpuLoad, ""), (OverlayMetric.CpuTemp, ""), (OverlayMetric.CpuLoad, ""),
     };

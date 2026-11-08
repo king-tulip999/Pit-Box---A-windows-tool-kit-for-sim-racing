@@ -108,9 +108,13 @@ internal sealed class OverlayRenderer : IDisposable
         float RowWidth(List<Group> row) =>
             row.Sum(g => GroupWidth(g, layout.Style == OverlayStyle.Compact)) + groupGap * Math.Max(0, row.Count - 1);
 
+        bool table = layout.Style == OverlayStyle.Expanded;
+        if (table) cellGap = 20 * scale * across;
+        float tableRight = table && groups.Count > 0 ? TableWidth(groups, side + labelColumn + labelGap, cellGap, scale) : 0;
+
         bool graph = layout.ShowGraph && data.FrameTimes.Length > 1;
         float graphHeight = graph ? 34 * scale : 0;
-        float contentWidth = Math.Max(rows.Count == 0 ? 0 : rows.Max(RowWidth), graph ? 160 * scale : 0);
+        float contentWidth = Math.Max(rows.Count == 0 ? 0 : table ? tableRight - side : rows.Max(RowWidth), graph ? 160 * scale : 0);
         int width = Math.Max(20, (int)Math.Ceiling(contentWidth + side * 2));
         float textHeight = rows.Count * rowHeight + Math.Max(0, rows.Count - 1) * rowGap;
         int height = Math.Max(20, (int)Math.Ceiling(pad * 2 + textHeight + (graph ? graphHeight + (rows.Count > 0 ? 6 * scale : 0) : 0)));
@@ -147,6 +151,11 @@ internal sealed class OverlayRenderer : IDisposable
                 float labelWidth = inline ? Measure(group.Label, _labelFont!) : labelColumn;
                 Hits?.Add(new(group.Key, null, new RectangleF(x, y, labelWidth, rowHeight)));
                 x += labelWidth + labelGap;
+                if (table)
+                {
+                    DrawColumns(g, group, _places[groups.IndexOf(group)], y, rowHeight, cellGap, colors, scale);
+                    continue;
+                }
                 float drawnEnd = x;
                 for (int i = 0; i < group.Cells.Count; i++)
                 {
@@ -181,10 +190,139 @@ internal sealed class OverlayRenderer : IDisposable
         return new Size(width, height);
     }
 
-    private void Rule(Graphics g, float x, float y, float rowHeight, Palette colors, float scale)
+    private float PrefixWidth(Cell c) => c.Prefix.Length > 0 ? Measure(PitBox.SimRacing.Race.PooledText.Concat(c.Prefix, " "), _unitFont!) : 0;
+    private float UnitWidth(Cell c, float scale) => c.Unit.Length > 0 ? 2 * scale + Measure(c.Unit, _unitFont!) : 0;
+
+    private float TemplateWidth(Cell c)
+    {
+        if (_wideDigit == ' ')
+            _wideDigit = "0123456789".MaxBy(d => Measure(d.ToString(), _valueFont!));
+        return Measure(c.Template.Replace('0', _wideDigit), _valueFont!);
+    }
+
+    private readonly List<float> _columnX = new();
+    private List<int[]> _places = new();
+
+    internal static int Kind(OverlayMetric? metric, int nth) => (metric switch
+    {
+        OverlayMetric.GpuTemp or OverlayMetric.CpuTemp => 1,
+        OverlayMetric.AverageGpuTemp or OverlayMetric.AverageCpuTemp => 2,
+        OverlayMetric.GpuClock or OverlayMetric.CpuClock => 3,
+        OverlayMetric.GpuPower or OverlayMetric.CpuPower => 4,
+        OverlayMetric.GpuLoad or OverlayMetric.CpuLoad => 5,
+        { } m => 100 + (int)m,
+        null => 0,
+    }) * 16 + Math.Min(nth, 15);
+
+    internal static List<int[]> PlaceColumns(IReadOnlyList<int[]> groups)
+    {
+        var columns = new List<List<int>>();
+        var placed = new List<int[]>();
+        foreach (var kinds in groups)
+        {
+            var at = new int[kinds.Length];
+            var taken = new HashSet<int>();
+            for (int i = 0; i < kinds.Length; i++)
+            {
+                int known = columns.FindIndex(c => c.Contains(kinds[i]));
+                at[i] = known >= 0 && taken.Add(known) ? known : -1;
+            }
+            int previous = -1;
+            for (int i = 0; i < kinds.Length; i++)
+            {
+                if (at[i] >= 0) { previous = at[i]; continue; }
+                int j = previous + 1;
+                while (j < columns.Count && (taken.Contains(j) || columns[j].Exists(k => Array.IndexOf(kinds, k) >= 0))) j++;
+                if (j == columns.Count) columns.Add(new List<int>());
+                columns[j].Add(kinds[i]);
+                taken.Add(j);
+                at[i] = previous = j;
+            }
+            placed.Add(at);
+        }
+        return placed;
+    }
+
+    private static int LastColumn(int[] place) => place.Length == 0 ? -1 : place.Max();
+
+    private float TableWidth(List<Group> groups, float left, float cellGap, float scale)
+    {
+        _places = PlaceColumns(groups.Select(g =>
+        {
+            var kinds = new int[g.Cells.Count];
+            for (int i = 0; i < kinds.Length; i++)
+            {
+                int nth = 0;
+                for (int k = 0; k < i; k++) if (g.Cells[k].Metric == g.Cells[i].Metric) nth++;
+                kinds[i] = Kind(g.Cells[i].Metric, nth);
+            }
+            return kinds;
+        }).ToList());
+        int count = _places.Count == 0 ? 0 : _places.Max(LastColumn) + 1;
+        var widths = new float[count];
+        for (int gi = 0; gi < groups.Count; gi++)
+        {
+            int last = LastColumn(_places[gi]);
+            for (int i = 0; i < groups[gi].Cells.Count; i++)
+            {
+                var cell = groups[gi].Cells[i];
+                int j = _places[gi][i];
+                if (j != last && cell.Tone != Tone.Dim) widths[j] = Math.Max(widths[j], CellWidth(cell));
+            }
+        }
+        _columnX.Clear();
+        float x = left;
+        for (int j = 0; j < count; j++)
+        {
+            _columnX.Add(x);
+            x += widths[j] + cellGap;
+        }
+        float right = left;
+        for (int gi = 0; gi < groups.Count; gi++)
+            for (int i = 0; i < groups[gi].Cells.Count; i++)
+            {
+                int j = _places[gi][i];
+                float extent = j == LastColumn(_places[gi]) ? CellExtent(groups[gi].Cells[i], scale) : widths[j];
+                right = Math.Max(right, _columnX[j] + extent);
+            }
+        return right;
+    }
+
+    private float CellExtent(Cell cell, float scale) =>
+        cell.Tone == Tone.Dim ? Measure(cell.Value, _valueFont!)
+        : PrefixWidth(cell) + Math.Max(TemplateWidth(cell), Measure(cell.Value, _valueFont!)) + UnitWidth(cell, scale);
+
+    private void DrawColumns(Graphics g, Group group, int[] place, float y, float rowHeight, float cellGap, Palette colors, float scale)
+    {
+        int last = LastColumn(place);
+        bool first = true;
+        for (int j = 0; j <= last; j++)
+        {
+            int i = Array.IndexOf(place, j);
+            if (i < 0) continue;
+            var cell = group.Cells[i];
+            float x = _columnX[j];
+            if (!first) Rule(g, x - cellGap / 2, y, rowHeight, colors, scale, 70);
+            first = false;
+            float start = x;
+            if (cell.Prefix.Length > 0)
+            {
+                DrawText(g, cell.Prefix, _unitFont!, colors.Secondary, x, y + UnitOffset(g, rowHeight));
+                x += PrefixWidth(cell);
+            }
+            DrawText(g, cell.Value, _valueFont!, ToneColor(cell.Tone, colors), x, y);
+            x += Measure(cell.Value, _valueFont!);
+            if (cell.Unit.Length > 0)
+                DrawText(g, cell.Unit, _unitFont!, colors.Secondary, x + 2 * scale, y + UnitOffset(g, rowHeight));
+            float right = j == last ? start + CellExtent(cell, scale) : (j + 1 < _columnX.Count ? _columnX[j + 1] - cellGap : start + CellWidth(cell));
+            Hits?.Add(new(group.Key, cell.Metric, new RectangleF(start, y, right - start, rowHeight)));
+        }
+    }
+
+    private void Rule(Graphics g, float x, float y, float rowHeight, Palette colors, float scale, int alpha = 150)
     {
         float h = _labelFont!.GetHeight(g);
-        var rule = CachedPen(ref _rulePen, Color.FromArgb(150, colors.Accent), Math.Max(1f, 1.5f * scale));
+        var rule = CachedPen(ref _rulePen, Color.FromArgb(alpha, colors.Accent), Math.Max(1f, 1.5f * scale));
         g.DrawLine(rule, x, y + (rowHeight - h) / 2 + h * 0.05f, x, y + (rowHeight + h) / 2 - h * 0.05f);
     }
 
@@ -218,7 +356,7 @@ internal sealed class OverlayRenderer : IDisposable
                 case OverlayMetric.GpuTemp: group.Cells.Add(new(Tag(""), Num(hw?.GpuTemp), "°C", "100", TempTone(hw?.GpuTemp, 80, 90))); break;
                 case OverlayMetric.AverageGpuTemp: group.Cells.Add(new(Tag("avg"), Num(d.AverageGpuTemp), "°C", "100", TempTone(d.AverageGpuTemp, 80, 90))); break;
                 case OverlayMetric.GpuLoad: group.Cells.Add(new(Tag(""), Num(hw?.GpuLoad), "%", "100")); break;
-                case OverlayMetric.GpuHotSpot: group.Cells.Add(new(Tag("hotspot"), Num(hw?.GpuHotSpot), "°C", "100", TempTone(hw?.GpuHotSpot, 95, 105))); break;
+                case OverlayMetric.GpuHotSpot: group.Cells.Add(new(Tag("hot"), Num(hw?.GpuHotSpot), "°C", "100", TempTone(hw?.GpuHotSpot, 95, 105))); break;
                 case OverlayMetric.GpuClock: group.Cells.Add(new(Tag(""), Num(hw?.GpuClockMhz), Units.MHz, "0000")); break;
                 case OverlayMetric.GpuPower: group.Cells.Add(new(Tag(""), Num(hw?.GpuPower), "W", "000")); break;
                 case OverlayMetric.GpuFan: group.Cells.Add(new(Tag("fan"), Num(hw?.GpuFanRpm), Units.Rpm, "0000")); break;
