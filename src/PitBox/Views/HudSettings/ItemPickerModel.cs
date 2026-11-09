@@ -57,6 +57,14 @@ internal sealed class ItemPickerModel
 
     public IReadOnlyList<string> Values => Lanes.Select(l => string.Join(",", l)).ToList();
 
+    public static string KeepUnoffered(string picked, string stored, Func<string, bool> offered)
+    {
+        var ids = Split(picked).ToList();
+        foreach (var id in Split(stored))
+            if (!offered(id) && !ids.Contains(id)) ids.Add(id);
+        return string.Join(",", ids);
+    }
+
     public static IEnumerable<string> Split(string value) => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     public static bool Matches(HudChoice c, string query)

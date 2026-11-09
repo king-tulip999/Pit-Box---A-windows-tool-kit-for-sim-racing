@@ -1019,7 +1019,11 @@ internal sealed class HudHost : IDisposable
         if (!Trial(config, race, width, FitTall).Clean)
         {
             float wide = Math.Min((float)HudWidgetConfig.MaxSize, width * 2);
-            if (!Trial(config, race, wide, FitTall).Clean) return stored;
+            if (!Trial(config, race, wide, FitTall).Clean)
+            {
+                wide = (float)HudWidgetConfig.MaxSize;
+                if (wide <= width || !Trial(config, race, wide, FitTall).Clean) return stored;
+            }
             width = Smallest(width, wide, x => Trial(config, race, x, FitTall).Clean);
         }
         float height = Smallest(minH, FitTall, y => Trial(config, race, width, y).Clean);

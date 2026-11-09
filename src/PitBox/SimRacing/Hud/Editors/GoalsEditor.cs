@@ -21,11 +21,5 @@ internal static class GoalsEditor
                 O("totalLaps") with { ShowIf = o => o.Columns("goals").Contains("total") },
                 O("minutes") with { ShowIf = o => o.Columns("goals").Contains("minutes") }),
         },
-        Presets = new HudPreset[]
-        {
-            new(HudPreset.Minimal, V(("goals", "clean"))),
-            new(HudPreset.Standard, V()),
-            new(HudPreset.Everything, V(("goals", "clean,consistent,near,under,total,minutes"), ("races", true))),
-        },
     };
 }

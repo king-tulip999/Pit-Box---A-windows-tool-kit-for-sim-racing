@@ -19,11 +19,5 @@ internal static class SessionEditor
             })),
         },
         Regions = new Dictionary<string, string> { ["progress"] = "progress" },
-        Presets = new HudPreset[]
-        {
-            new(HudPreset.Minimal, V(("fields", "remain,pos"), ("progress", false))),
-            new(HudPreset.Standard, V()),
-            new(HudPreset.Everything, V(("fields", "remain,lapsleft,elapsed,lap,pos,cpos,phase,track,temps,trend,inc,irchange,offtracks,consistency,clock,finish"))),
-        },
     };
 }

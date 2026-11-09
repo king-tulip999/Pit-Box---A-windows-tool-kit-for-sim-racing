@@ -552,7 +552,7 @@ internal static class Ui
         HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(labelWidth, 0, 0, 6),
     };
 
-    public static Border Dialog(MainWindow window, string title, string subtitle, UIElement content, StackPanel buttons, TextBlock? error = null, double width = 518, FrameworkElement? leftAction = null)
+    public static Border Dialog(IModalHost window, string title, string subtitle, UIElement content, StackPanel buttons, TextBlock? error = null, double width = 518, FrameworkElement? leftAction = null)
     {
         var stack = new StackPanel();
         var heading = Text(title, "H2");
@@ -600,7 +600,7 @@ internal static class Ui
         };
     }
 
-    public static StackPanel DialogButtons(MainWindow window, string saveText, Func<bool> save)
+    public static StackPanel DialogButtons(IModalHost window, string saveText, Func<bool> save)
     {
         var buttons = new StackPanel();
         var cancel = new Button { Content = "Cancel", Margin = AfterButton };

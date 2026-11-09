@@ -100,8 +100,51 @@ internal static class HudSheet
             }
 
             var fuel = HudCatalog.Find("fuel")!;
-            Save(fuel, fuel.W, 150, Path.Combine(dir, "fuel-pitexit.png"), 1, ("parts", "header,pitexit"));
+            Save(fuel, fuel.W, 150, Path.Combine(dir, "fuel-pitexit.png"), 1, ("parts", "header,figures"), ("head", "togo,pitexit,stops,add"), ("top", "pitexit,level,laps"));
             Save(fuel, fuel.W, 150, Path.Combine(dir, "fuel-save.png"), 1, ("parts", "header,save,undercut"));
+            var everyFuel = new[]
+            {
+                ("parts", "header,gauge,plan,save,figures,undercut,table,grid"), ("head", "togo,nextpit,stops,pitby,add,pitexit,level"),
+                ("gridRows", "curr,avg,max,min,last"), ("top", "level,perlap,togo,laps,add,stops,window,pitexit,atflag,surplus,tofinish,max,last,time"),
+            };
+            foreach (var (look, columns) in new[] { ("full", "1"), ("full", "2"), ("full", "3"), ("compact", "3") })
+            {
+                var options = everyFuel.Append(("columns", columns)).Append(("exitLook", look)).ToArray();
+                var size = Fitted(fuel, options);
+                Save(fuel, size.Width, size.Height, Path.Combine(dir, $"fuel-every-{look}-{columns}col.png"), 1, options);
+            }
+
+            SizeF Fitted(HudWidgetDef def, (string Key, string Value)[] options)
+            {
+                var config = new HudWidgetConfig { Id = "fit-" + def.Kind, Kind = def.Kind };
+                foreach (var (key, value) in options) config.Options[key] = value;
+                using var fit = new HudPainter { Overflow = new() };
+                using var surface = new PitBox.Overlay.DibSurface();
+                var widget = def.Create();
+                bool Clean(float w, float h)
+                {
+                    var g = surface.Ensure(new Size((int)Math.Ceiling(w), (int)Math.Ceiling(h)));
+                    fit.Simulated = true;
+                    fit.IsPreview = true;
+                    fit.Begin(g, 1, new SizeF(w, h), palette, settings.Appearance);
+                    widget.Draw(fit, new HudView { Frame = race.Frame, Race = race, Settings = settings, Config = config, Options = new HudOptions(def, config), Def = def });
+                    fit.FinishPanels();
+                    return fit.Overflow!.Count == 0 && !fit.Spilled && fit.MinWidth <= w + 0.5f;
+                }
+                const float Tall = 2400;
+                Clean((float)def.W, Tall);
+                float width = Math.Max((float)def.W, fit.MinWidth);
+                Clean(width, Tall);
+                width = Math.Max(width, fit.MinWidth);
+                float lo = (float)def.MinH, hi = Tall;
+                while (hi - lo > 1)
+                {
+                    float mid = MathF.Round((lo + hi) / 2);
+                    if (mid <= lo || mid >= hi) break;
+                    if (Clean(width, mid)) hi = mid; else lo = mid;
+                }
+                return new SizeF(width, MathF.Ceiling(hi));
+            }
 
             foreach (var kind in new[] { "relative", "standings", "fuel" })
                 Save(HudCatalog.Find(kind)!, HudCatalog.Find(kind)!.W, HudCatalog.Find(kind)!.H, Path.Combine(dir, kind + "@150.png"), 1.5f);

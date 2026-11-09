@@ -11,6 +11,18 @@ internal sealed class ResultWidget : HudWidget
     public const string AllParts = "checker,gain,class,car,ribbon,name,carname,track,rating,incidents,awards,best,average,consistency,laps,time,strip";
     public const string Card = "card", Banner = "banner", Stamp = "stamp", Story = "story";
 
+    private static readonly HashSet<string> BannerParts = new(StringComparer.OrdinalIgnoreCase) { "gain", "car", "ribbon", "name", "carname", "track", "best", "average", "consistency", "incidents", "laps", "time", "strip" };
+    private static readonly HashSet<string> StampParts = new(StringComparer.OrdinalIgnoreCase) { "gain", "ribbon", "best", "average", "incidents", "consistency", "strip" };
+    private static readonly HashSet<string> StoryParts = new(StringComparer.OrdinalIgnoreCase) { "gain", "name", "carname", "track", "best", "average", "consistency", "laps", "incidents", "time" };
+
+    public static bool Offers(string look, string part) => look switch
+    {
+        Banner => BannerParts.Contains(part),
+        Stamp => StampParts.Contains(part),
+        Story => StoryParts.Contains(part),
+        _ => true,
+    };
+
     public static IReadOnlyList<HudOption> Options { get; } = new[]
     {
         HudOption.Choice("look", "Look", Card,
@@ -68,7 +80,13 @@ internal sealed class ResultWidget : HudWidget
 
     internal static double ConsistencyShare(double grade) => Math.Clamp(grade / 100, 0, 1);
 
-    private readonly record struct Result(FinishCard Card, int Finish, bool Overall, Color Tier, Color Ink, string Name);
+    private readonly record struct Result(FinishCard Card, int Finish, bool Overall, Color Tier, Color Ink, string Name, IReadOnlyList<string> Show)
+    {
+        public bool Has(string part) => Show.Contains(part);
+    }
+
+    private static string CarAndTrack(Result r) =>
+        string.Join(" · ", new[] { r.Has("carname") ? r.Card.Car : null, r.Has("track") ? r.Card.Place : null }.Where(t => !string.IsNullOrEmpty(t)));
 
     public override void Draw(HudPainter p, HudView v)
     {
@@ -84,7 +102,7 @@ internal sealed class ResultWidget : HudWidget
         bool overall = v.Options.Choice("position") == "overall" && card.Overall is > 0;
         int finish = overall ? card.Overall!.Value : card.Finish;
         var tier = Tier(p.P, finish, v.Options.Choice("colors") == "finish");
-        var r = new Result(card, finish, overall, tier, HudPalette.On(tier), RaceFormat.Name(card.Driver, v.Options.Choice("nameFormat")));
+        var r = new Result(card, finish, overall, tier, HudPalette.On(tier), RaceFormat.Name(card.Driver, v.Options.Choice("nameFormat")), v.Options.Columns("show"));
         switch (v.Options.Choice("look"))
         {
             case Banner: DrawBanner(p, r); break;
@@ -291,31 +309,41 @@ internal sealed class ResultWidget : HudWidget
         var label = p.Font(10.5f * k, true);
         p.Slant(new RectangleF(X(0), Y(0), 132 * k, 150 * k), r.Tier, 0, 0, 1, 0, 108f / 132, 1, 0, 1);
         Number(p, RaceFormat.Pos(r.Finish), 70 * k, r.Ink, X(56), Y(62), 112 * k, HAlign.Center);
-        string from = card.Start is > 0 && !r.Overall ? $"{Gain(card.Gained)} from {RaceFormat.Pos(card.Start.Value)}" : r.Overall ? "Overall" : "";
+        string from = r.Overall ? "Overall" : card.Start is > 0 && r.Has("gain") ? $"{Gain(card.Gained)} from {RaceFormat.Pos(card.Start.Value)}" : "";
         if (from.Length > 0) Label(p, from, X(54), Y(110), 104 * k, r.Ink, p.Font(11 * k, true), HAlign.Center);
-        if (HudArt.Car(card.Car) is { } picture) p.Picture(picture, new RectangleF(X(150), Y(58), 196 * k, 72 * k));
-        string name = r.Name.ToUpperInvariant();
-        float namePx = 26 * k, nameW = p.DisplaySize(name, namePx).Width;
-        if (nameW > 230 * k) { namePx *= 230 * k / nameW; nameW = 230 * k; }
-        Number(p, name, namePx, p.P.Heading, X(136), Y(22), 236 * k);
-        if (card.Awards.Count > 0)
+        if (r.Has("car") && HudArt.Car(card.Car) is { } picture) p.Picture(picture, new RectangleF(X(150), Y(58), 196 * k, 72 * k));
+        float nameW = 0;
+        if (r.Has("name"))
+        {
+            string name = r.Name.ToUpperInvariant();
+            float namePx = 26 * k;
+            nameW = p.DisplaySize(name, namePx).Width;
+            if (nameW > 230 * k) { namePx *= 230 * k / nameW; nameW = 230 * k; }
+            Number(p, name, namePx, p.P.Heading, X(136), Y(22), 236 * k);
+        }
+        if (r.Has("ribbon") && card.Awards.Count > 0)
         {
             string tag = p.LabelText(RaceResult.Name(card.Awards[0]));
             float tagW = p.Measure(tag, label) + 14 * k;
-            var box = new RectangleF(X(144) + nameW, Y(13), tagW, 18 * k);
+            var box = new RectangleF(nameW > 0 ? X(144) + nameW : X(137), Y(13), tagW, 18 * k);
             if (box.Right < X(370))
             {
                 p.Fill(box, HudPalette.Alpha(r.Tier, 77));
                 p.Text(tag, label, p.P.Heading, box, HAlign.Center, VAlign.Center, false);
             }
         }
-        p.Text($"{card.Car} · {card.Place}", p.Font(11.5f * k, false), p.P.Muted, new RectangleF(X(137), Y(42) - 8 * k, 236 * k, 16 * k), HAlign.Left, VAlign.Center);
-        Stat(0, "Best lap", RaceFormat.LapTime(card.Best));
-        Stat(1, "Avg clean", RaceFormat.LapTime(card.AverageClean));
-        Stat(2, "Consistency", card.Consistency is { } g ? g.ToString("0.0", CultureInfo.InvariantCulture) + "%" : RaceFormat.Missing);
-        Stat(3, "Incidents", card.Incidents is { } inc ? inc + "x" : RaceFormat.Missing);
-        Label(p, $"{RaceFormat.Count(card.Laps.Count, "lap")} · {RaceFormat.Count(card.PitStops, "stop")} · {RaceFormat.Clock(card.RaceTime)}", X(380), Y(124), 188 * k, p.P.Muted, label);
-        LapStrip(p, new RectangleF(X(132), Y(140), 448 * k, 10 * k), card, r.Tier);
+        string carTrack = CarAndTrack(r);
+        if (carTrack.Length > 0) p.Text(carTrack, p.Font(11.5f * k, false), p.P.Muted, new RectangleF(X(137), Y(42) - 8 * k, 236 * k, 16 * k), HAlign.Left, VAlign.Center);
+        int slot = 0;
+        if (r.Has("best")) Stat(slot++, "Best lap", RaceFormat.LapTime(card.Best));
+        if (r.Has("average")) Stat(slot++, "Avg clean", RaceFormat.LapTime(card.AverageClean));
+        if (r.Has("consistency")) Stat(slot++, "Consistency", card.Consistency is { } g ? g.ToString("0.0", CultureInfo.InvariantCulture) + "%" : RaceFormat.Missing);
+        if (r.Has("incidents")) Stat(slot, "Incidents", card.Incidents is { } inc ? inc + "x" : RaceFormat.Missing);
+        var totals = new List<string>();
+        if (r.Has("laps")) { totals.Add(RaceFormat.Count(card.Laps.Count, "lap")); totals.Add(RaceFormat.Count(card.PitStops, "stop")); }
+        if (r.Has("time")) totals.Add(RaceFormat.Clock(card.RaceTime));
+        if (totals.Count > 0) Label(p, string.Join(" · ", totals), X(380), Y(124), 188 * k, p.P.Muted, label);
+        if (r.Has("strip")) LapStrip(p, new RectangleF(X(132), Y(140), 448 * k, 10 * k), card, r.Tier);
 
         void Stat(int i, string name, string value)
         {
@@ -341,27 +369,41 @@ internal sealed class ResultWidget : HudWidget
         p.Display(pos, px, r.Ink, new RectangleF(pad - 2 * k, 0, room + 2 * k, block), HAlign.Left, VAlign.Center);
         p.Fill(new RectangleF(colX - 10 * k, pad, 1, block - 2 * pad), HudPalette.Alpha(r.Ink, 77));
         float lh = p.LineHeight(label);
-        if (!r.Overall && card.Gained is { } gained)
+        if (!r.Overall && r.Has("gain") && card.Gained is { } gained)
         {
             Label(p, "Gained", colX, pad + 3 * k, 80 * k, r.Ink, label);
             Number(p, Gain(gained), 26 * k, r.Ink, colX, pad + 26 * k, 80 * k);
             Label(p, $"{RaceFormat.Pos(card.Start ?? 0)} to {RaceFormat.Pos(card.Finish)}", colX, pad + 47 * k, 80 * k, r.Ink, label);
         }
         else Label(p, r.Overall ? "Overall" : "Finished", colX, pad + 3 * k, 80 * k, r.Ink, label);
-        if (card.Awards.Count > 0) Label(p, RaceResult.Name(card.Awards[0]), colX, block - pad - lh / 2 + 2 * k, 80 * k, r.Ink, label);
+        if (r.Has("ribbon") && card.Awards.Count > 0) Label(p, RaceResult.Name(card.Awards[0]), colX, block - pad - lh / 2 + 2 * k, 80 * k, r.Ink, label);
         float ly = block + 18 * k, vy = block + 40 * k;
-        Label(p, "Best lap", pad, ly, 84 * k, p.P.Muted, label);
-        Number(p, RaceFormat.LapTime(card.Best), 20 * k, p.P.Heading, pad, vy, 84 * k);
-        Label(p, "Avg clean", 98 * k, ly, 84 * k, p.P.Muted, label);
-        Number(p, RaceFormat.LapTime(card.AverageClean), 20 * k, p.P.Heading, 98 * k, vy, 84 * k);
-        Label(p, "Inc", w - pad, ly, 40 * k, p.P.Muted, label, HAlign.Right);
-        Number(p, card.Incidents is { } inc ? inc + "x" : RaceFormat.Missing, 20 * k, p.P.Heading, w - pad, vy, 40 * k, HAlign.Right);
+        float lapX = pad;
+        if (r.Has("best"))
+        {
+            Label(p, "Best lap", lapX, ly, 84 * k, p.P.Muted, label);
+            Number(p, RaceFormat.LapTime(card.Best), 20 * k, p.P.Heading, lapX, vy, 84 * k);
+            lapX = 98 * k;
+        }
+        if (r.Has("average"))
+        {
+            Label(p, "Avg clean", lapX, ly, 84 * k, p.P.Muted, label);
+            Number(p, RaceFormat.LapTime(card.AverageClean), 20 * k, p.P.Heading, lapX, vy, 84 * k);
+        }
+        if (r.Has("incidents"))
+        {
+            Label(p, "Inc", w - pad, ly, 40 * k, p.P.Muted, label, HAlign.Right);
+            Number(p, card.Incidents is { } inc ? inc + "x" : RaceFormat.Missing, 20 * k, p.P.Heading, w - pad, vy, 40 * k, HAlign.Right);
+        }
         float cy = block + 62 * k;
-        string grade = card.Consistency is { } g ? $"Consistency {g.ToString("0.0", CultureInfo.InvariantCulture)}%" : "Consistency " + RaceFormat.Missing;
-        float gw = p.Measure(p.LabelText(grade), label);
-        Label(p, grade, pad, cy, gw + 4, p.P.Muted, label);
-        if (card.Consistency is { } m) Meter(p, new RectangleF(pad + gw + 10 * k, cy - 3 * k, w - pad - (pad + gw + 10 * k), 6 * k), ConsistencyShare(m), r.Tier, 8);
-        LapStrip(p, RectangleF.FromLTRB(pad, cy + 10 * k, w - pad, b.Height - pad), card, r.Tier);
+        if (r.Has("consistency"))
+        {
+            string grade = card.Consistency is { } g ? $"Consistency {g.ToString("0.0", CultureInfo.InvariantCulture)}%" : "Consistency " + RaceFormat.Missing;
+            float gw = p.Measure(p.LabelText(grade), label);
+            Label(p, grade, pad, cy, gw + 4, p.P.Muted, label);
+            if (card.Consistency is { } m) Meter(p, new RectangleF(pad + gw + 10 * k, cy - 3 * k, w - pad - (pad + gw + 10 * k), 6 * k), ConsistencyShare(m), r.Tier, 8);
+        }
+        if (r.Has("strip")) LapStrip(p, RectangleF.FromLTRB(pad, cy + 10 * k, w - pad, b.Height - pad), card, r.Tier);
     }
 
     private static void DrawStory(HudPainter p, Result r)
@@ -379,10 +421,11 @@ internal sealed class ResultWidget : HudWidget
         p.Display(pos, 44 * k, r.Ink, block, HAlign.Center, VAlign.Center);
         float textX = block.Right + 12 * k, textW = X(W - 70) - textX;
         var nameFont = p.Font(20 * k, true);
-        p.Text(r.Name, nameFont, p.P.Heading, new RectangleF(textX, Y(26) - p.LineHeight(nameFont) / 2, textW, p.LineHeight(nameFont)), HAlign.Left, VAlign.Center);
+        if (r.Has("name")) p.Text(r.Name, nameFont, p.P.Heading, new RectangleF(textX, Y(26) - p.LineHeight(nameFont) / 2, textW, p.LineHeight(nameFont)), HAlign.Left, VAlign.Center);
         var small = p.Font(12 * k, false);
-        p.Text($"{card.Car} · {card.Place}", small, p.P.Muted, new RectangleF(textX, Y(48) - p.LineHeight(small) / 2, textW, p.LineHeight(small)), HAlign.Left, VAlign.Center);
-        if (!r.Overall && card.Gained is { } gained)
+        string carTrack = CarAndTrack(r);
+        if (carTrack.Length > 0) p.Text(carTrack, small, p.P.Muted, new RectangleF(textX, Y(48) - p.LineHeight(small) / 2, textW, p.LineHeight(small)), HAlign.Left, VAlign.Center);
+        if (!r.Overall && r.Has("gain") && card.Gained is { } gained)
         {
             Number(p, Gain(gained), 38 * k, gained > 0 ? p.P.GoodText : gained < 0 ? p.P.DangerText : p.P.Muted, X(W - 12), Y(30), 70 * k, HAlign.Right);
             Label(p, $"From {RaceFormat.Pos(card.Start ?? 0)}", X(W - 12), Y(56), 80 * k, p.P.Muted, label, HAlign.Right);
@@ -402,7 +445,7 @@ internal sealed class ResultWidget : HudWidget
                 p.Line(chart.X, y, chart.Right, y, p.P.Line);
                 p.Text(RaceFormat.Clock(t), tick, p.P.Faint, new RectangleF(chart.X - 40 * k, y - p.LineHeight(tick) / 2, 36 * k, p.LineHeight(tick)), HAlign.Right, VAlign.Center, false);
             }
-            if (card.AverageClean is { } avg)
+            if (r.Has("average") && card.AverageClean is { } avg)
             {
                 p.Line(chart.X, YOf(avg), chart.Right, YOf(avg), HudPalette.Alpha(p.P.Muted, 204));
                 Label(p, $"Avg {RaceFormat.LapTime(avg)}", chart.Right - 4 * k, YOf(avg) + 9 * k, 120 * k, p.P.Muted, label, HAlign.Right);
@@ -420,17 +463,25 @@ internal sealed class ResultWidget : HudWidget
             int bestIndex = 0;
             for (int i = 0; i < laps.Count; i++) if (laps[i].Clean && Math.Abs(laps[i].Time - best) < Math.Abs(laps[bestIndex].Time - best)) bestIndex = i;
             float bx = XOf(bestIndex), by = YOf(best);
-            p.Fill(new RectangleF(bx - 4 * k, by - 4 * k, 8 * k, 8 * k), p.P.Heading);
-            Label(p, $"Best {RaceFormat.LapTime(best)}", bx - 8 * k, by + 12 * k, 130 * k, p.P.Heading, label, HAlign.Right);
+            if (r.Has("best"))
+            {
+                p.Fill(new RectangleF(bx - 4 * k, by - 4 * k, 8 * k, 8 * k), p.P.Heading);
+                Label(p, $"Best {RaceFormat.LapTime(best)}", bx - 8 * k, by + 12 * k, 130 * k, p.P.Heading, label, HAlign.Right);
+            }
             Label(p, "Lap 1", chart.X, chart.Bottom + 10 * k, 60 * k, p.P.Faint, label);
             Label(p, laps.Count.ToString(CultureInfo.InvariantCulture), chart.Right, chart.Bottom + 10 * k, 60 * k, p.P.Faint, label, HAlign.Right);
         }
 
-        Stat(12, "Consistency", card.Consistency is { } g ? g.ToString("0.0", CultureInfo.InvariantCulture) + "%" : RaceFormat.Missing, HAlign.Left);
-        Stat(128, "Laps", laps.Count.ToString(CultureInfo.InvariantCulture), HAlign.Left);
-        Stat(210, "Stops", card.PitStops.ToString(CultureInfo.InvariantCulture), HAlign.Left);
-        Stat(292, "Inc", card.Incidents is { } inc ? inc + "x" : RaceFormat.Missing, HAlign.Left);
-        Stat(W - 12, "Time", RaceFormat.Clock(card.RaceTime), HAlign.Right);
+        float[] slots = { 12, 128, 210, 292 };
+        int slot = 0;
+        if (r.Has("consistency")) Stat(slots[slot++], "Consistency", card.Consistency is { } g ? g.ToString("0.0", CultureInfo.InvariantCulture) + "%" : RaceFormat.Missing, HAlign.Left);
+        if (r.Has("laps"))
+        {
+            Stat(slots[slot++], "Laps", laps.Count.ToString(CultureInfo.InvariantCulture), HAlign.Left);
+            Stat(slots[slot++], "Stops", card.PitStops.ToString(CultureInfo.InvariantCulture), HAlign.Left);
+        }
+        if (r.Has("incidents")) Stat(slots[slot], "Inc", card.Incidents is { } inc ? inc + "x" : RaceFormat.Missing, HAlign.Left);
+        if (r.Has("time")) Stat(W - 12, "Time", RaceFormat.Clock(card.RaceTime), HAlign.Right);
 
         void Stat(float x, string name, string value, HAlign align)
         {

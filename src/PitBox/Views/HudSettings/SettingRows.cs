@@ -19,8 +19,6 @@ internal sealed class HudSettingContext
     public required IReadOnlyList<string> KnownClasses { get; init; }
     public Action? Rebuild { get; init; }
     public Func<string, IReadOnlyList<IReadOnlyDictionary<string, string>>, IReadOnlyList<System.Windows.Media.ImageSource>?>? Pictures { get; init; }
-    public Dictionary<string, ItemPicker> Pickers { get; } = new(StringComparer.OrdinalIgnoreCase);
-    public Action<string, string?>? HoverItem { get; init; }
     public HudOptions Options => new(Def, W);
     public HudOption Option(string key) => Def.Option(key) ?? throw new InvalidOperationException($"{Def.Kind} has no option {key}");
     public void SetOne(string key, string? value) => Set(new Dictionary<string, string?> { [key] = value });
@@ -34,8 +32,7 @@ internal static class SettingRows
 
     public static FrameworkElement Build(HudSetting s, HudSettingContext c, string? groupTitle = null) => s switch
     {
-        PickerSetting p => Picker(p, c, groupTitle),
-        LanesSetting l => Lanes(l, c, groupTitle),
+        PickerSetting or LanesSetting => throw new ArgumentException("Lists of items are edited in the widget panel", nameof(s)),
         MergedSetting m => Merged(m, c),
         TogglesSetting t => Row(t.Label ?? t.Title, t.Help, true, Toggles(t.Toggles.Select(k => (k, c.Option(k).Label, c.Option(k).Help)).ToList(), k => c.Options.Bool(k), (k, on) => c.SetOne(k, on ? "true" : "false"))),
         ClassFilterSetting => ClassFilter(c),
@@ -65,7 +62,15 @@ internal static class SettingRows
         control.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(control, 1);
         grid.Children.Add(control);
-        if (help is not null && inlineHelp)
+        if (help is not null && inlineHelp && HelpTip.IsList(help))
+        {
+            var list = HelpTip.List(help);
+            list.Margin = new Thickness(0, 8, 0, 6);
+            Grid.SetRow(list, 1);
+            Grid.SetColumnSpan(list, 2);
+            grid.Children.Add(list);
+        }
+        else if (help is not null && inlineHelp)
         {
             var text = new TextBlock { Text = help, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 2) };
             Grid.SetColumn(text, 1);
@@ -83,7 +88,7 @@ internal static class SettingRows
         switch (o.Kind)
         {
             case HudOptionKind.Columns:
-                return Picker(new PickerSetting(s.Key, FieldSettings.NoCategories) { Label = s.Label }, c);
+                throw new ArgumentException("Lists of items are edited in the widget panel", nameof(s));
             case HudOptionKind.Set:
                 var on = current.Split(',', StringSplitOptions.RemoveEmptyEntries).ToHashSet();
                 return Row(label, o.Help, true, Toggles(o.Choices.Select(ch => (ch.Id, ch.Label, ch.Help)).ToList(), id => on.Contains(id), (id, now) =>
@@ -181,6 +186,11 @@ internal static class SettingRows
             box.Click += (_, _) => changed(id, box.IsChecked == true);
             panel.Children.Add(box);
         }
+        panel.Loaded += (_, _) =>
+        {
+            double widest = panel.Children.OfType<FrameworkElement>().Select(child => child.DesiredSize.Width).DefaultIfEmpty(0).Max();
+            if (widest > 0 && Math.Abs(panel.ItemWidth - widest) > 0.5) panel.ItemWidth = Math.Ceiling(widest);
+        };
         return panel;
     }
 
@@ -208,30 +218,6 @@ internal static class SettingRows
         }
         Render();
         return PictureRow(m.Label ?? m.Title, m.Help, host);
-    }
-
-    private static bool Repeats(string title, string? groupTitle) => string.Equals(title, groupTitle, StringComparison.OrdinalIgnoreCase);
-
-    private static FrameworkElement Picker(PickerSetting p, HudSettingContext c, string? groupTitle = null)
-    {
-        var o = c.Option(p.Key);
-        string title = p.Label ?? o.Label;
-        var picker = new ItemPicker(title, o.Help, o.Choices, p.Categories,
-            new[] { new PickerLane(p.Key, null, c.Options.Value(p.Key), o.Default) },
-            values => c.SetOne(p.Key, values[0]), !Repeats(title, groupTitle)) { HoverItem = c.HoverItem };
-        c.Pickers[p.Key] = picker;
-        return picker;
-    }
-
-    private static FrameworkElement Lanes(LanesSetting l, HudSettingContext c, string? groupTitle)
-    {
-        var first = c.Option(l.Lanes[0].Key);
-        var lanes = l.Lanes.Select(x => new PickerLane(x.Key, x.Lane, c.Options.Value(x.Key), c.Option(x.Key).Default)).ToList();
-        string title = l.Label ?? l.Title;
-        var picker = new ItemPicker(title, l.Help ?? "Bars above and below the widget. Drag items in the preview to reorder them or move them between bars.", first.Choices, l.Categories, lanes,
-            values => c.Set(l.Lanes.Select((x, i) => (x.Key, values[i])).ToDictionary(v => v.Key, v => (string?)v.Item2, StringComparer.OrdinalIgnoreCase)), !Repeats(title, groupTitle)) { HoverItem = c.HoverItem };
-        foreach (var x in l.Lanes) c.Pickers[x.Key] = picker;
-        return picker;
     }
 
     private static FrameworkElement ClassFilter(HudSettingContext c)

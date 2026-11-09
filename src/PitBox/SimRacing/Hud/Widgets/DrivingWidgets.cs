@@ -159,7 +159,7 @@ internal sealed class FuelWidget : HudWidget
 {
     private static readonly HudChoice[] Figures =
     {
-        new("level", "Fuel in the tank"), new("perlap", "Per lap (average)"), new("last", "Last lap"),
+        new("level", "Fuel in the tank"), new("perlap", "Per lap (average)"), new("last", "Last lap"), new("pitexit", "Pit exit position", PitExitHelp),
         new("max", "Most on one lap"), new("laps", "Laps it lasts"), new("time", "Time it lasts"),
         new("tofinish", "Needed to the flag"), new("surplus", "Spare / short at the flag"), new("atflag", "Left at the flag (expected)"),
         new("add", "Add at the next stop"), new("stops", "Stops left"), new("window", "Pit window"), new("togo", "Laps to go"),
@@ -173,7 +173,6 @@ internal sealed class FuelWidget : HudWidget
         new("plan", "Plan state", "No stop, window open, pit needed… as a colored band"),
         new("figures", "Big figures", "Large numbers (Big figures shows)"),
         new("table", "Last / average / most table", "Columns of rates, rows of per lap, laps and refuel (Table columns / rows)"),
-        new("pitexit", "Pit exit", "Where a stop now would put you: class position, the nearest cars in your class ahead and behind, traffic around where you'd rejoin, and a ghost on a track strip (Pit exit and undercut look). Learns the pit lane, fill rate and tire time per track and car"),
         new("undercut", "Undercut / overcut", "Races: what you'd have to gain per lap, over 1 to 3 laps, to jump the car ahead in class by stopping first, and what the car behind needs to jump you. Green = less than your tires have dropped off this stint"),
         new("save", "Fuel saving", "What each lap may use to make the flag with one stop fewer, how much that saves per lap, and what this lap is on course for. Green target = you've already done a lap that frugal. With no stop needed: the spare per lap"),
     };
@@ -185,7 +184,7 @@ internal sealed class FuelWidget : HudWidget
         HudOption.Columns("head", "Header", "togo,nextpit,stops,pitby,add,level",
             new HudChoice("togo", "Laps to go", "Colored by how sure the estimate is"), new HudChoice("nextpit", "Next pit lap", "The lap the pit window opens (one stop then reaches the flag)"),
             new HudChoice("pitby", "Pit by lap", "The last lap before the tank runs dry"), new HudChoice("stops", "Stops left"),
-            new HudChoice("add", "Add at the next stop"), new HudChoice("level", "Fuel in the tank")),
+            new HudChoice("add", "Add at the next stop"), new HudChoice("level", "Fuel in the tank"), new HudChoice("pitexit", "Pit exit position", PitExitHelp)),
         HudOption.Columns("gridRows", "Grid rows", "curr,avg,max,min,last",
             new HudChoice("curr", "This lap", "Projected from what this lap has used so far"), new HudChoice("avg", "Average", "The rate the plan uses (clean, green laps)"),
             new HudChoice("avgN", "Average of the last laps", "Plain average of your last clean laps (Laps in the average)"),
@@ -194,6 +193,7 @@ internal sealed class FuelWidget : HudWidget
             new HudChoice("use", "Per lap"), new HudChoice("laps", "Laps it lasts"), new HudChoice("refuel", "Refuel to the flag", "What to add, in total, to reach the flag at that rate (with the plan's reserve)"),
             new HudChoice("finish", "Left at the flag", "Fuel in the tank at the flag at that rate, without stopping (negative = short)")),
         HudOption.Int("avgLaps", "Laps in the average", 5, 3, 10),
+        HudOption.Int("columns", "Columns", 1, 1, 3, null, "Sections side by side: the first column fills top to bottom, then the next, split so the columns come out about the same height"),
         HudOption.Bool("statusEdge", "Status border", false, "Green: enough to the flag. Amber: a stop to come. Red: under the low-fuel alert's laps"),
         HudOption.Bool("title", "Title row", false, "“Fuel” with how many clean laps the estimate has"),
         HudOption.Columns("top", "Big figures", "level,laps,togo,perlap", Figures),
@@ -201,25 +201,71 @@ internal sealed class FuelWidget : HudWidget
             new HudChoice("last", "Last lap"), new HudChoice("avg", "Average", "The rate the plan uses (clean, green laps)"), new HudChoice("max", "Most on one lap")),
         HudOption.Columns("rows", "Table rows", "perlap,laps,refuel",
             new HudChoice("perlap", "Per lap"), new HudChoice("laps", "Laps it lasts"), new HudChoice("refuel", "Refuel to the flag", "What to add, in total, to reach the flag at that rate (with the plan's reserve)")),
-        HudOption.Choice("exitLook", "Pit exit and undercut look", "full",
-            new HudChoice("full", "Full", "Pit exit adds a track strip: the dot is you now, the ring is where you'd rejoin"),
-            new HudChoice("compact", "Compact", "One line of values per section, no track strip; values that don't fit are left out"))
+        HudOption.Choice("exitLook", "Undercut look", "full",
+            new HudChoice("full", "Full", "A row for the car ahead and one for the car behind, with what you'd need over 1, 2 and 3 laps"),
+            new HudChoice("compact", "Compact", "One line of values; values that don't fit are left out"))
             with { Help = ExitHelp },
     };
 
     private static string ExitHelp => string.Join("\n",
-        "Pit exit: the class position you'd rejoin in if you pitted now with the fuel and tires set in your pit menu, and the places that gains or loses.",
-        "Traffic: how many cars of any class, lapped ones too, would be within " + PitExitPredictor.TrafficWindow.ToString("0.#", System.Globalization.CultureInfo.CurrentCulture) + " s ahead or behind you as you rejoin; clean air means none.",
-        "Ahead / behind: the nearest cars in your class in front of and behind you after that stop, with the gap in seconds.",
-        "≈ marks an estimate until the pit lane, fill rate and tire change time are learned for this track and car, and everything greys out under caution.",
-        "Undercut: the time per lap you'd have to gain on the car ahead in class, over 1, 2 or 3 laps, to pass it by stopping first, green when your tire drop-off covers it.",
-        "Cover: the same for the car behind in class, amber when it could pass you by stopping first.",
+        "Undercut: what you'd have to gain per lap on the car ahead in class, over 1, 2 or 3 laps, to pass it by stopping first. Green when your tire drop-off covers it.",
+        "Cover: the same for the car behind in class. Amber when it could pass you by stopping first.",
         "Tires: how much slower your last 3 laps are than your best of the first 3 this stint, once the stint has 6 clean laps.");
+
+    private const string PitExitHelp = "Where a stop now would put you in your class, with the fuel and tires set in your pit menu, and the places that gains or loses. ≈ until the pit lane, fill rate and tire change time are learned for this track and car; grey under caution";
+
+    private static (string Value, Color Color) PitExitValue(HudPainter p, HudView v)
+    {
+        var x = v.Race.PitExit;
+        if (x is not { Valid: true }) return (v.Frame.OnPitRoad ? "In pit" : RaceFormat.Missing, p.P.Faint);
+        string pos = PooledText.Number("P", x.ProjectedClassPos);
+        int change = x.CurrentClassPos - x.ProjectedClassPos;
+        if (change != 0) pos = PooledText.Concat(pos, change > 0 ? " +" : " −", PooledText.Number("", Math.Abs(change)));
+        if (!x.Calibrated) pos = RaceFormat.About(pos);
+        var color = x.Unreliable ? p.P.Faint : change > 0 ? p.P.GoodText : change < 0 ? p.P.DangerText : p.P.Heading;
+        return (pos, color);
+    }
 
     private readonly List<(string Id, string Label, string Value, Color? Color)> _top = new();
     private readonly List<(string Label, string Value, Color? Color)> _line = new();
 
     private static bool Compact(HudView v) => v.Options.Choice("exitLook") == "compact";
+
+    private const float ColumnMin = 300;
+
+    private readonly List<string> _shown = new();
+    private readonly List<(string Label, string Value, Color Color, bool Dot, float Natural)> _head = new();
+    private readonly List<float> _heights = new();
+    private int _columns = 1;
+    private float _columnWidth;
+
+    internal static void SplitColumns(ReadOnlySpan<float> heights, int columns, float gap, Span<int> column)
+    {
+        int n = heights.Length;
+        column.Clear();
+        columns = Math.Clamp(columns, 1, Math.Max(1, Math.Min(3, n)));
+        if (columns == 1) return;
+        float best = float.MaxValue;
+        int bestA = n, bestB = n;
+        for (int a = 1; a < n; a++)
+        {
+            int from = columns == 3 ? a + 1 : n, to = columns == 3 ? n - 1 : n;
+            for (int b = from; b <= to; b++)
+            {
+                float tall = Math.Max(Stack(heights[..a], gap), Math.Max(Stack(heights[a..b], gap), Stack(heights[b..], gap)));
+                if (tall < best - 0.01f) { best = tall; bestA = a; bestB = b; }
+            }
+        }
+        for (int i = 0; i < n; i++) column[i] = i < bestA ? 0 : i < bestB ? 1 : 2;
+    }
+
+    private static float Stack(ReadOnlySpan<float> heights, float gap)
+    {
+        if (heights.Length == 0) return 0;
+        float sum = gap * (heights.Length - 1);
+        foreach (float h in heights) sum += h;
+        return sum;
+    }
 
     private enum Status { Safe, Caution, Danger }
 
@@ -251,41 +297,61 @@ internal sealed class FuelWidget : HudWidget
         double lowLaps = r.Alerts.Threshold("fuel.low");
         var status = StatusOf(plan, lowLaps);
         Color? edge = v.Options.Bool("statusEdge") ? HudPalette.Alpha(status switch { Status.Danger => p.P.Danger, Status.Caution => p.P.Warn, _ => p.P.Good }, 170) : null;
-        var area = new RectangleF(pad, top + partPad, bounds.Width - pad * 2, bounds.Height - top - partPad * 2);
         var parts = v.Options.Columns("parts");
-        float edgeTop = float.NaN, edgeBottom = 0;
-        for (int i = 0; i < parts.Count; i++)
+        _shown.Clear();
+        _heights.Clear();
+        _columns = Math.Clamp(v.Options.Int("columns"), 1, 3);
+        float columnGap = p.PieceGap;
+        _columnWidth = (bounds.Width - columnGap * (_columns - 1)) / _columns;
+        if (_columns > 1) p.NeedWidth(_columns * ColumnMin * p.Density + columnGap * (_columns - 1));
+        foreach (var part in parts)
         {
-            float need = Height(parts[i], p, v);
-            if (need <= 0) continue;
-            if (area.Height < need - 0.5f)
-            {
-                for (int k = i; k < parts.Count; k++) p.Overflow?.Add(("parts", parts[k]));
-                break;
-            }
-            float h = i == parts.Count - 1 && parts[i] is "grid" or "table" ? area.Height : Math.Min(area.Height, Natural(parts[i], p, v));
-            var box = area.Top(h, out area);
-            p.Item("parts", parts[i], box);
-            if (parts[i] is "pitexit" or "undercut") p.Region("exitLook", box);
-            var piece = new RectangleF(0, box.Y - partPad, bounds.Width, box.Height + partPad * 2);
-            p.Panel(piece);
-            if (float.IsNaN(edgeTop)) edgeTop = piece.Y;
-            edgeBottom = piece.Bottom;
-            switch (parts[i])
-            {
-                case "header": HeaderLine(p, v, box, level, plan); break;
-                case "gauge": Gauge(p, v, box, level, plan, status); break;
-                case "grid": Grid(p, v, box, level, plan); break;
-                case "plan": PlanBand(p, v, box, plan, measured); break;
-                case "figures": Figures_(p, v, box, level, plan, lowLaps); break;
-                case "table": TablePart(p, v, box, level, plan); break;
-                case "pitexit": if (Compact(v)) PitExitLine(p, v, box); else PitExitPart(p, v, box); break;
-                case "undercut": if (Compact(v)) UndercutLine(p, v, box); else UndercutPart(p, v, box); break;
-                case "save": SavePart(p, v, box, level, plan); break;
-            }
-            area = new RectangleF(area.X, area.Y + gap, area.Width, Math.Max(0, area.Height - gap));
+            if (Height(part, p, v) <= 0) continue;
+            _shown.Add(part);
+            _heights.Add(Natural(part, p, v));
         }
-        if (edge is { } c && !float.IsNaN(edgeTop)) p.Outline(new RectangleF(0, edgeTop, bounds.Width, edgeBottom - edgeTop).Inflated(-1, -1), c, 2, p.CornerRadius(4));
+        Span<int> columnOf = stackalloc int[Math.Max(1, _shown.Count)];
+        SplitColumns(System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_heights), _columns, gap, columnOf);
+        float edgeTop = float.NaN, edgeBottom = 0;
+        for (int c = 0; c < _columns; c++)
+        {
+            float x0 = c * (_columnWidth + columnGap);
+            var area = new RectangleF(x0 + pad, top + partPad, _columnWidth - pad * 2, bounds.Height - top - partPad * 2);
+            int last = -1;
+            for (int i = 0; i < _shown.Count; i++) if (columnOf[i] == c) last = i;
+            for (int i = 0; i < _shown.Count; i++)
+            {
+                if (columnOf[i] != c) continue;
+                string part = _shown[i];
+                if (area.Height < Height(part, p, v) - 0.5f)
+                {
+                    for (int k = i; k < _shown.Count; k++) if (columnOf[k] == c) p.Overflow?.Add(("parts", _shown[k]));
+                    break;
+                }
+                float h = i == last && part is "grid" or "table" ? area.Height : Math.Min(area.Height, _heights[i]);
+                var box = area.Top(h, out area);
+                p.Item("parts", part, box);
+                if (part is "undercut") p.Region("exitLook", box);
+                float pieceTop = box.Y - partPad, pieceBottom = i == last ? bounds.Height : box.Bottom + partPad;
+                var piece = new RectangleF(x0, pieceTop, _columnWidth, pieceBottom - pieceTop);
+                p.Panel(piece);
+                edgeTop = float.IsNaN(edgeTop) ? piece.Y : Math.Min(edgeTop, piece.Y);
+                edgeBottom = Math.Max(edgeBottom, piece.Bottom);
+                switch (part)
+                {
+                    case "header": HeaderLine(p, v, box, level, plan); break;
+                    case "gauge": Gauge(p, v, box, level, plan, status); break;
+                    case "grid": Grid(p, v, box, level, plan); break;
+                    case "plan": PlanBand(p, v, box, plan, measured); break;
+                    case "figures": Figures_(p, v, box, level, plan, lowLaps); break;
+                    case "table": TablePart(p, v, box, level, plan); break;
+                    case "undercut": if (Compact(v)) UndercutLine(p, v, box); else UndercutPart(p, v, box); break;
+                    case "save": SavePart(p, v, box, level, plan); break;
+                }
+                area = new RectangleF(area.X, area.Y + gap, area.Width, Math.Max(0, area.Height - gap));
+            }
+        }
+        if (edge is { } edgeColor && !float.IsNaN(edgeTop)) p.Outline(new RectangleF(0, edgeTop, bounds.Width, edgeBottom - edgeTop).Inflated(-1, -1), edgeColor, 2, p.CornerRadius(4));
     }
 
     private static Status StatusOf(FuelPlan? plan, double lowLaps)
@@ -310,10 +376,9 @@ internal sealed class FuelWidget : HudWidget
         "grid" => v.Options.Columns("gridRows").Count == 0 || v.Options.Columns("gridCols").Count == 0 ? 0
             : p.LineHeight(p.Label) + 4 + Math.Min(2, v.Options.Columns("gridRows").Count) * (p.LineHeight(p.Body) + 4 * p.Density),
         "plan" => p.LineHeight(p.Bold) + 8 * p.Density,
-        "pitexit" => Compact(v) ? p.StripHeight : p.LineHeight(p.Label) + p.LineHeight(p.Bold) + p.LineHeight(p.Small) + 14 * p.Density,
         "save" => p.LineHeight(p.Label) + p.LineHeight(p.Bold) + 6 * p.Density,
         "undercut" => Compact(v) ? p.StripHeight : 2 * (p.LineHeight(p.Label) + p.LineHeight(p.Bold) + 4 * p.Density) + 4 * p.Density,
-        "figures" => v.Options.Columns("top").Count > 0 ? p.ValueStatHeight() : 0,
+        "figures" => FigureRows(p, v) is var (_, rows, font) && rows > 0 ? rows * p.ValueStatHeight(font) + (rows - 1) * FigureRowGap(p) : 0,
         "table" => v.Options.Columns("cols").Count == 0 || v.Options.Columns("rows").Count == 0 ? 0
             : p.LineHeight(p.Label) + 4 + (p.LineHeight(p.Bold) + 5 * p.Density + 2),
         _ => 0,
@@ -383,17 +448,16 @@ internal sealed class FuelWidget : HudWidget
         }
     }
 
-    private static void HeaderLine(HudPainter p, HudView v, RectangleF box, double level, FuelPlan? plan)
+    private void HeaderLine(HudPainter p, HudView v, RectangleF box, double level, FuelPlan? plan)
     {
         var f = v.Frame;
         var u = v.Units;
         var ids = v.Options.Columns("head");
         if (ids.Count == 0) return;
-        float cw = box.Width / ids.Count;
+        _head.Clear();
+        float total = 0, dotRoom = 3 * p.Density * 2 + 4;
         for (int i = 0; i < ids.Count; i++)
         {
-            var cell = new RectangleF(box.X + i * cw, box.Y, cw, box.Height);
-            var align = i == 0 ? HAlign.Left : i == ids.Count - 1 ? HAlign.Right : HAlign.Center;
             Color color = p.P.Heading;
             string label, value;
             bool dot = false;
@@ -432,11 +496,29 @@ internal sealed class FuelWidget : HudWidget
                     label = "ADD";
                     value = plan?.Stops is 0 ? "–" : plan?.AddAtNextStop is { } add ? RaceFormat.Fuel(add, u) : RaceFormat.Missing;
                     break;
+                case "pitexit":
+                    label = "PIT EXIT";
+                    (value, color) = PitExitValue(p, v);
+                    break;
                 default:
                     label = "TANK";
                     value = RaceFormat.Fuel(level, u);
                     break;
             }
+            string shortest = dot && value.EndsWith(" LAPS", StringComparison.Ordinal) ? value[..^5] : value;
+            float natural = Math.Max(p.Measure(p.LabelText(label), p.Label), p.Measure(shortest, p.Bold) + (dot ? dotRoom : 0)) + 10 * p.Density;
+            _head.Add((label, value, color, dot, natural));
+            total += natural;
+        }
+        NeedColumn(p, total);
+        float spare = (box.Width - total) / ids.Count, squeeze = total > box.Width ? box.Width / total : 1, at = box.X;
+        for (int i = 0; i < ids.Count; i++)
+        {
+            var (label, value, color, dot, natural) = _head[i];
+            float cw = squeeze < 1 ? natural * squeeze : natural + spare;
+            var cell = new RectangleF(at, box.Y, cw, box.Height);
+            at += cw;
+            var align = i == 0 ? HAlign.Left : i == ids.Count - 1 ? HAlign.Right : HAlign.Center;
             p.Item("head", ids[i], cell);
             float lh = p.LineHeight(p.Label);
             p.Text(p.LabelText(label), p.Label, p.LabelColor, new RectangleF(cell.X, cell.Y, cell.Width, lh), align, VAlign.Top);
@@ -454,7 +536,7 @@ internal sealed class FuelWidget : HudWidget
         }
     }
 
-    private static void Gauge(HudPainter p, HudView v, RectangleF box, double level, FuelPlan? plan, Status status)
+    private void Gauge(HudPainter p, HudView v, RectangleF box, double level, FuelPlan? plan, Status status)
     {
         var u = v.Units;
         var r = v.Race;
@@ -463,7 +545,10 @@ internal sealed class FuelWidget : HudWidget
         p.Text("TANK", p.Label, p.LabelColor, line, HAlign.Left, VAlign.Center, false);
         string middle = plan is not null ? PooledText.Concat(RaceFormat.Fuel(level, u), PooledText.Number(" · ", plan.LapsOfFuel, "0.00", System.Globalization.CultureInfo.InvariantCulture, " LAPS")) : RaceFormat.Fuel(level, u);
         p.Text(middle, p.SmallBold, p.P.Heading, line, HAlign.Center, VAlign.Center);
-        if (r.Tank is { } cap) p.Text(PooledText.Concat(RaceFormat.Fuel(cap, u), " CAP"), p.Label, p.LabelColor, line, HAlign.Right, VAlign.Center, false);
+        string capText = r.Tank is { } cap ? PooledText.Concat(RaceFormat.Fuel(cap, u), " CAP") : "";
+        if (capText.Length > 0) p.Text(capText, p.Label, p.LabelColor, line, HAlign.Right, VAlign.Center, false);
+        float side = Math.Max(p.Measure("TANK", p.Label), capText.Length > 0 ? p.Measure(capText, p.Label) : 0);
+        NeedColumn(p, p.Measure(middle, p.SmallBold) + 2 * side + 16 * p.Density);
         var track = new RectangleF(box.X, line.Bottom + 2, box.Width, 6 * p.Density);
         if (r.Tank is not { } tank || tank <= 0) return;
         var fill = status switch { Status.Danger => p.P.Danger, Status.Caution => p.P.Warn, _ => p.P.Good };
@@ -585,23 +670,55 @@ internal sealed class FuelWidget : HudWidget
         p.Number(value, p.Bold, on, right, HAlign.Right, VAlign.Center);
     }
 
-    private void Figures_(HudPainter p, HudView v, RectangleF row, double level, FuelPlan? plan, double lowLaps)
+    private static float FigureRowGap(HudPainter p) => 4 * p.Density;
+
+    private const int BigFiguresPerRow = 3;
+
+    private void NeedColumn(HudPainter p, float inner) =>
+        p.NeedWidth(_columns * (inner + 14 * p.Density) + p.PieceGap * (_columns - 1));
+
+    private (int Columns, int Rows, Font Font) FigureRows(HudPainter p, HudView v)
     {
         _top.Clear();
+        double level = v.Frame.Fuel ?? 0;
         foreach (var id in v.Options.Columns("top"))
-            if (Cell(id, p, v, level, plan) is { } c) _top.Add(c);
-        if (_top.Count == 0) return;
-        int n = Math.Max(1, Math.Min(_top.Count, (int)(row.Width / (78 * p.Density))));
-        float cw = row.Width / n;
-        for (int i = 0; i < n; i++)
+            if (Cell(id, p, v, level, v.Race.Fuel) is { } c) _top.Add(c);
+        if (_top.Count == 0) return (0, 0, p.Big);
+        float big = 0, small = 0;
+        foreach (var (_, label, value, _) in _top)
         {
+            float labelW = p.Measure(p.LabelText(label), p.Label);
+            big = Math.Max(big, Math.Max(p.Measure(value, p.Big), labelW) + 14 * p.Density);
+            small = Math.Max(small, Math.Max(p.Measure(value, p.Bold), labelW) + 14 * p.Density);
+        }
+        NeedColumn(p, small);
+        float width = Math.Max(1, (_columnWidth > 0 ? _columnWidth : p.Bounds.Width) - 14 * p.Density);
+        bool useBig = (int)(width / big) >= Math.Min(BigFiguresPerRow, _top.Count);
+        int columns = Math.Clamp((int)(width / (useBig ? big : small)), 1, _top.Count);
+        return (columns, (_top.Count + columns - 1) / columns, useBig ? p.Big : p.Bold);
+    }
+
+    private void Figures_(HudPainter p, HudView v, RectangleF row, double level, FuelPlan? plan, double lowLaps)
+    {
+        var (columns, _, font) = FigureRows(p, v);
+        if (_top.Count == 0 || columns == 0) return;
+        float statH = p.ValueStatHeight(font), rowGap = FigureRowGap(p);
+        float cw = row.Width / columns;
+        for (int i = 0; i < _top.Count; i++)
+        {
+            int line = i / columns, at = i % columns;
+            float y = row.Y + line * (statH + rowGap);
+            if (y + statH > row.Bottom + 0.5f)
+            {
+                for (int k = i; k < _top.Count; k++) p.Overflow?.Add(("top", _top[k].Id));
+                break;
+            }
             var (id, label, value, color) = _top[i];
             if (id == "laps" && plan is { } pl) color = pl.LapsOfFuel < lowLaps ? p.P.DangerText : pl.LapsOfFuel < lowLaps * 2 ? p.P.WarnText : color;
-            if (i > 0) p.Divider(row.X + i * cw, row.Y + 4, row.Bottom - 4);
-            p.ValueStat(new RectangleF(row.X + i * cw + 4, row.Y, cw - 8, row.Height), label, value, color, p.Big, HAlign.Center);
-            p.Item("top", id, new RectangleF(row.X + i * cw, row.Y, cw, row.Height));
+            if (at > 0) p.Divider(row.X + at * cw, y + 4, y + statH - 4);
+            p.ValueStat(new RectangleF(row.X + at * cw + 4, y, cw - 8, statH), label, value, color, font, HAlign.Center);
+            p.Item("top", id, new RectangleF(row.X + at * cw, y, cw, statH));
         }
-        for (int i = n; i < _top.Count; i++) p.Overflow?.Add(("top", _top[i].Id));
     }
 
     private static void TablePart(HudPainter p, HudView v, RectangleF r, double level, FuelPlan? plan)
@@ -680,72 +797,6 @@ internal sealed class FuelWidget : HudWidget
         }
     }
 
-    private static void PitExitPart(HudPainter p, HudView v, RectangleF box)
-    {
-        var f = v.Frame;
-        var x = v.Race.PitExit;
-        bool valid = x is { Valid: true }, grey = x is { Valid: true, Unreliable: true }, rough = valid && !x!.Calibrated;
-        Color strong = grey ? p.P.Faint : rough ? p.P.Muted : p.P.Heading, plain = grey ? p.P.Faint : rough ? p.P.Muted : p.P.Text;
-        string Mark(string s) => rough ? RaceFormat.About(s) : s;
-        float lh = p.LineHeight(p.Label), vh = p.LineHeight(p.Bold), sh = p.LineHeight(p.Small);
-        p.Text("PIT EXIT", p.Label, p.LabelColor, new RectangleF(box.X, box.Y, box.Width / 2, lh), HAlign.Left, VAlign.Top, false);
-        var head = new RectangleF(box.X, box.Y + lh, box.Width, vh);
-        if (!valid)
-        {
-            p.Text(f.OnPitRoad ? "In pit" : RaceFormat.Missing, p.Bold, p.P.Faint, head, HAlign.Left, VAlign.Center, false);
-        }
-        else
-        {
-            string pos = Mark("P" + x!.ProjectedClassPos.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            p.Text(pos, p.Bold, strong, head, HAlign.Left, VAlign.Center, false);
-            int change = x.CurrentClassPos - x.ProjectedClassPos;
-            if (change != 0)
-            {
-                float pw = p.Measure(pos, p.Bold) + 6 * p.Density;
-                string delta = (change > 0 ? "+" : "−") + Math.Abs(change).ToString(System.Globalization.CultureInfo.InvariantCulture);
-                p.Text(delta, p.SmallBold, grey ? p.P.Faint : change > 0 ? p.P.GoodText : p.P.DangerText, new RectangleF(head.X + pw, head.Y, head.Width / 2 - pw, head.Height), HAlign.Left, VAlign.Center, false);
-            }
-            bool clean = x.Traffic.Count == 0;
-            string tag = clean ? "CLEAN AIR" : "TRAFFIC " + x.Traffic.Count.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            float tw = p.Measure(tag, p.Label) + 12 * p.Density, th = lh + 4 * p.Density;
-            var bg = grey ? p.Raised(0.12) : clean ? p.P.GoodSoft : p.P.WarnSoft;
-            p.Pill(new RectangleF(box.Right - tw, head.Y + (vh - th) / 2, tw, th), tag, bg, p.Label, grey ? p.P.Faint : clean ? p.P.GoodText : p.P.WarnText);
-        }
-        var names = new RectangleF(box.X, head.Bottom + 2 * p.Density, box.Width, sh);
-        Neighbour(p, v, names.Left(names.Width / 2 - 4 * p.Density, out _), "AHEAD", valid ? x!.Ahead : null, HAlign.Left, plain, rough);
-        Neighbour(p, v, names.Right(names.Width / 2 - 4 * p.Density, out _), "BEHIND", valid ? x!.Behind : null, HAlign.Right, plain, rough);
-        var strip = new RectangleF(box.X, names.Bottom + 5 * p.Density, box.Width, 4 * p.Density);
-        p.Fill(strip, HudPalette.Alpha(p.P.LineStrong, 140));
-        float r = 3.5f * p.Density, cy = strip.Y + strip.Height / 2;
-        if (f.LapDistPct is { } me and >= 0) p.Dot(strip.X + (float)me * strip.Width, cy, r, grey ? p.P.Faint : p.P.Player);
-        if (valid)
-        {
-            float gx = strip.X + x!.GhostPct * strip.Width;
-            p.G.DrawEllipse(p.Pen(grey ? p.P.Faint : p.P.Heading, 1.5f), gx - r, cy - r, r * 2, r * 2);
-        }
-    }
-
-    private void PitExitLine(HudPainter p, HudView v, RectangleF box)
-    {
-        var x = v.Race.PitExit;
-        bool valid = x is { Valid: true }, grey = x is { Valid: true, Unreliable: true }, rough = valid && !x!.Calibrated;
-        Color strong = grey ? p.P.Faint : rough ? p.P.Muted : p.P.Heading, plain = grey ? p.P.Faint : rough ? p.P.Muted : p.P.Text;
-        _line.Clear();
-        if (!valid) _line.Add(("Pit exit", v.Frame.OnPitRoad ? "In pit" : RaceFormat.Missing, p.P.Faint));
-        else
-        {
-            string pos = PooledText.Number("P", x!.ProjectedClassPos);
-            int change = x.CurrentClassPos - x.ProjectedClassPos;
-            if (change != 0) pos = PooledText.Concat(pos, change > 0 ? " +" : " −", PooledText.Number("", Math.Abs(change)));
-            _line.Add(("Pit exit", rough ? RaceFormat.About(pos) : pos, strong));
-            bool clean = x.Traffic.Count == 0;
-            _line.Add(("", clean ? "Clean air" : PooledText.Number("Traffic ", x.Traffic.Count), grey ? p.P.Faint : clean ? p.P.GoodText : p.P.WarnText));
-        }
-        _line.Add(("Ahead", NeighbourText(v, valid ? x!.Ahead : null, rough), plain));
-        _line.Add(("Behind", NeighbourText(v, valid ? x!.Behind : null, rough), plain));
-        p.Strip(box.Inflated(8 * p.Density, 0), _line);
-    }
-
     private void UndercutLine(HudPainter p, HudView v, RectangleF box)
     {
         var f = v.Frame;
@@ -770,30 +821,6 @@ internal sealed class FuelWidget : HudWidget
             int laps = first ?? Undercut.Laps;
             string value = PooledText.Concat(PooledText.Number("", laps, "L "), PooledText.Number("", Undercut.Needed(x.Gap, laps), "0.00", System.Globalization.CultureInfo.CurrentCulture));
             return (PooledText.Number(prefix, x.ClassPosition), value, first is null ? p.P.Muted : on);
-        }
-    }
-
-    private static string NeighbourText(HudView v, ExitCar? car, bool rough)
-    {
-        if (car is not { } c || !v.Frame.Session.ByCar.TryGetValue(c.CarIdx, out var d)) return RaceFormat.Missing;
-        string name = d.AbbrevName.Length > 0 ? d.AbbrevName : d.Name;
-        string gap = Math.Abs(c.Gap).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
-        return name + "  " + (rough ? RaceFormat.About(gap) : gap);
-    }
-
-    private static void Neighbour(HudPainter p, HudView v, RectangleF r, string label, ExitCar? car, HAlign align, Color color, bool rough)
-    {
-        float lw = p.Measure(label, p.Label) + 5 * p.Density;
-        string text = NeighbourText(v, car, rough);
-        if (align == HAlign.Left)
-        {
-            p.Text(label, p.Label, p.LabelColor, new RectangleF(r.X, r.Y, lw, r.Height), HAlign.Left, VAlign.Center, false);
-            p.Text(text, p.Small, color, new RectangleF(r.X + lw, r.Y, r.Width - lw, r.Height), HAlign.Left, VAlign.Center);
-        }
-        else
-        {
-            p.Text(label, p.Label, p.LabelColor, new RectangleF(r.Right - lw, r.Y, lw, r.Height), HAlign.Right, VAlign.Center, false);
-            p.Text(text, p.Small, color, new RectangleF(r.X, r.Y, r.Width - lw, r.Height), HAlign.Right, VAlign.Center);
         }
     }
 
@@ -864,6 +891,9 @@ internal sealed class FuelWidget : HudWidget
             case "add":
                 return (id, "ADD", plan?.Stops is 0 ? "No stop" : plan?.AddAtNextStop is { } add ? RaceFormat.Fuel(add, u) : RaceFormat.Missing, plan?.Stops is 0 ? p.P.GoodText : null);
             case "stops": return (id, "STOPS", plan?.Stops is { } st ? st.ToString() : RaceFormat.Missing, null);
+            case "pitexit":
+                var (exit, exitColor) = PitExitValue(p, v);
+                return (id, "PIT EXIT", exit, exitColor);
             case "window":
                 string win = plan?.Stops switch
                 {

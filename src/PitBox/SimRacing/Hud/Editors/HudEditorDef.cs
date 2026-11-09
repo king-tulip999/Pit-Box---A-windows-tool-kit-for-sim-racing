@@ -24,6 +24,8 @@ internal sealed record OptionSetting(string Key) : HudSetting(Key)
 internal sealed record PickerSetting(string Key, IReadOnlyList<HudCategory> Categories) : HudSetting(Key)
 {
     public override IReadOnlyList<string> Keys => new[] { Key };
+    public Func<HudOptions, string, bool>? Offers { get; init; }
+    public string? OffersFollow { get; init; }
 }
 
 internal sealed record HudCategory(string Title, params string[] Ids);
@@ -82,16 +84,9 @@ internal sealed record MergedSetting(string Id, string Title, IReadOnlyList<stri
 
 internal sealed record HudGroup(string Id, string? Title, HudTab Tab, bool Open, params HudSetting[] Settings);
 
-internal sealed record HudPreset(string Name, IReadOnlyDictionary<string, string> Values)
-{
-    public const string Minimal = "Minimal", Standard = "Standard", Everything = "Everything";
-}
-
 internal sealed class HudEditorDef
 {
     public required IReadOnlyList<HudGroup> Groups { get; init; }
-    public IReadOnlyList<HudPreset> Presets { get; init; } = Array.Empty<HudPreset>();
-    public IReadOnlyList<string> PresetKeeps { get; init; } = Array.Empty<string>();
     public IReadOnlyDictionary<string, string> Regions { get; init; } = new Dictionary<string, string>();
     public string ContentTitle { get; init; } = "Columns and info";
 
@@ -112,53 +107,6 @@ internal sealed class HudEditorDef
     {
         foreach (var (region, id) in Regions) if (string.Equals(id, settingId, StringComparison.OrdinalIgnoreCase)) yield return region;
         if (Setting(settingId) is { } s) foreach (var k in s.Keys) yield return k;
-    }
-
-    private static HudWidgetConfig WithPreset(HudWidgetDef def, HudWidgetConfig w, HudPreset preset, IReadOnlyList<string> keeps)
-    {
-        var copy = w.Copy();
-        Apply(def, copy, preset, keeps);
-        return copy;
-    }
-
-    public void Apply(HudWidgetDef def, HudWidgetConfig w, HudPreset preset) => Apply(def, w, preset, PresetKeeps);
-
-    private static void Apply(HudWidgetDef def, HudWidgetConfig w, HudPreset preset, IReadOnlyList<string> keeps)
-    {
-        foreach (var o in def.Options)
-        {
-            if (keeps.Contains(o.Key, StringComparer.OrdinalIgnoreCase)) continue;
-            if (preset.Values.TryGetValue(o.Key, out var value) && value != o.Default) w.Options[o.Key] = value;
-            else w.Options.Remove(o.Key);
-        }
-    }
-
-    public string? PresetName(HudWidgetDef def, HudWidgetConfig w)
-    {
-        var mine = new HudOptions(def, w);
-        foreach (var preset in Presets)
-        {
-            var theirs = new HudOptions(def, WithPreset(def, w, preset, PresetKeeps));
-            bool same = Settings.Where(s => !s.Keys.All(k => PresetKeeps.Contains(k, StringComparer.OrdinalIgnoreCase)))
-                .All(s => s.Visible(mine) == s.Visible(theirs) && (!s.Visible(mine) || s.Same(mine, theirs)));
-            if (same) return preset.Name;
-        }
-        return null;
-    }
-
-    public (string Name, IReadOnlyList<string> Changed)? Nearest(HudWidgetDef def, HudWidgetConfig w)
-    {
-        var mine = new HudOptions(def, w);
-        (string Name, IReadOnlyList<string> Changed)? best = null;
-        foreach (var preset in Presets)
-        {
-            var theirs = new HudOptions(def, WithPreset(def, w, preset, PresetKeeps));
-            var changed = Settings.Where(s => !s.Keys.All(k => PresetKeeps.Contains(k, StringComparer.OrdinalIgnoreCase)))
-                .Where(s => s.Visible(mine) != s.Visible(theirs) || (s.Visible(mine) && !s.Same(mine, theirs)))
-                .Select(s => s.Id).ToList();
-            if (best is null || changed.Count < best.Value.Changed.Count) best = (preset.Name, changed);
-        }
-        return best;
     }
 
     public static HudEditorDef Plain(HudWidgetDef def) => new()

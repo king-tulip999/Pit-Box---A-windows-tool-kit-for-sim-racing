@@ -24,6 +24,18 @@ internal static class FieldSettings
         new("Weather", "air", "track", "wind", "humidity", "wetness", "rain"),
     };
 
+    public static readonly IReadOnlyDictionary<string, string[]> ItemSettings = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["columns:name"] = new[] { "nameFormat", "noDigits", "proAm" },
+        ["columns:badge"] = new[] { "badgeFormat" },
+        ["columns:last"] = new[] { "timeFormat", "decimals" },
+        ["columns:best"] = new[] { "timeFormat", "decimals" },
+        ["columns:avglap"] = new[] { "avgLaps", "timeFormat" },
+        ["columns:gap"] = new[] { "gapTo", "decimals" },
+        ["columns:int"] = new[] { "decimals" },
+        ["columns:pit"] = new[] { "pitShow", "pitTime" },
+    };
+
     public static Func<HudOptions, bool> Has(string key, string id) => o => o.Columns(key).Contains(id);
 
     public static readonly LanesSetting InfoBars = new("infobars", "Info bars", new[] { ("header", "Top"), ("footer", "Bottom") }, StripCategories);

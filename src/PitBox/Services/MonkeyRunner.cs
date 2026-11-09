@@ -67,7 +67,7 @@ internal static class MonkeyRunner
             window.Show();
             if (full) window.WindowState = WindowState.Maximized;
             await Task.Delay(1500);
-            window.Navigate(window.FirstPage);
+            if (Focus is { } start) GoFocus(window, start); else window.Navigate(window.FirstPage);
             await Settle();
             int baseline = TickHandlers(app);
             Log($"tick handlers on the first page: {baseline}");
@@ -144,6 +144,12 @@ internal static class MonkeyRunner
                 break;
             case < 56:
             {
+                if (Focus is { } focus)
+                {
+                    Log($"{_step} page {focus}");
+                    GoFocus(window, focus);
+                    break;
+                }
                 var keys = window.NavKeys;
                 string key = keys[rnd.Next(keys.Count)];
                 Log($"{_step} page {key}");
@@ -181,10 +187,19 @@ internal static class MonkeyRunner
                 break;
             default:
                 Log($"{_step} first page");
-                window.Navigate(window.FirstPage);
+                if (Focus is { } home) GoFocus(window, home);
+                else window.Navigate(window.FirstPage);
                 break;
         }
         await Settle();
+    }
+
+    private static string? Focus => Environment.GetCommandLineArgs() is var args && Array.FindIndex(args, a => a.Equals("--monkey-page", StringComparison.OrdinalIgnoreCase)) is int at and >= 0 && at + 1 < args.Length ? args[at + 1] : null;
+
+    private static void GoFocus(MainWindow window, string focus)
+    {
+        var parts = focus.Split('/', 2);
+        window.GoTo(parts[0], parts.Length > 1 ? parts[1] : null, flash: false);
     }
 
     private static IEnumerable<Visual> Roots(Window window)

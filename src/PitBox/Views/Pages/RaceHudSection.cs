@@ -31,7 +31,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     private const int WidgetsTab = 0, AlertsTabIndex = 1, FuelTabIndex = 2, SettingsTab = 3;
 
     private readonly AppServices _app;
-    private readonly MainWindow _window;
+    private readonly IModalHost _window;
     private readonly Border _body = new();
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private readonly TextBlock _status = TextFit.TipWhenTrimmed(new TextBlock { TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap, MaxWidth = 300 });
@@ -50,7 +50,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
 
     public PreviewSource Preview => _preview ??= PreviewSource.Take(() => S);
 
-    public RaceHudSection(AppServices app, MainWindow window)
+    public RaceHudSection(AppServices app, IModalHost window)
     {
         _app = app;
         _window = window;
@@ -228,6 +228,13 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         }), DispatcherPriority.ContextIdle);
     }
 
+    public void PickWidget(string id)
+    {
+        Finish();
+        if (_tab != WidgetsTab) SelectTab(WidgetsTab);
+        _widgets?.SelectId(id);
+    }
+
     public string ShownLayout => Host?.LayoutName is { Length: > 0 } n ? n : S.ActiveLayout;
 
     private void SyncLayoutPick()
@@ -286,6 +293,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
 
     private void Build()
     {
+        var keep = _widgets?.Keep();
         _steps = 2;
         _tick = null;
         _rules = null;
@@ -303,7 +311,11 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         };
         if (_tab == AlertsTabIndex) Ui.Anchor((FrameworkElement)_body.Child, AlertsAnchor);
         else if (_tab == SettingsTab) Ui.Anchor((FrameworkElement)_body.Child, SettingsAnchor);
-        if (_widgets is not null) _tick = _widgets.Tick;
+        if (_widgets is not null)
+        {
+            if (keep is { } kept) _widgets.Restore(kept);
+            _tick = _widgets.Tick;
+        }
     }
 
     private static Tile Group(string title, string? caption, params UIElement[] rows)
@@ -435,7 +447,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         Ui.Anchor(row, LayoutsAnchor);
         _layoutSlot.Content = row;
 
-        _widgets = new RaceHudWidgets(_app, this, inPage: true);
+        _widgets = new RaceHudWidgets(_app, this);
         root.Children.Add(_widgets.Root);
         return root;
     }
@@ -1214,21 +1226,21 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         {
             var all = PitBox.SimRacing.Hud.Widgets.StandingsWidget.Options.First(o => o.Key == "columns").Choices!.Select(c => c.Id);
             _widgets?.SetOption("standings", "columns", string.Join(",", all));
-            _widgets?.ShowTab("standings", "content");
+            _widgets?.ShowAll("standings");
             return Task.CompletedTask;
         });
         yield return ("hud-standings-default-columns", () => { _widgets?.SetOption("standings", "columns", null); return Task.CompletedTask; });
         yield return ("hud-standings-scrolled", async () =>
         {
-            _widgets?.ShowTab("standings", "display");
+            _widgets?.ShowAll("standings");
             await Task.Delay(300);
             _widgets?.ScrollPageBy(900);
             await Task.Delay(300);
         });
         yield return ("hud-every-widget", () => { _widgets?.DrawEveryKind(); _widgets?.Select("fuel"); return Task.CompletedTask; });
         yield return ("hud-standings-click-class-heading", () => { _widgets?.Reveal("standings", "classInfo"); return Task.CompletedTask; });
-        yield return ("hud-standings-hover-title-row", () => { _widgets?.Point("standings", "titleRow"); return Task.CompletedTask; });
-        yield return ("hud-standings-column-ticks", async () => { _widgets?.Point("standings", "columns"); await Task.Delay(300); });
+        yield return ("hud-standings-hover-title-row", () => { _widgets?.Reveal("standings", "titleRow"); return Task.CompletedTask; });
+        yield return ("hud-standings-column-ticks", async () => { _widgets?.Reveal("standings", "columns"); await Task.Delay(300); });
         yield return ("hud-relative-panels", async () =>
         {
             _widgets?.Select("relative");
@@ -1236,28 +1248,27 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             _widgets?.ScrollPageBy(700);
             await Task.Delay(300);
         });
-        yield return ("hud-relative-pick-classes", () => { _widgets?.SetOption("relative", "classes", "pick"); _widgets?.ShowTab("relative", "content"); return Task.CompletedTask; });
+        yield return ("hud-relative-pick-classes", () => { _widgets?.SetOption("relative", "classes", "pick"); _widgets?.ShowAll("relative"); return Task.CompletedTask; });
         yield return ("hud-relative-all-classes", () => { _widgets?.SetOption("relative", "classes", null); return Task.CompletedTask; });
-        yield return ("hud-timing", () => { _widgets?.ShowTab("timing", "content"); return Task.CompletedTask; });
-        yield return ("hud-fuel-sections", () => { _widgets?.ShowTab("fuel", "content"); return Task.CompletedTask; });
-        RaceHudWidgets? quick = null;
-        Border? quickBox = null;
-        yield return ("hud-quick-editor", () =>
+        yield return ("hud-timing", () => { _widgets?.ShowAll("timing"); return Task.CompletedTask; });
+        yield return ("hud-fuel-sections", () => { _widgets?.ShowAll("fuel"); return Task.CompletedTask; });
+        foreach (var def in HudCatalog.All)
         {
-            quick = new RaceHudWidgets(_app, this);
-            quickBox = Hairline.Frame(new Border { Width = 810, Height = 583, Child = quick.Root, Margin = new Thickness(0, 10, 0, 0) });
-            quickBox.SetResourceReference(Border.BackgroundProperty, "Bg");
-            quickBox.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
-            Children.Add(quickBox);
-            _widgets?.ShowTab("relative");
-            quick.ShowTab("relative");
-            quickBox.BringIntoView();
-            return Task.CompletedTask;
-        });
-        yield return ("hud-quick-editor-content", () => { quick?.ShowTab("relative", "content"); return Task.CompletedTask; });
-        yield return ("hud-quick-editor-fuel", () => { _widgets?.ShowTab("fuel"); quick?.ShowTab("fuel"); return Task.CompletedTask; });
-        yield return ("hud-quick-editor-settings", () => { quick?.ShowTab(null); return Task.CompletedTask; });
-        yield return ("hud-quick-editor-done", () => { if (quickBox is not null) Children.Remove(quickBox); return Task.CompletedTask; });
+            string kind = def.Kind;
+            yield return ($"hud-sweep-{kind}", async () => { if (_tab != WidgetsTab) SelectTab(WidgetsTab); _widgets?.SweepSelect(kind); await Task.Delay(500); _widgets?.SweepSelect(kind); await Task.Delay(300); });
+            foreach (var (name, target) in _widgets?.SweepParts() ?? Array.Empty<(string, RaceHudWidgets.PanelTarget)>())
+            {
+                yield return ($"hud-sweep-{kind}-{name}", async () => { _widgets?.SweepOpen(target); await Task.Delay(200); });
+                if (name != "all") continue;
+                int drops = _widgets?.SweepDropdowns() ?? 0;
+                for (int i = 0; i < drops; i++)
+                {
+                    int at = i;
+                    yield return ($"hud-sweep-{kind}-all-drop{at}", async () => { _widgets?.SweepOpenDropdown(at); await Task.Delay(250); });
+                }
+                yield return ($"hud-sweep-{kind}-exercise", async () => { if (_widgets is { } w) await w.SweepExercise(kind); });
+            }
+        }
         yield return ("hud-alerts", () => { SelectTab(AlertsTabIndex); return Task.CompletedTask; });
         yield return ("hud-fuel", () => { SelectTab(FuelTabIndex); return Task.CompletedTask; });
         yield return ("hud-settings", () => { SelectTab(SettingsTab); return Task.CompletedTask; });

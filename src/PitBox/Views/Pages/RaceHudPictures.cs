@@ -3,30 +3,17 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using PitBox.Config;
 using PitBox.SimRacing.Hud;
-using PitBox.Views.HudSettings;
 
 namespace PitBox.Views.Pages;
 
 internal sealed partial class RaceHudWidgets
 {
-    private const double SideBySideMin = 860, SettingsShare = 1.05, GroupMinWidth = 440;
     private const double PictureMaxW = 104, PictureMaxH = 34, PicturePadX = 3, PicturePadY = 5, PictureMinScale = 0.45, PictureFade = 18;
     private const int PictureCache = 64;
 
-    private readonly Dictionary<string, UIElement> _presetDots = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<SettingGroup, FrameworkElement> _groupCards = new();
     private readonly HudPainter _picturePainter = new() { Items = new(), Regions = new() };
     private static readonly Dictionary<string, IReadOnlyList<ImageSource>?> PictureMemo = new();
     private System.Drawing.Bitmap? _pictureBitmap;
-
-    private void ShowPresetState(HudWidgetConfig w, HudWidgetDef def)
-    {
-        var editor = def.EditorDef;
-        var nearest = editor.Nearest(def, w);
-        _presets?.Show(editor.PresetName(def, w), nearest);
-        var changed = (nearest?.Changed ?? Array.Empty<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var (id, dot) in _presetDots) dot.Visibility = changed.Contains(id) ? Visibility.Visible : Visibility.Collapsed;
-    }
 
     private IReadOnlyList<ImageSource>? Pictures(HudWidgetConfig w, HudWidgetDef def, string settingId, IReadOnlyList<IReadOnlyDictionary<string, string>> choices)
     {

@@ -26,13 +26,5 @@ internal static class RelativeEditor
             ["flag"] = "flagBanner",
             ["rows"] = "ahead",
         },
-        PresetKeeps = new[] { "flagBanner" },
-        Presets = new HudPreset[]
-        {
-            new(HudPreset.Minimal, V(("columns", "cpos,num,name,gap"), ("header", ""), ("footer", ""))),
-            new(HudPreset.Standard, V()),
-            new(HudPreset.Everything, V(("columns", "pos,cpos,change,num,name,team,badge,irchange,last,best,avglap,delta,laps,lapsdone,pit,out,stint,inc,trend,gap"),
-                ("header", "session,remain,lapsleft,pos,cpos,inc,bias"), ("footer", "lap,last,best,clock,wetness,air,track"), ("showHeader", true))),
-        },
     };
 }

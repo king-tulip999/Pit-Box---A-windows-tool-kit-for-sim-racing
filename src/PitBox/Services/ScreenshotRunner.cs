@@ -208,7 +208,7 @@ internal static class ScreenshotRunner
                     int state = 0;
                     foreach (var (name, enter) in states.ScreenshotStates())
                     {
-                        if (!whole && !views.Contains($"{page}-{name}"))
+                        if (!whole && !views.Contains($"{page}-{name}") && !views.Any(v => v.EndsWith('*') && $"{page}-{name}".StartsWith(v[..^1], StringComparison.OrdinalIgnoreCase)))
                         {
                             state++;
                             continue;
@@ -232,7 +232,7 @@ internal static class ScreenshotRunner
                 n++;
             }
 
-            foreach (var missing in views.Where(v => !matchedViews.Contains(v)))
+            foreach (var missing in views.Where(v => !v.EndsWith('*') && !matchedViews.Contains(v)))
                 RecordError(new ArgumentException($"--pages: '{missing}' is not a page or a page-view"));
             await LintSizesAsync(window, pages);
             if (Environment.GetCommandLineArgs().Contains("--sizes", StringComparer.OrdinalIgnoreCase))
@@ -688,7 +688,7 @@ internal static class ScreenshotRunner
     private static async Task CaptureSizesAsync(MainWindow window, string folder)
     {
         window.Navigate(window.FirstPage);
-        foreach (var (w, h) in new[] { (1600, 1040), (1500, 820), (1400, 760), (1280, 720) })
+        foreach (var (w, h) in new[] { (1600, 1040), (1500, 820), (1400, 800), (1280, 800) })
         {
             try
             {

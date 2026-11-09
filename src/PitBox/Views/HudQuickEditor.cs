@@ -6,7 +6,6 @@ using System.Windows.Media;
 using System.Windows.Shell;
 using System.Windows.Threading;
 using PitBox.Controls;
-using PitBox.Config;
 using PitBox.Services;
 using PitBox.SimRacing.Hud;
 using PitBox.SimRacing.Telemetry;
@@ -15,20 +14,16 @@ using PitBox.Theme;
 
 namespace PitBox.Views;
 
-internal sealed class HudQuickEditor : Window, IHudEditorHost
+internal sealed class HudQuickEditor : Window, IModalHost
 {
     private static HudQuickEditor? _open;
 
     private readonly AppServices _app;
     private readonly HudHost _hud;
-    private readonly RaceHudWidgets _widgets;
-    private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+    private readonly RaceHudSection _section;
     private readonly Grid _modal = new() { Visibility = Visibility.Collapsed };
     private readonly TextBlock _layout = new();
     private readonly Button _undo, _redo, _snap, _grid;
-    private readonly ComboBox _layoutPick = new() { MinWidth = 122, VerticalAlignment = VerticalAlignment.Center, ToolTip = "The layout on screen (and edited here)" };
-    private string _layoutsShown = "";
-    private bool _fillingLayouts;
     private readonly IntPtr _returnTo;
     private TaskCompletionSource<bool>? _confirm;
     private bool _closing;
@@ -49,7 +44,6 @@ internal sealed class HudQuickEditor : Window, IHudEditorHost
         _app = app;
         _hud = hud;
         _returnTo = GetForegroundWindow();
-        Preview = new PreviewSource(() => app.Config.SimRacing.Hud);
         Title = "Pit-Box · iRacing Overlay editor";
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.CanResize;
@@ -63,10 +57,10 @@ internal sealed class HudQuickEditor : Window, IHudEditorHost
         Topmost = true;
         ShowInTaskbar = true;
         WindowStartupLocation = WindowStartupLocation.Manual;
-        Width = Math.Min(875, SystemParameters.PrimaryScreenWidth * 0.9);
-        Height = Math.Min(632, SystemParameters.PrimaryScreenHeight * 0.85);
-        MinWidth = 640;
-        MinHeight = 400;
+        Width = Math.Min(1180, SystemParameters.PrimaryScreenWidth * 0.9);
+        Height = Math.Min(760, SystemParameters.PrimaryScreenHeight * 0.85);
+        MinWidth = 760;
+        MinHeight = 440;
         Left = (SystemParameters.PrimaryScreenWidth - Width) / 2;
         Top = (SystemParameters.PrimaryScreenHeight - Height) / 2;
         SetResourceReference(BackgroundProperty, "Bg");
@@ -79,14 +73,6 @@ internal sealed class HudQuickEditor : Window, IHudEditorHost
         _snap.ToolTip = "Snap widgets to the grid and to each other while dragging (hold Alt for a free move). Click to switch on / off.";
         _grid = Ui.LabeledButton("I.Eye", "Grid", () => { _hud.ToggleGrid(); Refresh(); }, "GhostButton");
         _grid.ToolTip = "Show the snap grid over your screens while arranging. Snapping works with it hidden.";
-        _layoutPick.SelectionChanged += (_, _) =>
-        {
-            if (_fillingLayouts || _layoutPick.SelectedItem is not Choice { Id: { } name } || name == ShownLayout) return;
-            _hud.UseLayout(name);
-        };
-        var add = Ui.LabeledButton("I.Plus", "Add new", () => { }, "GhostButton");
-        add.ToolTip = "A new layout: a clean screen or a copy of this one. It goes on screen at once.";
-        add.Click += (_, _) => RaceHudSection.NewLayoutBox(add, _app.Config.SimRacing.Hud, _app.Config.SimRacing.Hud.Layout(ShownLayout), AddLayout);
         var done = Ui.LabeledButton("I.Check", "Done", Close, "PrimaryButton");
         done.ToolTip = "Save and close (or press the keybind again, or Esc): the widgets go back to letting clicks through";
 
@@ -100,9 +86,6 @@ internal sealed class HudQuickEditor : Window, IHudEditorHost
         tools.Children.Add(_snap);
         _grid.Margin = new Thickness(5, 0, 6, 0);
         tools.Children.Add(_grid);
-        tools.Children.Add(_layoutPick);
-        add.Margin = new Thickness(5, 0, 6, 0);
-        tools.Children.Add(add);
         tools.Children.Add(done);
         var bar = Ui.SplitRow(titleText, tools);
         var barHost = Hairline.Frame(new Border { Padding = new Thickness(13, 8, 10, 8), Child = bar }, Sides.Bottom);
@@ -115,25 +98,26 @@ internal sealed class HudQuickEditor : Window, IHudEditorHost
             Text = "Drag a widget on screen to move it; drag its corner to scale it. Click one on screen to open its settings here.",
             Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(15, 8, 15, 2),
         };
-        _widgets = new RaceHudWidgets(app, this);
+        _section = new RaceHudSection(app, this);
+        var page = new ScrollViewer { Style = Ui.Res<Style>("PageScroll"), Content = new Border { Padding = new Thickness(Ui.PageSide, 12, Ui.PageSide, 4), Child = _section }, Focusable = false };
+        Ui.ChainWheel(page);
         var body = new DockPanel();
         DockPanel.SetDock(barHost, Dock.Top);
         DockPanel.SetDock(hint, Dock.Top);
         body.Children.Add(barHost);
         body.Children.Add(hint);
-        body.Children.Add(_widgets.Root);
+        body.Children.Add(page);
         var root = new Grid { Children = { body, _modal } };
         RenderOptions.SetClearTypeHint(root, ClearTypeHint.Enabled);
         Content = root;
 
         _hud.WidgetPicked += OnPicked;
         _hud.Changed += OnHudChanged;
-        _timer.Tick += (_, _) => { Preview.Advance(_hud); _widgets.Tick(); };
-        _timer.Start();
+        _section.OnShown();
         PreviewKeyDown += (_, e) =>
         {
             if (e.Key != Key.Escape || e.Handled) return;
-            if (_confirm is not null) { EndConfirm(false); e.Handled = true; return; }
+            if (_confirm is not null) { CloseModal(false); e.Handled = true; return; }
             if (Keyboard.FocusedElement is HotkeyBox or TextBox { Text.Length: > 0 }) return;
             e.Handled = true;
             Close();
@@ -142,20 +126,13 @@ internal sealed class HudQuickEditor : Window, IHudEditorHost
         Refresh();
     }
 
-    public PreviewSource Preview { get; }
+    private string ShownLayout => _hud.LayoutName is { Length: > 0 } n ? n : _app.Config.SimRacing.Hud.ActiveLayout;
 
-    public string ShownLayout => _hud.LayoutName is { Length: > 0 } n ? n : _app.Config.SimRacing.Hud.ActiveLayout;
-
-    public void Changed() => _hud.SettingsChanged();
-
-    public void ShowSettings() => _widgets.ShowTab(null);
-
-    private void OnPicked(string id) => _widgets.SelectId(id);
+    private void OnPicked(string id) => _section.PickWidget(id);
 
     private void OnHudChanged()
     {
         if (!_hud.Editing && !_closing) { Close(); return; }
-        _widgets.FollowLayout();
         Refresh();
     }
 
@@ -169,57 +146,34 @@ internal sealed class HudQuickEditor : Window, IHudEditorHost
         bool grid = _app.Config.SimRacing.Hud.GridShown;
         Ui.SetToggled(_grid, grid);
         _grid.Content = Ui.IconLabel(grid ? "I.Eye" : "I.EyeOff", grid ? "Grid on" : "Grid off");
-        FillLayouts();
         bool live = _app.Telemetry.Status == SimStatus.Connected && !_app.Telemetry.Simulated;
         _layout.Text = $"Layout {ShownLayout} · " + (live ? "live from iRacing" : "sample data until a session is running");
     }
 
-    private void FillLayouts()
-    {
-        var layouts = _app.Config.SimRacing.Hud.Layouts;
-        string shown = string.Join("|", layouts.Select(l => l.Name)) + ">" + ShownLayout;
-        if (shown == _layoutsShown) return;
-        _layoutsShown = shown;
-        _fillingLayouts = true;
-        _layoutPick.Items.Clear();
-        foreach (var l in layouts) _layoutPick.Items.Add(new Choice(l.Name, l.Name));
-        _layoutPick.SelectedItem = _layoutPick.Items.Cast<Choice>().FirstOrDefault(c => string.Equals(c.Id, ShownLayout, StringComparison.OrdinalIgnoreCase));
-        _fillingLayouts = false;
-    }
+    public double ModalRoom => ActualHeight - 90;
 
-    private void AddLayout(HudLayout layout)
+    public Task<bool> ShowModal(FrameworkElement content)
     {
-        _app.Config.SimRacing.Hud.Layouts.Add(layout);
-        _hud.UseLayout(layout.Name);
-    }
-
-    public Task<bool> Confirm(string title, string message, string confirmText, bool danger)
-    {
-        EndConfirm(false);
+        _confirm?.TrySetResult(false);
         _confirm = new TaskCompletionSource<bool>();
-        var stack = new StackPanel();
-        stack.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("H3"), TextWrapping = TextWrapping.Wrap });
-        stack.Children.Add(new TextBlock { Text = message, Style = Ui.Res<Style>("Muted"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 5, 0, 11) });
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        var cancel = new Button { Content = "Cancel", Margin = Ui.AfterButton };
-        cancel.Click += (_, _) => EndConfirm(false);
-        var ok = new Button { Content = confirmText, Style = Ui.Res<Style>(danger ? "DangerConfirmButton" : "PrimaryButton") };
-        ok.Click += (_, _) => EndConfirm(true);
-        buttons.Children.Add(cancel);
-        buttons.Children.Add(ok);
-        stack.Children.Add(buttons);
-        var card = new Tile { Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(16, 15, 16, 13), MaxWidth = 340, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Child = stack };
+        content.VerticalAlignment = VerticalAlignment.Center;
+        content.HorizontalAlignment = HorizontalAlignment.Center;
+        if (content.Width > ActualWidth - 40) content.Width = Math.Max(300, ActualWidth - 40);
         _modal.Children.Clear();
         var dim = new Border();
         dim.SetResourceReference(Border.BackgroundProperty, "Dim");
         _modal.Children.Add(dim);
-        _modal.Children.Add(card);
+        _modal.Children.Add(content);
         _modal.Visibility = Visibility.Visible;
-        ok.Focus();
+        Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
+        {
+            if (_confirm is not null && !_modal.IsKeyboardFocusWithin)
+                content.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
+        });
         return _confirm.Task;
     }
 
-    private void EndConfirm(bool result)
+    public void CloseModal(bool result)
     {
         var pending = _confirm;
         _confirm = null;
@@ -228,11 +182,29 @@ internal sealed class HudQuickEditor : Window, IHudEditorHost
         pending?.TrySetResult(result);
     }
 
+    public Task<bool> Confirm(string title, string message, string confirmText, bool danger = false)
+    {
+        var stack = new StackPanel();
+        stack.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("H3"), TextWrapping = TextWrapping.Wrap });
+        stack.Children.Add(new TextBlock { Text = message, Style = Ui.Res<Style>("Muted"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 5, 0, 11) });
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        var cancel = new Button { Content = "Cancel", Margin = Ui.AfterButton };
+        cancel.Click += (_, _) => CloseModal(false);
+        var ok = new Button { Content = confirmText, Style = Ui.Res<Style>(danger ? "DangerConfirmButton" : "PrimaryButton") };
+        ok.Click += (_, _) => CloseModal(true);
+        buttons.Children.Add(cancel);
+        buttons.Children.Add(ok);
+        stack.Children.Add(buttons);
+        var task = ShowModal(new Tile { Style = Ui.Res<Style>("LiftedCard"), Padding = new Thickness(16, 15, 16, 13), MaxWidth = 340, Child = stack });
+        ok.Focus();
+        return task;
+    }
+
     protected override void OnClosed(EventArgs e)
     {
         _closing = true;
-        EndConfirm(false);
-        _timer.Stop();
+        CloseModal(false);
+        _section.OnHidden();
         _hud.WidgetPicked -= OnPicked;
         _hud.Changed -= OnHudChanged;
         if (_hud.Editing) _hud.EndEdit(keep: true);

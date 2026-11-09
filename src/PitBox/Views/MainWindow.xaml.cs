@@ -15,9 +15,14 @@ using PitBox.Views.Pages;
 
 namespace PitBox.Views;
 
-public partial class MainWindow : Window
+public partial class MainWindow : Window, IModalHost
 {
     private readonly AppServices _app;
+
+    double IModalHost.ModalRoom => ModalRoom;
+    Task<bool> IModalHost.ShowModal(FrameworkElement content) => ShowModal(content);
+    void IModalHost.CloseModal(bool result) => CloseModal(result);
+    Task<bool> IModalHost.Confirm(string title, string message, string confirmText, bool danger) => Confirm(title, message, confirmText, danger);
 
     internal AppServices Services => _app;
     private const string PageConsumer = "Open page";
@@ -303,7 +308,7 @@ public partial class MainWindow : Window
         CurrentSectioned?.ShowSection(section);
     }
 
-    internal const double MinWindowWidth = 1280, MinWindowHeight = 720, DefaultWindowWidth = MinWindowWidth;
+    internal const double MinWindowWidth = 1280, MinWindowHeight = 800, DefaultWindowWidth = MinWindowWidth;
 
     private void StepPage(int by)
     {

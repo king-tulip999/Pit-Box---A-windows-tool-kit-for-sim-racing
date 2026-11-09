@@ -11,10 +11,5 @@ internal static class TyresEditor
             new("shows", "Shows", HudTab.Layout, true, O("titleRow"), new TogglesSetting("shows", "Each corner shows", new[] { "pressure", "temps", "wear" })),
             new("limits", "Temperature limits", HudTab.Layout, false, O("low") with { ShowIf = o => o.Bool("temps") }, O("high") with { ShowIf = o => o.Bool("temps") }),
         },
-        Presets = new HudPreset[]
-        {
-            new(HudPreset.Minimal, V(("temps", false), ("wear", false))),
-            new(HudPreset.Standard, V()),
-        },
     };
 }

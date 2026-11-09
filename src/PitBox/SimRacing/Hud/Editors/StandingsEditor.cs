@@ -45,12 +45,5 @@ internal static class StandingsEditor
             ["divider"] = "divider",
             ["rows"] = "top",
         },
-        Presets = new HudPreset[]
-        {
-            new(HudPreset.Minimal, V(("columns", "pos,num,name,gap"), ("footer", ""), ("classInfo", "cars"))),
-            new(HudPreset.Standard, V()),
-            new(HudPreset.Everything, V(("columns", "pos,cpos,change,num,name,team,badge,irchange,gap,int,gapme,lapsdone,last,best,avglap,delta,pit,out,stint,inc"),
-                ("header", "session,remain,lapsleft,pos,cpos"), ("footer", "inc,sof,fastest,classFastest,air,track"), ("progress", true), ("classInfo", "cars,sof,laps"))),
-        },
     };
 }

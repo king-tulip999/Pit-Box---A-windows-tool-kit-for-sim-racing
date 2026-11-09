@@ -42,6 +42,11 @@ public partial class App : Application
             HudSheet.Run(this, sheetFolder);
             return;
         }
+        if (ArgValue(e.Args, HudProto.Arg) is { } protoFolder)
+        {
+            HudProto.Run(this, protoFolder);
+            return;
+        }
         if (ArgValue(e.Args, HudSheet.FramesArg) is { } framesFolder)
         {
             HudSheet.Run(this, framesFolder, frames: true);

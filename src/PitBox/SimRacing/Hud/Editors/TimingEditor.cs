@@ -18,12 +18,5 @@ internal static class TimingEditor
             })),
         },
         Regions = new Dictionary<string, string> { ["delta"] = "reference", ["bar"] = "bar", ["sectors"] = "sectors" },
-        PresetKeeps = new[] { "split" },
-        Presets = new HudPreset[]
-        {
-            new(HudPreset.Minimal, V(("fields", "current,best"), ("sectors", false))),
-            new(HudPreset.Standard, V()),
-            new(HudPreset.Everything, V(("fields", "current,last,best,predicted,theoretical,consistency,sessionBest,classBest"))),
-        },
     };
 }

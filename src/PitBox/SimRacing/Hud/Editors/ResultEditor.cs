@@ -17,13 +17,7 @@ internal static class ResultEditor
                 new("Driver", "name", "carname", "track"),
                 new("Chips", "rating", "incidents", "awards"),
                 new("Stats", "best", "average", "consistency", "laps", "time", "strip"),
-            }) { ShowIf = o => o.Choice("look") == Widgets.ResultWidget.Card }),
-        },
-        Presets = new HudPreset[]
-        {
-            new(HudPreset.Minimal, V(("show", "gain,name,rating,best,consistency"), ("awardChips", 0))),
-            new(HudPreset.Standard, V()),
-            new(HudPreset.Everything, V(("show", Widgets.ResultWidget.AllParts), ("awardChips", 6), ("seconds", 0))),
+            }) { Offers = (o, part) => Widgets.ResultWidget.Offers(o.Choice("look"), part), OffersFollow = "look" }),
         },
     };
 }
