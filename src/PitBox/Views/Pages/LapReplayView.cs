@@ -156,8 +156,9 @@ internal sealed class LapReplayView : Grid
             });
         }
 
-        _zoom = new Slider { Minimum = 0, Maximum = 1, Value = settings.ReplayZoom, Width = 97, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 0, 5, 0) };
-        _zoom.ValueChanged += (_, e) => SetZoom(e.NewValue);
+        _zoom = new Slider { Minimum = 0, Maximum = 1, Value = settings.ReplayZoom, Width = 110, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 0, 5, 0) };
+        SliderFace.SetText(_zoom, ZoomText(settings.ReplayZoom));
+        _zoom.ValueChanged += (_, e) => { SliderFace.SetText(_zoom, ZoomText(e.NewValue)); SetZoom(e.NewValue); };
         _zoom.ToolTip = "Zoom; all the way out = the whole lap";
         var turn = Ui.LabeledButton("I.Rotate", "Turn with car", () => { });
         Ui.SetToggled(turn, settings.ReplayTurn);
@@ -487,6 +488,8 @@ internal sealed class LapReplayView : Grid
         _wind?.Turn(_stage.Rotation);
     }
 
+    private static string ZoomText(double z) => $"{Math.Round(z * 100):0}%";
+
     private void ZoomBy(double step)
     {
         if (_settings.ReplayFree) _stage.ZoomFree(step > 0 ? 1.25 : 1 / 1.25);
@@ -594,9 +597,7 @@ internal sealed class ReplayWind : Tile
         var north = new Grid { Width = 15, Height = 15, Margin = new Thickness(8, 0, 0, 0), RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = _north, ToolTip = "North" };
         var needle = new Icon { Data = Ui.Res<Geometry>("I.Needle"), Width = 15, Height = 15 };
         needle.SetResourceReference(Icon.ForegroundProperty, "TextMuted");
-        var n = new TextBlock { Text = "N", Style = Ui.Res<Style>("Caption"), FontSize = 7, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom };
         north.Children.Add(needle);
-        north.Children.Add(n);
         title.Children.Add(north);
         Cell(rows, title, 0, 0, 4);
         int row = 1;
@@ -618,7 +619,7 @@ internal sealed class ReplayWind : Tile
             };
             arrow.SetResourceReference(Icon.ForegroundProperty, line.BrushKey);
             double speed = imperial ? wind.Kph / 1.609344 : wind.Kph;
-            var value = new TextBlock { Text = $"{line.Short}  {speed:0} {(imperial ? Units.Mph : Units.Kmh)}", Style = Ui.Res<Style>("Body"), FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+            var value = new TextBlock { Text = $"{line.Short}  {speed:0} {(imperial ? Units.Mph : Units.Kmh)}", Style = Ui.Res<Style>("Body"), FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
             var point = new TextBlock { Text = SimRacing.Race.RaceFormat.Compass(wind.From + Math.PI), Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center };
             point.ToolTip = "Where the wind blows to";
             Cell(rows, swatch, row, 0);
@@ -1357,11 +1358,11 @@ internal sealed class ReplayCard : Tile
 
         var swatch = new Border { Width = 3, Margin = new Thickness(0, 0, 8, 0) };
         swatch.SetResourceReference(Border.BackgroundProperty, car.Line.BrushKey);
-        var name = TextFit.TipWhenTrimmed(new TextBlock { Text = car.Line.Driver.Length > 0 ? car.Line.Driver : car.Line.Short, Style = Ui.Res<Style>("Body"), FontSize = 11.5, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.NoWrap, TextTrimming = TextTrimming.CharacterEllipsis });
-        var sub = TextFit.TipWhenTrimmed(new TextBlock { Text = car.Line.Driver.Length > 0 ? car.Line.Short : "", Style = Ui.Res<Style>("Caption"), FontSize = 11, TextWrapping = TextWrapping.NoWrap, TextTrimming = TextTrimming.CharacterEllipsis });
+        var name = TextFit.TipWhenTrimmed(new TextBlock { Text = car.Line.Driver.Length > 0 ? car.Line.Driver : car.Line.Short, Style = Ui.Res<Style>("Body"), FontSize = 12, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.NoWrap, TextTrimming = TextTrimming.CharacterEllipsis });
+        var sub = TextFit.TipWhenTrimmed(new TextBlock { Text = car.Line.Driver.Length > 0 ? car.Line.Short : "", Style = Ui.Res<Style>("Caption"), FontSize = 12, TextWrapping = TextWrapping.NoWrap, TextTrimming = TextTrimming.CharacterEllipsis });
         if (car.Line.Reference && !onlyOne) sub.Text = sub.Text.Length > 0 ? sub.Text + " · reference" : "Reference";
         sub.ToolTip = sub.Text;
-        var time = new TextBlock { Text = StatFormat.LapTime(car.Trace.LapTime), Style = Ui.Res<Style>("Body"), FontSize = 11.5, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Top };
+        var time = new TextBlock { Text = StatFormat.LapTime(car.Trace.LapTime), Style = Ui.Res<Style>("Body"), FontSize = 12, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Top };
         Typography.SetNumeralAlignment(time, FontNumeralAlignment.Tabular);
         var boost = Ui.Chip("P2P", StatsUi.Hue("Coral").Soft, StatsUi.Hue("Coral").Deep);
         boost.Margin = new Thickness(0, 0, 6, 0);
@@ -1414,7 +1415,7 @@ internal sealed class ReplayCard : Tile
         var track = new Border { Height = 5, Child = fill, Margin = new Thickness(0, 4, 0, 0) };
         track.SetResourceReference(Border.BackgroundProperty, "SurfaceAlt");
         percent.Style = Ui.Res<Style>("Body");
-        percent.FontSize = 11.5;
+        percent.FontSize = 12;
         percent.FontWeight = FontWeights.SemiBold;
         percent.Text = "–";
         percent.MinWidth = 32;
@@ -1424,7 +1425,7 @@ internal sealed class ReplayCard : Tile
         var top = new DockPanel();
         DockPanel.SetDock(percent, Dock.Right);
         top.Children.Add(percent);
-        top.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), FontSize = 11, VerticalAlignment = VerticalAlignment.Center });
+        top.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), FontSize = 12, VerticalAlignment = VerticalAlignment.Center });
         return new StackPanel { Children = { top, track } };
     }
 
@@ -1436,7 +1437,7 @@ internal sealed class ReplayCard : Tile
         value.FontWeight = FontWeights.SemiBold;
         value.Text = "–";
         Typography.SetNumeralAlignment(value, FontNumeralAlignment.Tabular);
-        return new StackPanel { Children = { value, new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), FontSize = 11 } } };
+        return new StackPanel { Children = { value, new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), FontSize = 12 } } };
     }
 
     private static void Set(TextBlock text, ref int last, int value, Func<int, string> format)

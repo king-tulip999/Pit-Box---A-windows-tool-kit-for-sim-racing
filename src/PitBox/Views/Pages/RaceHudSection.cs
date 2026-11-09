@@ -64,7 +64,9 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         _arrange.Margin = new Thickness(Ui.GroupGap, 0, 0, 0);
         _titleTools.Children.Add(_arrange);
         var power = Ui.Switch(S.Enabled, on => Host?.SetEnabled(on));
-        ToggleCards.Row(power, ToggleCards.RowTitle("Show the overlay"), null);
+        var powerTitle = ToggleCards.RowTitle("Show the overlay");
+        Ui.AddInfo(powerTitle, "Shows over borderless and windowed iRacing, not exclusive fullscreen. Nothing is injected into the sim. When each widget shows is set per widget and under Overlay settings.");
+        ToggleCards.Row(power, powerTitle, null);
         power.Margin = new Thickness(Ui.GroupGap, 0, 0, 0);
         power.VerticalAlignment = VerticalAlignment.Center;
         power.HorizontalAlignment = HorizontalAlignment.Left;
@@ -75,7 +77,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         _segments.HorizontalAlignment = HorizontalAlignment.Left;
         _segments.VerticalAlignment = VerticalAlignment.Center;
         var tabRow = Ui.SplitRow(_segments, _layoutSlot, 19);
-        tabRow.Margin = new Thickness(0, 0, 0, 10);
+        tabRow.Margin = Ui.TabRowMargin;
         Children.Add(tabRow);
         Children.Add(_body);
         Ui.Anchor(this, "simracing.hud");
@@ -269,6 +271,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         if (_statusChip.Parent is Panel parent && (text, soft, deep) != _statusShown)
         {
             var chip = Ui.Chip(text, soft, deep);
+            chip.BorderThickness = new Thickness(0);
             chip.Margin = new Thickness(0);
             chip.VerticalAlignment = VerticalAlignment.Center;
             int i = parent.Children.IndexOf(_statusChip);
@@ -382,8 +385,8 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
         layoutLabel.Margin = new Thickness(0, 0, 10, 0);
         row.Children.Add(layoutLabel);
         row.Children.Add(pick);
-        foreach (var b in new[] { rename, dup, delete }) { b.Margin = new Thickness(5, 0, 0, 0); row.Children.Add(b); }
-        add.Margin = new Thickness(5, 0, 0, 0);
+        foreach (var b in new[] { rename, dup, delete }) { b.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0); row.Children.Add(b); }
+        add.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0);
         row.Children.Add(add);
 
         var rules = new StackPanel();
@@ -460,7 +463,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
     {
         if (_ruleCount is null) return;
         _ruleCount.Text = S.Rules.Count == 0 ? "No rules" : RaceFormat.Count(S.Rules.Count, "rule");
-        _ruleCount.Visibility = S.AutoSwitch ? Visibility.Collapsed : Visibility.Visible;
+        _ruleCount.Visibility = S.AutoSwitch || S.Rules.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private FrameworkElement RuleRow(HudLayoutRule rule)
@@ -754,7 +757,7 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             changed();
             rebuild();
         }, 194);
-        yield return row("Colors", a.Colors == HudAppearance.AppColors ? "Every widget. Changes with the app theme." : "Every widget.", pick,
+        yield return row("Colors", a.Colors == HudAppearance.AppColors ? "Applies to every widget. Follows the app theme." : "Applies to every widget.", pick,
             (() => a.Colors == HudAppearance.DefaultColors, () => a.Colors = HudAppearance.DefaultColors, "Default"));
         if (preset)
         {

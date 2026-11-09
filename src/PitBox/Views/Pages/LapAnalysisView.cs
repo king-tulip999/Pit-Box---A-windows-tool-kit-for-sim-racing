@@ -109,7 +109,7 @@ internal static class LapAnalysisView
             swatch.SetResourceReference(Border.BackgroundProperty, line.BrushKey);
             if (line.Reference && !s.Single) swatch.Opacity = 0.6;
             chip.Children.Add(swatch);
-            chip.Children.Add(new TextBlock { Text = line.Label, Style = Ui.Res<Style>("Body"), FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center });
+            chip.Children.Add(new TextBlock { Text = line.Label, Style = Ui.Res<Style>("Body"), FontSize = 12, VerticalAlignment = VerticalAlignment.Center });
             if (line.Reference && !s.Single) chip.Children.Add(new TextBlock { Text = "Reference", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(5, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
             int lapNumber = data.Laps.FirstOrDefault(l => ReferenceEquals(l.Trace, line.Trace)).Lap;
             if (lapNumber > 0)
@@ -451,11 +451,17 @@ internal static class LapAnalysisView
     internal static string Format(string lane, double v) => lane switch
     {
         "delta" => PitBox.SimRacing.Race.RaceFormat.Signed(v, "0.000", CultureInfo.CurrentCulture),
-        "latg" => v.ToString("0.00", CultureInfo.CurrentCulture),
-        "bias" => v.ToString("0.0", CultureInfo.CurrentCulture),
+        "latg" => Minus(v, "0.00"),
+        "bias" => Minus(v, "0.0"),
         "gear" => v < 0 ? "R" : v == 0 ? "N" : v.ToString("0", CultureInfo.CurrentCulture),
-        _ => v.ToString("0", CultureInfo.CurrentCulture),
+        _ => Minus(v, "0"),
     };
+
+    private static string Minus(double v, string format)
+    {
+        string magnitude = Math.Abs(v).ToString(format, CultureInfo.CurrentCulture);
+        return v < 0 && magnitude.Any(c => c is >= '1' and <= '9') ? "−" + magnitude : magnitude;
+    }
 
     internal static string DistanceText(double m, bool imperial) =>
         imperial ? (m / 1609.344).ToString("0.00", CultureInfo.CurrentCulture) + " " + Units.Mi : (m / 1000).ToString("0.00", CultureInfo.CurrentCulture) + " " + Units.Km;
@@ -499,7 +505,7 @@ internal sealed class LapMap : FrameworkElement, IKeepsWheel
                 minX = Math.Min(minX, r.X[i]); maxX = Math.Max(maxX, r.X[i]);
                 minY = Math.Min(minY, r.Y[i]); maxY = Math.Max(maxY, r.Y[i]);
             }
-            double pad = 19, w = ActualWidth - 2 * pad, h = ActualHeight - 2 * pad;
+            double pad = 10, w = ActualWidth - 2 * pad, h = ActualHeight - 2 * pad;
             double scale = Math.Min(w / Math.Max(10, maxX - minX), h / Math.Max(10, maxY - minY));
             return new MapView(minX, maxY, scale, pad + (w - (maxX - minX) * scale) / 2, pad + (h - (maxY - minY) * scale) / 2);
         }

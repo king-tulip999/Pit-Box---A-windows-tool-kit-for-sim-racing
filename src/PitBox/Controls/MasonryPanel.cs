@@ -9,6 +9,7 @@ public sealed class MasonryPanel : Panel
     public int MaxColumns { get; set; } = 3;
     public double Gap { get; set; } = 13;
     public bool Stable { get; set; }
+    public bool EvenBottoms { get; set; }
     public Func<int, int, int?>? ColumnOf { get; set; }
 
     private int ColumnFor(double[] heights, int index) =>
@@ -42,14 +43,23 @@ public sealed class MasonryPanel : Panel
         int columns = Columns(final.Width);
         double w = ColumnWidth(final.Width, columns);
         var heights = new double[columns];
+        var placed = new List<(UIElement Child, int Column, double Top)>();
         int index = 0;
         foreach (UIElement child in InternalChildren)
         {
             if (child.Visibility == Visibility.Collapsed) { child.Arrange(new Rect()); continue; }
             int c = ColumnFor(heights, index++);
-            double x0 = Math.Round(c * (w + Gap)), x1 = Math.Round(c * (w + Gap) + w);
-            child.Arrange(new Rect(x0, heights[c], Math.Max(0, x1 - x0), child.DesiredSize.Height));
+            placed.Add((child, c, heights[c]));
             heights[c] += child.DesiredSize.Height + Gap;
+        }
+        double bottom = heights.Max() - Gap;
+        for (int i = 0; i < placed.Count; i++)
+        {
+            var (child, c, top) = placed[i];
+            bool last = !placed.Skip(i + 1).Any(p => p.Column == c);
+            double h = EvenBottoms && columns > 1 && last ? Math.Max(child.DesiredSize.Height, bottom - top) : child.DesiredSize.Height;
+            double x0 = Math.Round(c * (w + Gap)), x1 = Math.Round(c * (w + Gap) + w);
+            child.Arrange(new Rect(x0, top, Math.Max(0, x1 - x0), h));
         }
         return final;
     }

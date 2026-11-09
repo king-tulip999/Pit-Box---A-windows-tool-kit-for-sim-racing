@@ -88,9 +88,7 @@ internal static class StatsSessionTools
 
     private static TextBlock Head(string text, string? tip = null)
     {
-        var t = new TextBlock { Text = text, Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, ToolTip = tip };
-        t.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
-        return t;
+        return Ui.TableHead(text, tip);
     }
 
     private static TextBlock Label(string text) =>
@@ -172,7 +170,7 @@ internal static class StatsSessionTools
                     track.SetResourceReference(Border.BackgroundProperty, soft);
                     track.SizeChanged += (_, e) => fill.Width = e.NewSize.Width * Math.Clamp(left, 0, 1);
                     var cell = new StackPanel { ToolTip = $"{names[z]}: {left * 100:0.0}% left", Margin = new Thickness(0, 0, z < 2 ? 8 : 0, 0) };
-                    var zone = new TextBlock { Text = names[z], Style = Ui.Res<Style>("Caption"), FontSize = 11 };
+                    var zone = new TextBlock { Text = names[z], Style = Ui.Res<Style>("Caption"), FontSize = 12 };
                     zone.SetResourceReference(TextBlock.ForegroundProperty, "TextFaint");
                     cell.Children.Add(zone);
                     cell.Children.Add(Number($"{left * 100:0.0}", "Caption"));

@@ -352,7 +352,7 @@ internal sealed class GrrDashboardSection : StackPanel
         else text = grr.FetchedAt(League!) is { } t ? $"Updated {GrrParts.Ago(t)}" : "Not read yet";
         if (_freshnessText != text) { _freshnessText = text; _freshness.Text = text; }
         _freshness.Foreground = Ui.Res<Brush>(brush);
-        _freshness.FontSize = 11.5;
+        _freshness.FontSize = 12;
         _freshness.ToolTip = tip;
     }
 
@@ -672,7 +672,7 @@ internal sealed class GrrDashboardSection : StackPanel
                 var col = columns[c];
                 var t = TextFit.TipWhenTrimmed(new TextBlock
                 {
-                    Text = col.Value(row) ?? "–", FontSize = 11.5, FontWeight = weight, Foreground = Ui.Res<Brush>(col == columns[^1] ? "Heading" : col.Right ? "TextMuted" : "Text"),
+                    Text = col.Value(row) ?? "–", FontSize = 12, FontWeight = weight, Foreground = Ui.Res<Brush>(col == columns[^1] ? "Heading" : col.Right ? "TextMuted" : "Text"),
                     TextAlignment = col.Right ? TextAlignment.Right : TextAlignment.Left, Margin = new Thickness(0, 0, col.Right ? 8 : 6, 0), VerticalAlignment = VerticalAlignment.Center,
                     TextTrimming = TextTrimming.CharacterEllipsis, IsHitTestVisible = false, Typography = { NumeralAlignment = FontNumeralAlignment.Tabular },
                 });
@@ -741,6 +741,8 @@ internal sealed class GrrDashboardSection : StackPanel
             foreach (var w in round.Winners)
             {
                 var chip = Ui.Chip($"{w.Class} · {w.Driver}");
+                chip.BorderThickness = new Thickness(0);
+                if (chip.Child is TextBlock label) label.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
                 chip.ToolTip = $"Won {w.Class}";
                 chips.Children.Add(chip);
             }
@@ -852,12 +854,6 @@ internal sealed class GrrDashboardSection : StackPanel
                     click = () => { _eventKey = Key(e); _session = -1; _allResults = false; _shape = ""; Build(); ShowResults(); };
                 tipContent = GrrParts.RoundTip(outcome, e is null ? null : "Click to see the results");
             }
-            else if (i == next)
-            {
-                var c = GrrParts.Clock(10.5, "AccentText");
-                c.Text = GrrLeagues.ShortCountdown(GrrLeagues.Until(r.Start, now));
-                right = c;
-            }
             list.Children.Add(strip
                 ? StripCell(eyebrow, r.Track, GrrParts.ShortWhen(r.Start), right, mark, i == from || (i - from) % columns == 0, i == to - 1 || (i - from) % columns == columns - 1, click, tipContent)
                 : GrrParts.TimelineRow(eyebrow, r.Track, GrrParts.ShortWhen(r.Start), right, mark, i == from, i == to - 1, click, tipContent));
@@ -892,7 +888,7 @@ internal sealed class GrrDashboardSection : StackPanel
             System.Windows.Automation.AutomationProperties.SetName(fl, "Fastest lap");
             row.Children.Add(fl);
         }
-        row.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = name, FontSize = 11.5, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>("Text"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center }));
+        row.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = name, FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>("Text"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center }));
         return row;
     }
 
@@ -916,7 +912,7 @@ internal sealed class GrrDashboardSection : StackPanel
         stack.Children.Add(GrrParts.Eyebrow(eyebrow, mark == GrrParts.TimelineMark.Next ? "AccentText" : null));
         stack.Children.Add(new TextBlock
         {
-            Text = track, FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>(mark == GrrParts.TimelineMark.Done ? "TextMuted" : "Text"),
+            Text = track, FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>(mark == GrrParts.TimelineMark.Done ? "TextMuted" : "Text"),
             TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, LineHeight = 15, LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
             MaxHeight = 30, Margin = new Thickness(0, 2, 0, 0), ToolTip = track,
         });

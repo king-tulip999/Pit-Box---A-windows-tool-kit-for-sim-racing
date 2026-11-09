@@ -104,7 +104,7 @@ internal sealed class FanCalibrator
         const int Window = 4;
         _hardware.SetOverride(controlId, percent);
         var samples = new List<int>();
-        int interval = _demo ? 150 : SampleMs, minimum = _demo ? 2 : 1500 / SampleMs, maximum = _demo ? 8 : 12_000 / SampleMs;
+        int interval = _demo ? 150 : SampleMs, minimum = _demo ? 10 : 1500 / SampleMs, maximum = _demo ? 16 : 12_000 / SampleMs;
         for (int i = 0; i < maximum; i++)
         {
             await Task.Delay(interval, cancel);

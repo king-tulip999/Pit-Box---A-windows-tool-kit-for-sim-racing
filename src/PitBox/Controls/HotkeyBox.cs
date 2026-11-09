@@ -17,7 +17,7 @@ public sealed class HotkeyBox : TextBox
     private bool _paused, _recording;
     private Window? _window;
     private readonly Popup _hint;
-    private readonly TextBlock _hintText = new() { FontSize = 11, TextWrapping = TextWrapping.Wrap, MaxWidth = 227 };
+    private readonly TextBlock _hintText = new() { FontSize = 12, TextWrapping = TextWrapping.Wrap, MaxWidth = 227 };
     private KeyCaps? _caps;
 
     public string? Hotkey { get; private set; }
@@ -32,7 +32,29 @@ public sealed class HotkeyBox : TextBox
         init { _placeholder = value; Tag = value; }
     }
 
-    public bool ForSearch { get; init; }
+    private bool _forSearch, _clearWired;
+
+    public bool ForSearch
+    {
+        get => _forSearch;
+        init
+        {
+            _forSearch = value;
+            if (value) SetResourceReference(StyleProperty, "SearchBox");
+        }
+    }
+
+    public override void OnApplyTemplate()
+    {
+        base.OnApplyTemplate();
+        if (!_forSearch || _clearWired || GetTemplateChild("Clear") is not Button clear) return;
+        _clearWired = true;
+        clear.Click += (_, _) =>
+        {
+            if (Hotkey is not null) Update(null);
+            Cancel();
+        };
+    }
 
     private bool _lastExtended;
 

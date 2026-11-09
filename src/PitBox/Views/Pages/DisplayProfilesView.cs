@@ -29,8 +29,8 @@ internal sealed class DisplayProfilesView : Tile
         var title = Ui.Text("Saved profiles", "H2");
         title.VerticalAlignment = VerticalAlignment.Center;
         title.HorizontalAlignment = HorizontalAlignment.Left;
-        Ui.AddInfo(title, "Saved setups like “Desk” and “Sim rig”: which displays are on, arrangement, resolution, refresh rate, main display, HDR, taskbar, wallpapers and audio devices. Give each a keybind to switch between them.");
         stack.Children.Add(title);
+        stack.Children.Add(new TextBlock { Text = "Which displays are on, arrangement, resolution, refresh rate, HDR, taskbar, wallpapers and audio. Give each a keybind to switch.", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) });
         SaveCurrent = Ui.LabeledButton("I.Save", "Save current setup", SaveCurrentAsync, "PrimaryButton");
         stack.Children.Add(_grid);
         stack.Children.Add(_empty);
@@ -119,7 +119,7 @@ internal sealed class DisplayProfilesView : Tile
             var preview = new MonitorLayoutView { Height = 60 };
             var tiles = ProfileLayout.Tiles(_app, profile.Layout);
             var unnumbered = tiles.Where(t => !int.TryParse(t.Label, out _)).ToList();
-            preview.SetTiles(tiles.Select(t => unnumbered.Contains(t) ? t with { Label = SimRacing.Race.RaceFormat.Missing, Detail = t.Label } : t).ToList());
+            preview.SetTiles(EvenRow(tiles.Select(t => unnumbered.Contains(t) ? t with { Label = SimRacing.Race.RaceFormat.Missing, Detail = t.Label } : t).ToList()));
             if (unnumbered.Count > 0)
                 preview.ToolTip = string.Join("\n", unnumbered.Select(t => $"{t.Label}: {t.Detail} (no number while it's off)"));
             previewBox.Child = preview;
@@ -160,17 +160,21 @@ internal sealed class DisplayProfilesView : Tile
         if (_grid.Columns != columns) _grid.Columns = columns;
     }
 
+    private static List<LayoutTile> EvenRow(List<LayoutTile> tiles)
+    {
+        var sorted = tiles.OrderBy(t => t.X).ToList();
+        for (int i = 1; i < sorted.Count; i++)
+            if (sorted[i].X < sorted[i - 1].X + sorted[i - 1].Width - 1) return tiles;
+        const double width = 1600, height = 900;
+        return sorted.Select((t, i) => t with { X = i * width, Y = 0, Width = width, Height = height }).ToList();
+    }
+
     private static StackPanel ChangesFold(List<FrameworkElement> lines)
     {
         var panel = new StackPanel { Margin = new Thickness(0, 6, 0, 0) };
         var list = new StackPanel { Visibility = Visibility.Collapsed, Margin = new Thickness(3, 3, 0, 0) };
         foreach (var line in lines) list.Children.Add(line);
-        var chevron = Ui.FoldChevron(false);
-        var label = new StackPanel { Orientation = Orientation.Horizontal };
-        label.Children.Add(chevron);
-        label.Children.Add(new TextBlock { Text = $"What applying it changes ({lines.Count})", VerticalAlignment = VerticalAlignment.Center });
-        var toggle = new Button { Style = Ui.Res<Style>("QuietButton"), Content = label, HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(5, 3, 6, 3) };
-        ClickGuard.SetAllowRepeat(toggle, true);
+        var toggle = Ui.FoldHead($"What applying it changes ({lines.Count})", false, out var chevron, out _);
         toggle.Click += (_, _) =>
         {
             bool open = list.Visibility != Visibility.Visible;

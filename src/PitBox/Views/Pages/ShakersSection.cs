@@ -205,15 +205,9 @@ internal sealed class ShakersSection : Tile
     {
         var panel = new StackPanel { Margin = new Thickness(0, 4, 0, 4) };
         var list = new StackPanel { Visibility = _gamesOpen ? Visibility.Visible : Visibility.Collapsed, Margin = new Thickness(3, 3, 0, 0) };
-        var chevron = Ui.FoldChevron(_gamesOpen);
-        var label = new StackPanel { Orientation = Orientation.Horizontal };
-        label.Children.Add(chevron);
-        var count = new TextBlock { VerticalAlignment = VerticalAlignment.Center };
+        var toggle = Ui.FoldHead("Supported games", _gamesOpen, out var chevron, out var count);
         void Count() => count.Text = $"Supported games ({ShakerGames.All.Count(g => S.GameOn(g.Id))} of {ShakerGames.All.Count} on)";
         Count();
-        label.Children.Add(count);
-        var toggle = new Button { Style = Ui.Res<Style>("QuietButton"), Content = label, HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(5, 3, 6, 3) };
-        ClickGuard.SetAllowRepeat(toggle, true);
         toggle.Click += (_, _) =>
         {
             _gamesOpen = list.Visibility != Visibility.Visible;

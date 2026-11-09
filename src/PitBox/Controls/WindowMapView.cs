@@ -32,7 +32,7 @@ public sealed class WindowMapView : FrameworkElement, Views.IFrameStep
     private static Brush ScreenStroke => ThemeManager.Brush("LineStrong", Brushes.LightGray);
     private static Brush TextBrush => ThemeManager.Brush("Text", Brushes.Black);
     private static Brush MutedBrush => ThemeManager.Brush("TextMuted", Brushes.Gray);
-    private const double LabelSize = 12, NumberSize = 13, Pad = 6, WindowInset = 4;
+    private const double LabelSize = 12, NumberSize = 13, Pad = 6, WindowInset = 4, MinLabelWidth = 22;
 
     public event Action<string>? WindowClicked;
 
@@ -250,7 +250,16 @@ public sealed class WindowMapView : FrameworkElement, Views.IFrameStep
         foreach (var (t, r) in _hits.OrderByDescending(x => x.Window.Key == active).ThenBy(x => x.Box.Width * x.Box.Height))
         {
             if (Label(t.Label, LabelSize, t.Key == active, _accent!, dpi) is not { } text) continue;
-            if (text.Width + Pad * 2 > r.Width || text.Height + 4 > r.Height) continue;
+            if (text.Height + 4 > r.Height) continue;
+            if (text.Width + Pad * 2 > r.Width)
+            {
+                double room = r.Width - Pad * 2;
+                if (room < MinLabelWidth) continue;
+                text = new FormattedText(t.Label, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, t.Key == active ? ThemeManager.DisplayFace : ThemeManager.UiFace(), LabelSize, _accent!, dpi)
+                {
+                    MaxTextWidth = room, MaxLineCount = 1, Trimming = TextTrimming.CharacterEllipsis,
+                };
+            }
             var spots = new[] { r.Bottom - Pad - text.Height, r.Y + Pad, r.Y + (r.Height - text.Height) / 2 }
                 .Where(y => y >= r.Y + 2 && y + text.Height <= r.Bottom - 2)
                 .Select(y => (Rect?)new Rect(r.X + Pad, y, text.Width, text.Height));

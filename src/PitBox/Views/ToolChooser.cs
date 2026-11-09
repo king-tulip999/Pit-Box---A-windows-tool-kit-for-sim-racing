@@ -13,10 +13,7 @@ internal static class ToolChooser
 {
     internal static TextBlock Compact(TextBlock text)
     {
-        text.SetResourceReference(TextBlock.FontFamilyProperty, "RaceFont");
-        text.FontWeight = FontWeights.Bold;
-        TextCase.SetTight(text, true);
-        TextCase.SetUpper(text, true);
+        text.FontWeight = FontWeights.SemiBold;
         return text;
     }
 
@@ -58,7 +55,7 @@ internal static class ToolChooser
 
     private static TextBlock GroupTitle(string text)
     {
-        var title = Compact(new TextBlock { Text = text, Style = Ui.Res<Style>("Eyebrow"), FontSize = 14, Margin = new Thickness(2, 0, 0, 6) });
+        var title = new TextBlock { Text = text, Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(2, 0, 0, 6) };
         title.Foreground = Ui.Res<Brush>("EyebrowText");
         return title;
     }

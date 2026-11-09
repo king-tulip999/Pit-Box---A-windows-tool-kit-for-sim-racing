@@ -271,17 +271,17 @@ internal sealed class RigDiagram : FrameworkElement, IFrameStep
             arc.Freeze();
             dc.DrawLine(new Pen(faint, Hairline.Pixels(1, Hairline.ScaleOf(this))) { DashStyle = new DashStyle(new double[] { 2, 2 }, 0) }, hinge, new Point(hinge.X + radius + 10, hinge.Y));
             dc.DrawGeometry(null, new Pen(peach, 1.6), arc);
-            Label(dc, $"{r.SideAngle:0.0}°", new Point(hinge.X + radius + 6, hinge.Y + 6), peach, 9.5, bold: true);
+            Label(dc, $"{r.SideAngle:0.0}°", new Point(hinge.X + radius + 6, hinge.Y + 6), peach, 12, bold: true);
         }
 
         dc.DrawEllipse(ThemeManager.Brush("Surface", Brushes.White), new Pen(text, 1.6), eye, 9, 9);
         dc.DrawEllipse(text, null, new Point(eye.X - 3.2, eye.Y - 1.5), 1.6, 1.6);
         dc.DrawEllipse(text, null, new Point(eye.X + 3.2, eye.Y - 1.5), 1.6, 1.6);
 
-        Label(dc, $"{r.HorizontalFovTotal:0.0}° horizontal", new Point(eye.X, eye.Y + 14), accent, 9.5, bold: true, centre: true);
+        Label(dc, $"{r.HorizontalFovTotal:0.0}° horizontal", new Point(eye.X, eye.Y + 14), accent, 12, bold: true, centre: true);
         string unit = _imperial ? Units.In : Units.Cm;
         double k = _imperial ? 1 / 2.54 : 1;
-        Label(dc, $"Dotted box: ≈ {r.FootprintWidthCm * k:0} × {r.FootprintDepthCm * k:0} {unit} footprint", new Point(w - 2, 0), muted, 9, alignRight: true);
+        Label(dc, $"Dotted box: ≈ {r.FootprintWidthCm * k:0} × {r.FootprintDepthCm * k:0} {unit} footprint", new Point(w - 2, 0), muted, 12, alignRight: true);
         dc.Pop();
     }
 
@@ -294,7 +294,7 @@ internal sealed class RigDiagram : FrameworkElement, IFrameStep
         DrawPolyline(dc, pen, ideal.Screens[1].Select(at).ToList());
         DrawPolyline(dc, pen, ideal.Screens[2].Select(at).ToList());
         var end = at(ideal.Screens[1][^1]);
-        Label(dc, $"ideal {ideal.SideAngle:0.0}°", new Point(end.X + 6, end.Y - 6), ghost, 9.5, bold: true);
+        Label(dc, $"ideal {ideal.SideAngle:0.0}°", new Point(end.X + 6, end.Y - 6), ghost, 12, bold: true);
         dc.Pop();
     }
 

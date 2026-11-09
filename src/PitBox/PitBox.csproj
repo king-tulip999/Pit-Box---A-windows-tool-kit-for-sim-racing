@@ -19,7 +19,7 @@
     <ApplicationIcon>Assets\PitBox.ico</ApplicationIcon>
     <AssemblyName>PitBox</AssemblyName>
     <RootNamespace>PitBox</RootNamespace>
-    <Version>3.5.0</Version>
+    <Version>3.52.0</Version>
     <Title>Pit-Box</Title>
     <AssemblyTitle>Pit-Box</AssemblyTitle>
     <Product>Pit-Box</Product>

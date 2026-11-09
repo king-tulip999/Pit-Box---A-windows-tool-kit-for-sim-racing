@@ -16,7 +16,7 @@ internal sealed partial class RaceHudWidgets
 {
     private const double PanelNarrow = 400, PanelWide = 860, PanelWideMin = 560, WellPad = 13, PanelGap = 12;
     private const double TwoColumnMin = PanelNarrow * 2 + 18;
-    private const double WellMinHeight = 120, PanelCapMin = 480, PanelCapMax = 620, WellViewShare = 0.62, CategoryWidth = 96;
+    private const double WellMinHeight = 120, CategoryWidth = 96;
 
     internal readonly record struct PanelTarget(string? SettingId, string? Key, string? Id)
     {
@@ -67,12 +67,10 @@ internal sealed partial class RaceHudWidgets
         var hint = new TextBlock { Text = "Click a part of the widget to change it; drag items to reorder", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
         var all = Ui.LabeledButton("I.Sliders", "All settings", () => OpenPanel(new PanelTarget(null, null, null)));
         all.ToolTip = "Every setting of this widget in one panel";
-        var more = new TextBlock { Text = "More options may be in All settings", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(Ui.GroupGap, 0, Ui.ButtonGap, 0) };
         var head = new DockPanel { Margin = new Thickness(0, 0, 0, 8) };
         DockPanel.SetDock(all, Dock.Right);
-        DockPanel.SetDock(more, Dock.Right);
+        all.Margin = new Thickness(Ui.GroupGap, 0, 0, 0);
         head.Children.Add(all);
-        head.Children.Add(more);
         head.Children.Add(hint);
 
         _previewNote = new TextBlock { Style = Ui.Res<Style>("Caption"), Margin = new Thickness(2, 6, 0, 0) };
@@ -83,12 +81,6 @@ internal sealed partial class RaceHudWidgets
     }
 
     private double WellHeight() => Math.Max(WellMinHeight, Math.Ceiling(_laidHeight * _previewScale + WellPad * 2));
-
-    private double PanelCap()
-    {
-        double view = PageOf(_well) is { ViewportHeight: > 200 } page ? page.ViewportHeight * WellViewShare : PanelCapMin;
-        return Math.Max(WellHeight(), Math.Clamp(view, PanelCapMin, PanelCapMax));
-    }
 
     private double RoomRight() => _well is null ? 0 : _well.ActualWidth - (WellPad + _laidWidth * _previewScale + PanelGap) - 6;
 
@@ -182,15 +174,13 @@ internal sealed partial class RaceHudWidgets
         }
         if (_panelWide) _panel.Width = Math.Floor(Math.Min(room, PanelWide));
         double height;
-        double headerHeight = (_panel.Child as DockPanel)?.Children[0] is FrameworkElement h ? h.ActualHeight > 0 ? h.ActualHeight : 40 : 40;
         double left, top;
         _panelScroll.MaxHeight = double.PositiveInfinity;
         _panel.Measure(new Size(_panel.Width, double.PositiveInfinity));
         double natural = _panel.DesiredSize.Height;
         if (room >= _panel.Width - 1)
         {
-            height = Math.Max(WellHeight(), Math.Min(PanelCap(), Math.Ceiling(natural + WellPad + 6)));
-            _panelScroll.MaxHeight = Math.Max(120, height - WellPad - 6 - headerHeight - 2);
+            height = Math.Max(WellHeight(), Math.Ceiling(natural + WellPad + 6));
             left = WellPad + _laidWidth * _previewScale + PanelGap;
             top = WellPad;
         }

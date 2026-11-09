@@ -269,8 +269,8 @@ internal sealed partial class RaceHudWidgets
         var look = new List<FrameworkElement>();
         foreach (var colorRow in RaceHudSection.LookRows(S.Appearance, () => { Changed(); if (_preview is not null) DrawPreview(w); }, () => _list.Dispatcher.BeginInvoke(Fill, System.Windows.Threading.DispatcherPriority.Background), (t, d, c, _) => SettingRows.Row(t, d, true, c)))
             look.Add((FrameworkElement)colorRow);
-        look.Add(SettingRows.Row("Opacity", null, true, Ui.SliderWithValue(20, 100, w.Opacity, "{0:0}%", v => { w.Opacity = (int)v; Changed(); if (_preview is not null) DrawPreview(w); }, 110, 5)));
-        var background = Ui.SliderWithValue(0, 100, w.Background ?? S.Appearance.Background, "{0:0}%", v => { w.Background = (int)v; Changed(); if (_preview is not null) DrawPreview(w); }, 110, 5);
+        look.Add(SettingRows.Row("Opacity", null, true, Ui.SliderWithValue(20, 100, w.Opacity, "{0:0}%", v => { w.Opacity = (int)v; Changed(); if (_preview is not null) DrawPreview(w); }, ComboWidth - 42, 5)));
+        var background = Ui.SliderWithValue(0, 100, w.Background ?? S.Appearance.Background, "{0:0}%", v => { w.Background = (int)v; Changed(); if (_preview is not null) DrawPreview(w); }, ComboWidth - 42, 5);
         var backgroundRow = SettingRows.Row("Background", null, true, background);
         backgroundRow.Visibility = w.Background is not null ? Visibility.Visible : Visibility.Collapsed;
         var own = Ui.Switch(w.Background is not null, on =>
@@ -280,7 +280,7 @@ internal sealed partial class RaceHudWidgets
             Changed();
             if (_preview is not null) DrawPreview(w);
         });
-        look.Add(SettingRows.Row("Own background", "The panel behind the text only; off, it follows the overlay's Background.", true, own));
+        look.Add(SettingRows.Row("Own background", "Off: uses the overlay's background.", true, own));
         look.Add(backgroundRow);
         var rates = new[] { 0, 1, 2, 5, 10, 15, 20, 30, 60 }.Select(r => new Choice(r.ToString(), r == 0 ? def.MovingHz > 0 ? $"Default ({def.DefaultHz} per second, {def.MovingHz} while it moves)" : $"Default ({def.DefaultHz} per second)" : $"{r} per second"));
         look.Add(SettingRows.Row("Redraw", null, true, Ui.Combo(rates, w.UpdateHz.ToString(), c => { w.UpdateHz = int.Parse(c.Id!); Changed(); }, ComboWidth)));
@@ -319,7 +319,7 @@ internal sealed partial class RaceHudWidgets
         var web = Card("Browser source", BrowserSourceRows(w));
         Ui.Anchor(web, RaceHudSection.WebAnchor);
 
-        var panels = new MasonryPanel { MinColumnWidth = PanelMinWidth, MaxColumns = 4, Gap = 14 };
+        var panels = new MasonryPanel { MinColumnWidth = PanelMinWidth, MaxColumns = 4, Gap = 14, EvenBottoms = true };
         panels.Children.Add(Card("When shown", when));
         var lookCard = Card("Panel and redraw", look);
         var placeCard = Card("Placement", place);

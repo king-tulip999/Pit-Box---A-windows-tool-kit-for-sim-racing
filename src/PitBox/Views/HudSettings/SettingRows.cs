@@ -26,7 +26,7 @@ internal sealed class HudSettingContext
 
 internal static class SettingRows
 {
-    public const double LabelWidth = 172;
+    public const double LabelWidth = 172, LabelMin = 90;
     private const double UnpickedPicture = 0.5;
     private const double ComboWidth = 194;
 
@@ -50,12 +50,23 @@ internal static class SettingRows
             grid.Children.Add(ToggleCards.Row((CheckBox)control, ToggleCards.RowTitle(label), help));
             return grid;
         }
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(LabelWidth) });
+        var labelColumn = new ColumnDefinition { Width = new GridLength(LabelWidth) };
+        grid.ColumnDefinitions.Add(labelColumn);
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto, MinHeight = 28 });
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         var name = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
-        name.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Body"), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, MaxWidth = help is not null && !inlineHelp ? LabelWidth - 34 : LabelWidth - 10 });
+        double labelSpare = help is not null && !inlineHelp ? 34 : 10;
+        var labelText = new TextBlock { Text = label, Style = Ui.Res<Style>("Body"), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, MaxWidth = LabelWidth - labelSpare };
+        name.Children.Add(labelText);
+        grid.SizeChanged += (_, e) =>
+        {
+            if (!e.WidthChanged) return;
+            control.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            double room = Math.Floor(Math.Clamp(e.NewSize.Width - control.DesiredSize.Width, LabelMin, LabelWidth));
+            if (Math.Abs(labelColumn.Width.Value - room) > 0.5) labelColumn.Width = new GridLength(room);
+            labelText.MaxWidth = room - labelSpare;
+        };
         if (help is not null && !inlineHelp) name.Children.Add(HelpTip.For(help, label));
         grid.Children.Add(new Border { MinHeight = 28, VerticalAlignment = VerticalAlignment.Top, Child = name });
         control.HorizontalAlignment = HorizontalAlignment.Left;
@@ -176,9 +187,9 @@ internal static class SettingRows
         return new Tile { Style = Ui.Res<Style>("Segmented"), Child = panel };
     }
 
-    public static WrapPanel Toggles(IReadOnlyList<(string Id, string Label, string? Help)> items, Func<string, bool> isOn, Action<string, bool> changed)
+    public static System.Windows.Controls.Primitives.UniformGrid Toggles(IReadOnlyList<(string Id, string Label, string? Help)> items, Func<string, bool> isOn, Action<string, bool> changed)
     {
-        var panel = new WrapPanel { Margin = new Thickness(0, 2, 0, 2) };
+        var panel = new System.Windows.Controls.Primitives.UniformGrid { Columns = Math.Clamp(items.Count, 1, 2), Margin = new Thickness(0, 2, 0, 2), HorizontalAlignment = HorizontalAlignment.Left };
         foreach (var (id, label, help) in items)
         {
             var box = new CheckBox { Content = label, IsChecked = isOn(id), Margin = new Thickness(0, 5, 18, 5), ToolTip = help };
@@ -186,11 +197,6 @@ internal static class SettingRows
             box.Click += (_, _) => changed(id, box.IsChecked == true);
             panel.Children.Add(box);
         }
-        panel.Loaded += (_, _) =>
-        {
-            double widest = panel.Children.OfType<FrameworkElement>().Select(child => child.DesiredSize.Width).DefaultIfEmpty(0).Max();
-            if (widest > 0 && Math.Abs(panel.ItemWidth - widest) > 0.5) panel.ItemWidth = Math.Ceiling(widest);
-        };
         return panel;
     }
 
@@ -236,7 +242,7 @@ internal static class SettingRows
             empty.Visibility = shown.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             c.SetOne(HudClassFilter.ListKey, string.Join(",", shown));
         }
-        WrapPanel Chips(IEnumerable<string> names) => Toggles(
+        System.Windows.Controls.Primitives.UniformGrid Chips(IEnumerable<string> names) => Toggles(
             names.Select(n => (n, n, string.Equals(n, mine, StringComparison.OrdinalIgnoreCase) ? "Your class" : (string?)null)).ToList(),
             n => shown.Contains(n, StringComparer.OrdinalIgnoreCase),
             (n, on) =>

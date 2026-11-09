@@ -62,7 +62,7 @@ internal static class IdentifyDisplays
                     {
                         new TextBlock { Text = monitor.Label, FontSize = 78, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, Foreground = (Brush)Application.Current.FindResource("AccentText"), FontFamily = (FontFamily)Application.Current.FindResource("DisplayFont") },
                         new TextBlock { Text = monitor.Name, FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, Foreground = (Brush)Application.Current.FindResource("Text") },
-                        new TextBlock { Text = $"{monitor.Width}×{monitor.Height} · {monitor.Hz} {Units.Hz}" + (monitor.Primary ? " · main" : ""), FontSize = 11, Margin = new Thickness(0, 2, 0, 0), HorizontalAlignment = HorizontalAlignment.Center, Foreground = (Brush)Application.Current.FindResource("TextMuted") },
+                        new TextBlock { Text = $"{monitor.Width}×{monitor.Height} · {monitor.Hz} {Units.Hz}" + (monitor.Primary ? " · main" : ""), FontSize = 12, Margin = new Thickness(0, 2, 0, 0), HorizontalAlignment = HorizontalAlignment.Center, Foreground = (Brush)Application.Current.FindResource("TextMuted") },
                     },
                 },
             };
@@ -289,6 +289,8 @@ internal static class Ui
 
     public static Thickness HeaderMargin => new(HeaderIndent, HeaderTop, 0, HeaderGap);
 
+    public static Thickness TabRowMargin => new(0, 0, 0, 12);
+
     public const double PanelSpacing = 19;
 
     public const double TwoCardsFrom = 1120;
@@ -459,6 +461,19 @@ internal static class Ui
     }
 
     public static void SetFold(Icon chevron, bool open) => chevron.Data = Res<Geometry>(open ? "I.ChevronDown" : "I.ChevronRight");
+
+    public static Button FoldHead(string text, bool open, out Icon chevron, out TextBlock label)
+    {
+        chevron = FoldChevron(open);
+        label = new TextBlock { Text = text, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+        var face = new StackPanel { Orientation = Orientation.Horizontal };
+        face.Children.Add(chevron);
+        face.Children.Add(label);
+        var toggle = new Button { Style = Res<Style>("QuietButton"), Content = face, HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(5, 3, 6, 3), Margin = new Thickness(-5, 0, 0, 0) };
+        ClickGuard.SetAllowRepeat(toggle, true);
+        AutomationProperties.SetName(toggle, text);
+        return toggle;
+    }
 
     public static DockPanel MenuFace(UIElement text, UIElement? lead = null)
     {
@@ -908,7 +923,7 @@ internal static class Ui
         if (!string.IsNullOrWhiteSpace(title))
             stack.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.Bold, Foreground = Res<Brush>(deep), TextWrapping = TextWrapping.Wrap });
         if (!string.IsNullOrWhiteSpace(detail))
-            stack.Children.Add(new TextBlock { Text = detail, FontSize = 11, Foreground = Res<Brush>(title is null ? deep : "Text"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, title is null ? 0 : 2, 0, 0) });
+            stack.Children.Add(new TextBlock { Text = detail, FontSize = 12, Foreground = Res<Brush>(title is null ? deep : "Text"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, title is null ? 0 : 2, 0, 0) });
         Grid.SetColumn(stack, 1);
         grid.Children.Add(stack);
         if (action is { } a)
@@ -1003,6 +1018,14 @@ internal static class Ui
 
     public sealed record SettingDefault(Func<bool> IsDefault, Action Reset, string Default);
 
+    public static readonly DependencyProperty ControlBelowProperty = DependencyProperty.RegisterAttached("ControlBelow", typeof(bool), typeof(Ui));
+
+    public static T ControlBelow<T>(T row) where T : Grid
+    {
+        row.SetValue(ControlBelowProperty, true);
+        return row;
+    }
+
     public static Grid SettingRow(string title, string? description, UIElement control, SettingDefault? fallback = null, string? more = null)
     {
         if (ToggleCards.IsSwitch(control)) return SwitchRow(title, description, (CheckBox)control, fallback, more);
@@ -1080,7 +1103,7 @@ internal static class Ui
                 measuredFor = key;
             }
             double room = grid.ActualWidth - fe.DesiredSize.Width - 18;
-            bool stack = StacksSettingControl(room, natural, titleWidth, longest, titleOnly: text.Children.Count == 1);
+            bool stack = (bool)grid.GetValue(ControlBelowProperty) || StacksSettingControl(room, natural, titleWidth, longest, titleOnly: text.Children.Count == 1);
             double laneMin = stack ? 0 : spare ? Math.Max(SettingControlLane, fe.DesiredSize.Width) : fe.DesiredSize.Width;
             if (lane.MinWidth != laneMin) lane.MinWidth = laneMin;
             if (stack == stacked) return;
@@ -1115,6 +1138,13 @@ internal static class Ui
         ToggleCards.Row(toggle, head, description, trailing: reset);
         grid.Children.Add(toggle);
         return grid;
+    }
+
+    public static TextBlock TableHead(string text, string? tip = null)
+    {
+        var head = new TextBlock { Text = text, Style = Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, ToolTip = tip };
+        head.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
+        return head;
     }
 
     public static TextBlock SubHeader(string text, bool first = false)

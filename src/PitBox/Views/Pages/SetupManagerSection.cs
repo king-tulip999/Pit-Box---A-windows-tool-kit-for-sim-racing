@@ -110,8 +110,8 @@ internal sealed class SetupManagerSection : StackPanel
         _explorer.Margin = new Thickness(13, 0, 0, 0);
         Grid.SetColumn(_explorer, 1);
         split.Children.Add(_explorer);
-        _split = Pane(split);
-        _split.Margin = new Thickness(0, 11, 0, 0);
+        _split = new Tile { Child = split };
+        _split.Margin = new Thickness(0, 13, 0, 0);
         _split.Height = 616;
         stack.Children.Add(_split);
         _split.IsVisibleChanged += (_, _) => Dispatcher.BeginInvoke(FitSplit, System.Windows.Threading.DispatcherPriority.Loaded);
@@ -284,7 +284,7 @@ internal sealed class SetupManagerSection : StackPanel
         head.Children.Add(close);
         head.Children.Add(new TextBlock
         {
-            Text = "Pit-Box watches your Downloads folder for iRacing setups (.sto) and share packs (.zip) from league mates or setup shops. Each one is listed with the car it looks like it's for. File it moves the file into that car's iRacing setups folder, so it shows up in the iRacing garage. Change the car if the guess is wrong, or press × to leave the file where it is.",
+            Text = "Setups (.sto) and share packs (.zip) found in your Downloads folder. File it moves one into that car's iRacing setups folder, so it shows up in the iRacing garage. Change the car if the guess is wrong.",
             Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 10, 5), VerticalAlignment = VerticalAlignment.Center,
         });
         stack.Children.Add(head);
@@ -330,11 +330,18 @@ internal sealed class SetupManagerSection : StackPanel
 
         FrameworkElement car;
         if (item.PackCars.Count > 0)
-            car = new TextBlock
+        {
+            var packCars = TextFit.TipWhenTrimmed(new TextBlock
             {
-                Text = "→ " + string.Join(", ", item.PackCars.Select(d => _store.Car(d)?.Name ?? d)), Style = Ui.Res<Style>("Muted"),
-                TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, ToolTip = "The pack says which car each setup is for",
-            };
+                Text = string.Join(", ", item.PackCars.Select(d => _store.Car(d)?.Name ?? d)), FontWeight = FontWeights.SemiBold,
+                TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center,
+            });
+            var field = new Border { Height = Ui.ControlHeight, Width = 194, HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(10, 0, 10, 0), Child = packCars, ToolTip = "The pack says which car each setup is for" };
+            field.SetResourceReference(Border.BackgroundProperty, "QuietBg");
+            field.SetResourceReference(Border.BorderBrushProperty, "QuietEdge");
+            Hairline.Frame(field);
+            car = field;
+        }
         else
         {
             car = Ui.Combo(choices, item.Car, c => { item.Car = c.Id; RenderInbox(); }, 194);
@@ -739,7 +746,7 @@ internal sealed class SetupManagerSection : StackPanel
         var name = TextFit.TipWhenTrimmed(new TextBlock
         {
             Text = car.Name, Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis,
-            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 0, 6, 0), Opacity = dim ? 0.55 : 1,
+            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 0, 6, 0),
         });
         Grid.SetColumn(name, 1);
         grid.Children.Add(name);
@@ -757,10 +764,9 @@ internal sealed class SetupManagerSection : StackPanel
             tag.Margin = new Thickness(6, 0, 0, 0);
             tail.Children.Add(tag);
         }
-        var count = Small(car.Root.Files.ToString(System.Globalization.CultureInfo.CurrentCulture));
+        var count = Small(car.Root.Files.ToString(System.Globalization.CultureInfo.CurrentCulture), dim ? "TextFaint" : "TextMuted");
         count.Margin = new Thickness(8, 0, 0, 0);
         count.ToolTip = SetupTree.Plural(car.Root.Files, "setup");
-        if (dim) count.Opacity = 0.55;
         tail.Children.Add(count);
         Grid.SetColumn(tail, 2);
         grid.Children.Add(tail);
@@ -863,7 +869,7 @@ internal sealed class SetupManagerSection : StackPanel
             stack.Children.Add(path);
         }
 
-        if (sel.Count == 0)
+        if (sel.Count == 0 && !target.IsRoot)
         {
             var summary = FolderSummary(target);
             DockPanel.SetDock(summary, Dock.Top);
@@ -954,6 +960,8 @@ internal sealed class SetupManagerSection : StackPanel
             news.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "AccentText");
             counts.Inlines.Add(news);
         }
+        if (car.Root.Files > 0) counts.Inlines.Add(new System.Windows.Documents.Run(" · changed " + SetupTree.Date(car.Root.Latest)));
+        counts.Inlines.Add(new System.Windows.Documents.InlineUIContainer(HudSettings.HelpTip.For(TreeHelp, car.Name)) { BaselineAlignment = BaselineAlignment.Center });
         var rename = Ui.IconButton("I.Pencil", "Change the name or class Pit-Box shows", () => EditCarName(car), "QuietIconButton");
         rename.VerticalAlignment = VerticalAlignment.Center;
         rename.ToolTip = $"Change the name or class Pit-Box shows (the folder on disk stays {car.Dir})";
@@ -998,9 +1006,7 @@ internal sealed class SetupManagerSection : StackPanel
             actions.Children.Add(selected);
             if (one is not null) Act(Plain("Rename", () => Rename(one)), "Rename (F2)");
             Act(Plain("Move", () => PickMove(car, sel)), "Move to another folder of this car");
-            var share = Ui.IconButton("I.External", $"Share / export ({sel.Count}): save a share pack for league mates, or plain copies", () => Export(car, sel));
-            share.VerticalAlignment = VerticalAlignment.Center;
-            Act(share, null);
+            Act(Plain("Share / export", () => Export(car, sel)), $"Share / export ({sel.Count}): save a share pack for league mates, or plain copies");
             if (one is not null) Act(Plain(one.IsFolder ? "Open in Explorer" : "Show in Explorer", () => { if (one.IsFolder) OpenFolder(one); else Reveal(one); }), null);
             var delete = Plain("Delete", () => Delete(sel), "DangerButton");
             Act(delete, "Move to the Recycle Bin");
@@ -1145,6 +1151,8 @@ internal sealed class SetupManagerSection : StackPanel
 
     private string Label(SetupNode folder) => folder.IsRoot ? folder.Car.Name : folder.Name;
 
+    private const string TreeHelp = "Click a folder to make it where Import and New folder add. Double-click a folder to open it. Drag rows up or down to reorder, onto a folder to move them into it, or onto the gap under a folder to move them out of it.";
+
     private FrameworkElement FolderSummary(SetupNode folder)
     {
         var bits = new List<string>();
@@ -1155,7 +1163,7 @@ internal sealed class SetupManagerSection : StackPanel
         }
         if (folder.Files > 0) bits.Add((bits.Count == 0 ? "Changed " : "changed ") + SetupTree.Date(folder.Latest));
         var text = new TextBlock { Text = string.Join(" · ", bits), Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center };
-        Ui.AddInfo(text, "Click a folder to make it where Import and New folder add. Double-click a folder to open it. Drag rows up or down to reorder, onto a folder to move them into it, or onto the gap under a folder to move them out of it.");
+        Ui.AddInfo(text, TreeHelp);
         return new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 5, 0, 0), Children = { text } };
     }
 
@@ -1182,7 +1190,7 @@ internal sealed class SetupManagerSection : StackPanel
             var g = new Grid { Margin = new Thickness(0, 8, 0, 0) };
             g.ColumnDefinitions.Add(new ColumnDefinition());
             g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var shown = TextCase.Verbatim(TextFit.TipWhenTrimmed(new TextBlock { Text = path, TextTrimming = TextTrimming.CharacterEllipsis, FontFamily = Ui.Res<FontFamily>("MonoFont"), FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center }));
+            var shown = TextCase.Verbatim(TextFit.TipWhenTrimmed(new TextBlock { Text = path, TextTrimming = TextTrimming.CharacterEllipsis, FontFamily = Ui.Res<FontFamily>("MonoFont"), FontSize = 12, VerticalAlignment = VerticalAlignment.Center }));
             var field = Hairline.Frame(new Border { Height = 28, Padding = new Thickness(8, 0, 8, 0), Child = shown });
             field.SetResourceReference(Border.BorderBrushProperty, "Line");
             field.SetResourceReference(Border.BackgroundProperty, "SurfaceAlt");

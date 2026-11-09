@@ -271,12 +271,12 @@ internal sealed class PanelGrid : Panel
         veil.Background = new SolidColorBrush(Color.FromArgb(VeilAlpha, surface.R, surface.G, surface.B));
 
         var tag = new StackPanel { Orientation = Orientation.Horizontal };
-        tag.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = def.Label, FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>("AccentText"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis }));
+        tag.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = def.Label, FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>("AccentText"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis }));
         var layers = new Grid();
         layers.Children.Add(new Tile
         {
             Background = Ui.Res<Brush>("AccentSoft"), BorderBrush = Ui.Res<Brush>("Accent"), BorderThickness = Hairline.Edges(), CornerRadius = ThemeManager.Round(12),
-            Padding = new Thickness(9, 0, 9, 0), Height = 24, Margin = new Thickness(6), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Child = tag,
+            Padding = new Thickness(9, 0, 9, 0), Height = 24, Margin = new Thickness(8), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Child = tag,
         });
         if (CanResize(def))
             layers.Children.Add(Grip(item));

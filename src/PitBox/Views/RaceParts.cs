@@ -384,8 +384,8 @@ internal static class RaceParts
         if (value is not null && delta is { } d)
         {
             string brush = d > 0 ? "SageDeep" : d < 0 ? "CoralDeep" : "TextMuted";
-            if (d != 0) row.Children.Add(Glyph(d > 0 ? "I.ChevronUp" : "I.ChevronDown", 10, brush).Also(g => g.Margin = new Thickness(5, 0, 1, 0)));
-            row.Children.Add(new TextBlock { Text = format(Math.Abs(d)), Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(d == 0 ? 5 : 0, 0, 0, 0) }
+            string sign = d > 0 ? "+" : d < 0 ? "−" : "";
+            row.Children.Add(new TextBlock { Text = sign + format(Math.Abs(d)), Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 0, 0, 0) }
                 .Also(t => t.SetResourceReference(TextBlock.ForegroundProperty, brush)));
         }
         return Chip(row, tip: tip);
@@ -460,7 +460,7 @@ internal static class RaceParts
         if (picture is not null)
         {
             picture.HorizontalAlignment = carArea > 0 ? HorizontalAlignment.Right : HorizontalAlignment.Center;
-            picture.VerticalAlignment = VerticalAlignment.Top;
+            picture.VerticalAlignment = carArea > 0 ? VerticalAlignment.Center : VerticalAlignment.Top;
             if (carArea > 0) picture.Margin = new Thickness(0, 0, Math.Max(0, (carArea - carWidth) / 2), 0);
             zone.Children.Add(picture);
         }

@@ -131,7 +131,7 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
 
         var tabs = Ui.PageTabs(Tabs, _tabIndex, i => { _tabIndex = i; ShowTab(); Motion.FadeIn(_tab); }, "TiTab");
         tabs.VerticalAlignment = VerticalAlignment.Center;
-        _titleTools.Children.Add(tabs);
+        tabs.HorizontalAlignment = HorizontalAlignment.Left;
         _modes = null;
         if (_ws.Modes.Count > 1)
         {
@@ -154,16 +154,17 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
         refresh.VerticalAlignment = VerticalAlignment.Center;
         _titleTools.Children.Add(refresh);
 
-        var where = TextFit.TipWhenTrimmed(new TextBlock { Style = Ui.Res<Style>("Caption"), Margin = new Thickness(2, 0, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
+        var where = TextFit.TipWhenTrimmed(new TextBlock { Style = Ui.Res<Style>("Caption"), Margin = new Thickness(16, 0, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, TextAlignment = TextAlignment.Right });
         if (_ws.Demo) where.Inlines.Add(new System.Windows.Documents.Run("Demo settings (nothing is read from or written to the PC) · "));
         else where.Inlines.Add(TextCase.Verbatim(new System.Windows.Documents.Run(_ws.Folder + " · ")));
         where.Inlines.Add(new System.Windows.Documents.Run($"{Session.Settings.Count} settings in "));
         where.Inlines.Add(TextCase.Verbatim(new System.Windows.Documents.Run(string.Join(", ", Session.FileNames))));
-        (_tabTools.Parent as Panel)?.Children.Remove(_tabTools);
-        var bar = Ui.SplitRow(where, _tabTools, stackLeft: true);
-        bar.Margin = new Thickness(0, 0, 0, 8);
+        var bar = new DockPanel { Margin = Ui.TabRowMargin, LastChildFill = true };
+        DockPanel.SetDock(tabs, Dock.Left);
+        bar.Children.Add(tabs);
+        bar.Children.Add(where);
         Children.Add(bar);
-        _where = bar;
+        _where = where;
 
         Ui.PendingBar(_pending);
         _pending.Margin = new Thickness(0, 12, 0, 0);
@@ -410,10 +411,10 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
             var text = new TextBlock { Text = label, Style = Ui.Res<Style>("Muted"), VerticalAlignment = VerticalAlignment.Center };
             line.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 22, 0), Children = { number, text } });
         }
-        Figure(Number(problems), problems == 1 ? "thing to look at" : "things to look at", problems == 0 ? "SageDeep" : "WarnDeep");
-        Figure(Number(report.Unusual.Count), "changed from iRacing's default", "SlateDeep");
-        Figure(Number(report.Passed.Count), "checks passed", "SageDeep");
-        Figure(backupCount is { } n ? Number(n) : RaceFormat.Missing, backupCount == 1 ? "backup" : "backups", "AccentText");
+        Figure(Number(problems), problems == 1 ? "thing to look at" : "things to look at", problems == 0 ? "Heading" : "WarnDeep");
+        Figure(Number(report.Unusual.Count), "changed from iRacing's default", "Heading");
+        Figure(Number(report.Passed.Count), "checks passed", "Heading");
+        Figure(backupCount is { } n ? Number(n) : RaceFormat.Missing, backupCount == 1 ? "backup" : "backups", "Heading");
         _tab.Children.Add(new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(16, 0, 16, 0), MinHeight = 40, Margin = new Thickness(0, 0, 0, 8), Child = line });
 
         if (layout.Count > 0)
@@ -630,6 +631,10 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
         _tabTools.Children.Add(search);
         _tabTools.Children.Add(onlyChanged);
         _tabTools.Children.Add(foldAll);
+        (_tabTools.Parent as Panel)?.Children.Remove(_tabTools);
+        _tabTools.HorizontalAlignment = HorizontalAlignment.Left;
+        _tabTools.Margin = new Thickness(0, 0, 0, 10);
+        content.Children.Add(_tabTools);
         var band = new AreaBand();
         content.Children.Add(band);
         var wide = new StackPanel();
@@ -713,9 +718,10 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
                 };
                 if (side)
                 {
-                    b.Height = 38;
+                    b.Height = 32;
                     b.Padding = new Thickness(12, 0, 10, 0);
-                    b.FontSize = 15;
+                    b.FontSize = 13.5;
+                    b.FontWeight = FontWeights.SemiBold;
                 }
                 if (selected && glideFrom is not null)
                 {
@@ -735,7 +741,14 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
                     FillTabs();
                     Fill();
                 };
-                tabs.Children.Add(b);
+                if (side && i > 0)
+                {
+                    var edged = new Border { Child = b };
+                    Hairline.Frame(edged, Sides.Top);
+                    edged.SetResourceReference(Border.BorderBrushProperty, "Line");
+                    tabs.Children.Add(edged);
+                }
+                else tabs.Children.Add(b);
             }
             if (!Global()) _railArea = _area;
             if (landing is { } target && glideFrom is { } from)

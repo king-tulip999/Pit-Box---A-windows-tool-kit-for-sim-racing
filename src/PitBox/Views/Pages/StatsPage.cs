@@ -1061,7 +1061,7 @@ internal static class StatsSections
         best.Children.Add(Scoped("Personal best", "all time, in the car and track you drove last"));
         if (charts.Bests.FirstOrDefault() is { } pb)
         {
-            var carZone = RaceParts.CarOnStripe(pb.Car, "Place4", 128, 104, 268, carArea: CarArea);
+            var carZone = RaceParts.CarOnStripe(pb.Car, "Place4", 128, 116, 330, carArea: CarArea);
             var outline = new Border
             {
                 Width = OutlineWidth, Height = OutlineHeight, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top,
@@ -1828,7 +1828,7 @@ internal static class StatsCharts
     private static FrameworkElement ShareChip(double share)
     {
         bool big = share >= 0.1;
-        var text = new TextBlock { Text = Share(share), FontSize = 11, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        var text = new TextBlock { Text = Share(share), FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         text.SetResourceReference(TextBlock.ForegroundProperty, big ? "AccentText" : "TextFaint");
         var chip = new Border { Width = 38, Height = 18, Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Child = text };
         chip.SetResourceReference(Border.BackgroundProperty, big ? "AccentSoft" : "MeterTrack");

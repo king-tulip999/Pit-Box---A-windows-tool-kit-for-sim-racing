@@ -266,11 +266,10 @@ internal sealed partial class IracingControllerSection
         public SwitchDetail(Action<Setting, StackPanel> fill)
         {
             _fill = fill;
-            Box = new Border { Child = _text, Padding = new Thickness(12, 9, 12, 9), Margin = new Thickness(0, 10, 0, 8), MinHeight = DetailMinHeight };
+            Box = new Border { Child = _text, Padding = new Thickness(12, 9, 12, 9), Margin = new Thickness(0, 10, 0, 8), MinHeight = DetailMinHeight, Visibility = Visibility.Collapsed };
             Box.SetResourceReference(Border.BackgroundProperty, "SurfaceAlt");
             Box.SetResourceReference(Border.BorderBrushProperty, "Line");
             Box.SetResourceReference(Border.BorderThicknessProperty, "HairlineEdge");
-            _text.Children.Add(new TextBlock { Text = "Point at a setting to see what it does.", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap });
         }
 
         public void Show(Setting s)
@@ -287,6 +286,7 @@ internal sealed partial class IracingControllerSection
 
         private void Fill()
         {
+            Box.Visibility = Visibility.Visible;
             _text.Children.Clear();
             _fill(_shown!, _text);
         }
@@ -583,7 +583,7 @@ internal sealed partial class IracingControllerSection
             drop.MinHeight = 0;
             DockPanel.SetDock(drop, Dock.Right);
             line.Children.Add(drop);
-            var text = TextFit.TipWhenTrimmed(new TextBlock { Text = $"{s.Def.Label}: {s.Show(s.Applied)} → {s.Show(s.Draft)}", MaxWidth = TrayChipText, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, FontSize = 11 });
+            var text = TextFit.TipWhenTrimmed(new TextBlock { Text = $"{s.Def.Label}: {s.Show(s.Applied)} → {s.Show(s.Draft)}", MaxWidth = TrayChipText, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, FontSize = 12 });
             text.SetResourceReference(TextBlock.ForegroundProperty, "AccentText");
             line.Children.Add(text);
             chip.Child = line;

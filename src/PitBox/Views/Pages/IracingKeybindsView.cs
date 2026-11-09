@@ -197,10 +197,6 @@ internal sealed class KeybindsBoard : StackPanel
         grid.Children.Add(ProfileBlock());
         Grid.SetColumn(_summary, 1);
         grid.Children.Add(_summary);
-        var bar = new Border { Width = 3, HorizontalAlignment = HorizontalAlignment.Left };
-        bar.SetResourceReference(Border.BackgroundProperty, "Accent");
-        Grid.SetColumnSpan(bar, 2);
-        grid.Children.Add(bar);
         return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), ClipToBounds = true, Child = grid };
     }
 
@@ -349,7 +345,8 @@ internal sealed class KeybindsBoard : StackPanel
         })
         {
             int n = _entries.Count(e => Passes(e, filter));
-            var count = new TextBlock { Text = n.ToString(CultureInfo.CurrentCulture), Margin = new Thickness(7, 0, 0, 0), Opacity = 0.6, VerticalAlignment = VerticalAlignment.Center };
+            var count = new TextBlock { Text = n.ToString(CultureInfo.CurrentCulture), Margin = new Thickness(7, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            count.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
             var face = new StackPanel { Orientation = Orientation.Horizontal };
             if (dot is not null)
             {
@@ -595,7 +592,7 @@ internal sealed class KeybindsBoard : StackPanel
         else if (set) keys.Child = Caps(entry.Get()!);
         else
         {
-            hint = new TextBlock { Text = "Set keybind", FontWeight = FontWeights.SemiBold, FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center };
+            hint = new TextBlock { Text = "Set keybind", FontWeight = FontWeights.SemiBold, FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
             hint.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
             var action = Hairline.Frame(new Border { Height = 24, Padding = new Thickness(8, 0, 8, 0), Child = hint });
             action.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
@@ -616,12 +613,24 @@ internal sealed class KeybindsBoard : StackPanel
             grid.Children.Add(undo);
         }
 
-        bool clashing = _clash is { } clash && clash.Entry.Id == entry.Id;
+        bool clashing = _clash is { } clash && (clash.Entry.Id == entry.Id || clash.Other.Id == entry.Id);
         var holder = new Grid { Background = Brushes.Transparent, Children = { grid } };
-        if (changed || clashing)
+        void Rest()
+        {
+            if (clashing) holder.SetResourceReference(Panel.BackgroundProperty, "ApricotSoft");
+            else holder.Background = Brushes.Transparent;
+        }
+        Rest();
+        if (clashing)
+        {
+            var bar = new Border { Width = 3, HorizontalAlignment = HorizontalAlignment.Left };
+            bar.SetResourceReference(Border.BackgroundProperty, "Apricot");
+            holder.Children.Add(bar);
+        }
+        else if (changed)
         {
             var bar = new Border { Width = 2, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Height = RowHeight - 18, Margin = new Thickness(0, 9, 0, 0) };
-            bar.SetResourceReference(Border.BackgroundProperty, clashing ? "Apricot" : "Accent");
+            bar.SetResourceReference(Border.BackgroundProperty, "Accent");
             holder.Children.Add(bar);
         }
         var row = Hairline.Frame(new Border { Child = holder, Cursor = locked ? null : Cursors.Hand, ToolTip = locked ? entry.Locked : null }, Sides.Bottom);
@@ -635,7 +644,7 @@ internal sealed class KeybindsBoard : StackPanel
         };
         row.MouseLeave += (_, _) =>
         {
-            holder.Background = Brushes.Transparent;
+            Rest();
             if (undo is not null) undo.Opacity = 0;
             hint?.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
         };
@@ -814,7 +823,7 @@ internal sealed class KeybindsBoard : StackPanel
                 plus.SetResourceReference(TextBlock.ForegroundProperty, "TextFaint");
                 panel.Children.Add(plus);
             }
-            var label = new TextBlock { Text = keys[i], FontWeight = FontWeights.SemiBold, FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+            var label = new TextBlock { Text = keys[i], FontWeight = FontWeights.SemiBold, FontSize = 12, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
             var cap = new Border { MinWidth = 30, Height = 24, Padding = new Thickness(8, 2, 8, 0), BorderThickness = new Thickness(1, 1, 1, 3), Child = label };
             cap.SetResourceReference(Border.BackgroundProperty, "SurfaceAlt");
             cap.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
@@ -827,7 +836,7 @@ internal sealed class KeybindsBoard : StackPanel
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         row.Children.Add(RaceParts.Glyph("I.Gamepad", 13, "TextMuted"));
-        var text = new TextBlock { Text = "Wheel", FontWeight = FontWeights.SemiBold, FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
+        var text = new TextBlock { Text = "Wheel", FontWeight = FontWeights.SemiBold, FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
         text.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
         row.Children.Add(text);
         var chip = new Border { Height = 24, Padding = new Thickness(8, 0, 8, 0), Child = row, ToolTip = tip };

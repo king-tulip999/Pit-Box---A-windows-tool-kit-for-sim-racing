@@ -151,7 +151,7 @@ internal static class GrrParts
         text.Children.Add(Eyebrow(eyebrow, mark == TimelineMark.Next ? "AccentText" : null));
         text.Children.Add(TextFit.TipWhenTrimmed(new TextBlock
         {
-            Text = track, FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>(mark == TimelineMark.Done ? "TextMuted" : "Text"),
+            Text = track, FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>(mark == TimelineMark.Done ? "TextMuted" : "Text"),
             TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 1, 0, 0),
         }));
         text.Children.Add(Caption(when, 1));
@@ -219,6 +219,7 @@ internal static class GrrParts
     public static Border Badge(string text, string family, string tip)
     {
         var badge = Ui.Chip(text, family + "Soft", family + "Deep");
+        badge.BorderThickness = new Thickness(0);
         badge.Margin = new Thickness(5, 0, 0, 0);
         badge.VerticalAlignment = VerticalAlignment.Center;
         badge.ToolTip = tip;

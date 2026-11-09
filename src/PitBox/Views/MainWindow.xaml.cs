@@ -1144,6 +1144,7 @@ public partial class MainWindow : Window, IModalHost
         FieldBox.SetFill(content, true);
         ModalContent.Content = content;
         PlaceModal();
+        Toasts.Visibility = Visibility.Collapsed;
         ModalLayer.Visibility = Visibility.Visible;
         ModalLayer.BeginAnimation(OpacityProperty, null);
         ModalLayer.Opacity = 0;
@@ -1186,6 +1187,7 @@ public partial class MainWindow : Window, IModalHost
             {
                 ModalLayer.Visibility = Visibility.Collapsed;
                 ModalContent.Content = null;
+                Toasts.Visibility = Visibility.Visible;
             }
         });
         if (_focusBeforeModal is UIElement { IsVisible: true } back) back.Focus();

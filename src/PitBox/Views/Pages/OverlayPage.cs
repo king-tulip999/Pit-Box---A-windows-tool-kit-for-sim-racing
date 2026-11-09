@@ -419,7 +419,9 @@ internal sealed class OverlayPage : UserControl, IPage
     {
         var row = _embedded ? new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) } : _layoutBar;
         row.Children.Clear();
-        var label = new TextBlock { Text = "Layout", Style = Ui.Res<Style>("Muted"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 9, 0) };
+        var label = Ui.Text("Layout", "H3");
+        label.VerticalAlignment = VerticalAlignment.Center;
+        label.Margin = new Thickness(0, 0, 10, 0);
         row.Children.Add(label);
         var pick = Ui.Combo(O.Layouts.Select(l => new Choice(l.Name, l.Name)), O.ActiveLayout, c =>
         {
@@ -429,15 +431,24 @@ internal sealed class OverlayPage : UserControl, IPage
                 Changed();
             }, 380);
             QueueBuild();
-        }, 162);
+        }, 160);
         AutomationProperties.SetName(pick, "Layout");
         row.Children.Add(pick);
-        var edit = Ui.IconButton("I.Pencil", "Rename, duplicate, reset or delete this layout", () => _ = EditLayoutAsync());
-        edit.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0);
-        row.Children.Add(edit);
-        var add = Ui.IconButton("I.Plus", "New layout", () => _ = NewLayoutAsync(copy: false));
-        add.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0);
-        row.Children.Add(add);
+        var edit = Ui.IconButton("I.Pencil", "Rename or reset this layout", () => _ = EditLayoutAsync());
+        var dup = Ui.IconButton("I.Copy", "Duplicate this layout", () => _ = NewLayoutAsync(copy: true));
+        var delete = Ui.IconButton("I.Trash", "Delete this layout", () => _ = DeleteAsync());
+        delete.IsEnabled = !L.IsDefault && O.Layouts.Count > 1;
+        if (L.IsDefault)
+        {
+            delete.ToolTip = "The default layout can't be deleted";
+            ToolTipService.SetShowOnDisabled(delete, true);
+        }
+        var add = Ui.LabeledButton("I.Plus", "New layout", () => _ = NewLayoutAsync(copy: false));
+        foreach (var b in new[] { edit, dup, delete, add })
+        {
+            b.Margin = new Thickness(Ui.ButtonGap, 0, 0, 0);
+            row.Children.Add(b);
+        }
         Ui.Anchor(row, "overlay.layouts");
         if (!_embedded) return;
         var stack = new StackPanel();
@@ -532,12 +543,17 @@ internal sealed class OverlayPage : UserControl, IPage
         Grid.SetColumn(dataHead, 2);
         heads.Children.Add(Ui.Text("Look", "H2"));
         heads.Children.Add(dataHead);
-        var rows = new SettingsFlow { MaxColumns = 2, ColumnGap = LookColumnGap, FillRows = true };
-        for (int r = 0; r < Math.Max(general.Count, data.Count); r++)
-        {
-            rows.Children.Add(r < general.Count ? general[r] : new SettingRowGrid());
-            rows.Children.Add(r < data.Count ? data[r] : new SettingRowGrid());
-        }
+        var lookRows = new SettingsFlow { MaxColumns = 1 };
+        foreach (var row in general) lookRows.Children.Add(row);
+        var dataRows = new SettingsFlow { MaxColumns = 1 };
+        foreach (var row in data) dataRows.Children.Add(row);
+        var rows = new Grid();
+        rows.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        rows.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(LookColumnGap) });
+        rows.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid.SetColumn(dataRows, 2);
+        rows.Children.Add(lookRows);
+        rows.Children.Add(dataRows);
         var stack = new StackPanel { Children = { heads, rows } };
         var wide = new Grid();
         wide.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) });

@@ -36,6 +36,8 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         _app = app;
         _window = window;
         var scroll = new ScrollViewer { Style = Ui.Res<Style>("PageScroll"), Content = Ui.PageFrame(_body), Focusable = false };
+        _floating.RowDefinitions.Add(new RowDefinition());
+        _floating.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         _floating.Children.Add(scroll);
         Content = _floating;
 
@@ -70,10 +72,10 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         bar.Children.Add(buttons);
         _profiles = new DisplayProfilesView(app, window, () => HasPending);
         _pendingBar = Ui.PendingBar(new Tile { Child = bar });
-        var barHolder = new Border { Margin = new Thickness(23, 0, 23, 16), Child = _pendingBar };
+        var barHolder = new Border { Padding = new Thickness(23, 8, 23, 16), Child = _pendingBar };
         barHolder.SetResourceReference(Border.BackgroundProperty, "Bg");
         var barFrame = Ui.PageFrame(barHolder);
-        barFrame.VerticalAlignment = VerticalAlignment.Bottom;
+        Grid.SetRow(barFrame, 1);
         barFrame.Visibility = Visibility.Collapsed;
         _floating.Children.Add(barFrame);
         _pendingFrame = barFrame;
@@ -542,13 +544,11 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         if (pending && _pendingFrame.Visibility != Visibility.Visible)
         {
             _pendingFrame.Visibility = Visibility.Visible;
-            _body.Margin = new Thickness(BodyMargin.Left, 0, BodyMargin.Right, BodyMargin.Bottom + 60);
             Motion.Enter(_pendingBar, distance: 8);
         }
         else if (!pending)
         {
             _pendingFrame.Visibility = Visibility.Collapsed;
-            _body.Margin = BodyMargin;
         }
     }
 
@@ -640,7 +640,7 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
         var card = _window.DialogCard("Keep these display settings?", "", out var buttons, message);
         void SetText() => message.Text = $"If you can see this, choose Keep changes. Otherwise everything goes back to how it was in {SimRacing.Race.RaceFormat.Count(seconds, "second")}.";
         SetText();
-        var revert = new Button { Content = "Revert", Margin = Ui.AfterButton };
+        var revert = new Button { Content = $"Revert ({seconds})", Margin = Ui.AfterButton };
         var keep = new Button { Content = "Keep changes", Style = Ui.Res<Style>("PrimaryButton") };
         revert.Click += (_, _) => _window.CloseModal(false);
         keep.Click += (_, _) => _window.CloseModal(true);
@@ -653,6 +653,7 @@ internal sealed class DisplaysPage : UserControl, IPage, IScreenshotStates
             superseded |= _app.DisplayProfiles.ApplyCount != applies;
             seconds--;
             SetText();
+            revert.Content = $"Revert ({Math.Max(0, seconds)})";
             if (superseded || seconds <= 0)
             {
                 timer.Stop();

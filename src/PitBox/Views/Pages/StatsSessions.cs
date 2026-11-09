@@ -43,7 +43,7 @@ internal static class StatsSessions
         {
             var table = new Grid();
             for (int c = 0; c < Columns; c++)
-                table.ColumnDefinitions.Add(c == 2 ? new ColumnDefinition { Width = new GridLength(1000, GridUnitType.Star), MinWidth = 97, MaxWidth = CarTrackMax } : new ColumnDefinition { Width = GridLength.Auto });
+                table.ColumnDefinitions.Add(c == 2 ? new ColumnDefinition { Width = new GridLength(1000, GridUnitType.Star), MinWidth = 97 } : new ColumnDefinition { Width = GridLength.Auto });
             table.ColumnDefinitions.Add(new ColumnDefinition());
             table.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             var shown = list.Take(filter.Shown).ToList();
@@ -52,7 +52,7 @@ internal static class StatsSessions
             int span = table.ColumnDefinitions.Count;
             for (int c = 0; c < heads.Length; c++)
             {
-                var head = new TextBlock { Text = heads[c], Style = Ui.Res<Style>("Eyebrow") };
+                var head = Ui.TableHead(heads[c], c == 9 ? "Pink: lap traces kept, lap analysis available. Grey: times only." : null);
                 if (c == 2 && shown.Any(s => CarPictures.For(s.Car) is not null)) head.Padding = new Thickness(21 * CarPictures.SlotAspect + 8, 0, 0, 0);
                 Cell(table, 0, c, head, c is >= 5 and <= 8);
             }
@@ -71,9 +71,8 @@ internal static class StatsSessions
                 string place = RaceParts.Place(s);
                 if (raced)
                 {
-                    var band = new Border { BorderThickness = new Thickness(3, 0, 0, 0), IsHitTestVisible = false };
+                    var band = new Border { IsHitTestVisible = false };
                     band.SetResourceReference(Border.BackgroundProperty, place + "Fade");
-                    band.SetResourceReference(Border.BorderBrushProperty, place);
                     Grid.SetRow(band, row);
                     Grid.SetColumnSpan(band, span);
                     table.Children.Add(band);
@@ -92,7 +91,7 @@ internal static class StatsSessions
                 table.Children.Add(rule);
                 if (newDay)
                 {
-                    var dayText = new TextBlock { Text = Dates.Weekday(local) + " " + Dates.Short(local), Style = Ui.Res<Style>("Caption"), FontSize = 10.5, FontWeight = FontWeights.Bold };
+                    var dayText = new TextBlock { Text = Dates.Weekday(local) + " " + Dates.Short(local), Style = Ui.Res<Style>("Caption"), FontSize = 12, FontWeight = FontWeights.Bold };
                     dayText.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
                     Cell(table, row, 0, new StackPanel { Children = { dayText, Caption(Dates.Time(local)) } });
                 }
@@ -120,7 +119,6 @@ internal static class StatsSessions
                     ToolTip = hasTrace ? "Lap traces kept: lap analysis available" : "Times only: no lap analysis. " + NoTraceReason(s, traceSettings, now),
                 };
                 mark.SetResourceReference(Control.ForegroundProperty, hasTrace ? "AccentText" : "TextFaint");
-                if (!hasTrace) mark.Opacity = 0.55;
                 Cell(table, row, 9, mark);
             }
             body.Children.Add(table);
@@ -142,7 +140,7 @@ internal static class StatsSessions
     }
 
     private const int Columns = 10;
-    private const double RowHeight = 44, CarTrackMax = 440, CascadeStepMs = 22, MaxCascadeMs = 420;
+    private const double RowHeight = 44, CascadeStepMs = 22, MaxCascadeMs = 420;
 
     internal static string NoTraceReason(SessionSummary s, Config.SessionStatsSettings settings, DateTime nowUtc)
     {

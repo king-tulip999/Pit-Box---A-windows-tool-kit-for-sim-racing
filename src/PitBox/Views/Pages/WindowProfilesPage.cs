@@ -167,6 +167,8 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
                 }
             }
             left.Children.Add(grid);
+            columns.Children.Remove(left);
+            columns.Children.Insert(0, new Tile { Style = Ui.Res<Style>("Card"), VerticalAlignment = VerticalAlignment.Top, Child = left });
         }
         FillWindows();
         UpdateMap();
@@ -183,8 +185,8 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
         else if (_map.Parent is Panel holder) holder.Children.Remove(_map);
         _map.SetScreens(MapScreens());
         var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition());
         FrameworkElement side;
         if (_layouts.Count > 0)
         {
@@ -199,14 +201,13 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
         {
             var hint = Ui.Text("Each profile's window shows here. Point at an open window in the list to see where it is.", "Caption");
             hint.TextWrapping = TextWrapping.Wrap;
-            hint.MaxWidth = 256;
             side = hint;
         }
         side.HorizontalAlignment = HorizontalAlignment.Left;
         side.VerticalAlignment = VerticalAlignment.Top;
-        side.Margin = new Thickness(0, 0, 21, 0);
+        side.Margin = new Thickness(0, 0, 0, 8);
         grid.Children.Add(side);
-        Grid.SetColumn(_map, 1);
+        Grid.SetRow(_map, 1);
         grid.Children.Add(_map);
         return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(13, 8, 13, 8), Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Child = grid };
     }
@@ -307,8 +308,8 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
         _openHost.Children.Clear();
         var free = _open.Where(w => Owners(w.Process).Count == 0).ToList();
         var refresh = Ui.IconButton("I.Refresh", "Look again", () => _ = ScanAsync());
-        _openHost.Children.Add(Ui.SectionHeader("Open windows", free.Count == 0 ? null : $"{SimRacing.Race.RaceFormat.Count(free.Count, "program")} without a profile", refresh));
         var list = new StackPanel();
+        list.Children.Add(Ui.SectionHeader("Open windows", free.Count == 0 ? null : $"{SimRacing.Race.RaceFormat.Count(free.Count, "program")} without a profile", refresh));
         if (free.Count == 0)
         {
             if (_scanned) list.Children.Add(new TextBlock { Text = "Every program with a window open has a profile.", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 10) });
@@ -321,7 +322,7 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
                 list.Children.Add(OpenRow(free[i]));
             }
         }
-        _openHost.Children.Add(new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(15, 4, 15, 4), Child = list });
+        _openHost.Children.Add(new Tile { Style = Ui.Res<Style>("Card"), Child = list });
     }
 
     private Grid OpenRow(OpenWindow w)
@@ -401,7 +402,7 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
     {
         var row = ProfileRow(p);
         row.Margin = new Thickness(13, 3, ApplyInset - 1, 3);
-        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(0), Child = row, ClipToBounds = true, Cursor = System.Windows.Input.Cursors.Hand, ToolTip = "Click to edit, drag to arrange" };
+        return new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(0), Child = row, ClipToBounds = true, Cursor = System.Windows.Input.Cursors.Hand, ToolTip = "Click to edit, drag to arrange" };
     }
 
     private Grid ProfileRow(WindowProfile p)
@@ -541,7 +542,7 @@ internal sealed class WindowProfilesPage : UserControl, IPage, IScreenshotStates
             PanelGrid.SetNoDrag(list, true);
             stack.Children.Add(list);
         }
-        return new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(GroupPad, 4, GroupPad, 8), Child = stack, Cursor = System.Windows.Input.Cursors.Hand, ToolTip = "Click to edit the group, drag to arrange" };
+        return new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(GroupPad, 4, GroupPad, 8), Child = stack, Cursor = System.Windows.Input.Cursors.Hand, ToolTip = "Click to edit the group, drag to arrange" };
     }
 
     private const double GroupPad = 13, ApplyInset = 26;

@@ -11,8 +11,8 @@ internal static class HelpTip
 {
     public static FrameworkElement For(string text, string? name = null)
     {
-        var icon = new Icon { Data = Ui.Res<Geometry>("I.Info"), Width = 11, Height = 11 };
-        icon.SetResourceReference(Control.ForegroundProperty, "TextFaint");
+        var icon = new Icon { Data = Ui.Res<Geometry>("I.Info"), Width = 13, Height = 13 };
+        icon.SetResourceReference(Control.ForegroundProperty, "Text");
         var box = new Border
         {
             Child = icon, Padding = new Thickness(2), Margin = new Thickness(3, 0, 0, 0), Background = Brushes.Transparent,
@@ -26,9 +26,9 @@ internal static class HelpTip
         System.Windows.Automation.AutomationProperties.SetName(box, name is null ? "More about this" : "More about " + name);
         System.Windows.Automation.AutomationProperties.SetHelpText(box, text);
         box.GotKeyboardFocus += (_, _) => icon.SetResourceReference(Control.ForegroundProperty, "AccentText");
-        box.LostKeyboardFocus += (_, _) => icon.SetResourceReference(Control.ForegroundProperty, "TextFaint");
+        box.LostKeyboardFocus += (_, _) => icon.SetResourceReference(Control.ForegroundProperty, "Text");
         box.MouseEnter += (_, _) => icon.SetResourceReference(Control.ForegroundProperty, "AccentText");
-        box.MouseLeave += (_, _) => { if (!box.IsKeyboardFocused) icon.SetResourceReference(Control.ForegroundProperty, "TextFaint"); };
+        box.MouseLeave += (_, _) => { if (!box.IsKeyboardFocused) icon.SetResourceReference(Control.ForegroundProperty, "Text"); };
         return box;
     }
 

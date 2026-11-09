@@ -52,7 +52,7 @@ internal sealed class HudQuickEditor : Window, IModalHost
         Resources[WindowScale.Key] = Transform.Identity;
         SetResourceReference(FontFamilyProperty, "UiFont");
         SetResourceReference(ForegroundProperty, "Text");
-        FontSize = 11;
+        FontSize = 12;
         TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
         Topmost = true;
         ShowInTaskbar = true;

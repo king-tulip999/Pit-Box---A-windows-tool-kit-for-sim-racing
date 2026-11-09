@@ -43,7 +43,7 @@ internal sealed class ThemePicker : UniformGrid
         var name = new TextBlock
         {
             Text = theme.Label,
-            FontFamily = ThemeManager.Family(ThemeSpec.Saira), FontWeight = theme.HeadingWeight, FontSize = 11.5,
+            FontFamily = ThemeManager.Family(ThemeSpec.Saira), FontWeight = theme.HeadingWeight, FontSize = 12,
             Foreground = Of("Heading"), VerticalAlignment = VerticalAlignment.Bottom, TextWrapping = TextWrapping.Wrap,
             LineHeight = 12.5, LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
             Margin = new Thickness(0, 9, menu is not null ? 13 : selected ? 9 : 0, 0),

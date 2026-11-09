@@ -21,7 +21,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
     private readonly PanelStack _body;
     private readonly MasonryPanel _sections = new() { MinColumnWidth = 356, MaxColumns = 3, Gap = Ui.PanelSpacing, ColumnOf = SectionColumn };
 
-    private static readonly int[] ThreeColumns = { 0, 1, 2, 2, 1, 2 }, TwoColumns = { 0, 1, 1, 0, 1, 0 };
+    private static readonly int[] ThreeColumns = { 0, 0, 2, 2, 1, 2 }, TwoColumns = { 0, 1, 1, 0, 1, 0 };
 
     private static int? SectionColumn(int columns, int index)
     {
@@ -378,8 +378,7 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
             : "Windows' “Animation effects” setting is off, so animations stay off.";
         var anim = Ui.Switch(U.Animations, v => { U.Animations = v; _app.Save(); NavIcon.RefreshAll(); Motion.Refresh(); });
         anim.IsEnabled = SystemParameters.ClientAreaAnimation;
-        look.Children.Add(TickRow("Animations", anim, SystemParameters.ClientAreaAnimation ? "Off in the tray" : "Off in Windows", more: animationNote,
-            fallback: SystemParameters.ClientAreaAnimation ? new Ui.SettingDefault(() => U.Animations, () => { U.Animations = true; _app.Save(); NavIcon.RefreshAll(); Motion.Refresh(); Build(); }, "On") : null));
+        look.Children.Add(TickRow("Animations", anim, SystemParameters.ClientAreaAnimation ? "Off in the tray" : "Off in Windows", more: animationNote));
     }
 
     private void BuildPerformance()
@@ -628,16 +627,16 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         var import = Ui.LabeledButton("I.Download", "Import…", () => _ = ImportSettingsAsync());
         import.ToolTip = "Loads settings from an exported file (shows what's in it first; Pit-Box then restarts)";
         transfer.Children.Add(import);
-        var transferRow = Ui.SettingRow("Export / import settings",
+        var transferRow = Ui.ControlBelow(Ui.SettingRow("Export / import settings",
             "Importing replaces your settings (a copy is kept) and restarts Pit-Box.",
-            transfer);
+            transfer));
         Ui.Anchor(transferRow, "settings.export");
         section.Children.Add(transferRow);
         section.Children.Add(Ui.Divider());
 
         var folder = Ui.LabeledButton("I.Folder", "Open folder", () => OpenFolder(ConfigStore.Folder));
         folder.ToolTip = TextCase.PathTip(ConfigStore.Folder);
-        var fileRow = Ui.SettingRow("Settings file", "Your settings, the error log, backups made by Reset and Import, and iRacing backups, all in one folder.", folder);
+        var fileRow = Ui.ControlBelow(Ui.SettingRow("Settings file", "Your settings, the error log, backups made by Reset and Import, and iRacing backups, all in one folder.", folder));
         Ui.Anchor(fileRow, "settings.folder");
         section.Children.Add(fileRow);
         section.Children.Add(Ui.Divider());
@@ -653,13 +652,8 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
     private FrameworkElement StorageFold()
     {
         var holder = new ContentControl { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 2, 0, 4) };
-        var chevron = Ui.FoldChevron(false);
-        var label = new StackPanel { Orientation = Orientation.Horizontal };
-        label.Children.Add(chevron);
-        label.Children.Add(new TextBlock { Text = "Storage", Style = Ui.Res<Style>("H3"), VerticalAlignment = VerticalAlignment.Center });
-        var toggle = new Button { Style = Ui.Res<Style>("QuietButton"), Content = label, HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(5, 3, 6, 3), Margin = new Thickness(-5, 2, 0, 2) };
-        ClickGuard.SetAllowRepeat(toggle, true);
-        System.Windows.Automation.AutomationProperties.SetName(toggle, "Storage");
+        var toggle = Ui.FoldHead("Storage", false, out var chevron, out _);
+        toggle.Margin = new Thickness(-5, 2, 0, 2);
         void Set(bool open)
         {
             if (open && holder.Content is null) holder.Content = new StorageView(_app, _window);
@@ -991,9 +985,9 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
     {
         var button = Ui.LabeledButton("I.Undo", "Reset Pit-Box", () => _ = ResetAsync(), "DangerButton");
         button.ToolTip = "Asks first. Your current settings are kept as a copy in the settings folder.";
-        var row = Ui.SettingRow("Back to defaults",
+        var row = Ui.ControlBelow(Ui.SettingRow("Back to defaults",
             "Every setting, profile, layout and fan curve. Pit-Box restarts; a copy of your settings is kept.",
-            button);
+            button));
         Ui.Anchor(row, "settings.reset");
         return row;
     }

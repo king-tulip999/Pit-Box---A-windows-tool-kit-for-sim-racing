@@ -52,19 +52,20 @@ internal sealed class SetupTree : Grid
         var list = items.ToList();
         _anySelected = list.Any(i => i.Selected && !i.Node.IsFolder);
         var open = new Stack<OpenFolder>();
-        void Close(bool more)
+        void Close(bool divider)
         {
             var f = open.Pop();
-            if (f.Listed) _rows.Children.Add(Gap(f.Node, f.Depth, more));
+            if (f.Listed) _rows.Children.Add(Gap(f.Node, f.Depth, divider));
         }
         foreach (var (node, depth, isOpen, selected, target, fresh) in list)
         {
-            while (open.Count > 0 && open.Peek().Depth >= depth) Close(more: true);
+            while (open.Count > 0 && open.Peek().Depth >= depth)
+                Close(divider: open.Count < 2 || open.ElementAt(1).Depth < depth);
             if (open.Count > 0) open.Peek().Listed = true;
             _rows.Children.Add(Row(node, depth, isOpen, selected, target, fresh));
             if (node.IsFolder && isOpen) open.Push(new OpenFolder(node, depth));
         }
-        while (open.Count > 0) Close(more: false);
+        while (open.Count > 0) Close(divider: false);
     }
 
     private bool _anySelected;

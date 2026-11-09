@@ -48,7 +48,7 @@ internal sealed class CustomThemeSection : StackPanel
 
         var label = TextFit.TipWhenTrimmed(new TextBlock
         {
-            Text = ThemeMarks.ShortName(name), Foreground = Of("Heading"), FontSize = 11, LineHeight = 14, LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
+            Text = ThemeMarks.ShortName(name), Foreground = Of("Heading"), FontSize = 12, LineHeight = 14, LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
             TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, MaxHeight = 28, VerticalAlignment = VerticalAlignment.Bottom,
         });
         var bar = new Rectangle { Height = 3, Fill = Of("Accent"), Margin = new Thickness(0, 4, 0, 0) };

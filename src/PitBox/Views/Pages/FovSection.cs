@@ -139,7 +139,7 @@ internal sealed class FovSection : StackPanel
         _bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         _bottom.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         _bottom.Margin = new Thickness(0, Ui.PanelSpacing, 0, 0);
-        var iracingCard = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(15, 11, 15, 13), Child = _iracing, VerticalAlignment = VerticalAlignment.Top };
+        var iracingCard = new Tile { Style = Ui.Res<Style>("Card"), Padding = new Thickness(15, 11, 15, 13), Child = _iracing, VerticalAlignment = VerticalAlignment.Stretch };
         Ui.Anchor(iracingCard, "simracing.fov.iracing");
         _bottom.Children.Add(iracingCard);
         var right = new StackPanel();
@@ -521,15 +521,20 @@ internal sealed class FovSection : StackPanel
         var write = Ui.LabeledButton("I.Download", "Write into iRacing", () => _ = ExportIntoIracing(), "PrimaryButton");
         write.ToolTip = $"FOV {target:0.#}° into app.ini and the screen setup into rendererDX11Monitor.ini (iRacing must be closed)";
         write.IsEnabled = folder is not null;
-        statusText.Margin = new Thickness(0, 0, 0, 8);
-        _iracing.Children.Add(statusText);
         string[] steps =
         {
             "Import starts from the screen size, distance, bezel, side angle and curve iRacing has now.",
             "Adjust the rig above until it matches your seat and screens.",
             "Write with iRacing closed; its files are backed up first (iRacing Controller → Health and backups). Or save copies and copy them in yourself.",
         };
-        head.Children.Add(HudSettings.HelpTip.For(string.Join("\n", steps.Select((step, i) => $"{i + 1}. {step}")), "iRacing settings"));
+        var tip = HudSettings.HelpTip.For(string.Join("\n", steps.Select((step, i) => $"{i + 1}. {step}")), "iRacing settings");
+        tip.VerticalAlignment = VerticalAlignment.Center;
+        tip.Margin = new Thickness(8, 0, 0, 0);
+        var statusRow = new DockPanel { Margin = new Thickness(0, 0, 0, 8) };
+        DockPanel.SetDock(tip, Dock.Right);
+        statusRow.Children.Add(tip);
+        statusRow.Children.Add(statusText);
+        _iracing.Children.Add(statusRow);
         var buttons = new WrapPanel();
         Button B(string icon, string label, Action run, string style, string tip)
         {
@@ -573,6 +578,9 @@ internal sealed class FovSection : StackPanel
         for (int i = 0; i < heads.Length; i++)
         {
             var head = T(heads[i], true);
+            head.Style = Ui.Res<Style>("Caption");
+            head.FontWeight = FontWeights.SemiBold;
+            head.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
             head.ToolTip = tips[i];
             Cell(head, i);
         }
@@ -920,19 +928,12 @@ internal sealed class FovSection : StackPanel
     {
         var grid = new Grid { Margin = new Thickness(0, 3, 0, 3) };
         Ui.NameFor(control, label);
-        if (ToggleCards.IsSwitch(control))
-        {
-            var title = ToggleCards.RowTitle(label);
-            if (help is not null) Ui.AddInfo(title, help);
-            grid.Children.Add(ToggleCards.Row((CheckBox)control, title, null));
-            return grid;
-        }
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         var name = new TextBlock { Foreground = Ui.Res<Brush>("TextMuted"), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 6, 0), Background = Brushes.Transparent, ToolTip = help };
         name.Inlines.Add(new System.Windows.Documents.Run(label));
         if (help is not null)
-            name.Inlines.Add(new System.Windows.Documents.InlineUIContainer(new Icon { Data = Ui.Res<Geometry>("I.Info"), Width = 10, Height = 10, Margin = new Thickness(4, 0, 0, 0), Foreground = Ui.Res<Brush>("TextFaint") }) { BaselineAlignment = BaselineAlignment.Center });
+            name.Inlines.Add(new System.Windows.Documents.InlineUIContainer(new Icon { Data = Ui.Res<Geometry>("I.Info"), Width = 13, Height = 13, Margin = new Thickness(5, 0, 0, 0), Foreground = Ui.Res<Brush>("Text") }) { BaselineAlignment = BaselineAlignment.Center });
         grid.Children.Add(name);
         if (control is FrameworkElement fe) { fe.HorizontalAlignment = HorizontalAlignment.Left; fe.VerticalAlignment = VerticalAlignment.Center; }
         Grid.SetColumn(control, 1);

@@ -145,6 +145,12 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         Ui.Anchor(masterSwitch, "fans.master");
         header.Children.Add(masterSwitch);
         _body.Children.Add(header);
+        _tabs = Ui.PageTabs(new[] { "Fans", "Curves" }, 0, SwitchTab, "fantabs");
+        _fanTools.HorizontalAlignment = HorizontalAlignment.Right;
+        _fanTools.VerticalAlignment = VerticalAlignment.Center;
+        _fanTools.Margin = new Thickness(0, 0, 0, 3);
+        var tabRow = new Grid { Margin = Ui.TabRowMargin, Children = { _tabs, _fanTools } };
+        _body.Children.Add(tabRow);
 
         var emergencyTitle = Ui.Text("Emergency temperature", "H3");
         emergencyTitle.VerticalAlignment = VerticalAlignment.Center;
@@ -171,12 +177,6 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         _body.Children.Add(masterBox);
 
         _body.Children.Add(_banners);
-        _tabs = Ui.PageTabs(new[] { "Fans", "Curves" }, 0, SwitchTab, "fantabs");
-        _fanTools.HorizontalAlignment = HorizontalAlignment.Right;
-        _fanTools.VerticalAlignment = VerticalAlignment.Center;
-        _fanTools.Margin = new Thickness(0, 0, 0, 3);
-        var tabRow = new Grid { Margin = new Thickness(0, 0, 0, Ui.PanelSpacing), Children = { _tabs, _fanTools } };
-        _body.Children.Add(tabRow);
         _body.Children.Add(_fansView);
         _fansView.Children.Add(_fanMessage);
         _fansView.Children.Add(_fanGrid);
@@ -564,7 +564,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         names.Children.Add(new TextBlock { Text = about, ToolTip = about, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 2, 0, 0), TextWrapping = TextWrapping.NoWrap, TextTrimming = TextTrimming.CharacterEllipsis });
         Grid.SetColumn(names, 1);
         left.Children.Add(names);
-        var bar = new SegmentMeter(hw.IsPump ? "Slate" : "Sage") { Height = 10, Tiered = true, Smooth = true, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 16, 0),
+        var bar = new SegmentMeter("Sage") { Height = 10, Smooth = true, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 16, 0),
             ToolTip = $"Speed now. Amber above {SegmentMeter.WarnFrom * 100:0}%, red above {SegmentMeter.HotFrom * 100:0}%." };
         var output = RaceParts.LiveFigure("–", 36, "Heading");
         output.VerticalAlignment = VerticalAlignment.Bottom;
@@ -639,7 +639,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
                     var preview = new CurvePreview
                     {
                         CurveName = name,
-                        Graph = new CurveEditor { ReadOnly = true, Height = 220, MinHeight = 0, IsHitTestVisible = false },
+                        Graph = new CurveEditor { ReadOnly = true, MinHeight = 220, IsHitTestVisible = false },
                         Status = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 5, 0, 0) },
                     };
                     var edit = Ui.LabeledButton("I.Pencil", $"Edit “{name}”", () => EditCurve(name), "GhostButton");
@@ -649,7 +649,10 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
                     preview.Status.Margin = new Thickness(0, 0, 13, 0);
                     preview.Status.MaxWidth = 454;
                     var statusRow = new WrapPanel { Margin = new Thickness(0, 6, 0, 0), Children = { preview.Status, edit } };
-                    var curveSide = new StackPanel { VerticalAlignment = VerticalAlignment.Top, Children = { new TextBlock { Text = "Curve", Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 0, 0, 4) }, preview.Graph, statusRow } };
+                    var curveTitle = new TextBlock { Text = "Curve", Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 0, 0, 4) };
+                    DockPanel.SetDock(curveTitle, Dock.Top);
+                    DockPanel.SetDock(statusRow, Dock.Bottom);
+                    var curveSide = new DockPanel { LastChildFill = true, Children = { curveTitle, statusRow, preview.Graph } };
                     Grid.SetColumn(curveSide, 2);
                     body.Children.Add(curveSide);
                     if (parts is not null) parts.Curve = preview;
@@ -719,7 +722,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
 
     private const double FanTextIndent = 56;
 
-    private const double LimitSlider = 200;
+    private const double LimitSlider = 200, TuneSlider = 100;
 
     private StackPanel Limits(FanInfo fan, FanHardware hw)
     {
@@ -774,13 +777,13 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
             ExplainMinimum();
             _app.FanSettingsChanged();
         };
-        more.Children.Add(new TextBlock { Text = "This fan's own limits. Its curve has its own too; the slower one wins.", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 2) });
         var stepUp = Row("Fastest rise", Ui.SliderWithValue(0, 50, hw.StepUpPerSecond, RateText, v => { hw.StepUpPerSecond = (int)v; _app.FanSettingsChanged(); }, LimitSlider));
         stepUp.ToolTip = "How fast this fan may speed up. The curve has its own Fastest rise; when both are set, the slower one wins";
         more.Children.Add(stepUp);
         var stepDown = Row("Fastest drop", Ui.SliderWithValue(0, 50, hw.StepDownPerSecond, RateText, v => { hw.StepDownPerSecond = (int)v; _app.FanSettingsChanged(); }, LimitSlider));
         stepDown.ToolTip = "How fast this fan may slow down. The curve has its own Fastest drop; when both are set, the slower one wins";
         more.Children.Add(stepDown);
+        more.Children.Add(new TextBlock { Text = "The curve has its own limits too; the slower one wins.", Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 2) });
 
         var calRow = new UniformGrid { Columns = 2, Margin = new Thickness(0, 10, 0, 2) };
         var calibrate = Ui.LabeledButton("I.Target", hw.Calibration is null ? "Calibrate" : "Recalibrate", () => _ = CalibrateAsync(fan));
@@ -893,11 +896,8 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         if (hidden.Count == 0)
             return;
 
-        var toggle = new Button { Style = Ui.Res<Style>("GhostButton"), HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 8) };
-        var content = new StackPanel { Orientation = Orientation.Horizontal };
-        content.Children.Add(new Icon { Data = Ui.Res<Geometry>(_showHidden ? "I.ChevronDown" : "I.ChevronRight"), Width = 11, Height = 11 });
-        content.Children.Add(new TextBlock { Text = $"Hidden fans ({hidden.Count})", Margin = new Thickness(5, 0, 0, 0) });
-        toggle.Content = content;
+        var toggle = Ui.FoldHead($"Hidden fans ({hidden.Count})", _showHidden, out _, out _);
+        toggle.Margin = new Thickness(-5, 0, 0, 8);
         toggle.Click += (_, _) => { _showHidden = !_showHidden; BuildHidden(hidden); };
         _hiddenPanel.Children.Add(toggle);
         if (!_showHidden)
@@ -1005,7 +1005,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
                 Style = Ui.Res<Style>("NavItem"),
                 GroupName = "FanCurves",
                 Content = TextFit.TipWhenTrimmed(new TextBlock { Text = curve.Name, TextWrapping = TextWrapping.Wrap }),
-                Tag = Ui.Res<Geometry>(curve.Type switch { FanCurveType.Flat => "I.Minus", FanCurveType.Mix => "I.Layers", _ => "I.Activity" }),
+                Tag = Ui.Res<Geometry>(curve.Type switch { FanCurveType.Flat => "I.Gauge", FanCurveType.Mix => "I.Layers", _ => "I.Activity" }),
                 IsChecked = curve.Name == _selectedCurve,
             };
             string name = curve.Name;
@@ -1087,9 +1087,9 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
 
             stack.Children.Add(new TextBlock { Text = "Drag points to move them · double-click to add one · right-click to remove", Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 5, 0, 0) });
             var tune = new SettingsFlow { Margin = new Thickness(0, 5, 0, 0) };
-            tune.Children.Add(Ui.SettingRow("Ignore changes under", null, Ui.SliderWithValue(0, 10, curve.HysteresisC, "{0:0} °C", v => { curve.HysteresisC = (int)v; _app.FanSettingsChanged(); }, 130)));
-            tune.Children.Add(Ui.SettingRow("Fastest rise", null, Ui.SliderWithValue(0, 50, curve.StepUpPerSecond, RateText, v => { curve.StepUpPerSecond = (int)v; _app.FanSettingsChanged(); }, 130), more: "Each fan has its own Fastest rise too; when both are set, the slower one wins."));
-            tune.Children.Add(Ui.SettingRow("Fastest drop", null, Ui.SliderWithValue(0, 50, curve.StepDownPerSecond, RateText, v => { curve.StepDownPerSecond = (int)v; _app.FanSettingsChanged(); }, 130), more: "Each fan has its own Fastest drop too; when both are set, the slower one wins."));
+            tune.Children.Add(Ui.SettingRow("Ignore changes under", null, Ui.SliderWithValue(0, 10, curve.HysteresisC, "{0:0} °C", v => { curve.HysteresisC = (int)v; _app.FanSettingsChanged(); }, TuneSlider), more: "Temperature changes smaller than this don't move the fans, so they don't hunt up and down."));
+            tune.Children.Add(Ui.SettingRow("Fastest rise", null, Ui.SliderWithValue(0, 50, curve.StepUpPerSecond, RateText, v => { curve.StepUpPerSecond = (int)v; _app.FanSettingsChanged(); }, TuneSlider), more: "Each fan has its own Fastest rise too; when both are set, the slower one wins."));
+            tune.Children.Add(Ui.SettingRow("Fastest drop", null, Ui.SliderWithValue(0, 50, curve.StepDownPerSecond, RateText, v => { curve.StepDownPerSecond = (int)v; _app.FanSettingsChanged(); }, TuneSlider), more: "Each fan has its own Fastest drop too; when both are set, the slower one wins."));
             stack.Children.Add(tune);
         }
         else if (curve.Type == FanCurveType.Flat)

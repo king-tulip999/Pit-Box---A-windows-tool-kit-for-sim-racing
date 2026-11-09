@@ -250,6 +250,9 @@
                 <Setter Property="Foreground" Value="{DynamicResource PrimaryHoverFg}" />
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Background" Value="{DynamicResource QuietBg}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource QuietEdge}" />
+                <Setter Property="Foreground" Value="{DynamicResource QuietFg}" />
                 <Setter Property="Opacity" Value="0.45" />
             </Trigger>
         </Style.Triggers>
@@ -327,6 +330,10 @@
                 <Setter Property="BorderBrush" Value="{DynamicResource Danger}" />
                 <Setter Property="Foreground" Value="{DynamicResource OnDanger}" />
             </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Foreground" Value="{DynamicResource QuietFg}" />
+                <Setter Property="Opacity" Value="0.45" />
+            </Trigger>
         </Style.Triggers>
     </Style>
     <!-- the yes of a destructive confirmation: the danger look at rest (DangerSoft, 1.5 px Danger edge, bold DangerDeep;
@@ -337,6 +344,14 @@
         <Setter Property="BorderThickness" Value="1.5" />
         <Setter Property="Foreground" Value="{DynamicResource DangerDeep}" />
         <Setter Property="FontWeight" Value="Bold" />
+        <Style.Triggers>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Background" Value="{DynamicResource QuietBg}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource QuietEdge}" />
+                <Setter Property="Foreground" Value="{DynamicResource QuietFg}" />
+                <Setter Property="Opacity" Value="0.45" />
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <!-- icon-only action (pencil, trash, eye…): a square ghost button; 3 px margins keep neighbours the 6 px button gap (Ui.ButtonGap) apart -->
@@ -711,11 +726,10 @@
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Hover}" />
+                            <Setter TargetName="Mark" Property="Background" Value="{DynamicResource LineStrong}" />
                             <Setter Property="Foreground" Value="{DynamicResource Heading}" />
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="Transparent" />
                             <Setter TargetName="Mark" Property="Background" Value="{DynamicResource AccentText}" />
                             <Setter Property="Foreground" Value="{DynamicResource Heading}" />
                         </Trigger>
@@ -910,7 +924,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RepeatButton">
-                    <Border Background="{DynamicResource AccentSoft}" Margin="0,0,-6,0" />
+                    <Border Background="{DynamicResource Accent}" Opacity="0.38" Margin="0,0,-6,0" />
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -930,11 +944,11 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Thumb">
                     <Grid Width="12" Background="Transparent">
-                        <Border x:Name="E" Width="2" HorizontalAlignment="Center" Background="{DynamicResource Accent}" />
+                        <Border x:Name="E" Width="3" HorizontalAlignment="Center" Background="{DynamicResource Accent}" />
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsDragging" Value="True">
-                            <Setter TargetName="E" Property="Width" Value="3" />
+                            <Setter TargetName="E" Property="Width" Value="4" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

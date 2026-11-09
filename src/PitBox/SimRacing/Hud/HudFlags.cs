@@ -45,7 +45,7 @@ internal static class HudFlags
         float x = p.Snap(area.X + (area.Width - wPx / s) / 2), y = p.Snap(area.Y + (area.Height - hPx / s) / 2);
         var r = new RectangleF(x, y, wPx / s, hPx / s);
         var g = p.G;
-        g.FillRectangle(p.Brush(Frame), r.X - px, r.Y - px, r.Width + 2 * px, r.Height + 2 * px);
+        g.FillRectangle(p.Brush(kind == FlagKind.Black ? HudPalette.Alpha(HudPalette.FlagWhite, 150) : Frame), r.X - px, r.Y - px, r.Width + 2 * px, r.Height + 2 * px);
         var state = g.Save();
         g.SetClip(r, CombineMode.Intersect);
         g.FillRectangle(p.Brush(Base(kind)), r);

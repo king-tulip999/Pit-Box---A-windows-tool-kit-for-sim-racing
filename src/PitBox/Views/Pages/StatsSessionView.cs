@@ -269,7 +269,7 @@ internal static class StatsSessionView
         var top = new Grid { MinHeight = BannerHeight, ClipToBounds = true };
         top.Children.Add(new Slant(place + "Wash", 0, 0, 0.7, 0, 0.52, 1, 0, 1));
         top.Children.Add(new Slant(place + "Faint", 0.7, 0, 0.76, 0, 0.58, 1, 0.52, 1));
-        var carZone = RaceParts.CarOnStripe(s.Car, place, BannerHeight, 104, 264, carArea: CarArea);
+        var carZone = RaceParts.CarOnStripe(s.Car, place, BannerHeight, 110, 320, carArea: CarArea);
         top.Children.Add(carZone);
         var outline = new Border
         {
