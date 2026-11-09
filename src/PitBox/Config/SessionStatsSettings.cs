@@ -8,10 +8,6 @@ public sealed class SessionStatsSettings
 
     public string Range { get; set; } = "season";
 
-    public string? TimelineCombo { get; set; }
-
-    public long? TimelinePickedUtc { get; set; }
-
     public bool TraceRecord { get; set; } = true;
 
     public int TraceKeepDays { get; set; } = 365;
@@ -43,7 +39,7 @@ public sealed class SessionStatsSettings
     public static readonly (string Id, string Name)[] Panels =
     {
         ("overview", "Overview"), ("sessions", "Sessions"), ("activity", "Driving activity"), ("cars", "Cars and tracks"),
-        ("performance", "Performance"), ("achievements", "Achievements"), ("telemetry", "Telemetry files"),
+        ("achievements", "Achievements"), ("telemetry", "Telemetry files"),
     };
 
     public bool Shows(string panel) => !HiddenPanels.Contains(panel);

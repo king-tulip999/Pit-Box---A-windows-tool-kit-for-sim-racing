@@ -51,7 +51,8 @@ internal sealed class StatsStore : IDisposable
         AddColumns("laps", "sectors TEXT", "flags INTEGER", "lap_incidents INTEGER", "run INTEGER", "setup TEXT");
         AddColumns("sessions", "air_temp REAL", "wind_kph REAL", "wind_dir REAL", "humidity REAL", "pressure REAL", "air_density REAL", "skies INTEGER",
             "rain_max REAL", "wetness_max INTEGER", "rubber TEXT NOT NULL DEFAULT ''", "sim_start TEXT NOT NULL DEFAULT ''",
-            "track_id INTEGER", "track_name TEXT NOT NULL DEFAULT ''", "tank_l REAL", "tyre_wear TEXT", "tier TEXT NOT NULL DEFAULT ''", "tier_pos INTEGER", "laps_led INTEGER", "field INTEGER");
+            "track_id INTEGER", "track_name TEXT NOT NULL DEFAULT ''", "tank_l REAL", "tyre_wear TEXT", "tier TEXT NOT NULL DEFAULT ''", "tier_pos INTEGER", "laps_led INTEGER", "field INTEGER",
+            "air_temp_min REAL", "air_temp_max REAL", "wind_min REAL", "wind_max REAL", "humidity_min REAL", "humidity_max REAL", "tier_start INTEGER");
         RelinkRatings();
     }
 
@@ -232,10 +233,13 @@ internal sealed class StatsStore : IDisposable
             tank_l = COALESCE(tank_l, ?15), tyre_wear = COALESCE(tyre_wear, ?16),
             start_pos = COALESCE(start_pos, ?17), finish_pos = COALESCE(finish_pos, ?18), finished = MAX(finished, ?19),
             tier = CASE WHEN tier = '' THEN ?20 ELSE tier END, tier_pos = COALESCE(tier_pos, ?21),
-            laps_led = COALESCE(laps_led, ?22), field = MAX(COALESCE(field, ?23), COALESCE(?23, field))
+            laps_led = COALESCE(laps_led, ?22), field = MAX(COALESCE(field, ?23), COALESCE(?23, field)),
+            air_temp_min = COALESCE(air_temp_min, ?24), air_temp_max = COALESCE(air_temp_max, ?25), wind_min = COALESCE(wind_min, ?26), wind_max = COALESCE(wind_max, ?27),
+            humidity_min = COALESCE(humidity_min, ?28), humidity_max = COALESCE(humidity_max, ?29), tier_start = COALESCE(tier_start, ?30)
             WHERE id = ?1
             """, existing.Id, r.AirTemp, r.WindKph, r.WindDir, r.Humidity, r.Pressure, r.AirDensity, r.Skies, r.RainMax, r.WetnessMax,
-            r.Rubber, r.SimStart, r.TrackId, r.TrackName, r.TankL, TyreWear.Text(r.Tyres), r.StartPos, r.FinishPos, r.Finished ? 1 : 0, r.Tier, r.TierPos, r.LapsLed, r.Field);
+            r.Rubber, r.SimStart, r.TrackId, r.TrackName, r.TankL, TyreWear.Text(r.Tyres), r.StartPos, r.FinishPos, r.Finished ? 1 : 0, r.Tier, r.TierPos, r.LapsLed, r.Field,
+            r.AirTempMin, r.AirTempMax, r.WindMin, r.WindMax, r.HumidityMin, r.HumidityMax, r.TierStart);
         return true;
     }
 
@@ -350,7 +354,8 @@ internal sealed class StatsStore : IDisposable
         league_id, subsession, session_num, season_id, race_week, official, drive_s, garage_s, longest_stint_s, rain_s, night_s,
         track_temp_min, track_temp_max, distance_km, pit_stops, pit_s, source,
         air_temp, wind_kph, wind_dir, humidity, pressure, air_density, skies, rain_max, wetness_max, rubber, sim_start, track_id, track_name,
-        tank_l, tyre_wear, tier, tier_pos, laps_led, field
+        tank_l, tyre_wear, tier, tier_pos, laps_led, field,
+        air_temp_min, air_temp_max, wind_min, wind_max, humidity_min, humidity_max, tier_start
         """;
 
     private static object?[] Values(SessionRow r) => new object?[]
@@ -361,6 +366,7 @@ internal sealed class StatsStore : IDisposable
         r.TrackTempMin, r.TrackTempMax, r.DistanceKm, r.PitStops, r.PitS, r.Source,
         r.AirTemp, r.WindKph, r.WindDir, r.Humidity, r.Pressure, r.AirDensity, r.Skies, r.RainMax, r.WetnessMax, r.Rubber, r.SimStart, r.TrackId, r.TrackName,
         r.TankL, TyreWear.Text(r.Tyres), r.Tier, r.TierPos, r.LapsLed, r.Field,
+        r.AirTempMin, r.AirTempMax, r.WindMin, r.WindMax, r.HumidityMin, r.HumidityMax, r.TierStart,
     };
 
     private long InsertRow(SessionRow r)
@@ -428,12 +434,17 @@ internal sealed class StatsStore : IDisposable
             tank_l = COALESCE(tank_l, ?32),
             tyre_wear = CASE WHEN ?33 IS NULL THEN tyre_wear WHEN tyre_wear IS NULL THEN ?33 ELSE tyre_wear || ';' || ?33 END,
             tier = CASE WHEN ?34 = '' THEN tier ELSE ?34 END, tier_pos = CASE WHEN ?7 IS NULL THEN tier_pos ELSE ?35 END,
-            laps_led = CASE WHEN ?36 IS NULL THEN laps_led ELSE COALESCE(laps_led, 0) + ?36 END, field = MAX(COALESCE(field, ?37), COALESCE(?37, field))
+            laps_led = CASE WHEN ?36 IS NULL THEN laps_led ELSE COALESCE(laps_led, 0) + ?36 END, field = MAX(COALESCE(field, ?37), COALESCE(?37, field)),
+            air_temp_min = MIN(COALESCE(air_temp_min, ?38), COALESCE(?38, air_temp_min)), air_temp_max = MAX(COALESCE(air_temp_max, ?39), COALESCE(?39, air_temp_max)),
+            wind_min = MIN(COALESCE(wind_min, ?40), COALESCE(?40, wind_min)), wind_max = MAX(COALESCE(wind_max, ?41), COALESCE(?41, wind_max)),
+            humidity_min = MIN(COALESCE(humidity_min, ?42), COALESCE(?42, humidity_min)), humidity_max = MAX(COALESCE(humidity_max, ?43), COALESCE(?43, humidity_max)),
+            tier_start = COALESCE(tier_start, ?44)
             WHERE id = ?1
             """, id, Unix(r.StartUtc), Unix(r.EndUtc), lapCount, r.Incidents, r.StartPos, r.FinishPos, r.Finished,
             r.DriveS, r.GarageS, r.LongestStintS, r.RainS, r.NightS, r.TrackTempMin, r.TrackTempMax, r.DistanceKm, r.PitStops, r.PitS,
             r.AirTemp, r.WindKph, r.WindDir, r.Humidity, r.Pressure, r.AirDensity, r.Skies, r.RainMax, r.WetnessMax, r.Rubber, r.SimStart,
-            r.TrackId, r.TrackName, r.TankL, TyreWear.Text(r.Tyres, lapOffset), r.Tier, r.TierPos, r.LapsLed, r.Field);
+            r.TrackId, r.TrackName, r.TankL, TyreWear.Text(r.Tyres, lapOffset), r.Tier, r.TierPos, r.LapsLed, r.Field,
+            r.AirTempMin, r.AirTempMax, r.WindMin, r.WindMax, r.HumidityMin, r.HumidityMax, r.TierStart);
     }
 
     private static readonly string RatedPick = $"SELECT id, session_type, ir_start, sr_start, official FROM sessions WHERE driver_id = ?1 AND category = ?2 AND id <> ?3 AND ir_start > {RaceResult.PlaceholderIRating}";
@@ -534,12 +545,15 @@ internal sealed class StatsStore : IDisposable
     {
         var q = _db.Query("""
             SELECT air_temp, track_temp_min, track_temp_max, wind_kph, wind_dir, humidity, pressure, air_density, skies, rain_max, wetness_max,
-            rubber, sim_start, dynamic_weather FROM sessions WHERE id = ?1
+            rubber, sim_start, dynamic_weather, air_temp_min, air_temp_max, wind_min, wind_max, humidity_min, humidity_max, rain_s FROM sessions WHERE id = ?1
             """, session);
         if (q.Count == 0) return null;
         var r = q[0];
         return new SessionConditions(D(r[0]), D(r[1]), D(r[2]), D(r[3]), D(r[4]), D(r[5]), D(r[6]), D(r[7]), I(r[8]), D(r[9]), I(r[10]),
-            r[11] as string ?? "", r[12] as string ?? "", Convert.ToInt64(r[13]) != 0);
+            r[11] as string ?? "", r[12] as string ?? "", Convert.ToInt64(r[13]) != 0)
+        {
+            AirTempMin = D(r[14]), AirTempMax = D(r[15]), WindMin = D(r[16]), WindMax = D(r[17]), HumidityMin = D(r[18]), HumidityMax = D(r[19]), RainS = D(r[20]) ?? 0,
+        };
     }
 
     public (double? Tank, List<TyreReading> Tyres) CarExtras(long session) =>
@@ -579,7 +593,7 @@ internal sealed class StatsStore : IDisposable
         SELECT s.id, s.start_utc, s.session_type, s.car, s.car_class, s.track, s.track_config, s.laps,
         (SELECT MIN(time) FROM laps WHERE session_id = s.id AND clean = 1), s.incidents, s.start_pos, s.finish_pos, s.finished,
         s.weather, s.track_km, s.ir_delta, s.sr_delta, s.drive_s, s.official, s.league_id, s.source, s.ir_start, s.sr_start, s.pit_stops, s.track_id, s.track_name,
-        s.tier, s.tier_pos
+        s.tier, s.tier_pos, s.tier_start
         FROM sessions s
         """;
 
@@ -587,21 +601,34 @@ internal sealed class StatsStore : IDisposable
         (long)r[0]!, FromUnix((long)r[1]!), (string)r[2]!, (string)r[3]!, (string)r[4]!, (string)r[5]!, (string)r[6]!, Convert.ToInt32(r[7]), D(r[8]),
         I(r[9]), I(r[10]), I(r[11]), Convert.ToInt64(r[12]) != 0, (string)r[13]!, D(r[14]), I(r[15]), D(r[16]), Convert.ToDouble(r[17]), Convert.ToInt64(r[18]) != 0,
         Convert.ToInt32(r[19]), (string)r[20]!, I(r[21]) is { } ir && RaceResult.KnownRating(ir) ? ir : null,
-        RaceResult.KnownRating(I(r[21])) ? D(r[22]) : null, Convert.ToInt32(r[23]), I(r[24]), r[25] as string ?? "", r[26] as string ?? "", I(r[27]));
+        RaceResult.KnownRating(I(r[21])) ? D(r[22]) : null, Convert.ToInt32(r[23]), I(r[24]), r[25] as string ?? "", r[26] as string ?? "", I(r[27]), I(r[28]));
 
     public void Dispose() => _db.Dispose();
 }
 
 internal sealed record SessionConditions(double? AirTemp, double? TrackTempMin, double? TrackTempMax, double? WindKph, double? WindDir, double? Humidity,
-    double? Pressure, double? AirDensity, int? Skies, double? RainMax, int? WetnessMax, string Rubber, string SimStart, bool Dynamic);
+    double? Pressure, double? AirDensity, int? Skies, double? RainMax, int? WetnessMax, string Rubber, string SimStart, bool Dynamic)
+{
+    public double? AirTempMin { get; init; }
+    public double? AirTempMax { get; init; }
+    public double? WindMin { get; init; }
+    public double? WindMax { get; init; }
+    public double? HumidityMin { get; init; }
+    public double? HumidityMax { get; init; }
+    public double RainS { get; init; }
+}
 
 internal sealed record SessionSummary(long Id, DateTime StartUtc, string Type, string Car, string CarClass, string Track, string Config, int Laps, double? Best,
     int? Incidents, int? StartPos, int? FinishPos, bool Finished, string Weather, double? TrackKm, int? IrDelta, double? SrDelta, double DriveS, bool Official,
-    int LeagueId, string Source, int? IrStart = null, double? SrStart = null, int PitStops = 0, int? TrackId = null, string TrackName = "", string Tier = "", int? TierPos = null)
+    int LeagueId, string Source, int? IrStart = null, double? SrStart = null, int PitStops = 0, int? TrackId = null, string TrackName = "", string Tier = "", int? TierPos = null, int? TierStart = null)
 {
     public string Place => Config.Length > 0 ? $"{Track} · {Config}" : Track;
 
     public bool HasTier => Tier.Length > 0 && TierPos is > 0;
+
+    public int? ShownStart => HasTier ? TierStart : StartPos;
+
+    public int? Gained => ShownStart is > 0 and var start && ShownPos is > 0 and var finish ? start - finish : null;
 
     public int? ShownPos => HasTier ? TierPos : FinishPos;
 

@@ -369,7 +369,7 @@ internal sealed class SessionStatsService : IDisposable
         }
     }
 
-    private const string RereadKey = "recorder_reread", RereadVersion = "official-lap-times-differs-grid-class-finish-car-settings-off-track";
+    private const string RereadKey = "recorder_reread", RereadVersion = "official-lap-times-differs-grid-class-finish-car-settings-off-track-weather-ranges";
 
     private void Reread(StatsStore store, string folder, bool traces, TraceRetention retention, CancellationToken cancel)
     {
@@ -399,14 +399,15 @@ internal sealed class SessionStatsService : IDisposable
         try { store.RenumberTraces(replaced); }
         catch (Exception ex) { App.LogError(ex); }
         string now = DateTime.UtcNow.ToString("O");
-        foreach (var key in new[] { RereadKey, "conditions_backfill", "tyres_backfill", "positions_backfill", StatsStore.TierBackfill, FieldBackfill })
+        foreach (var key in new[] { RereadKey, "conditions_backfill", "tyres_backfill", "positions_backfill", StatsStore.TierBackfill, FieldBackfill, TierStartBackfill })
             store.SetMeta(key, key == RereadKey ? RereadVersion : now);
         PostChanged();
     }
 
     private void FillMissing(StatsStore store, string folder, HashSet<string> done, CancellationToken cancel)
     {
-        if (store.Meta("conditions_backfill") is not null && store.Meta("tyres_backfill") is not null && store.Meta("positions_backfill") is not null && store.Meta(StatsStore.TierBackfill) is not null && store.Meta(FieldBackfill) is not null) return;
+        if (store.Meta("conditions_backfill") is not null && store.Meta("tyres_backfill") is not null && store.Meta("positions_backfill") is not null && store.Meta(StatsStore.TierBackfill) is not null && store.Meta(FieldBackfill) is not null
+            && store.Meta(TierStartBackfill) is not null) return;
         if (store.Meta(StatsStore.TierBackfill) is null) store.ClearTierPositions();
         var todo = new DirectoryInfo(folder).EnumerateFiles("*.ibt")
             .Where(f => !done.Contains(f.Name) && store.Imported(f.Name))
@@ -429,9 +430,10 @@ internal sealed class SessionStatsService : IDisposable
         store.SetMeta("positions_backfill", DateTime.UtcNow.ToString("O"));
         store.SetMeta(StatsStore.TierBackfill, DateTime.UtcNow.ToString("O"));
         store.SetMeta(FieldBackfill, DateTime.UtcNow.ToString("O"));
+        store.SetMeta(TierStartBackfill, DateTime.UtcNow.ToString("O"));
     }
 
-    private const string FieldBackfill = "field_laps_led_backfill";
+    private const string FieldBackfill = "field_laps_led_backfill", TierStartBackfill = "tier_start_backfill";
 
     private const string MissingFromKey = "traces_missing_from", ChannelsKey = "traces_channels", ChannelsVersion = "yaw-uneven-halves";
 

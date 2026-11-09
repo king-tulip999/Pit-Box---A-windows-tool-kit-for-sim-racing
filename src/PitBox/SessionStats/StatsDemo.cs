@@ -73,7 +73,10 @@ internal static class StatsDemo
                 Skies = wet ? 3 : more.Next(0, 3), RainMax = wet ? 0.35 : 0, WetnessMax = wet ? 4 : 1,
                 Rubber = kind == "Race" ? "moderately high usage" : "moderate usage", SimStart = $"{start:yyyy-MM-dd} {13 + more.Next(0, 5):00}:{more.Next(0, 4) * 15:00}",
                 TankL = car.Tank, Tyres = DemoTyres(more, lapCount, pitLap),
+                AirTempMin = wet ? 14 : 19, AirTempMax = wet ? 16 + more.Next(0, 3) : 21 + more.Next(0, 5),
+                WindMin = 3 + more.Next(0, 4), WindMax = 9 + more.Next(0, 8), HumidityMin = wet ? 0.86 : 0.45, HumidityMax = wet ? 0.94 : 0.5 + more.NextDouble() * 0.2,
                 Tier = league && kind == "Race" ? "AM" : "", TierPos = league && finished ? Math.Max(1, (finish + 1) / 2) : null,
+                TierStart = league && kind == "Race" ? Math.Max(1, (grid + 1) / 2) : null,
                 Field = kind == "Race" ? field : null, LapsLed = kind == "Race" ? (finished && finish <= 2 ? more.Next(1, lapCount / 2) : 0) : null,
                 PitStops = kind == "Race" && lapCount > 18 ? 1 : 0, PitS = kind == "Race" && lapCount > 18 ? 38 + rnd.NextDouble() * 12 : 0,
             };

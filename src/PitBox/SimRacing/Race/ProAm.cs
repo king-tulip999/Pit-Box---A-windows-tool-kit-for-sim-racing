@@ -55,6 +55,20 @@ internal static class ProAm
         return known ? n : 0;
     }
 
+    public static int TierPosition(SessionInfo session, int me, int myClassPos, IReadOnlyDictionary<int, int> classPositions)
+    {
+        if (myClassPos <= 0 || !session.ByCar.TryGetValue(me, out var mine)) return 0;
+        bool pro = IsPro(mine.Name), known = false;
+        int n = 1;
+        foreach (var (car, p) in classPositions)
+        {
+            if (car == me || p <= 0 || !session.ByCar.TryGetValue(car, out var d) || d.ClassId != mine.ClassId) continue;
+            known = true;
+            if (IsPro(d.Name) == pro && p < myClassPos) n++;
+        }
+        return known ? n : 0;
+    }
+
     public static int[] Positions(IReadOnlyList<StandingRow> standings, SessionInfo session, int[] into, Dictionary<(int Class, bool Pro), int> counts)
     {
         Array.Clear(into);

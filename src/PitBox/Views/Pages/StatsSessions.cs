@@ -43,12 +43,14 @@ internal static class StatsSessions
         {
             var table = new Grid();
             for (int c = 0; c < Columns; c++)
-                table.ColumnDefinitions.Add(c == 2 ? new ColumnDefinition { Width = new GridLength(1000, GridUnitType.Star), MinWidth = 97 } : new ColumnDefinition { Width = GridLength.Auto });
-            table.ColumnDefinitions.Add(new ColumnDefinition());
+            {
+                table.ColumnDefinitions.Add(c == 2 ? new ColumnDefinition { Width = GridLength.Auto, MaxWidth = NamesMaxWidth } : new ColumnDefinition { Width = GridLength.Auto });
+                if (Spaced(c)) table.ColumnDefinitions.Add(new ColumnDefinition());
+            }
             table.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             var shown = list.Take(filter.Shown).ToList();
             bool strips = shown.Any(s => RaceParts.Raced(s) && races.LapsOf(s.Id).Count > 1);
-            string[] heads = { "Time", "Session", "Car and track", "Map", strips ? "Lap times" : "", "Laps", "Best lap", "Incidents", "Awards", "Traces" };
+            string[] heads = { "Time", "Session", "Track and car", "Map", strips ? "Lap times" : "", "Laps", "Best lap", "Incidents", "Awards", "Traces" };
             int span = table.ColumnDefinitions.Count;
             for (int c = 0; c < heads.Length; c++)
             {
@@ -84,20 +86,21 @@ internal static class StatsSessions
                 var session = s;
                 hit.MouseLeftButtonUp += (_, e) => { e.Handled = true; open(session); };
                 var rule = Hairline.Rule(new Border { VerticalAlignment = VerticalAlignment.Top, IsHitTestVisible = false });
-                rule.SetResourceReference(Border.BackgroundProperty, "Line");
+                rule.SetResourceReference(Border.BackgroundProperty, newDay && row > 1 ? "LineStrong" : "Line");
                 Grid.SetRow(rule, row);
                 Grid.SetColumnSpan(rule, span);
                 table.Children.Add(hit);
                 table.Children.Add(rule);
                 if (newDay)
                 {
-                    var dayText = new TextBlock { Text = Dates.Weekday(local) + " " + Dates.Short(local), Style = Ui.Res<Style>("Caption"), FontSize = 12, FontWeight = FontWeights.Bold };
+                    var dayText = new TextBlock { Text = Dates.Weekday(local) + " " + Dates.Short(local), Style = Ui.Res<Style>("Caption"), FontSize = StatSize, FontWeight = FontWeights.Bold };
                     dayText.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
-                    Cell(table, row, 0, new StackPanel { Children = { dayText, Caption(Dates.Time(local)) } });
+                    Cell(table, row, 0, new StackPanel { Children = { dayText, Stat(Dates.Time(local)) } });
                 }
-                else Cell(table, row, 0, Caption(Dates.Time(local)));
-                Cell(table, row, 1, raced ? Finish(s, place) : TypeMark(s.Type));
-                var names = new StackPanel { Children = { Body(s.Car), Body(s.Place, "TextMuted", 9.5) } };
+                else Cell(table, row, 0, Stat(Dates.Time(local)));
+                Cell(table, row, 1, raced ? Finish(s, place) : TypeMark(s.Type, true));
+                var config = StatFormat.Config(s.Config);
+                var names = new StackPanel { Children = { Body(s.Track, "Heading", 13), Body(config.Length > 0 ? $"{config} · {s.Car}" : s.Car, "TextMuted", 12) } };
                 var carPicture = CarPictures.Beside(names, s.Car, 21, 8);
                 if (CarPictures.For(s.Car) is null) names.Margin = new Thickness(21 * CarPictures.SlotAspect + 8, 0, 0, 0);
                 Cell(table, row, 2, carPicture);
@@ -108,9 +111,12 @@ internal static class StatsSessions
                     var strip = new LapStrip(lapTimes, place) { Width = StripWidth, Height = 22, ToolTip = "Lap times: taller = faster" };
                     Cell(table, row, 4, strip);
                 }
-                Cell(table, row, 5, Caption(s.Laps.ToString(CultureInfo.CurrentCulture)), true);
-                Cell(table, row, 6, Time(s.Best), true);
-                Cell(table, row, 7, Caption(s.Incidents is { } inc ? inc + "x" : SimRacing.Race.RaceFormat.Missing), true);
+                Cell(table, row, 5, Stat(s.Laps.ToString(CultureInfo.CurrentCulture)), true);
+                var best = Time(s.Best);
+                best.FontSize = StatSize;
+                best.FontWeight = FontWeights.Bold;
+                Cell(table, row, 6, best, true);
+                Cell(table, row, 7, Stat(s.Incidents is { } inc ? inc + "x" : SimRacing.Race.RaceFormat.Missing), true);
                 Cell(table, row, 8, Awards(races.AwardsOf(s.Id), place), true);
                 bool hasTrace = traced.Contains(s.Id);
                 var mark = new Icon
@@ -140,7 +146,7 @@ internal static class StatsSessions
     }
 
     private const int Columns = 10;
-    private const double RowHeight = 44, CascadeStepMs = 22, MaxCascadeMs = 420;
+    private const double RowHeight = 44, CascadeStepMs = 22, MaxCascadeMs = 420, NamesMaxWidth = 380, StatSize = 13;
 
     internal static string NoTraceReason(SessionSummary s, Config.SessionStatsSettings settings, DateTime nowUtc)
     {
@@ -155,13 +161,15 @@ internal static class StatsSessions
 
     internal static string TypeBrush(string type) => type switch { "Practice" => "Slate", "Qualify" => "Gold", "Race" => "Accent", _ => "LineStrong" };
 
-    internal static FrameworkElement TypeMark(string type)
+    internal static FrameworkElement TypeMark(string type, bool tableSize = false)
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal };
         var swatch = new Border { Width = 6, Height = 6, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center };
         swatch.SetResourceReference(Border.BackgroundProperty, TypeBrush(type));
         row.Children.Add(swatch);
-        row.Children.Add(new TextBlock { Text = TypeName(type), Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center });
+        var name = tableSize ? Stat(TypeName(type)) : new TextBlock { Text = TypeName(type), Style = Ui.Res<Style>("Caption") };
+        name.VerticalAlignment = VerticalAlignment.Center;
+        row.Children.Add(name);
         return row;
     }
 
@@ -171,16 +179,17 @@ internal static class StatsSessions
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal };
         row.Children.Add(RaceParts.Big("P" + s.ShownPos!.Value.ToString(CultureInfo.CurrentCulture), 25, place + "Text"));
-        if (s.StartPos is { } start)
+        if (s.Gained is { } gained)
         {
-            int gained = start - s.FinishPos!.Value;
             var gain = RaceParts.Big(RaceParts.Signed(gained), 14, RaceParts.GainBrush(gained));
             gain.Margin = new Thickness(6, 4, 0, 0);
             row.Children.Add(gain);
-            row.ToolTip = s.HasTier ? $"Started P{start} in class, finished P{s.FinishPos} in class, P{s.TierPos} {s.Tier}" : $"Started P{start}, finished P{s.FinishPos}";
+            row.ToolTip = s.HasTier
+                ? $"Started P{s.TierStart} {s.Tier}, finished P{s.TierPos} {s.Tier} (P{s.StartPos} to P{s.FinishPos} in class)"
+                : $"Started P{s.StartPos}, finished P{s.FinishPos}";
         }
         if (!s.HasTier) return row;
-        return new StackPanel { Children = { row, Body($"{s.Tier} · P{s.FinishPos} in class", "TextMuted", 9.5) } };
+        return new StackPanel { Children = { row, Body($"{s.Tier} · P{s.FinishPos} in class", "TextMuted", 12) } };
     }
 
     private static FrameworkElement Awards(IReadOnlyList<Award> awards, string place)
@@ -210,11 +219,17 @@ internal static class StatsSessions
         element.IsHitTestVisible = element.ToolTip is not null || element is StackPanel { Children.Count: > 0 } panel && panel.Children.OfType<FrameworkElement>().Any(c => c.ToolTip is not null);
         if (right) element.HorizontalAlignment = HorizontalAlignment.Right;
         Grid.SetRow(element, row);
-        Grid.SetColumn(element, col);
+        Grid.SetColumn(element, GridColumn(col));
         table.Children.Add(element);
     }
 
+    private static bool Spaced(int col) => col is >= 2 and < Columns - 1;
+
+    private static int GridColumn(int col) => col <= 2 ? col : 2 * col - 2;
+
     private static TextBlock Caption(string text) => new() { Text = text, Style = Ui.Res<Style>("Caption") };
+
+    private static TextBlock Stat(string text) => new() { Text = text, Style = Ui.Res<Style>("Body"), FontSize = StatSize, TextWrapping = TextWrapping.NoWrap };
 
     private static TextBlock Body(string text, string? brush = null, double size = 11)
     {

@@ -36,6 +36,7 @@ internal sealed class TrackSketch : FrameworkElement, IFrameStep
     public bool PlayOnLoad { get; init; }
     public int? TrackId { get; init; }
     public string TrackName { get; init; } = "";
+    public event EventHandler? MapMissing;
 
     public TrackSketch(string track, string config, string stroke, double thickness, bool lap = false)
     {
@@ -80,6 +81,7 @@ internal sealed class TrackSketch : FrameworkElement, IFrameStep
         if (map is null || map.Centerline.Length < 3)
         {
             Visibility = Visibility.Collapsed;
+            MapMissing?.Invoke(this, EventArgs.Empty);
             return;
         }
         _loop = TrackMap.Resample(map.Centerline, Points).Select(p => new Point(p.X, p.Y)).ToArray();

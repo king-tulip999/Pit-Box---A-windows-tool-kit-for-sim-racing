@@ -10,14 +10,16 @@ using PitBox.Theme;
 namespace PitBox.Views.Pages;
 
 internal sealed record SessionDetail(SessionSummary Session, List<LapRow> Laps, HashSet<int> Traced, double? AllTimeBest, SessionConditions? Conditions = null,
-    double? Tank = null, IReadOnlyList<TyreReading>? Tyres = null, RaceCardData? Race = null, int? TrackId = null, string TrackName = "");
+    double? Tank = null, IReadOnlyList<TyreReading>? Tyres = null, RaceCardData? Race = null, int? TrackId = null, string TrackName = "", StatsCharts.ComboCharts? Performance = null);
 
 internal static class StatsSessionView
 {
     public const int MaxLaps = 4;
 
-    public static FrameworkElement Build(SessionDetail d, Config.SessionStatsSettings settings, string noTraceReason, HashSet<int> ticked, Action<IReadOnlyList<int>> analyze)
+    public static FrameworkElement Build(SessionDetail d, Config.SessionStatsSettings settings, string noTraceReason, HashSet<int> ticked, Action<IReadOnlyList<int>> analyze,
+        FrameworkElement? performance = null)
     {
+        if (performance is not null) performance.Margin = new Thickness(0, 0, 0, Ui.PanelSpacing);
         bool imperial = settings.Imperial;
         var s = d.Session;
         var page = new StackPanel();
@@ -31,6 +33,7 @@ internal static class StatsSessionView
         if (laps.Count == 0)
         {
             page.Children.Add(Card(StatsSections.Empty("No complete laps in this session.")));
+            if (performance is not null) page.Children.Add(performance);
             return page;
         }
 
@@ -247,6 +250,7 @@ internal static class StatsSessionView
         }
         lapsCard.Margin = new Thickness(0, 0, 0, Ui.PanelSpacing);
         page.Children.Add(lapsCard);
+        if (performance is not null) page.Children.Add(performance);
         return page;
     }
 
@@ -368,15 +372,9 @@ internal static class StatsSessionView
         }
     }
 
-    private static string? SimTime(string text) =>
+    internal static string? SimTime(string text) =>
         DateTime.TryParseExact(text, "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var t)
             ? Dates.ShortTime(t) : null;
-
-    private static readonly string[] SkyNames = { "Clear", "Partly cloudy", "Mostly cloudy", "Overcast" };
-
-    private static readonly string[] WetnessNames = { "", "Dry", "Mostly dry", "Very lightly wet", "Lightly wet", "Moderately wet", "Very wet", "Extremely wet" };
-
-    private static readonly string[] Compass = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
 
     private static FrameworkElement? ConditionsStrip(SessionSummary s, SessionConditions? c, bool imperial)
     {
@@ -396,7 +394,7 @@ internal static class StatsSessionView
             strip.Children.Add(cell);
         }
         string type = s.Weather.Split(" · ")[0];
-        if (c?.Skies is { } sky) Add(sky == 0 ? "I.Sun" : "I.Cloud", type.Length > 0 ? $"Skies · {type}" : "Skies", SkyNames[sky], "Skies when you first drove · weather type");
+        if (c?.Skies is { } sky) Add(sky == 0 ? "I.Sun" : "I.Cloud", type.Length > 0 ? $"Skies · {type}" : "Skies", ConditionsText.SkyNames[sky], "Skies when you first drove · weather type");
         else if (s.Weather.Length > 0) Add("I.Cloud", "Weather", s.Weather, "Weather");
         if (c is { SimStart.Length: > 0 } && SimTime(c.SimStart) is { } simTime) Add("I.Clock", "In-sim time", simTime, "The date and time of day in the sim when the session started");
         if (c is not null)
@@ -406,14 +404,14 @@ internal static class StatsSessionView
                     "Track temperature while you drove (lowest–highest)");
             if (c.AirTemp is { } air) Add("I.Thermometer", "Air", StatFormat.Value(StatKind.Temp, air, imperial), "Air temperature when you first drove");
             if (c.WindKph is { } wind)
-                Add("I.Wind", c.WindDir is { } dir ? "Wind from " + Compass[(int)Math.Round((dir % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / (Math.PI / 4)) % 8] : "Wind",
+                Add("I.Wind", c.WindDir is { } dir ? "Wind from " + ConditionsText.Compass(dir) : "Wind",
                     StatFormat.Value(StatKind.Speed, wind, imperial), "Wind speed and where it comes from");
             if (c.Humidity is { } hum) Add("I.Droplet", "Humidity", $"{hum * 100:0}%", "Relative humidity");
             if (c.Pressure is { } pa) Add("I.Gauge", "Pressure", imperial ? $"{pa / 3386.389:0.00} inHg" : $"{pa / 100:0} hPa", "Air pressure");
             if (c.AirDensity is { } rho) Add("I.Layers", "Air density", imperial ? $"{rho * 0.062428:0.000} lb/ft³" : $"{rho:0.00} kg/m³", "Air density: less air, less grip and power");
             if (c.RainMax is > 0 and var rain) Add("I.CloudRain", "Most rain", $"{rain * 100:0}%", "The most rain while you drove");
-            if (c.WetnessMax is > 1 and < 8 and var wet) Add("I.Droplet", "Wettest", WetnessNames[wet], "The wettest the track got while you drove");
-            if (c.Rubber.Length > 0) Add("I.Wheel", "Rubber", char.ToUpperInvariant(c.Rubber[0]) + c.Rubber[1..], "Rubber on the racing line at the start");
+            if (c.WetnessMax is > 1 and < 8 and var wet) Add("I.Droplet", "Wettest", ConditionsText.WetnessNames[wet], "The wettest the track got while you drove");
+            if (c.Rubber.Length > 0) Add("I.Wheel", "Rubber", ConditionsText.Rubber(c.Rubber), "Rubber on the racing line at the start");
         }
         if (strip.Children.Count == 0) return null;
         var block = new StackPanel();

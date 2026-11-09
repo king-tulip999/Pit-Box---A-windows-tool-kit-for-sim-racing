@@ -42,7 +42,8 @@ internal sealed class Slant : FrameworkElement
 
 internal sealed class LapStrip : FrameworkElement
 {
-    public static readonly DependencyProperty BarProperty = Brush(nameof(Bar)), BestProperty = Brush(nameof(Best)), DirtyProperty = Brush(nameof(Dirty)), BaseProperty = Brush(nameof(Base));
+    public static readonly DependencyProperty BarProperty = Brush(nameof(Bar)), BestProperty = Brush(nameof(Best)), DirtyProperty = Brush(nameof(Dirty)), BaseProperty = Brush(nameof(Base)),
+        LabelProperty = Brush(nameof(Label)), TickProperty = Brush(nameof(Tick));
     public static readonly DependencyProperty GrowProperty = DependencyProperty.Register(nameof(Grow), typeof(double), typeof(LapStrip),
         new FrameworkPropertyMetadata(1.0, FrameworkPropertyMetadataOptions.AffectsRender));
 
@@ -53,26 +54,69 @@ internal sealed class LapStrip : FrameworkElement
     public Brush? Best { get => (Brush?)GetValue(BestProperty); set => SetValue(BestProperty, value); }
     public Brush? Dirty { get => (Brush?)GetValue(DirtyProperty); set => SetValue(DirtyProperty, value); }
     public Brush? Base { get => (Brush?)GetValue(BaseProperty); set => SetValue(BaseProperty, value); }
+    public Brush? Label { get => (Brush?)GetValue(LabelProperty); set => SetValue(LabelProperty, value); }
+    public Brush? Tick { get => (Brush?)GetValue(TickProperty); set => SetValue(TickProperty, value); }
     public double Grow { get => (double)GetValue(GrowProperty); set => SetValue(GrowProperty, value); }
 
-    private const double GrowSpread = 8;
+    private const double GrowSpread = 8, LabelSize = 11.5, LabelGap = 7, TickGap = 3;
+
+    public const double CleanOpacity = 0.82, DirtyOpacity = 0.6;
 
     private readonly IReadOnlyList<(double Time, bool Clean)> _laps;
     private readonly double _lo, _hi;
+    private readonly bool _scale;
+    private FormattedText? _fastest, _slowest;
+    private FormattedText[] _ticks = Array.Empty<FormattedText>();
+    private int[] _tickLaps = Array.Empty<int>();
+    private Brush? _labelsFor, _ticksFor;
+    private double _labelsDip;
 
     public const double ScaleTop = 1.05;
 
-    public LapStrip(IReadOnlyList<(double Time, bool Clean)> laps, string place)
+    public LapStrip(IReadOnlyList<(double Time, bool Clean)> laps, string place, bool scale = false)
     {
         _laps = laps;
+        _scale = scale;
         _lo = laps.Count > 0 ? laps.Min(l => l.Time) : 0;
         _hi = laps.Count > 0 ? Math.Min(laps.Max(l => l.Time), _lo * ScaleTop) : 1;
         SetResourceReference(BarProperty, place);
         SetResourceReference(BestProperty, "Heading");
         SetResourceReference(DirtyProperty, "Danger");
         SetResourceReference(BaseProperty, "Line");
+        SetResourceReference(LabelProperty, "TextMuted");
+        SetResourceReference(TickProperty, "TextFaint");
         SnapsToDevicePixels = true;
         ToolTip = "Lap times: taller = faster";
+    }
+
+    public static string ScaleLabel(double seconds)
+    {
+        long tenths = (long)Math.Round(Math.Max(0, seconds) * 10);
+        return $"{tenths / 600}:{tenths % 600 / 10:00}.{tenths % 10}";
+    }
+
+    public static int[] LapTicks(int count)
+    {
+        if (count <= 0) return Array.Empty<int>();
+        int step = count <= 30 ? 5 : count <= 60 ? 10 : count <= 150 ? 20 : 50;
+        var ticks = new List<int> { 1 };
+        for (int lap = step; lap <= count; lap += step) ticks.Add(lap);
+        return ticks.ToArray();
+    }
+
+    private void BuildLabels(double dip)
+    {
+        if (_fastest is not null && ReferenceEquals(_labelsFor, Label) && ReferenceEquals(_ticksFor, Tick) && _labelsDip == dip) return;
+        var family = TryFindResource("RaceFont") as FontFamily ?? new FontFamily("Segoe UI");
+        var face = new Typeface(family, FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal);
+        FormattedText Text(string s, Brush? brush) => new(s, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, face, LabelSize, brush ?? Brushes.Gray, dip);
+        _fastest = Text(ScaleLabel(_lo), Label);
+        _slowest = Text(ScaleLabel(_hi), Label);
+        _tickLaps = LapTicks(_laps.Count);
+        _ticks = _tickLaps.Select(lap => Text(lap.ToString(CultureInfo.CurrentCulture), Tick)).ToArray();
+        _labelsFor = Label;
+        _ticksFor = Tick;
+        _labelsDip = dip;
     }
 
     protected override void OnRender(DrawingContext dc)
@@ -81,22 +125,42 @@ internal sealed class LapStrip : FrameworkElement
         double w = ActualWidth, h = ActualHeight;
         if (_laps.Count == 0 || w <= 0 || h <= 0) return;
         double px = Hairline.ScaleOf(this);
-        double gap = _laps.Count * 2 < w ? 1 : 0;
-        double step = w / _laps.Count;
+        double left = 0, top0 = 0, bottom = h;
+        if (_scale)
+        {
+            BuildLabels(VisualTreeHelper.GetDpi(this).PixelsPerDip);
+            double half = _fastest!.Height / 2;
+            left = Math.Ceiling(Math.Max(_fastest.Width, _slowest!.Width) + LabelGap);
+            top0 = Math.Ceiling(half);
+            bottom = h - Math.Ceiling(_ticks.Length > 0 ? _ticks[0].Height + TickGap : 0);
+            if (bottom - top0 <= 4 || w - left <= 4) return;
+            dc.DrawText(_fastest, new Point(left - LabelGap - _fastest.Width, top0 - half));
+            dc.DrawText(_slowest, new Point(left - LabelGap - _slowest.Width, bottom - half));
+        }
+        double plotW = w - left, plotH = bottom - top0;
+        double gap = _laps.Count * 2 < plotW ? 1 : 0;
+        double step = plotW / _laps.Count;
         double range = Math.Max(0.001, _hi - _lo);
         for (int i = 0; i < _laps.Count; i++)
         {
             var (time, clean) = _laps[i];
             double share = time >= _hi ? 0.08 : 0.08 + 0.92 * (_hi - time) / range;
             if (Grow < 1) share *= FrameDriver.EaseOut((Grow * (_laps.Count + GrowSpread) - i) / GrowSpread);
-            double x0 = Hairline.Snap(i * step, px), x1 = Hairline.Snap((i + 1) * step - gap, px);
-            double top = Hairline.Snap(h - share * h, px);
+            double x0 = Hairline.Snap(left + i * step, px), x1 = Hairline.Snap(left + (i + 1) * step - gap, px);
+            double top = Hairline.Snap(bottom - share * plotH, px);
             var fill = time == _lo ? Best : clean ? Bar : Dirty;
-            dc.PushOpacity(time == _lo ? 1 : clean ? 0.82 : 0.6);
-            if (top < h) dc.DrawRectangle(fill, null, new Rect(x0, top, Math.Max(px, x1 - x0), h - top));
+            dc.PushOpacity(time == _lo ? 1 : clean ? CleanOpacity : DirtyOpacity);
+            if (top < bottom) dc.DrawRectangle(fill, null, new Rect(x0, top, Math.Max(px, x1 - x0), bottom - top));
             dc.Pop();
         }
-        dc.DrawRectangle(Base, null, new Rect(0, h - Hairline.Pixels(1, px), w, Hairline.Pixels(1, px)));
+        dc.DrawRectangle(Base, null, new Rect(left, Hairline.Snap(bottom, px) - Hairline.Pixels(1, px), plotW, Hairline.Pixels(1, px)));
+        if (!_scale) return;
+        for (int k = 0; k < _ticks.Length; k++)
+        {
+            double centre = left + (_tickLaps[k] - 0.5) * step - gap / 2;
+            double x = Math.Clamp(centre - _ticks[k].Width / 2, left, w - _ticks[k].Width);
+            dc.DrawText(_ticks[k], new Point(x, bottom + TickGap));
+        }
     }
 }
 
@@ -219,7 +283,8 @@ internal sealed class Stripe : Grid
     }
 }
 
-internal sealed record RaceCardData(SessionSummary Session, IReadOnlyList<(double Time, bool Clean)> Laps, double? Consistency, IReadOnlyList<Award> Awards, string Driver);
+internal sealed record RaceCardData(SessionSummary Session, IReadOnlyList<(double Time, bool Clean)> Laps, double? Consistency, IReadOnlyList<Award> Awards, string Driver,
+    SessionConditions? Conditions = null, bool Imperial = false);
 
 internal static class RaceParts
 {
@@ -391,20 +456,6 @@ internal static class RaceParts
         return Chip(row, tip: tip);
     }
 
-    public static FrameworkElement Meter(double grade, string place, int segments = 12)
-    {
-        var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        int on = (int)Math.Round(Math.Clamp((grade - 70) / 30, 0, 1) * segments);
-        for (int i = 0; i < segments; i++)
-        {
-            var cell = new Border { Width = 6, Height = 9, Margin = new Thickness(0, 0, 2, 0), RenderTransform = new SkewTransform(-15, 0), RenderTransformOrigin = new Point(0.5, 0.5) };
-            cell.SetResourceReference(Border.BackgroundProperty, i < on ? place : "MeterTrack");
-            row.Children.Add(cell);
-        }
-        row.ToolTip = ConsistencyTip;
-        return row;
-    }
-
     public const string ConsistencyTip = "70% how even your clean laps were (laps more than 7% off your middle lap time left out), 30% the share of clean laps";
 
     public static FrameworkElement Tile(string value, string label, string bar, string valueBrush = "Heading", double size = 30, string? tip = null, bool centred = false)
@@ -572,37 +623,17 @@ internal static class RaceParts
         stack.Children.Add(chips);
 
         var rows = new StackPanel { Margin = new Thickness(16, 6, 16, 0) };
-        void Row(string label, FrameworkElement value, string? tip = null)
-        {
-            var line = new DockPanel { Height = 30, ToolTip = tip, Background = Brushes.Transparent };
-            value.HorizontalAlignment = HorizontalAlignment.Right;
-            DockPanel.SetDock(value, Dock.Right);
-            line.Children.Add(value);
-            line.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center });
-            var rule = Hairline.Frame(new Border { Child = line }, Sides.Top);
-            rule.SetResourceReference(Border.BorderBrushProperty, "Line");
-            rows.Children.Add(rule);
-        }
-        Row("Best lap", Value(s.Best is { } best ? StatFormat.LapTime(best) : RaceFormat.Missing));
-        if (AverageClean(d.Laps) is { } average) Row("Average clean lap", Value(StatFormat.LapTime(average)));
-        if (d.Consistency is { } grade)
-        {
-            var meter = new StackPanel { Orientation = Orientation.Horizontal };
-            meter.Children.Add(Meter(grade, place).Also(m => m.Margin = new Thickness(0, 0, 9, 0)));
-            meter.Children.Add(Value(grade.ToString("0.0", CultureInfo.CurrentCulture) + "%"));
-            Row("Consistency", meter, ConsistencyTip);
-        }
-        var laps = new StackPanel { Orientation = Orientation.Horizontal };
-        laps.Children.Add(Value(s.Laps.ToString(CultureInfo.CurrentCulture)));
-        laps.Children.Add(new TextBlock { Text = RaceFormat.Count(s.PitStops, "stop"), Style = Ui.Res<Style>("Caption"), Margin = new Thickness(7, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
-        Row("Laps", laps);
-        Row("Drive time", Value(StatFormat.Duration(s.DriveS)));
+        Row(rows, "Best lap", Value(s.Best is { } best ? StatFormat.LapTime(best) : RaceFormat.Missing));
+        if (AverageClean(d.Laps) is { } average) Row(rows, "Average clean lap", Value(StatFormat.LapTime(average)));
+        if (d.Consistency is { } grade) Row(rows, "Consistency", Value(grade.ToString("0.0", CultureInfo.CurrentCulture) + "%"), ConsistencyTip);
+        Row(rows, "Laps", WithNote(s.Laps.ToString(CultureInfo.CurrentCulture), RaceFormat.Count(s.PitStops, "stop")));
+        Row(rows, "Drive time", Value(StatFormat.Duration(s.DriveS)));
         stack.Children.Add(rows);
 
         LapStrip? lapStrip = null;
         if (d.Laps.Count > 1)
         {
-            var strip = new StackPanel { Margin = new Thickness(16, 8, 16, 14) };
+            var strip = new StackPanel { Margin = new Thickness(16, 8, 16, 0) };
             var head = new DockPanel { Margin = new Thickness(0, 0, 0, 5) };
             int clean = d.Laps.Count(l => l.Clean);
             var share = new TextBlock { Text = $"{100.0 * clean / d.Laps.Count:0}% clean", Style = Ui.Res<Style>("Caption") };
@@ -610,17 +641,107 @@ internal static class RaceParts
             head.Children.Add(share);
             head.Children.Add(new TextBlock { Text = "Lap times", Style = Ui.Res<Style>("Caption") });
             strip.Children.Add(head);
-            lapStrip = new LapStrip(d.Laps, place) { Height = 38 };
+            lapStrip = new LapStrip(d.Laps, place, scale: true) { Height = 64 };
             strip.Children.Add(lapStrip);
+            strip.Children.Add(LapKey(place));
             stack.Children.Add(strip);
         }
-        else stack.Children.Add(new Border { Height = 12 });
+        if (d.Conditions is { } conditions && ConditionsBlock(s, conditions, d.Imperial) is { } block) stack.Children.Add(block);
+        else stack.Children.Add(new Border { Height = d.Laps.Count > 1 ? 14 : 12 });
 
         var card = Hairline.Frame(new Border { Child = stack, ClipToBounds = true }, edges);
         card.SetResourceReference(Border.BackgroundProperty, "Surface");
-        card.SetResourceReference(Border.BorderBrushProperty, "Line");
+        card.SetResourceReference(Border.BorderBrushProperty, "CardEdge");
         RaceArrival.When(card, position, climb, stripe, lapStrip);
         return card;
+    }
+
+    private static void Row(Panel rows, string label, FrameworkElement value, string? tip = null)
+    {
+        var line = new DockPanel { Height = 30, ToolTip = tip, Background = Brushes.Transparent };
+        value.HorizontalAlignment = HorizontalAlignment.Right;
+        DockPanel.SetDock(value, Dock.Right);
+        line.Children.Add(value);
+        line.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center });
+        var rule = Hairline.Frame(new Border { Child = line }, Sides.Top);
+        rule.SetResourceReference(Border.BorderBrushProperty, "Line");
+        rows.Children.Add(rule);
+    }
+
+    private static FrameworkElement WithNote(string value, string note)
+    {
+        if (note.Length == 0) return Value(value);
+        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        row.Children.Add(Value(value));
+        row.Children.Add(new TextBlock { Text = note, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(7, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center });
+        return row;
+    }
+
+    private static FrameworkElement LapKey(string place)
+    {
+        var key = new DockPanel { Margin = new Thickness(0, 5, 0, 0) };
+        var hint = new TextBlock { Text = "Taller = faster", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center };
+        hint.SetResourceReference(TextBlock.ForegroundProperty, "TextFaint");
+        DockPanel.SetDock(hint, Dock.Right);
+        key.Children.Add(hint);
+        var items = new StackPanel { Orientation = Orientation.Horizontal };
+        void Item(string brush, double opacity, string label)
+        {
+            var swatch = new Border { Width = 8, Height = 8, Opacity = opacity, Margin = new Thickness(0, 0, 5, 0), VerticalAlignment = VerticalAlignment.Center };
+            swatch.SetResourceReference(Border.BackgroundProperty, brush);
+            items.Children.Add(swatch);
+            items.Children.Add(new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), Margin = new Thickness(0, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center });
+        }
+        Item(place, LapStrip.CleanOpacity, "Clean");
+        Item("Danger", LapStrip.DirtyOpacity, "Not clean");
+        Item("Heading", 1, "Best");
+        key.Children.Add(items);
+        return key;
+    }
+
+    private static FrameworkElement? ConditionsBlock(SessionSummary s, SessionConditions c, bool imperial)
+    {
+        var rows = new StackPanel();
+        if (ConditionsText.Surface(c.WetnessMax, c.RainMax, c.RainS, s.DriveS) is { } surface)
+            Row(rows, "Surface", WithNote(surface.Value, surface.Note), "The wettest the track got, and how much of the race had rain or a track declared wet");
+        if (ConditionsText.Temp(c.TrackTempMin, c.TrackTempMax, null, imperial) is { } track) Row(rows, "Track temperature", Value(track), "Lowest–highest while you drove");
+        if (ConditionsText.Temp(c.AirTempMin, c.AirTempMax, c.AirTemp, imperial) is { } air) Row(rows, "Air temperature", Value(air), "Lowest–highest while you drove");
+        if (ConditionsText.Humidity(c.HumidityMin, c.HumidityMax, c.Humidity) is { } humidity) Row(rows, "Humidity", Value(humidity), "Lowest–highest relative humidity while you drove");
+        if (ConditionsText.Wind(c.WindMin, c.WindMax, c.WindKph, imperial) is { } wind)
+            Row(rows, "Wind", WithNote(wind, c.WindDir is { } dir ? ConditionsText.Compass(dir) : ""), "Lowest–highest wind speed while you drove, and where it came from at the start");
+        if (c.Rubber.Length > 0) Row(rows, "Rubber", Value(ConditionsText.Rubber(c.Rubber)), "Rubber on the racing line at the start");
+
+        string sky = c.Skies is { } skies and >= 0 and < 4 ? ConditionsText.SkyNames[skies] : "";
+        string? simTime = c.SimStart.Length > 0 ? Pages.StatsSessionView.SimTime(c.SimStart) : null;
+        if (rows.Children.Count == 0 && sky.Length == 0) return null;
+
+        var block = new StackPanel { Margin = new Thickness(16, 12, 16, 14) };
+        var head = new DockPanel { Margin = new Thickness(0, 10, 0, 4) };
+        if (c.Dynamic)
+        {
+            var dynamic = new TextBlock { Text = "Dynamic weather", Style = Ui.Res<Style>("Caption"), VerticalAlignment = VerticalAlignment.Center };
+            DockPanel.SetDock(dynamic, Dock.Right);
+            head.Children.Add(dynamic);
+        }
+        head.Children.Add(new TextBlock { Text = "Conditions", Style = Ui.Res<Style>("Eyebrow"), VerticalAlignment = VerticalAlignment.Center });
+        var rule = Hairline.Frame(new Border { Child = head }, Sides.Top);
+        rule.SetResourceReference(Border.BorderBrushProperty, "Line");
+        block.Children.Add(rule);
+
+        if (sky.Length > 0)
+        {
+            var line = new DockPanel { Margin = new Thickness(0, 4, 0, 8) };
+            var glyph = Glyph(c.Skies == 0 ? "I.Sun" : "I.Cloud", 26, "AccentText");
+            glyph.Margin = new Thickness(0, 0, 10, 0);
+            line.Children.Add(glyph);
+            var words = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            words.Children.Add(Big(sky, 17, "Heading", heavy: false));
+            if (simTime is not null) words.Children.Add(Muted($"Race start {simTime} sim time"));
+            line.Children.Add(words);
+            block.Children.Add(line);
+        }
+        block.Children.Add(rows);
+        return block;
     }
 
     public static double? AverageClean(IReadOnlyList<(double Time, bool Clean)> laps)

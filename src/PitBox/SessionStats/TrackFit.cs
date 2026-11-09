@@ -124,7 +124,7 @@ internal static class TrackFit
     public static TrackOutline? Fit(TrackMap map, IReadOnlyList<(double[] X, double[] Y, double Step, double Length)> lines)
     {
         lines = lines.Where(l => l.X.Length >= 50 && l.Length >= 200).ToList();
-        if (map.Surface.Count == 0 || TrackFit.Place(map, lines) is not { } placement) return null;
+        if (TrackFit.Place(map, lines) is not { } placement) return null;
         var (sim, centre, rms, mapLength) = placement;
         int nd = centre.Length;
 
@@ -138,7 +138,9 @@ internal static class TrackFit
         double width = Math.Max(0.1, map.Width * sim.Scale);
         var driven = lines.Select(l => Lateral(centre, l.X, l.Y)).ToList();
         var half = Enumerable.Repeat(width / 2, nd).ToArray();
-        var surface = map.Surface.Where(f => f.Length >= 3).Select(f => { var (px, py) = Placed(f); return Spline(px, py, closed: true, 1.5); }).ToList();
+        var surface = map.Surface.Count(f => f.Length >= 3) > 0
+            ? map.Surface.Where(f => f.Length >= 3).Select(f => { var (px, py) = Placed(f); return Spline(px, py, closed: true, 1.5); }).ToList()
+            : Band(centre, width / 2);
         var pit = new List<(double[], double[], bool)>();
         var pitPoints = map.Pit.Where(p => p.Filled).SelectMany(p => p.Figures).SelectMany(f => f.Points).Select(q => sim.Apply(q.X, q.Y)).ToList();
         for (int l = 0; l < lines.Count; l++)
@@ -161,6 +163,23 @@ internal static class TrackFit
         }
         var turns = map.Turns.Select(t => { var (tx, ty) = sim.Apply(t.At.X, t.At.Y); return (t.Text, tx, ty); }).ToList();
         return new TrackOutline(surface, pit, pitWidth, start, width, rms, mapLength, turns);
+    }
+
+    internal static List<(double[] X, double[] Y)> Band((double X, double Y)[] centre, double half)
+    {
+        int n = centre.Length;
+        double[] lx = new double[n], ly = new double[n], rx = new double[n], ry = new double[n];
+        for (int j = 0; j < n; j++)
+        {
+            var (ax, ay) = centre[(j - 1 + n) % n];
+            var (bx, by) = centre[(j + 1) % n];
+            double tx = bx - ax, ty = by - ay, tl = Math.Sqrt(tx * tx + ty * ty);
+            double nx = tl > 0 ? -ty / tl : 0, ny = tl > 0 ? tx / tl : 0;
+            var (cx, cy) = centre[j];
+            (lx[j], ly[j]) = (cx + nx * half, cy + ny * half);
+            (rx[j], ry[j]) = (cx - nx * half, cy - ny * half);
+        }
+        return new List<(double[] X, double[] Y)> { (lx, ly), (rx, ry) };
     }
 
     private static double[]? SolveLinear(double[,] m)

@@ -13,7 +13,7 @@ namespace PitBox.Views.Pages;
 
 internal sealed partial class IracingControllerSection
 {
-    private const double LevelCell = 66, LevelGap = 3, LevelLabelMax = 480, CellMin = 260, CellHeight = 36, DetailMinHeight = 76, ItemMin = 300, ItemGap = 26, TrayChips = 6, TrayChipText = 260;
+    private const double LevelCell = 66, LevelGap = 3, LevelLabelMax = 480, CellMin = 260, CellHeight = 36, ItemMin = 300, ItemGap = 26, TrayChips = 6, TrayChipText = 260;
 
     private IEnumerable<FrameworkElement> Pieces(List<Setting> settings, bool span)
     {
@@ -22,13 +22,11 @@ internal sealed partial class IracingControllerSection
         var switches = settings.Where(s => SettingShapes.Of(s.Def) == SettingShape.Switch).ToList();
         if (switches.Count > 0)
         {
-            var detail = new SwitchDetail(FillDetail);
             var grid = new EvenGrid { MinItemWidth = CellMin, ColumnSteps = new[] { 1, 2, 3 }, ColumnGap = ItemGap, RowGap = 0 };
-            foreach (var s in switches) grid.Children.Add(SwitchCell(s, detail));
+            foreach (var s in switches) grid.Children.Add(SwitchCell(s));
             var frame = Hairline.Frame(new Border { Child = grid, Margin = new Thickness(0, 2, 0, 0) }, Sides.Top);
             frame.SetResourceReference(Border.BorderBrushProperty, "Line");
             yield return frame;
-            yield return detail.Box;
         }
         var items = settings.Where(s => SettingShapes.Of(s.Def) is SettingShape.Slider or SettingShape.Choice).ToList();
         if (items.Count > 0)
@@ -182,7 +180,7 @@ internal sealed partial class IracingControllerSection
 
     private static bool Risky(Setting s) => !string.IsNullOrWhiteSpace(s.Def.Danger) && s.IsModified;
 
-    private Border SwitchCell(Setting s, SwitchDetail detail)
+    private Border SwitchCell(Setting s)
     {
         var host = Hairline.Frame(new Border { Padding = new Thickness(8, 0, 4, 0) }, Sides.Bottom);
         host.SetResourceReference(Border.BorderBrushProperty, "Line");
@@ -198,8 +196,6 @@ internal sealed partial class IracingControllerSection
         var grid = new Grid();
         grid.Children.Add(toggle);
         host.Child = grid;
-        host.MouseEnter += (_, _) => detail.Show(s);
-        toggle.GotKeyboardFocus += (_, _) => detail.Show(s);
         bool wasChanged = s.IsChanged;
         var edge = AddUnsavedEdge(grid, host, s, false);
         void Fill()
@@ -207,7 +203,8 @@ internal sealed partial class IracingControllerSection
             bool grow = !wasChanged;
             wasChanged = s.IsChanged;
             toggle.IsChecked = s.IsOn(s.Draft);
-            var title = TextFit.TipWhenTrimmed(new TextBlock { Style = Ui.Res<Style>("Body"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
+            var title = new TextBlock { Style = Ui.Res<Style>("Body"), TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, ToolTip = SwitchTip(s) };
+            ToolTipService.SetInitialShowDelay(title, 700);
             title.SetResourceReference(TextBlock.ForegroundProperty, Risky(s) ? "Danger" : "Heading");
             Ui.Highlight(title, s.Def.Label, _words);
             var line = new TrimRow { VerticalAlignment = VerticalAlignment.Center };
@@ -229,67 +226,32 @@ internal sealed partial class IracingControllerSection
             head.Content = line;
             var buttons = ItemActions(s, Fill);
             actions.Content = buttons.Children.Count > 0 ? buttons : null;
-            toggle.ToolTip = Details(s);
+            toggle.ToolTip = SwitchTip(s);
             ToolTipService.SetInitialShowDelay(toggle, 700);
             grid.Opacity = s.IsInert ? 0.6 : 1;
             ShowEdge(edge, s, grow);
-            detail.Refresh(s);
         }
         refill = Fill;
         Fill();
         return host;
     }
 
-    private void FillDetail(Setting s, StackPanel text)
+    private StackPanel SwitchTip(Setting s)
     {
+        var text = new StackPanel { MaxWidth = 380 };
         var name = new TextBlock { Style = Ui.Res<Style>("Body"), FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
         name.SetResourceReference(TextBlock.ForegroundProperty, Risky(s) ? "Danger" : "Heading");
-        Ui.Highlight(name, s.Def.Label, _words);
+        name.Text = s.Def.Label;
         text.Children.Add(name);
         if (s.Def.Help.Length > 0)
-        {
-            var help = new TextBlock { Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) };
-            Ui.Highlight(help, s.Def.Help, _words);
-            text.Children.Add(help);
-        }
+            text.Children.Add(new TextBlock { Text = s.Def.Help, Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) });
         Notes(s, text);
-    }
-
-    private sealed class SwitchDetail
-    {
-        private readonly StackPanel _text = new();
-        private readonly Action<Setting, StackPanel> _fill;
-        private Setting? _shown;
-
-        public Border Box { get; }
-
-        public SwitchDetail(Action<Setting, StackPanel> fill)
-        {
-            _fill = fill;
-            Box = new Border { Child = _text, Padding = new Thickness(12, 9, 12, 9), Margin = new Thickness(0, 10, 0, 8), MinHeight = DetailMinHeight, Visibility = Visibility.Collapsed };
-            Box.SetResourceReference(Border.BackgroundProperty, "SurfaceAlt");
-            Box.SetResourceReference(Border.BorderBrushProperty, "Line");
-            Box.SetResourceReference(Border.BorderThicknessProperty, "HairlineEdge");
-        }
-
-        public void Show(Setting s)
-        {
-            if (ReferenceEquals(_shown, s)) return;
-            _shown = s;
-            Fill();
-        }
-
-        public void Refresh(Setting s)
-        {
-            if (ReferenceEquals(_shown, s)) Fill();
-        }
-
-        private void Fill()
-        {
-            Box.Visibility = Visibility.Visible;
-            _text.Children.Clear();
-            _fill(_shown!, _text);
-        }
+        foreach (UIElement note in text.Children)
+            if (note.Visibility == Visibility.Hidden) note.Visibility = Visibility.Collapsed;
+        var where = new TextBlock { Text = Details(s), Style = Ui.Res<Style>("Caption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0) };
+        where.SetResourceReference(TextBlock.ForegroundProperty, "TextFaint");
+        text.Children.Add(where);
+        return text;
     }
 
     private Border ChoiceItem(Setting s)

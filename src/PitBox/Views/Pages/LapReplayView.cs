@@ -665,6 +665,7 @@ internal sealed class ReplayStage : FrameworkElement
     private readonly MatrixTransform _camera = new();
     private readonly DrawingVisual[] _carVisuals, _labelVisuals;
     private readonly MatrixTransform[] _carMatrix, _labelMatrix;
+    private readonly ReplayMarkerShape[] _markers;
     private readonly Point[] _labelAt;
     private readonly StreamGeometry[] _paths;
     private StreamGeometry _ticks;
@@ -729,6 +730,7 @@ internal sealed class ReplayStage : FrameworkElement
         _paths = cars.Select(c => Path(c.X, c.Y)).ToArray();
         _carVisuals = cars.Select(_ => new DrawingVisual()).ToArray();
         _carMatrix = cars.Select(_ => new MatrixTransform()).ToArray();
+        _markers = cars.Select(c => new ReplayMarkerShape(c)).ToArray();
         var track = Track;
         double step = _s.Reference.Trace.StepM;
         _labelAt = _s.SectorDistances.Select(d => LabelPoint(track, step, d, TrackWidth)).ToArray();
@@ -927,10 +929,8 @@ internal sealed class ReplayStage : FrameworkElement
             bool shown = _settings.ReplayShowReference || !car.Line.Reference || _onlyReference;
             _carVisuals[i].Opacity = shown ? 1 : 0;
             var p = m.Transform(new Point(car.Px, car.Py));
-            var cm = Matrix.Identity;
-            cm.Rotate((rot - car.Yaw + Math.PI / 2) * 180 / Math.PI);
-            cm.Translate(p.X, p.Y);
-            _carMatrix[i].Matrix = cm;
+            _carMatrix[i].Matrix = new Matrix(1, 0, 0, 1, p.X, p.Y);
+            if (shown) _markers[i].Place(car, m, p, _markerCarPx, scale);
         }
         for (int i = 0; i < _labelAt.Length; i++)
         {
@@ -974,7 +974,7 @@ internal sealed class ReplayStage : FrameworkElement
 
     private static readonly (bool Right, bool Down)[] CalloutCorners = { (true, false), (false, false), (true, true), (false, true) };
     private const double CalloutGap = 16;
-    private double _carPx = CarShape.MinPixels;
+    private double _carPx = CarShape.MinPixels, _markerCarPx = CarShape.MinPixels;
 
     private bool Free(Rect box)
     {
@@ -1071,12 +1071,14 @@ internal sealed class ReplayStage : FrameworkElement
             }
             DrawPedals(dc, follow, 3.5 * px);
         }
-        double carPx = Math.Max(_carLength * CarShape.Enlarge * scale, CarShape.MinPixels);
-        _carPx = carPx;
+        _markerCarPx = Math.Max(_carLength * CarShape.Enlarge * scale, CarShape.MinPixels);
+        _carPx = 2 * ReplayMarker.Radius(_markerCarPx) * ReplayMarker.Tip;
         for (int i = 0; i < _cars.Count; i++)
         {
-            var brush = Ui.Res<Brush>(_cars[i].Line.BrushKey);
-            using (var dc = _carVisuals[i].RenderOpen()) CarShape.Draw(dc, brush, carPx, _cars[i] == follow);
+            var marker = _markers[i];
+            marker.Colour(Ui.Res<Brush>(_cars[i].Line.BrushKey));
+            using var dc = _carVisuals[i].RenderOpen();
+            dc.DrawGeometry(marker.Fill, marker.Edge, marker.Geometry);
         }
         for (int i = 0; i < _labelVisuals.Length; i++)
         {
@@ -1260,34 +1262,148 @@ internal static class CarShape
         return DefaultLength;
     }
 
-    private static ImageBrush? _lines, _body;
-    private static ImageBrush Lines => _lines ??= Mask("CarTop.png");
-    private static ImageBrush Body => _body ??= Mask("CarTopBody.png");
-    private static double Aspect => Lines.ImageSource.Width / Lines.ImageSource.Height;
+}
 
-    private static ImageBrush Mask(string file)
+internal static class ReplayMarker
+{
+    public const int Samples = 48;
+    public const int Count = 2 * (Samples + 1) + 3;
+    public const double Tip = 1.55, TrailCars = 2.2, MinRadius = 5, RadiusOfCar = 0.15, FadeMid = 0.35;
+    private static readonly double TipAngle = Math.Acos(1 / Tip);
+
+    public static double Radius(double carPx) => Math.Max(MinRadius, carPx * RadiusOfCar);
+
+    public static double Trail(double carPx, double? speed, double topSpeed) =>
+        speed is { } v && topSpeed > 0 ? TrailCars * carPx * Math.Clamp(v / topSpeed, 0, 1) : 0;
+
+    public static double HalfWidth(double d, double radius, double trail)
     {
-        var image = new System.Windows.Media.Imaging.BitmapImage(new Uri("pack://application:,,,/PitBox;component/Assets/" + file));
-        var brush = new ImageBrush(image) { Stretch = Stretch.Fill };
-        RenderOptions.SetBitmapScalingMode(brush, BitmapScalingMode.HighQuality);
-        brush.Freeze();
+        double span = radius + trail, ball = d < radius ? Math.Sqrt(radius * radius - d * d) : 0;
+        double grow = Math.Min(1, trail / (1.5 * radius));
+        return Math.Max(ball, radius * Math.Pow(Math.Max(0, 1 - d / span), 1.3) * grow);
+    }
+
+    public static (double Solid, double Mid) Fade(double radius, double trail)
+    {
+        double solid = Math.Min(0.999, radius / (radius + trail));
+        return (solid, solid + (1 - solid) * FadeMid);
+    }
+
+    public static void Outline(ReadOnlySpan<Point> spine, double ahead, double radius, double trail, Span<Point> into)
+    {
+        int m = spine.Length - 1;
+        double span = radius + trail;
+        var back = new Vector(-Math.Cos(ahead), -Math.Sin(ahead));
+        for (int k = 0; k <= m; k++)
+        {
+            var dir = k < m ? spine[k + 1] - spine[k] : spine[k] - spine[k - 1];
+            if (dir.Length < 1e-6) dir = back;
+            else dir.Normalize();
+            var side = new Vector(-dir.Y, dir.X) * HalfWidth(span * k / m, radius, trail);
+            into[k] = spine[k] + side;
+            into[2 * m + 1 - k] = spine[k] - side;
+        }
+        var head = spine[0];
+        into[2 * m + 2] = head + new Vector(Math.Cos(ahead + TipAngle), Math.Sin(ahead + TipAngle)) * radius;
+        into[2 * m + 3] = head + new Vector(Math.Cos(ahead), Math.Sin(ahead)) * radius * Tip;
+        into[2 * m + 4] = head + new Vector(Math.Cos(ahead - TipAngle), Math.Sin(ahead - TipAngle)) * radius;
+    }
+}
+
+internal sealed class ReplayMarkerShape
+{
+    private readonly Point[] _spine = new Point[ReplayMarker.Samples + 1], _outline = new Point[ReplayMarker.Count];
+    private readonly PathFigure _figure = new() { IsClosed = true, IsFilled = true };
+    private readonly PolyLineSegment _sides = new();
+    private readonly ArcSegment _toTip = new() { SweepDirection = SweepDirection.Counterclockwise }, _fromTip = new() { SweepDirection = SweepDirection.Counterclockwise };
+    private readonly LineSegment _tip = new(), _tipBack = new();
+    private readonly LinearGradientBrush _fill = Fade(), _edgeBrush = Fade();
+    private readonly double _topSpeed;
+
+    public PathGeometry Geometry { get; } = new();
+    public Brush Fill => _fill;
+    public Pen Edge { get; }
+
+    public ReplayMarkerShape(ReplayCar car)
+    {
+        for (int i = 0; i < 2 * ReplayMarker.Samples + 1; i++) _sides.Points.Add(new Point());
+        _figure.Segments.Add(_sides);
+        _figure.Segments.Add(_toTip);
+        _figure.Segments.Add(_tip);
+        _figure.Segments.Add(_tipBack);
+        _figure.Segments.Add(_fromTip);
+        Geometry.Figures.Add(_figure);
+        Edge = new Pen(_edgeBrush, 1.5) { LineJoin = PenLineJoin.Round };
+        _topSpeed = car.Trace[TraceChannel.Speed] is { Length: > 0 } speeds ? speeds.Max() : 0;
+    }
+
+    private static LinearGradientBrush Fade()
+    {
+        var brush = new LinearGradientBrush { MappingMode = BrushMappingMode.Absolute };
+        for (int i = 0; i < 4; i++) brush.GradientStops.Add(new GradientStop());
         return brush;
     }
 
-    public static void Draw(DrawingContext dc, Brush brush, double length, bool strong)
+    public void Colour(Brush line)
     {
-        double width = length * Aspect;
-        var box = new Rect(-width / 2, -length / 2, width, length);
-        var fill = brush.Clone();
-        fill.Opacity = strong ? 0.28 : 0.16;
-        fill.Freeze();
-        dc.PushOpacityMask(Body);
-        dc.DrawRectangle(Ui.Res<Brush>("Bg"), null, box);
-        dc.DrawRectangle(fill, null, box);
-        dc.Pop();
-        dc.PushOpacityMask(Lines);
-        dc.DrawRectangle(brush, null, box);
-        dc.Pop();
+        var colour = line is SolidColorBrush solid ? solid.Color : Colors.White;
+        Tint(_fill, colour, 255, 115);
+        Tint(_edgeBrush, Colors.Black, 242, 128);
+    }
+
+    private static void Tint(LinearGradientBrush brush, Color colour, byte full, byte mid)
+    {
+        byte[] alpha = { full, full, mid, 0 };
+        for (int i = 0; i < 4; i++)
+        {
+            var c = colour;
+            c.A = alpha[i];
+            brush.GradientStops[i].Color = c;
+        }
+    }
+
+    public void Place(ReplayCar car, Matrix world, Point at, double carPx, double scale)
+    {
+        double radius = ReplayMarker.Radius(carPx), trail = ReplayMarker.Trail(carPx, car.Trace.At(TraceChannel.Speed, car.Distance), _topSpeed);
+        double spanM = (radius + trail) / Math.Max(1e-6, scale), step = car.Trace.StepM;
+        double startHeading = car.Headings.Length > 0 ? car.Headings[0] : car.Heading;
+        for (int k = 0; k <= ReplayMarker.Samples; k++)
+        {
+            double d = car.Distance - spanM * k / ReplayMarker.Samples;
+            var p = d >= 0
+                ? new Point(LapReplay.At(car.X, step, d), LapReplay.At(car.Y, step, d))
+                : new Point(car.X[0] + d * Math.Cos(startHeading), car.Y[0] + d * Math.Sin(startHeading));
+            var s = world.Transform(p);
+            _spine[k] = new Point(s.X - at.X, s.Y - at.Y);
+        }
+        var forward = world.Transform(new Vector(Math.Cos(car.Heading), Math.Sin(car.Heading)));
+        ReplayMarker.Outline(_spine, Math.Atan2(forward.Y, forward.X), radius, trail, _outline);
+
+        int m = ReplayMarker.Samples;
+        _figure.StartPoint = _outline[0];
+        for (int i = 1; i <= 2 * m + 1; i++) _sides.Points[i - 1] = _outline[i];
+        var round = new Size(radius, radius);
+        _toTip.Size = round;
+        _toTip.Point = _outline[2 * m + 2];
+        _tip.Point = _outline[2 * m + 3];
+        _tipBack.Point = _outline[2 * m + 4];
+        _fromTip.Size = round;
+        _fromTip.Point = _outline[0];
+
+        var end = _spine[m];
+        if ((end - _spine[0]).Length < 0.5) end = _spine[0] + new Vector(0, radius);
+        var (solid, mid) = ReplayMarker.Fade(radius, trail);
+        Stretch(_fill, _spine[0], end, solid, mid);
+        Stretch(_edgeBrush, _spine[0], end, solid, mid);
+    }
+
+    private static void Stretch(LinearGradientBrush brush, Point from, Point to, double solid, double mid)
+    {
+        brush.StartPoint = from;
+        brush.EndPoint = to;
+        brush.GradientStops[1].Offset = solid;
+        brush.GradientStops[2].Offset = mid;
+        brush.GradientStops[3].Offset = 1;
     }
 }
 

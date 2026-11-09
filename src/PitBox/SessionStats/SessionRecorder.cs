@@ -13,13 +13,14 @@ internal sealed class SessionRow
     public double? TrackKm;
     public bool DynamicWeather, Finished, Official;
     public int Laps;
-    public int? Incidents, StartPos, FinishPos, TierPos, IrStart, IrDelta, RaceWeek, LapsLed, Field;
+    public int? Incidents, StartPos, FinishPos, TierPos, TierStart, IrStart, IrDelta, RaceWeek, LapsLed, Field;
     public string Tier = "";
     public double? SrStart, SrDelta, NightS, TrackTempMin, TrackTempMax;
     public int LeagueId, SessionNum, SeasonId, PitStops;
     public long SubSession;
     public double DriveS, GarageS, LongestStintS, RainS, DistanceKm, PitS;
     public double? AirTemp, WindKph, WindDir, Humidity, Pressure, AirDensity;
+    public double? AirTempMin, AirTempMax, WindMin, WindMax, HumidityMin, HumidityMax;
     public int? Skies;
     public double? RainMax;
     public int? WetnessMax;
@@ -139,6 +140,21 @@ internal sealed class SessionRecorder
             {
                 row.TrackTempMin = Math.Min(row.TrackTempMin ?? temp, temp);
                 row.TrackTempMax = Math.Max(row.TrackTempMax ?? temp, temp);
+            }
+            if (f.AirTemp is { } airNow && airNow > -50 && airNow < 60)
+            {
+                row.AirTempMin = Math.Min(row.AirTempMin ?? airNow, airNow);
+                row.AirTempMax = Math.Max(row.AirTempMax ?? airNow, airNow);
+            }
+            if (f.WindSpeed is { } windNow && windNow >= 0 && windNow < 100)
+            {
+                row.WindMin = Math.Min(row.WindMin ?? windNow * 3.6, windNow * 3.6);
+                row.WindMax = Math.Max(row.WindMax ?? windNow * 3.6, windNow * 3.6);
+            }
+            if (f.Humidity is { } humidNow && humidNow >= 0 && humidNow <= 1)
+            {
+                row.HumidityMin = Math.Min(row.HumidityMin ?? humidNow, humidNow);
+                row.HumidityMax = Math.Max(row.HumidityMax ?? humidNow, humidNow);
             }
         }
         else if (f.IsInGarage) row.GarageS += dt;
@@ -267,10 +283,14 @@ internal sealed class SessionRecorder
             _fieldInfo = f.Session;
             if (ClassField(f.Session, me) is > 0 and var field) row.Field = Math.Max(row.Field ?? 0, field);
         }
-        if (f.Session.GridClassPositions.TryGetValue(me, out var grid) && grid > 0) row.StartPos = grid;
+        bool proAm = f.Session.HasProAm && f.Session.ByCar.ContainsKey(me);
+        if (f.Session.GridClassPositions.TryGetValue(me, out var grid) && grid > 0)
+        {
+            row.StartPos = grid;
+            if (proAm && SimRacing.Race.ProAm.TierPosition(f.Session, me, grid, f.Session.GridClassPositions) is > 0 and var tierGrid) row.TierStart = tierGrid;
+        }
         bool over = f.Phase is SessionPhase.Checkered or SessionPhase.CoolDown;
         var result = over && f.LapCompleted is { } done && f.Session.ResultOf(f.SessionNum, me) is { ClassPosition: > 0 } r && r.LapsComplete >= done ? r : null;
-        bool proAm = f.Session.HasProAm && f.Session.ByCar.ContainsKey(me);
         if (proAm) row.Tier = SimRacing.Race.ProAm.Tier(SimRacing.Race.ProAm.IsPro(f.Session, me));
         if (result is not null)
         {
@@ -279,7 +299,11 @@ internal sealed class SessionRecorder
         }
         int pos = f.CarClassPosition[me] > 0 ? f.CarClassPosition[me] : f.PlayerClassPosition is > 0 and var classPos ? classPos : 0;
         if (pos <= 0) return;
-        if (row.StartPos is null && f.Phase == SessionPhase.Racing) row.StartPos = pos;
+        if (row.StartPos is null && f.Phase == SessionPhase.Racing)
+        {
+            row.StartPos = pos;
+            if (proAm && SimRacing.Race.ProAm.TierPosition(f.Session, me, pos, f.CarClassPosition) is > 0 and var tierStart) row.TierStart = tierStart;
+        }
         if (f.Phase == SessionPhase.Racing || over && result is null)
         {
             row.FinishPos = pos;
