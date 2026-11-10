@@ -415,6 +415,7 @@ internal sealed class LapReplayView : Grid
         if (_cars.Count == 0) return;
         if (_time >= _follow.Trace.LapTime - 0.01) _time = 0;
         _playing = true;
+        _stage.Moving = true;
         ((Icon)_play.Content).Data = Ui.Res<Geometry>("I.Pause");
         if (!_hooked) { CompositionTarget.Rendering += OnFrame; _hooked = true; }
         _lastFrame = null;
@@ -425,6 +426,7 @@ internal sealed class LapReplayView : Grid
         if (_hooked) { CompositionTarget.Rendering -= OnFrame; _hooked = false; }
         if (!_playing) return;
         _playing = false;
+        _stage.Moving = false;
         ((Icon)_play.Content).Data = Ui.Res<Geometry>("I.Play");
         Place(force: true);
     }
@@ -707,6 +709,42 @@ internal sealed class ReplayStage : FrameworkElement
 
     public double TopInset { get; set; }
 
+    private const double TrailEaseSeconds = 0.4;
+    private bool _moving, _easing;
+    private double _trailShare;
+    private TimeSpan? _easeFrame;
+
+    public bool Moving
+    {
+        get => _moving;
+        set
+        {
+            if (_moving == value) return;
+            _moving = value;
+            if (_easing) return;
+            _easing = true;
+            _easeFrame = null;
+            CompositionTarget.Rendering += EaseTrail;
+        }
+    }
+
+    private void EaseTrail(object? sender, EventArgs e)
+    {
+        if (e is not RenderingEventArgs r) return;
+        double dt = _easeFrame is { } last ? (r.RenderingTime - last).TotalSeconds : 0;
+        _easeFrame = r.RenderingTime;
+        double target = _moving ? 1 : 0, step = Math.Clamp(dt, 0, 0.1) / TrailEaseSeconds;
+        _trailShare = _trailShare < target ? Math.Min(target, _trailShare + step) : Math.Max(target, _trailShare - step);
+        if (_trailShare == target)
+        {
+            CompositionTarget.Rendering -= EaseTrail;
+            _easing = false;
+        }
+        if (!_moving || !_easing) Update();
+    }
+
+    private double TrailShare => 1 - Math.Pow(1 - _trailShare, 2);
+
     private Point Anchor(double k)
     {
         double top = Math.Clamp(TopInset, 0, ActualHeight * 0.6), h = ActualHeight - top;
@@ -930,7 +968,7 @@ internal sealed class ReplayStage : FrameworkElement
             _carVisuals[i].Opacity = shown ? 1 : 0;
             var p = m.Transform(new Point(car.Px, car.Py));
             _carMatrix[i].Matrix = new Matrix(1, 0, 0, 1, p.X, p.Y);
-            if (shown) _markers[i].Place(car, m, p, _markerCarPx, scale);
+            if (shown) _markers[i].Place(car, m, p, _markerCarPx, scale, TrailShare);
         }
         for (int i = 0; i < _labelAt.Length; i++)
         {
@@ -1362,9 +1400,9 @@ internal sealed class ReplayMarkerShape
         }
     }
 
-    public void Place(ReplayCar car, Matrix world, Point at, double carPx, double scale)
+    public void Place(ReplayCar car, Matrix world, Point at, double carPx, double scale, double trailShare)
     {
-        double radius = ReplayMarker.Radius(carPx), trail = ReplayMarker.Trail(carPx, car.Trace.At(TraceChannel.Speed, car.Distance), _topSpeed);
+        double radius = ReplayMarker.Radius(carPx), trail = trailShare * ReplayMarker.Trail(carPx, car.Trace.At(TraceChannel.Speed, car.Distance), _topSpeed);
         double spanM = (radius + trail) / Math.Max(1e-6, scale), step = car.Trace.StepM;
         double startHeading = car.Headings.Length > 0 ? car.Headings[0] : car.Heading;
         for (int k = 0; k <= ReplayMarker.Samples; k++)
