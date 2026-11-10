@@ -598,6 +598,11 @@ internal sealed partial class RaceHudWidgets
         return remove;
     }
 
+    public void WarmPreview()
+    {
+        if ((Selected() ?? Layout?.Widgets.FirstOrDefault()) is { } w && Host is { } host) host.SizeOf(w, _section.Preview.Race);
+    }
+
     private void DrawPreview(HudWidgetConfig w)
     {
         if (_preview is null) return;
@@ -879,21 +884,21 @@ internal sealed partial class RaceHudWidgets
         foreach (var (otherId, other) in drawn)
         {
             if (otherId == id) continue;
-            var outline = Hairline.Frame(new Border { Width = other.Width * s, Height = other.Height * s, CornerRadius = ThemeManager.Round(4), SnapsToDevicePixels = true });
+            var outline = Hairline.Frame(new Border { Width = other.Width * s, Height = other.Height * s, SnapsToDevicePixels = true });
             outline.SetResourceReference(Border.BorderBrushProperty, "AccentText");
             outline.Opacity = 0.6;
             Canvas.SetLeft(outline, other.X * s);
             Canvas.SetTop(outline, other.Y * s);
             _previewMarks.Children.Add(outline);
         }
-        var slot = new Border { Width = box.Width * s, Height = box.Height * s, BorderThickness = new Thickness(1.5), CornerRadius = ThemeManager.Round(4) };
+        var slot = new Border { Width = box.Width * s, Height = box.Height * s, BorderThickness = new Thickness(1.5) };
         slot.SetResourceReference(Border.BorderBrushProperty, "AccentText");
         slot.SetResourceReference(Border.BackgroundProperty, "AccentSoft");
         slot.Opacity = 0.45;
         Canvas.SetLeft(slot, box.X * s);
         Canvas.SetTop(slot, box.Y * s);
         _previewMarks.Children.Add(slot);
-        var lifted = new Border { Width = box.Width * s, Height = box.Height * s, BorderThickness = new Thickness(2), CornerRadius = ThemeManager.Round(4) };
+        var lifted = new Border { Width = box.Width * s, Height = box.Height * s, BorderThickness = new Thickness(2) };
         lifted.SetResourceReference(Border.BorderBrushProperty, "Accent");
         lifted.Background = _liftedLook;
         Canvas.SetLeft(lifted, at.X - _grab.X);

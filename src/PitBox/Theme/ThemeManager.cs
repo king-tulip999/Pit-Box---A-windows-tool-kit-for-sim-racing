@@ -123,7 +123,7 @@ internal static class ThemeManager
         res["HeadingStyle"] = FontStyles.Normal;
 
         foreach (var (key, r) in new (string, double)[]
-                 { ("R.Card", CardRadius), ("R.Inset", 10), ("R.Popup", 10), ("R.Tooltip", 8), ("R.Small", 7), ("R.Tiny", 5) })
+                 { ("R.Card", CardRadius), ("R.Inset", 8), ("R.Popup", 8), ("R.Tooltip", 6), ("R.Small", 6), ("R.Tiny", 4) })
             res[key] = Round(r);
         res["R.Chip"] = Round(spec.ChipRadius);
         res["R.Control"] = res["R.Input"] = Round(spec.ControlRadius);
@@ -235,7 +235,7 @@ internal static class ThemeManager
     private static DropShadowEffect Shadow(Color color, double blur, double depth, double opacity) =>
         Freeze(new DropShadowEffect { BlurRadius = blur, ShadowDepth = depth, Direction = 270, Opacity = opacity, Color = color, RenderingBias = RenderingBias.Performance });
 
-    private const double CardRadius = 12;
+    private const double CardRadius = 8;
 
     public static CornerRadius CardCorner => Round(CardRadius);
 

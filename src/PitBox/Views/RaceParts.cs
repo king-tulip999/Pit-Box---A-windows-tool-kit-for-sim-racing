@@ -649,9 +649,14 @@ internal static class RaceParts
         if (d.Conditions is { } conditions && ConditionsBlock(s, conditions, d.Imperial) is { } block) stack.Children.Add(block);
         else stack.Children.Add(new Border { Height = d.Laps.Count > 1 ? 14 : 12 });
 
-        var card = Hairline.Frame(new Border { Child = stack, ClipToBounds = true }, edges);
+        var card = Hairline.Frame(new PitBox.Controls.Tile { Child = stack, ClipToBounds = true }, edges);
         card.SetResourceReference(Border.BackgroundProperty, "Surface");
         card.SetResourceReference(Border.BorderBrushProperty, "CardEdge");
+        if (edges == Sides.All)
+        {
+            card.SetResourceReference(Border.CornerRadiusProperty, "R.Card");
+            PitBox.Controls.Tile.SetLifted(card, true);
+        }
         RaceArrival.When(card, position, climb, stripe, lapStrip);
         return card;
     }

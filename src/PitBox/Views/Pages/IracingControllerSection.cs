@@ -20,6 +20,7 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
     private static readonly HashSet<string> HiddenSections = new(StringComparer.OrdinalIgnoreCase) { "renderer|AutoCfg", "renderer|Debug" };
     private const string WideSection = "renderer|Graphics Options";
     private const int WideMinRows = 6;
+    private const int FirstCards = 3;
 
     private readonly AppServices _app;
     private readonly MainWindow _window;
@@ -641,6 +642,13 @@ internal sealed partial class IracingControllerSection : StackPanel, IStagedBuil
         content.Children.Add(wide);
         var results = new MasonryPanel { MinColumnWidth = 421, MaxColumns = 3 };
         content.Children.Add(results);
+        void FirstShown(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            if (!results.IsVisible) return;
+            results.IsVisibleChanged -= FirstShown;
+            Motion.InTurns(results.Children.Cast<UIElement>().Skip(FirstCards));
+        }
+        results.IsVisibleChanged += FirstShown;
 
         IEnumerable<Setting> Listed(SectionInfo sec) => Session.In(sec).Where(s => !s.IsHidden);
         bool Global() => _search.Length > 0 || _changedOnly;

@@ -27,8 +27,8 @@ internal sealed class TitleNav : Grid
     public event Action<IReadOnlyList<string>>? GroupsMoved;
     public event Action<string, IReadOnlyList<string>>? ItemsMoved;
 
-    private readonly StackPanel _groups = new() { Orientation = Orientation.Horizontal };
-    private readonly StackPanel _end = new() { Orientation = Orientation.Horizontal };
+    private readonly GroupRow _groups = new("Accent", leadAt: -3, leadOpacity: 0.7, between: true);
+    private readonly GroupRow _end = new("LineStrong", leadAt: 0, leadOpacity: 1, between: false);
     private readonly DragList _drag;
     private readonly List<Entry> _entries = new();
     private string _signature = "";
@@ -36,6 +36,89 @@ internal sealed class TitleNav : Grid
     private Popup? _menu;
     private Entry? _menuEntry, _closedEntry;
     private long _closedAt;
+
+    private sealed class GroupRow : StackPanel
+    {
+        private const double MarkWidth = 2, MarkHeight = 22, MarkLeanDegrees = 18;
+
+        public static readonly DependencyProperty LeadBrushProperty = DependencyProperty.Register(nameof(LeadBrush), typeof(Brush), typeof(GroupRow),
+            new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+        public static readonly DependencyProperty LineBrushProperty = DependencyProperty.Register(nameof(LineBrush), typeof(Brush), typeof(GroupRow),
+            new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
+        public Brush? LeadBrush { get => (Brush?)GetValue(LeadBrushProperty); set => SetValue(LeadBrushProperty, value); }
+        public Brush? LineBrush { get => (Brush?)GetValue(LineBrushProperty); set => SetValue(LineBrushProperty, value); }
+
+        private static readonly double Lean = MarkHeight / 2 * Math.Tan(MarkLeanDegrees * Math.PI / 180);
+
+        private readonly double _leadAt, _leadOpacity;
+        private readonly bool _between;
+        private readonly List<double> _marks = new();
+
+        public GroupRow(string leadKey, double leadAt, double leadOpacity, bool between)
+        {
+            Orientation = Orientation.Horizontal;
+            _leadAt = leadAt;
+            _leadOpacity = leadOpacity;
+            _between = between;
+            SetResourceReference(LeadBrushProperty, leadKey);
+            SetResourceReference(LineBrushProperty, "LineStrong");
+        }
+
+        protected override Size ArrangeOverride(Size arrangeSize)
+        {
+            var size = base.ArrangeOverride(arrangeSize);
+            if (!_between) return size;
+            bool changed = false, first = true;
+            int count = 0;
+            double x = 0;
+            foreach (UIElement child in InternalChildren)
+            {
+                if (child.Visibility != Visibility.Visible) continue;
+                if (!first)
+                {
+                    if (count < _marks.Count)
+                    {
+                        if (_marks[count] != x) { _marks[count] = x; changed = true; }
+                    }
+                    else { _marks.Add(x); changed = true; }
+                    count++;
+                }
+                first = false;
+                x += child.DesiredSize.Width;
+            }
+            if (_marks.Count > count) { _marks.RemoveRange(count, _marks.Count - count); changed = true; }
+            if (changed) InvalidateVisual();
+            return size;
+        }
+
+        protected override void OnRender(DrawingContext dc)
+        {
+            base.OnRender(dc);
+            if (InternalChildren.Count == 0) return;
+            Mark(dc, LeadBrush, _leadAt, _leadOpacity);
+            foreach (double x in _marks) Mark(dc, LineBrush, x, 1);
+        }
+
+        private void Mark(DrawingContext dc, Brush? brush, double x, double opacity)
+        {
+            if (brush is null) return;
+            double mid = Math.Round(ActualHeight / 2), top = mid - MarkHeight / 2, bottom = mid + MarkHeight / 2, half = MarkWidth / 2;
+            x = Math.Round(x);
+            var shape = new StreamGeometry();
+            using (var c = shape.Open())
+            {
+                c.BeginFigure(new Point(x - half - Lean, bottom), true, true);
+                c.LineTo(new Point(x + half - Lean, bottom), true, false);
+                c.LineTo(new Point(x + half + Lean, top), true, false);
+                c.LineTo(new Point(x - half + Lean, top), true, false);
+            }
+            shape.Freeze();
+            if (opacity < 1) dc.PushOpacity(opacity);
+            dc.DrawGeometry(brush, null, shape);
+            if (opacity < 1) dc.Pop();
+        }
+    }
 
     private sealed class Entry
     {
@@ -254,11 +337,16 @@ internal sealed class TitleNav : Grid
 
     public void UseAccent(ResourceDictionary? theme)
     {
+        CopyAccent(Resources, theme);
+        Paint();
+    }
+
+    public static void CopyAccent(ResourceDictionary into, ResourceDictionary? theme)
+    {
         foreach (var key in AccentKeys)
         {
-            if (theme?[key] is { } value) Resources[key] = value;
-            else Resources.Remove(key);
+            if (theme?[key] is { } value) into[key] = value;
+            else into.Remove(key);
         }
-        Paint();
     }
 }

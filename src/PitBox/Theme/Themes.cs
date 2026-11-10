@@ -19,11 +19,11 @@ internal sealed record ThemeSpec
     public Uri? WindowIcon { get; init; }
     public ThemeLink? Link { get; init; }
 
-    public double Radius { get; init; }
+    public double Radius { get; init; } = 1;
     public double PanelOpacity { get; init; } = 0.85;
     public double SidebarOpacity { get; init; } = 0.6;
-    public double ChipRadius { get; init; }
-    public double ControlRadius { get; init; } = 5;
+    public double ChipRadius { get; init; } = 12;
+    public double ControlRadius { get; init; } = 8;
     public Thickness CardEdge { get; init; } = new(0, 1, 0, 2);
     public bool TileEdge => CardEdge.Bottom > CardEdge.Top;
     public Thickness ButtonEdge { get; init; } = new(1);

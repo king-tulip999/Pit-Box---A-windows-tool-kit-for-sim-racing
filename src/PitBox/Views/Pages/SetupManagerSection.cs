@@ -151,10 +151,11 @@ internal sealed class SetupManagerSection : StackPanel
     private void FitSplit()
     {
         if (_page is null || !_split.IsVisible || _page.Content is not UIElement content) return;
-        double top = _split.TranslatePoint(new Point(0, 0), content).Y;
-        double cardBottom = 13 + PageBottom;
-        double want = Math.Clamp(_page.ViewportHeight - top - cardBottom, SplitMin, SplitMax);
-        if (Math.Abs(want - _split.Height) > 1) _split.Height = Math.Round(want);
+        double target = _split.ActualHeight > 0 && _page.ExtentHeight > 0
+            ? _split.ActualHeight + _page.ViewportHeight - _page.ExtentHeight
+            : _page.ViewportHeight - _split.TranslatePoint(new Point(0, 0), content).Y - 13 - PageBottom;
+        double want = Math.Floor(Math.Clamp(target, SplitMin, SplitMax));
+        if (Math.Abs(want - _split.Height) >= 0.5) _split.Height = want;
     }
 
     private static Tile Pane(UIElement child)

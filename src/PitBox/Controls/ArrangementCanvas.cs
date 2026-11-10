@@ -166,7 +166,6 @@ public sealed class ArrangementCanvas : Canvas
     {
         var border = new Tile
         {
-            CornerRadius = ThemeManager.Round(10),
             BorderThickness = new Thickness(1.5),
             Tag = tile.Key,
             Child = new Grid(),

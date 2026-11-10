@@ -17,6 +17,49 @@ public class Tile : Border
 
     public static Geometry CardShape(Rect bounds, double radius) => Shape(bounds, ThemeManager.Round(radius));
 
+    public static readonly DependencyProperty LiftedProperty = DependencyProperty.RegisterAttached("Lifted", typeof(bool), typeof(Tile),
+        new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender | FrameworkPropertyMetadataOptions.AffectsArrange));
+
+    public static bool GetLifted(DependencyObject d) => (bool)d.GetValue(LiftedProperty);
+
+    public static void SetLifted(DependencyObject d, bool value) => d.SetValue(LiftedProperty, value);
+
+    private bool Lifted => GetLifted(this);
+
+    private bool ClipsToCard => Lifted && ClipToBounds && !ClipChild;
+
+    protected override Geometry? GetLayoutClip(Size layoutSlotSize) => ClipsToCard ? null : base.GetLayoutClip(layoutSlotSize);
+
+    protected override HitTestResult? HitTestCore(PointHitTestParameters hitTestParameters) =>
+        Lifted && !new Rect(RenderSize).Contains(hitTestParameters.HitPoint) ? null : base.HitTestCore(hitTestParameters);
+
+    private (double W, double H, double R, DrawingGroup Drawing)? _shadow;
+
+    private void DrawShadow(DrawingContext dc)
+    {
+        double w = ActualWidth, h = ActualHeight;
+        if (w <= 0 || h <= 0) return;
+        double r = Math.Min(CornerRadius.TopLeft, Math.Min(w, h) / 2);
+        if (_shadow is not { } cached || cached.W != w || cached.H != h || cached.R != r)
+        {
+            cached = (w, h, r, CardShadow.Build(w, h, r));
+            _shadow = cached;
+        }
+        dc.DrawDrawing(cached.Drawing);
+    }
+
+    private void ClipToCard(UIElement child, Size size)
+    {
+        var b = BorderThickness;
+        var offset = VisualTreeHelper.GetOffset(child);
+        var inner = new Rect(b.Left - offset.X, b.Top - offset.Y, Math.Max(0, size.Width - b.Left - b.Right), Math.Max(0, size.Height - b.Top - b.Bottom));
+        double r = Math.Max(0, Math.Min(CornerRadius.TopLeft, Math.Min(size.Width, size.Height) / 2) - Math.Max(b.Left, b.Top));
+        if (child.Clip is RectangleGeometry old && old.Rect == inner && old.RadiusX == r) return;
+        var clip = new RectangleGeometry(inner, r, r);
+        clip.Freeze();
+        child.Clip = clip;
+    }
+
     protected override Size MeasureOverride(Size constraint)
     {
         var size = base.MeasureOverride(constraint);
@@ -39,7 +82,9 @@ public class Tile : Border
                 var p = Padding;
                 ClipToInside(only, new Size(Math.Max(0, finalSize.Width - b.Left - b.Right - p.Left - p.Right), Math.Max(0, finalSize.Height - b.Top - b.Bottom - p.Top - p.Bottom)));
             }
-            return base.ArrangeOverride(finalSize);
+            var arranged = base.ArrangeOverride(finalSize);
+            if (ClipsToCard && Child is { } clipped) ClipToCard(clipped, finalSize);
+            return arranged;
         }
         var dpi = VisualTreeHelper.GetDpi(this);
         var edge = Hairline.WholePixels(BorderThickness, dpi.DpiScaleX, dpi.DpiScaleY);
@@ -49,6 +94,7 @@ public class Tile : Border
             Math.Max(0, finalSize.Height - top - edge.Bottom - whole.Bottom));
         ClipToInside(child, inside.Size);
         child.Arrange(inside);
+        if (ClipsToCard) ClipToCard(child, finalSize);
         return finalSize;
     }
 
@@ -76,6 +122,7 @@ public class Tile : Border
 
     protected override void OnRender(DrawingContext dc)
     {
+        if (Lifted) DrawShadow(dc);
         if (IsSquareWithEdge) DrawSquare(dc);
         else if (EvenEdge && BorderBrush is not null) DrawRounded(dc);
         else base.OnRender(dc);

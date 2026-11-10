@@ -496,11 +496,11 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         var charts = await Task.Run(() => StatsCharts.Read(store, q, range));
         var traces = stats.Traces;
         string driver = name ?? "";
-        var (sessions, traced, races, achievements, lastConditions) = await Task.Run(() =>
+        var (sessions, traced, races, lastConditions) = await Task.Run(() =>
         {
             var list = store.Sessions(q.From, q.To);
             var conditions = list.FirstOrDefault(RaceParts.Raced) is { } raced ? store.Conditions(raced.Id) : null;
-            return (list, traces?.SessionsWithTraces(list.Select(s => s.Id)) ?? new HashSet<long>(), RaceInfo.Read(store, driver), AchievementsData.Read(store), conditions);
+            return (list, traces?.SessionsWithTraces(list.Select(s => s.Id)) ?? new HashSet<long>(), RaceInfo.Read(store, driver), conditions);
         });
         await Motion.PageSettled(Dispatcher);
         if (version != _version || !_shown || _sessionId is not null) return;
@@ -517,12 +517,9 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         }
         var sessionsCard = StatsSessions.Card(sessions, traced, _filter, stats.Settings, Refresh, s => Open(s.Id), TraceSettings.Button(_app, stats, _window), races);
         var lastRace = sessions.FirstOrDefault(RaceParts.Raced);
-        var sections = StatsSections.Page(results, charts, stats, q, Changed, sessionsCard, lastRace is null ? null : RaceParts.Card(races.Data(lastRace) with { Driver = "", Conditions = lastConditions, Imperial = stats.Settings.Imperial }, "Last race"), StatsAchievements.Card(achievements));
+        _telemetry = null;
+        var sections = StatsSections.Page(results, charts, stats, q, Changed, sessionsCard, lastRace is null ? null : RaceParts.Card(races.Data(lastRace) with { Driver = "", Conditions = lastConditions, Imperial = stats.Settings.Imperial }, "Last race"), () => _telemetry = new TelemetryFilesCard(_app, _window, stats), staged: !restoreOffset);
         page.Children.Add(sections);
-        _telemetry = new TelemetryFilesCard(_app, _window, stats) { Margin = new Thickness(0, Ui.PanelSpacing, 0, 0) };
-        if (stats.Settings.Shows("telemetry")) page.Children.Add(_telemetry);
-        if (!restoreOffset && sections is Panel parts)
-            Motion.InTurns(stats.Settings.Shows("telemetry") ? parts.Children.Cast<UIElement>().Skip(2).Append(_telemetry) : parts.Children.Cast<UIElement>().Skip(2));
         bool arriving = _content.Content is null;
         _content.Content = page;
         if (arriving) Motion.FadeIn(page);
@@ -721,12 +718,6 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
                 await Task.Delay(300);
             });
         }
-        yield return ("achievements", async () =>
-        {
-            await Task.Delay(700);
-            Ui.FindAnchor(this, "stats.achievements")?.BringIntoView(new Rect(0, 0, 1, 600));
-            await Task.Delay(300);
-        });
         yield return ("imperial", () =>
         {
             if (Stats is { } stats) { stats.Settings.Range = "season"; stats.Settings.Imperial = true; Refresh(); }
@@ -804,7 +795,7 @@ internal static class StatsUi
 internal static class StatsSections
 {
     public static FrameworkElement Page(List<(StatDef Def, StatResult Result)> results, StatsCharts.Data charts, SessionStatsService service, StatQuery q, Action changed,
-        FrameworkElement? sessions = null, FrameworkElement? lastRace = null, FrameworkElement? achievements = null)
+        FrameworkElement? sessions = null, FrameworkElement? lastRace = null, Func<FrameworkElement>? telemetry = null, bool staged = false)
     {
         var settings = service.Settings;
         var byId = results.ToDictionary(r => r.Def.Id, r => r);
@@ -818,9 +809,43 @@ internal static class StatsSections
             element.Margin = new Thickness(0, page.Children.Count == 0 ? 0 : Ui.PanelSpacing, 0, 0);
             page.Children.Add(element);
         }
+        var later = new List<(Border Host, Func<FrameworkElement> Build)>();
+        void Later(string? anchor, Func<FrameworkElement> build)
+        {
+            if (!staged)
+            {
+                var built = build();
+                if (anchor is not null) Ui.Anchor(built, anchor);
+                Add(built);
+                return;
+            }
+            var host = new Border { Visibility = Visibility.Collapsed };
+            if (anchor is not null) Ui.Anchor(host, anchor);
+            Add(host);
+            later.Add((host, build));
+        }
+        void BuildLater(int next)
+        {
+            if (next >= later.Count) return;
+            if (!page.IsLoaded)
+            {
+                void Resume(object sender, RoutedEventArgs e)
+                {
+                    page.Loaded -= Resume;
+                    page.Dispatcher.BeginInvoke(() => BuildLater(next), System.Windows.Threading.DispatcherPriority.Background);
+                }
+                page.Loaded += Resume;
+                return;
+            }
+            var (host, build) = later[next];
+            host.Child = build();
+            host.Visibility = Visibility.Visible;
+            Motion.FadeIn(host);
+            page.Dispatcher.BeginInvoke(() => BuildLater(next + 1), System.Windows.Threading.DispatcherPriority.Background);
+        }
 
         var known = new HashSet<string> { "pace.laps", "time.total", "pace.distance",
-            "time.week", "time.month", "time.weekly", "time.streak", "time.session", "time.stint", "time.garage", "time.practice", "time.qualify", "time.race",
+            "time.week", "time.month", "time.weekly", "time.session", "time.stint", "time.garage", "time.practice", "time.qualify", "time.race",
             "car.unique", "track.unique", "combo.top", "car.time", "car.laps", "track.time", "track.laps", "class.time",
             "race.starts", "race.finishes", "race.wins", "race.podiums", "race.top5", "race.league", "race.avgstart", "race.avgfinish", "race.gained", "race.irating", "race.sr",
             "inc.total", "inc.zero", "style.fuel", "style.pits", "cond.rain", "cond.night" };
@@ -829,24 +854,29 @@ internal static class StatsSections
         if (settings.Shows("overview")) Add(Hero(charts, q, StatsUi.RangeName(service.Range), Many("pace.laps", "time.total", "pace.distance", "race.podiums").ToList(), racecraft, lastRace));
         if (settings.Shows("sessions")) Add(sessions);
 
-        var types = charts.SessionTypes;
-        var activity = Section("Driving activity", $"{SimRacing.Race.RaceFormat.Count(charts.Sessions, "session")}", null, Stack(
-            Chart("Session mix", null, StatsCharts.SessionMix(types)),
-            StatsLayout.Pair(
-                Chart("When you drive", "Brighter squares are the hours you drive most", StatsCharts.Heatmap(charts.Heatmap, charts.HeatmapDays)),
-                Chart(charts.Trend.Title, $"Each bar is your total driving time for that {charts.Trend.Unit}", StatsCharts.Trend(charts.Trend)), 1050, gap: 26),
-            Metrics(Many(service.Range == StatRange.Week ? new[] { "time.week", "time.month", "time.streak", "time.session", "time.stint", "time.garage" } : new[] { "time.week", "time.month", "time.weekly", "time.streak", "time.session", "time.stint", "time.garage" }))));
-        Ui.Anchor(activity, "stats.activity");
-        if (settings.Shows("activity")) Add(activity);
+        FrameworkElement Activity()
+        {
+            var types = charts.SessionTypes;
+            return Section("Driving activity", $"{SimRacing.Race.RaceFormat.Count(charts.Sessions, "session")}", null, Stack(
+                Chart("Session mix", null, StatsCharts.SessionMix(types)),
+                StatsLayout.Pair(
+                    Chart("When you drive", "Brighter squares are the hours you drive most", StatsCharts.Heatmap(charts.Heatmap, charts.HeatmapDays)),
+                    Chart(charts.Trend.Title, $"Each bar is your total driving time for that {charts.Trend.Unit}", StatsCharts.Trend(charts.Trend)), 1050, gap: 26),
+                Metrics(Many(service.Range == StatRange.Week ? new[] { "time.week", "time.month", "time.session", "time.stint", "time.garage" } : new[] { "time.week", "time.month", "time.weekly", "time.session", "time.stint", "time.garage" }))));
+        }
+        if (settings.Shows("activity")) Later("stats.activity", Activity);
 
-        string variety = string.Join(" · ", new[] { Count(Get("car.unique"), "car"), Count(Get("track.unique"), "track"), charts.Cars.Count > 0 ? "by driving time" : null }.OfType<string>());
-        var rankings = new StatGrid { MinTileWidth = 300, Gap = 26, Columns = 2 };
-        rankings.Children.Add(StatsSections.Column("Cars", StatsCharts.Ranked(charts.Cars, "No cars in this range", cars: true), StatsCharts.Totals(charts)));
-        rankings.Children.Add(StatsSections.Column("Tracks", StatsCharts.Ranked(charts.Tracks, "No tracks in this range")));
-        var cars = Section("Cars and tracks", variety.Length > 0 ? variety : null, null, rankings);
-        Ui.Anchor(cars, "stats.cars");
-        if (settings.Shows("cars")) Add(cars);
-        if (settings.Shows("achievements")) Add(achievements);
+        FrameworkElement Cars()
+        {
+            string variety = string.Join(" · ", new[] { Count(Get("car.unique"), "car"), Count(Get("track.unique"), "track"), charts.Cars.Count > 0 ? "by driving time" : null }.OfType<string>());
+            var rankings = new StatGrid { MinTileWidth = 380, Gap = 40, Columns = 2 };
+            rankings.Children.Add(StatsSections.Column("Cars", StatsCharts.Ranked(charts.Cars, "No cars in this range", cars: true), StatsCharts.Totals(charts)));
+            rankings.Children.Add(StatsSections.Column("Tracks", StatsCharts.Ranked(charts.Tracks, "No tracks in this range")));
+            return Section("Cars and tracks", variety.Length > 0 ? variety : null, null, rankings);
+        }
+        if (settings.Shows("cars")) Later("stats.cars", Cars);
+        if (settings.Shows("telemetry") && telemetry is not null) Later(null, telemetry);
+        if (later.Count > 0) page.Dispatcher.BeginInvoke(() => BuildLater(0), System.Windows.Threading.DispatcherPriority.Background);
         return page;
     }
 
@@ -869,10 +899,10 @@ internal static class StatsSections
     internal static FrameworkElement Column(string title, params FrameworkElement?[] parts)
     {
         var stack = new StackPanel();
-        stack.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 0, 0, 4) });
+        stack.Children.Add(new TextBlock { Text = title, Style = Ui.Res<Style>("Eyebrow"), FontSize = 13.5, Margin = new Thickness(0, 0, 0, 6) });
         foreach (var part in parts.OfType<FrameworkElement>())
         {
-            if (stack.Children.Count > 1) part.Margin = new Thickness(0, 14, 0, 0);
+            if (stack.Children.Count > 1) part.Margin = new Thickness(0, 20, 0, 0);
             stack.Children.Add(part);
         }
         return stack;
@@ -1553,7 +1583,7 @@ internal static class StatsCharts
     }
 
     private const int RankedShown = 8;
-    private const double RankRow = 30, RankPicture = 14;
+    private const double RankRow = 46, RankPicture = 24;
 
     public static FrameworkElement Ranked(List<Ranking> items, string empty, bool cars = false)
     {
@@ -1569,10 +1599,10 @@ internal static class StatsCharts
             string time = StatFormat.Duration(item.Seconds);
             string? laps = item.Laps > 0 ? SimRacing.Race.RaceFormat.Count(item.Laps, "lap") : null;
             double share = item.Seconds / total;
-            var row = RankGrid($"{name}\n{time}{(laps is null ? "" : " · " + laps)} · {Share(share)} of your driving time", 20, RankPicture * CarPictures.SlotAspect + 8);
+            var row = RankGrid($"{name}\n{time}{(laps is null ? "" : " · " + laps)} · {Share(share)} of your driving time", 32, RankPicture * CarPictures.SlotAspect + 14);
             void Put(UIElement element, int col) { Grid.SetColumn(element, col); row.Children.Add(element); }
 
-            var rank = new TextBlock { Text = place.ToString(CultureInfo.CurrentCulture), Style = Ui.Res<Style>("Caption"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+            var rank = new TextBlock { Text = place.ToString(CultureInfo.CurrentCulture), Style = Ui.Res<Style>("Caption"), FontSize = 15.5, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center };
             rank.SetResourceReference(TextBlock.ForegroundProperty, place switch { 1 => "AccentText", 2 => "Place2Text", 3 => "Place3Text", _ => "TextFaint" });
             Put(rank, 0);
 
@@ -1594,7 +1624,7 @@ internal static class StatsCharts
         if (hidden.Count > 0)
         {
             string closed = $"Show all {items.Count}", open = $"Show top {RankedShown}";
-            var more = new Button { Content = closed, Style = Ui.Res<Style>("GhostButton"), HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 10, 0, 0) };
+            var more = new Button { Content = closed, Style = Ui.Res<Style>("GhostButton"), HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 14, 0, 0) };
             more.Click += (_, _) =>
             {
                 bool show = hidden[0].Visibility != Visibility.Visible;
@@ -1628,7 +1658,7 @@ internal static class StatsCharts
         }
         if (rows.Count == 0) return null;
         var stack = new StackPanel();
-        stack.Children.Add(new TextBlock { Text = "Totals", Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(0, 6, 0, 4) });
+        stack.Children.Add(new TextBlock { Text = "Totals", Style = Ui.Res<Style>("Eyebrow"), FontSize = 13.5, Margin = new Thickness(0, 6, 0, 6) });
         foreach (var row in rows) stack.Children.Add(row);
         return stack;
     }
@@ -1637,7 +1667,7 @@ internal static class StatsCharts
     {
         var row = RankGrid(tip, double.NaN, 0);
         void Put(UIElement element, int col) { Grid.SetColumn(element, col); row.Children.Add(element); }
-        var key = new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 14, 0) };
+        var key = new TextBlock { Text = label, Style = Ui.Res<Style>("Caption"), FontSize = 13.5, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 14, 0) };
         Put(key, 0);
         if (detail is not null) Put(RankName(detail, "Text"), 2);
         Put(Figures(figure, note), 3);
@@ -1662,14 +1692,14 @@ internal static class StatsCharts
 
     private static TextBlock RankName(string text, string brush)
     {
-        var name = new TextBlock { Text = text, Style = Ui.Res<Style>("Body"), FontSize = 12, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 6, 0, 6) };
+        var name = new TextBlock { Text = text, Style = Ui.Res<Style>("Body"), FontSize = 15.5, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 8, 0, 8) };
         name.SetResourceReference(TextBlock.ForegroundProperty, brush);
         return name;
     }
 
     private static TextBlock Figures(string figure, string? note)
     {
-        var figures = new TextBlock { Style = Ui.Res<Style>("Caption"), Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        var figures = new TextBlock { Style = Ui.Res<Style>("Caption"), FontSize = 13.5, Margin = new Thickness(14, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         System.Windows.Documents.Typography.SetNumeralAlignment(figures, FontNumeralAlignment.Tabular);
         var figureRun = new System.Windows.Documents.Run(figure);
         figureRun.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "Heading");
@@ -1687,11 +1717,11 @@ internal static class StatsCharts
     {
         double width = RankPicture * CarPictures.SlotAspect, height = RankPicture + 2;
         var slot = new Grid { Width = width, Height = height };
-        var sketch = new TrackSketch(item.Label, item.Config, "Slate", first ? 1.6 : 1.2) { TrackId = item.TrackId, TrackName = item.TrackName, Opacity = first ? 1 : 0.6 };
+        var sketch = new TrackSketch(item.Label, item.Config, "Slate", first ? 2.2 : 1.6) { TrackId = item.TrackId, TrackName = item.TrackName, Opacity = first ? 1 : 0.6 };
         sketch.MapMissing += (_, _) =>
         {
             if (slot.Children.Count > 1) return;
-            var loop = new System.Windows.Shapes.Ellipse { Width = height * 1.4, Height = height * 0.75, StrokeThickness = 1.2, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            var loop = new System.Windows.Shapes.Ellipse { Width = height * 1.4, Height = height * 0.75, StrokeThickness = 1.6, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
             loop.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, "LineStrong");
             slot.Children.Add(loop);
         };
@@ -1704,9 +1734,9 @@ internal static class StatsCharts
 
     private static FrameworkElement ShareChip(string share, string text, string background)
     {
-        var label = new TextBlock { Text = share, FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        var label = new TextBlock { Text = share, FontSize = 13, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         label.SetResourceReference(TextBlock.ForegroundProperty, text);
-        var chip = new Border { MinWidth = 38, Height = 18, Padding = new Thickness(4, 0, 4, 0), Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Child = label };
+        var chip = new Border { MinWidth = 50, Height = 24, Padding = new Thickness(6, 0, 6, 0), Margin = new Thickness(14, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Child = label };
         chip.SetResourceReference(Border.BackgroundProperty, background);
         return chip;
     }

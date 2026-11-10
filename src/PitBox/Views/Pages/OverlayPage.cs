@@ -73,7 +73,8 @@ internal sealed class OverlayPage : UserControl, IPage
         _visible.IsChecked = O.Visible;
         RefreshStatus();
         if (!ReferenceEquals(_built, L) || MonitorSignature() != _builtMonitors) BuildSettings();
-        RenderPreview();
+        if (_previewBits is not null) RenderPreview();
+        else Motion.AfterPageSettles(Dispatcher, FirstPreview);
         _refresh.Interval = TimeSpan.FromMilliseconds(RefreshMs);
         _refresh.Start();
         _app.OverlayChanged += OnOverlayChanged;
@@ -265,7 +266,7 @@ internal sealed class OverlayPage : UserControl, IPage
         Grid.SetColumn(hint, 1);
         head.Children.Add(hint);
         stack.Children.Add(head);
-        stack.Children.Add(new Tile { CornerRadius = ThemeManager.Round(12), Margin = new Thickness(0, 10, 0, 0), Child = new Tile { CornerRadius = ThemeManager.Round(12), Child = scene, ClipToBounds = true } });
+        stack.Children.Add(new Tile { Margin = new Thickness(0, 10, 0, 0), Child = new Tile { Child = scene, ClipToBounds = true } });
         if (_closeUpBox.Child is null)
         {
             var closeUpStack = new StackPanel();
@@ -1014,6 +1015,13 @@ internal sealed class OverlayPage : UserControl, IPage
     {
         try { return OverlayController.AvailableMonitors().ToList(); }
         catch { return new[] { ("primary", "Primary monitor") }; }
+    }
+
+    private void FirstPreview()
+    {
+        if (!_refresh.IsEnabled || _previewBits is not null) return;
+        RenderPreview();
+        Motion.FadeIn(_preview);
     }
 
     private void RenderPreview()

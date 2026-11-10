@@ -64,7 +64,7 @@ Your iRacing history, kept on your PC.
 
 - **History:** laps, time, results, ratings, incidents and personal bests by week / month / season, with a picture of each car. Panels can be dragged into your own order.
 - **Result cards:** every race gets one with your finish, positions gained, rating changes, pace, consistency and awards (Win, Podium, Clean race, Personal best, Charger and more).
-- **Goals and achievements:** set up to 6 goals for iRating or safety rating (per license), races, wins, podiums, clean races or hours (per car / track or this season), earn achievement tiers and follow your streaks. Reached goals are kept with their date and show on that race's result card.
+- **Goals:** set up to 6 goals for iRating or safety rating (per license), races, wins, podiums, clean races or hours (per car / track or this season). Reached goals are kept with their date and show on that race's result card.
 - **Per car and track:** a report card, where your off-tracks happen on the map, and your notes.
 - **Lap analysis:** open any session for its laps and sectors, then compare laps on telemetry traces (including brake bias, ABS and traction control) or a top-down replay, and see which corners cost the most time. Export a lap to share and import other people's.
 - **Tire wear:** tracked per run from the pit-stall readings.

@@ -188,7 +188,7 @@ public sealed class WindowMapView : FrameworkElement, Views.IFrameStep
             _shownScreens[s.Label] = r;
             r.Inflate(-2, -2);
             if (r.Width <= 4 || r.Height <= 4) continue;
-            dc.DrawGeometry(ScreenFill, _screenPen, Tile.Shape(Hairline.SnapBox(r, px), ThemeManager.Round(6)));
+            dc.DrawGeometry(ScreenFill, _screenPen, Tile.Shape(Hairline.SnapBox(r, px), default));
             if (s.Label.Length > 0 && (Number(s.Label, _accent!, dpi) is { } big && big.Height + Pad * 2 < r.Height && big.Width + Pad * 2 < r.Width ? big : Label(s.Label, NumberSize, true, MutedBrush, dpi)) is { } number && number.Height + Pad * 2 < r.Height)
             {
                 var spot = new Rect(r.X + Pad + 2, r.Y + Pad, number.Width, number.Height);
@@ -229,7 +229,7 @@ public sealed class WindowMapView : FrameworkElement, Views.IFrameStep
         {
             var edge = r;
             edge.Inflate(-2, -2);
-            if (edge.Width > 4 && edge.Height > 4) dc.DrawGeometry(null, _screenPen, Tile.Shape(Hairline.SnapBox(edge, px), ThemeManager.Round(6)));
+            if (edge.Width > 4 && edge.Height > 4) dc.DrawGeometry(null, _screenPen, Tile.Shape(Hairline.SnapBox(edge, px), default));
         }
         if (active is not null)
         {

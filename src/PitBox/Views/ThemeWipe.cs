@@ -7,7 +7,7 @@ namespace PitBox.Views;
 
 internal sealed class ThemeWipe : IFrameStep
 {
-    private const double WipeMs = 560, Lean = 0.3;
+    private const double WipeMs = 560, Lean = 0.3, ShotScale = 0.5;
 
     private readonly Grid _host;
     private readonly Image _shot;
@@ -27,7 +27,7 @@ internal sealed class ThemeWipe : IFrameStep
         if (!Motion.Flourish || !content.IsVisible || content.ActualWidth < 1 || content.ActualHeight < 1) return;
         _running?.End();
         var dpi = VisualTreeHelper.GetDpi(content);
-        double zoom = WindowScale.Of(content);
+        double zoom = WindowScale.Of(content) * ShotScale;
         var bitmap = new RenderTargetBitmap((int)Math.Ceiling(content.ActualWidth * dpi.DpiScaleX * zoom), (int)Math.Ceiling(content.ActualHeight * dpi.DpiScaleY * zoom),
             dpi.PixelsPerInchX * zoom, dpi.PixelsPerInchY * zoom, PixelFormats.Pbgra32);
         bitmap.Render(content);

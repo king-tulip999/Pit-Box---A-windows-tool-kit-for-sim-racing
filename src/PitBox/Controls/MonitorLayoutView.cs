@@ -73,7 +73,7 @@ public sealed class MonitorLayoutView : FrameworkElement
                 continue;
             double half = 0.5 / dpi;
             var edge = new Rect(r.X + half, r.Y + half, Math.Max(0, r.Width - 2 * half), Math.Max(0, r.Height - 2 * half));
-            dc.DrawGeometry(TileFill, _tilePen, Tile.Shape(edge, ThemeManager.Round(6)));
+            dc.DrawGeometry(TileFill, _tilePen, Tile.Shape(edge, default));
             if (t.Primary)
                 dc.DrawRectangle(PrimaryStroke, null, new Rect(r.X, r.Y, r.Width, Math.Min(Snap(3), r.Height)));
             if (r.Height < MinLabelHeight || string.IsNullOrEmpty(t.Label))

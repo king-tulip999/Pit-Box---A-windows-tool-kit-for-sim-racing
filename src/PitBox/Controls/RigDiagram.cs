@@ -246,7 +246,7 @@ internal sealed class RigDiagram : FrameworkElement, IFrameStep
 
         double fw = r.FootprintWidthCm / 2;
         var footprint = new Rect(P(new V2(-fw, back)), P(new V2(fw, back - r.FootprintDepthCm)));
-        dc.DrawGeometry(null, new Pen(line, Hairline.Pixels(1, Hairline.ScaleOf(this))) { DashStyle = new DashStyle(new double[] { 2, 3 }, 0) }, Tile.Shape(footprint, ThemeManager.Round(4)));
+        dc.DrawGeometry(null, new Pen(line, Hairline.Pixels(1, Hairline.ScaleOf(this))) { DashStyle = new DashStyle(new double[] { 2, 3 }, 0) }, Tile.Shape(footprint, default));
 
         var screenPen = new Pen(text, Math.Max(3, 5 * scale / 4)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round };
         DrawIdeal(dc, _ideal, P, scale, 1);

@@ -39,7 +39,7 @@ public sealed class SessionStatsSettings
     public static readonly (string Id, string Name)[] Panels =
     {
         ("overview", "Overview"), ("sessions", "Sessions"), ("activity", "Driving activity"), ("cars", "Cars and tracks"),
-        ("achievements", "Achievements"), ("telemetry", "Telemetry files"),
+        ("telemetry", "Telemetry files"),
     };
 
     public bool Shows(string panel) => !HiddenPanels.Contains(panel);

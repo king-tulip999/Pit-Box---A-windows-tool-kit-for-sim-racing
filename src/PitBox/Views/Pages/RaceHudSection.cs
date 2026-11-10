@@ -87,7 +87,9 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
 
     public FrameworkElement TitleTools => _titleTools;
 
-    public bool Done => _steps >= 2;
+    private bool _warmed;
+
+    public bool Done => _steps >= 2 && _warmed;
 
     public bool BuildStep()
     {
@@ -97,8 +99,14 @@ internal sealed class RaceHudSection : StackPanel, IScreenshotStates, ICancelEdi
             _steps = 1;
             return true;
         }
-        if (_steps != 1) return false;
-        Build();
+        if (_steps == 1)
+        {
+            Build();
+            return true;
+        }
+        if (_warmed) return false;
+        _warmed = true;
+        _widgets?.WarmPreview();
         return true;
     }
 

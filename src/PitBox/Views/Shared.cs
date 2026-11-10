@@ -730,7 +730,7 @@ internal static class Ui
 
     public static DividerLine TitleRule(FrameworkElement title)
     {
-        var line = new DividerLine { FromStart = true, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, TitleRuleGap, 0, 0) };
+        var line = new DividerLine { FromStart = true, IsPageTitle = true, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, TitleRuleGap, 0, 0) };
         title.SizeChanged += (_, e) => line.Width = e.NewSize.Width + TitleRuleOverhang;
         return line;
     }

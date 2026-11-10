@@ -79,7 +79,6 @@ internal static class GrrDemo
                 points[r.Driver] = (s.Pts + r.Points!.Value, s.Wins + (r.Position == 1 ? 1 : 0), s.Podiums + (r.Position <= 3 ? 1 : 0),
                     s.Top5 + (r.Position <= 5 ? 1 : 0), s.Top10 + (r.Position <= 10 ? 1 : 0), s.Poles + (r.Pole ? 1 : 0), s.Led + (r.Led ?? 0));
             }
-            if (i < run - 3) continue;
             var sessions = new List<GrrSession> { new(classed ? "Overall" : "Overall Race Finish", rows) };
             if (classed)
                 sessions.AddRange(classes.Select((c, k) => new GrrSession(c.Label, rows.Where(r => r.Class == c.Label).Select((r, n) => r with { Position = n + 1 }).ToList())));

@@ -139,8 +139,10 @@
 
     <!-- ============================================================ surfaces
          Cards are Surface outlined like the folded Sim Racing Tools panels (CardEdge = LineStrong, 1 px, every theme)
-         and square corners; insets are wells (Panel); corners from R.*. -->
+         with rounded corners and a soft shadow below (Tile.Lifted, drawn outside the card so text keeps ClearType);
+         insets are wells (Panel); corners from R.*. -->
     <Style x:Key="Card" TargetType="Border">
+        <Setter Property="c:Tile.Lifted" Value="True" />
         <Setter Property="Background" Value="{DynamicResource Surface}" />
         <Setter Property="BorderBrush" Value="{DynamicResource CardEdge}" />
         <Setter Property="BorderThickness" Value="{DynamicResource CardEdgeThickness}" />

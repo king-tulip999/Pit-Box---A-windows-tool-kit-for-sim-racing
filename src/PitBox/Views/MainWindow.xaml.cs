@@ -43,7 +43,7 @@ public partial class MainWindow : Window, IModalHost
         Nav.Picked += OpenNavItem;
         Nav.GroupsMoved += MoveNavGroups;
         Nav.ItemsMoved += MoveNavItems;
-        _searchButton = Ui.IconButton("I.Search", "Search settings and keybinds (Ctrl+F)", OpenSearch);
+        _searchButton = Ui.IconButton("I.Search", "Search settings and keybinds (Ctrl+F)", OpenSearch, "QuietIconButton");
         System.Windows.Automation.AutomationProperties.SetName(_searchButton, "Search");
         Width = DefaultWindowWidth;
         Root.LayoutTransform = WindowScale.Transform;
@@ -94,7 +94,7 @@ public partial class MainWindow : Window, IModalHost
         SourceInitialized += (_, _) =>
         {
             FitToScale();
-            SquareCorners();
+            FitCorners();
             ApplyBackdrop();
             (PresentationSource.FromVisual(this) as HwndSource)?.AddHook(WatchSizeMove);
             ApplyLight();
@@ -192,7 +192,13 @@ public partial class MainWindow : Window, IModalHost
 
     internal FrameworkElement NavView => Nav;
 
-    internal void SetNavAccent(ResourceDictionary? theme) => Nav.UseAccent(theme);
+    internal void SetNavAccent(ResourceDictionary? theme)
+    {
+        Nav.UseAccent(theme);
+        TitleNav.CopyAccent(TitleBar.Resources, theme);
+        TitleNav.CopyAccent(TitleRule.Resources, theme);
+        TitleRule.InvalidateVisual();
+    }
 
     private ISectionedPage? _watched;
 
@@ -287,7 +293,12 @@ public partial class MainWindow : Window, IModalHost
     {
         double width = PageArea.ActualWidth;
         if (width <= 0) return;
-        double frame = Math.Min(Ui.PageWidth, width), body = Math.Round((width - frame) / 2) + Ui.PageSide;
+        double frame = Math.Min(Ui.PageWidth, width), offset = Math.Round((width - frame) / 2), body = offset + Ui.PageSide;
+        if (Math.Abs(TitleLeft.Margin.Left - (BrandInset + offset)) > 0.1)
+        {
+            TitleLeft.Margin = new Thickness(BrandInset + offset, TitleLeft.Margin.Top, 0, 0);
+            TitleRule.Margin = new Thickness(offset, 0, TitleRule.Margin.Right, 0);
+        }
         double afterBrand = TitleLeft.Margin.Left + TitleLeft.ActualWidth + BrandGap;
         Nav.Margin = new Thickness(Math.Max(body + Ui.HeaderIndent, afterBrand) - TitleNav.Lead, 0, 0, 0);
         FitThemeLogo();
@@ -566,6 +577,7 @@ public partial class MainWindow : Window, IModalHost
     private void OnThemeChanged()
     {
         TitleRule.InvalidateVisual();
+        FitCorners();
         FitBrand();
         ApplyThemeIcon();
         ApplyBackdrop();
@@ -967,13 +979,13 @@ public partial class MainWindow : Window, IModalHost
         _app.Save();
     }
 
-    private void SquareCorners()
+    private void FitCorners()
     {
         try
         {
             var hwnd = new WindowInteropHelper(this).Handle;
             if (hwnd == IntPtr.Zero) return;
-            int preference = 1;
+            int preference = ThemeManager.Current.Radius > 0 ? 2 : 1;
             DwmSetWindowAttribute(hwnd, 33, ref preference, sizeof(int));
         }
         catch
@@ -1215,7 +1227,7 @@ public partial class MainWindow : Window, IModalHost
         double height = Theme.Brand.CrispSize(TitleButtonHeight, VisualTreeHelper.GetDpi(this).PixelsPerDip * WindowScale.Current) ?? TitleButtonHeight;
         Ui.FitWordmark(Wordmark, height);
         double ruleY = ContentArea.RowDefinitions[0].Height.Value - TitleRule.Height + Math.Floor(TitleRule.Height / 2);
-        TitleLeft.Margin = new Thickness(BrandInset, Math.Round((ruleY - Ui.WordmarkCapHeight(height)) / 2), 0, 0);
+        TitleLeft.Margin = new Thickness(TitleLeft.Margin.Left, Math.Round((ruleY - Ui.WordmarkCapHeight(height)) / 2), 0, 0);
         Nav.Height = Math.Max(1, ruleY);
         PlaceNav();
         ShowThemeLink(ThemeManager.Current.Link);

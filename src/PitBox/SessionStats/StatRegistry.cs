@@ -50,7 +50,6 @@ internal static class StatRegistry
         new("time.session", Time, "Longest session", StatKind.Duration, $"SELECT MAX(drive_s), {Combo} FROM s"),
         new("time.stint", Time, "Longest stint", StatKind.Duration, $"SELECT MAX(longest_stint_s), {Combo} FROM s") { Help = "On track without stopping in the pits" },
         new("time.garage", Time, "Garage time", StatKind.Duration, "SELECT SUM(garage_s) FROM s") { LiveOnly = true },
-        new("time.streak", Time, "Day streak", StatKind.Count) { Compute = Streak, Help = "Days in a row with a session, up to today (all time)" },
 
         new("car.time", CarsTracks, "Most driven car", StatKind.Text, "SELECT car, SUM(drive_s) t FROM s GROUP BY car ORDER BY t DESC LIMIT 1") { DetailKind = StatKind.Duration },
         new("car.laps", CarsTracks, "Most laps in", StatKind.Text, "SELECT car, SUM(laps) n FROM s GROUP BY car ORDER BY n DESC LIMIT 1") { DetailKind = StatKind.Count, DetailSuffix = "laps" },
@@ -124,33 +123,6 @@ internal static class StatRegistry
         var (from, to) = TimeRanges.Of(range, q.NowUtc, null);
         return store.Db.Scalar("SELECT SUM(drive_s) FROM sessions WHERE start_utc >= ?1 AND start_utc < ?2", StatsStore.Unix(from), StatsStore.Unix(to)) is { } v
             ? new(StatFormat.Value(StatKind.Duration, Convert.ToDouble(v), q.Imperial)) : new(StatFormat.Value(StatKind.Duration, 0, q.Imperial));
-    }
-
-    private static StatResult Streak(StatsStore store, StatQuery q)
-    {
-        var days = store.Db.Query("SELECT start_utc FROM sessions WHERE drive_s >= 60")
-            .Select(r => DateOnly.FromDateTime(StatsStore.FromUnix(Convert.ToInt64(r[0])).ToLocalTime())).Distinct().ToList();
-        var (current, best) = Streaks(days, DateOnly.FromDateTime(q.NowUtc.ToLocalTime()));
-        return best == 0 ? StatResult.None : new(Days(current), "best " + Days(best));
-    }
-
-    private static string Days(int n) => n == 1 ? "1 day" : $"{n} days";
-
-    internal static (int Current, int Best) Streaks(IEnumerable<DateOnly> days, DateOnly today)
-    {
-        var set = days.ToHashSet();
-        int best = 0;
-        foreach (var d in set)
-        {
-            if (set.Contains(d.AddDays(-1))) continue;
-            int run = 1;
-            while (set.Contains(d.AddDays(run))) run++;
-            best = Math.Max(best, run);
-        }
-        var end = set.Contains(today) ? today : today.AddDays(-1);
-        int current = 0;
-        while (set.Contains(end.AddDays(-current))) current++;
-        return (current, best);
     }
 
     internal static double StdDev(IReadOnlyCollection<double> xs)

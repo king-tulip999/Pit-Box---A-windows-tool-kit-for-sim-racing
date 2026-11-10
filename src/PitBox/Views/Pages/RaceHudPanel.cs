@@ -60,7 +60,7 @@ internal sealed partial class RaceHudWidgets
             if (Math.Abs(e.NewSize.Width - e.PreviousSize.Width) > 1) DrawPreview(w);
             PlacePanel();
         };
-        _previewWell = Hairline.Frame(new Tile { CornerRadius = ThemeManager.Round(8), Child = _well });
+        _previewWell = Hairline.Frame(new Tile { Child = _well });
         _previewWell.SetResourceReference(Border.BackgroundProperty, "Bg");
         _previewWell.SetResourceReference(Border.BorderBrushProperty, "Line");
 

@@ -78,7 +78,7 @@ internal static class GrrParts
         return tag;
     }
 
-    public static Grid Hero(GrrRace race, GrrLeagueData? data, DateTime now, out TextBlock clock, double clockSize = 34, bool league = true)
+    public static Grid Hero(GrrRace race, GrrLeagueData? data, DateTime now, out TextBlock clock, double clockSize = 34, bool league = true, bool wrap = false)
     {
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -89,10 +89,17 @@ internal static class GrrParts
         grid.Children.Add(body);
 
         bool live = race.Start <= now;
-        var top = new DockPanel { LastChildFill = true };
+        Panel top = wrap ? new WrapPanel() : new DockPanel { LastChildFill = true };
         top.Children.Add(Tag(live ? "Racing now" : "Up next", live));
-        top.Children.Add(Eyebrow(Series(race, data, league), "TextMuted"));
-        ((FrameworkElement)top.Children[1]).VerticalAlignment = VerticalAlignment.Center;
+        var series = Eyebrow(Series(race, data, league), "TextMuted");
+        series.VerticalAlignment = VerticalAlignment.Center;
+        if (wrap)
+        {
+            series.TextTrimming = TextTrimming.None;
+            series.TextWrapping = TextWrapping.Wrap;
+            series.Margin = new Thickness(0, 2, 0, 2);
+        }
+        top.Children.Add(series);
         body.Children.Add(top);
 
         clock = RaceParts.Big("", clockSize * 1.35, live ? "SageDeep" : "Place4Text");
@@ -100,7 +107,7 @@ internal static class GrrParts
         clock.Margin = new Thickness(0, 6, 0, 0);
         clock.Text = GrrLeagues.Countdown(GrrLeagues.Until(race.Start, now));
         body.Children.Add(clock);
-        body.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = race.Track, Style = Ui.Res<Style>("H2"), Margin = new Thickness(0, 2, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis }));
+        body.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = race.Track, Style = Ui.Res<Style>("H2"), Margin = new Thickness(0, 2, 0, 0), TextTrimming = wrap ? TextTrimming.None : TextTrimming.CharacterEllipsis, TextWrapping = wrap ? TextWrapping.Wrap : TextWrapping.NoWrap }));
 
         var when = new WrapPanel { Margin = new Thickness(0, 3, 0, 0) };
         var whenText = Caption(LongWhen(race.Start));
@@ -123,7 +130,7 @@ internal static class GrrParts
         return chip;
     }
 
-    public static Button TimelineRow(string eyebrow, string track, string when, FrameworkElement? right, TimelineMark mark, bool first, bool last, Action? click, object? tip = null)
+    public static Button TimelineRow(string eyebrow, string track, string when, FrameworkElement? right, TimelineMark mark, bool first, bool last, Action? click, object? tip = null, bool wrap = false)
     {
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(18) });
@@ -152,7 +159,7 @@ internal static class GrrParts
         text.Children.Add(TextFit.TipWhenTrimmed(new TextBlock
         {
             Text = track, FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = Ui.Res<Brush>(mark == TimelineMark.Done ? "TextMuted" : "Text"),
-            TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 1, 0, 0),
+            TextTrimming = wrap ? TextTrimming.None : TextTrimming.CharacterEllipsis, TextWrapping = wrap ? TextWrapping.Wrap : TextWrapping.NoWrap, Margin = new Thickness(0, 1, 0, 0),
         }));
         text.Children.Add(Caption(when, 1));
         Grid.SetColumn(text, 1);

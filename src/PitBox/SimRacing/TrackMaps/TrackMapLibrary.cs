@@ -42,6 +42,21 @@ internal sealed class TrackMapManifest
         return null;
     }
 
+    public TrackMapEntry? FindByLooseName(string? name)
+    {
+        string n = Loose(name);
+        if (n.Length == 0) return null;
+        if (Entries.FirstOrDefault(e => Loose(e.Family) == n) is { } exact) return exact;
+        if (Entries.FirstOrDefault(e => Loose(e.Family) is { Length: > 0 } f && (Contains(f, n) || Contains(n, f))) is { } near) return near;
+        return Entries.FirstOrDefault(e => Loose(e.Config) is { Length: > 0 } c && Contains(n, c)
+            && Loose(e.Family).Split(' ')[0] is { Length: > 0 } first && n.Split(' ')[0] == first);
+    }
+
+    private static string Loose(string? text) =>
+        string.Join(' ', new string((text ?? "").ToLowerInvariant().Select(ch => char.IsLetterOrDigit(ch) ? ch : ' ').ToArray()).Split(' ', StringSplitOptions.RemoveEmptyEntries));
+
+    private static bool Contains(string outer, string inner) => $" {outer} ".Contains($" {inner} ", StringComparison.Ordinal);
+
     public TrackMapEntry? FindByDisplay(string? family, string? config)
     {
         string f = Normalize(family), c = Normalize(config);
@@ -123,6 +138,9 @@ internal static class TrackMapLibrary
         var manifest = await Manifest().ConfigureAwait(false);
         return manifest?.FindByDisplay(display, config) is { } entry ? await ByKey(entry.Key).ConfigureAwait(false) : null;
     }
+
+    public static async Task<TrackMap?> ForLooseName(string name) =>
+        (await Manifest().ConfigureAwait(false))?.FindByLooseName(name) is { } entry ? await ByKey(entry.Key).ConfigureAwait(false) : null;
 
     public static Task<TrackMap?> ForRace(Telemetry.SessionInfo s, bool sample) =>
         sample ? ByKey(SampleKey) : ForSession(s.TrackId, s.TrackName, s.TrackDisplayName, s.TrackConfig);

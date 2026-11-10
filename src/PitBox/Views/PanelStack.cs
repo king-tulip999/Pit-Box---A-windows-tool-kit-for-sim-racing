@@ -26,7 +26,7 @@ internal sealed class PanelStack : StackPanel
             {
                 double bottom = above.TranslatePoint(new Point(0, above.ActualHeight), this).Y, top = fe.TranslatePoint(new Point(0, 0), this).Y;
                 if (top - bottom > 2)
-                    Dividers.Draw(dc, 24, ActualWidth - 24, Math.Round((bottom + top) / 2));
+                    Dividers.Draw(dc, 24, ActualWidth - 24, Math.Round((bottom + top) / 2), accent: Dividers.AccentOf(this));
             }
             above = fe;
         }

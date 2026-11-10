@@ -57,6 +57,8 @@ public sealed record GrrClassResult(string Class, string? Winner, string? Fastes
 public sealed record GrrLeagueData(string League)
 {
     public string? Season { get; init; }
+    public int DropWeeks { get; init; }
+    public int? DropFromRound { get; init; }
     public IReadOnlyList<GrrClass> Classes { get; init; } = Array.Empty<GrrClass>();
     public IReadOnlyList<GrrRound>? Schedule { get; init; }
     public IReadOnlyDictionary<string, IReadOnlyList<GrrStanding>>? Standings { get; init; }
@@ -127,7 +129,52 @@ public sealed record GrrLeagueData(string League)
 
     public static GrrResult? ResultOf(GrrEvent e, string? driver) =>
         driver is null ? null : e.Sessions.Select(s => s.Rows.FirstOrDefault(r => GrrFeed.SameDriver(r.Driver, driver))).FirstOrDefault(r => r is not null);
+
+    public int? FinishOf(GrrEvent e, string driver)
+    {
+        string? mine = StandingOf(driver) is { } s ? ClassLabel(s.Class) : null;
+        if (!string.IsNullOrEmpty(mine)
+            && e.Sessions.FirstOrDefault(x => string.Equals(x.Label, mine, StringComparison.OrdinalIgnoreCase)) is { } own
+            && own.Rows.FirstOrDefault(r => GrrFeed.SameDriver(r.Driver, driver)) is { } inOwn)
+            return inOwn.Position;
+        foreach (var session in e.Sessions)
+        {
+            if (session.Rows.FirstOrDefault(r => GrrFeed.SameDriver(r.Driver, driver)) is not { } row) continue;
+            if (string.IsNullOrEmpty(row.Class)) return row.Position;
+            return 1 + session.Rows.Count(r => r.Position < row.Position && string.Equals(r.Class, row.Class, StringComparison.OrdinalIgnoreCase));
+        }
+        return null;
+    }
+
+    public IReadOnlyList<GrrFormRound> SeasonForm(string? driver, DateTime now)
+    {
+        var rounds = Schedule ?? Array.Empty<GrrRound>();
+        int next = rounds.ToList().FindIndex(r => r.Start + GrrService.RaceLength > now);
+        var form = new List<GrrFormRound>(rounds.Count);
+        for (int i = 0; i < rounds.Count; i++)
+        {
+            var r = rounds[i];
+            if (next >= 0 && i >= next)
+            {
+                form.Add(new GrrFormRound(r.Number, r.Track, r.Start, i == next ? GrrFormState.Next : GrrFormState.Later, null));
+                continue;
+            }
+            int? finish = driver is not null && EventFor(r) is { } e ? FinishOf(e, driver) : null;
+            form.Add(new GrrFormRound(r.Number, r.Track, r.Start, finish is null ? GrrFormState.NoResult : GrrFormState.Finished, finish));
+        }
+        return form;
+    }
+
+    public static double? AverageFinish(IReadOnlyList<GrrFormRound> form)
+    {
+        var done = form.Where(f => f.Finish is not null).Select(f => (double)f.Finish!.Value).ToList();
+        return done.Count == 0 ? null : done.Average();
+    }
 }
+
+public enum GrrFormState { Finished, NoResult, Next, Later }
+
+public sealed record GrrFormRound(int? Number, string Track, DateTime Start, GrrFormState State, int? Finish);
 
 public static class GrrFeed
 {
@@ -149,6 +196,8 @@ public static class GrrFeed
         return new GrrLeagueData(league)
         {
             Season = Str(season, "name"),
+            DropWeeks = Math.Max(0, Int(season, "dropWeeks") ?? 0),
+            DropFromRound = Int(season, "dropStartRound"),
             Classes = classes,
             Schedule = Try(() => Schedule(root, time, zone, classes)),
             Standings = Try(() => Standings(root)),
@@ -159,7 +208,7 @@ public static class GrrFeed
     public static bool SameDriver(string? a, string? b) =>
         a is not null && b is not null && string.Equals(Squash(a), Squash(b), StringComparison.OrdinalIgnoreCase);
 
-    private static string Squash(string s) => string.Join(' ', s.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+    internal static string Squash(string s) => string.Join(' ', s.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
     private static List<GrrRound>? Schedule(JsonElement root, TimeSpan time, TimeZoneInfo zone, List<GrrClass> classes)
     {
