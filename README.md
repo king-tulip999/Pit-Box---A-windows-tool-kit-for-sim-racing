@@ -102,6 +102,10 @@ Setup Manager, FOV calculator, iRacing's settings and keybinds in plain language
 
 <img src="screenshots/velocita-fov.jpg" alt="FOV calculator">
 
+**iRacing settings:** every iRacing setting in plain language, searchable, with what you changed from the defaults and one-click undo.
+
+<img src="screenshots/velocita-iracing-settings.jpg" alt="iRacing settings">
+
 **iRacing keybinds:** every in-sim keybind per profile, with what's set, missing or changed.
 
 <img src="screenshots/velocita-keybinds.jpg" alt="iRacing keybinds">
@@ -109,6 +113,10 @@ Setup Manager, FOV calculator, iRacing's settings and keybinds in plain language
 **Bass shakers:** engine, shifts, ABS, curbs and the rev limiter through any sound output.
 
 <img src="screenshots/velocita-shakers.jpg" alt="Bass shakers">
+
+**Trading Paints and Garage 61:** start them with Velocita or when iRacing starts, and see your own paint on car pictures across the app.
+
+<img src="screenshots/velocita-companions.jpg" alt="Trading Paints and Garage 61">
 </details>
 
 ### GRR League
