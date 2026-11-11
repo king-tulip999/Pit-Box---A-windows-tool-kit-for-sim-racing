@@ -1,0 +1,73 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <!-- WPF for the main window; WinForms only for the tray icon, global hotkeys and the GDI+ overlay. -->
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- WPF takes its per-monitor DPI setting from the manifest; the WinForms analyzer's alternative is for WinForms apps -->
+    <NoWarn>$(NoWarn);WFO0003;CS1591</NoWarn>
+    <!-- Analyzers that found real bugs fail the build: unused usings (IDE0005 needs the documentation file to run at build time; it is never shipped) and stackalloc in a loop. -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PublishDocumentationFile>false</PublishDocumentationFile>
+    <WarningsAsErrors>$(WarningsAsErrors);IDE0005;CA2014</WarningsAsErrors>
+    <AssemblyName>Core</AssemblyName>
+    <RootNamespace>Core</RootNamespace>
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <!-- Built-in COM interop is used for audio switching, so trimming must stay off. -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <!-- The app is English only: leave out the framework's translated resource assemblies (13 languages). -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <!-- WPF and WinForms share many type names (Application, Button, MessageBox, Point...),
+       so WinForms / System.Drawing are imported explicitly in the few files that use them. -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- the two apps start the shared code; tests/Core.Tests checks internal logic directly -->
+    <InternalsVisibleTo Include="Tecnica" />
+    <InternalsVisibleTo Include="Velocita" />
+    <InternalsVisibleTo Include="Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- iRacing settings catalog (Sim Racing Tools → iRacing Controller). -->
+    <EmbeddedResource Include="SimRacing\IracingFiles\catalog.json" />
+    <EmbeddedResource Include="SimRacing\IracingFiles\demo-values.json" />
+    <EmbeddedResource Include="SimRacing\Hud\Web\Pages\*" LogicalName="web/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Assets\TrackMaps.zip" LogicalName="TrackMaps.zip" Condition="Exists('Assets\TrackMaps.zip')" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\Tecnica.ico" />
+    <Resource Include="Assets\Velocita.ico" />
+    <Resource Include="Assets\Themes\*.ico" />
+    <Resource Include="Assets\OverlayPreview.jpg" />
+    <Resource Include="Assets\BackdropLines.png" />
+    <!-- Saira (the app font, wordmark and in-game overlay), SIL Open Font License, licence texts beside the fonts; the GRR logo -->
+    <Resource Include="Assets\Fonts\**" />
+    <Resource Include="Assets\GrrLogo.png" />
+    <Resource Include="Assets\Cars\*.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- CPU / GPU / RAM / storage / network sensors and fan control. CPU temps and motherboard fans also need PawnIO.
+         Also brings System.Management (WMI), used for RAM module speed. -->
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
+    <!-- Direct2D / DirectWrite: overlay text drawn by DirectWrite for crisp glyphs (Overlay/SharpText.cs). -->
+    <PackageReference Include="Vortice.Direct2D1" Version="3.8.3" />
+  </ItemGroup>
+
+</Project>

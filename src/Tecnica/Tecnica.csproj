@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <Import Project="..\Apps.props" />
+
+  <PropertyGroup>
+    <ApplicationIcon>..\Core\Assets\Tecnica.ico</ApplicationIcon>
+    <AssemblyName>Tecnica</AssemblyName>
+    <RootNamespace>Tecnica</RootNamespace>
+    <StartupObject>Tecnica.Program</StartupObject>
+    <Title>Tecnica</Title>
+    <AssemblyTitle>Tecnica</AssemblyTitle>
+    <Product>Tecnica</Product>
+  </PropertyGroup>
+
+</Project>

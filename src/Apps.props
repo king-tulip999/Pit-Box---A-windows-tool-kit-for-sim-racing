@@ -1,0 +1,79 @@
+<Project>
+
+  <!-- Shared by Tecnica.csproj and Velocita.csproj: everything an app exe needs around the Core library. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <NoWarn>$(NoWarn);WFO0003;CS1591</NoWarn>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PublishDocumentationFile>false</PublishDocumentationFile>
+    <WarningsAsErrors>$(WarningsAsErrors);IDE0005;CA2014</WarningsAsErrors>
+
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <PublishTrimmed>false</PublishTrimmed>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Core\Core.csproj" />
+  </ItemGroup>
+
+  <!-- Files the published exe leaves out because this app never loads them (each checked: nothing in the app uses them):
+       LibreHardwareMonitor's Linux-only native helper; the .NET debugger's symbol reader; WPF / WinForms parts for
+       XPS / printing, the WinForms designer, VB forms, and the Fluent / XP-era themes (Windows 10 / 11 use Aero2;
+       Classic / AeroLite / Aero stay for high contrast and older fallbacks). Ribbon and WindowsFormsIntegration must
+       stay: they're part of WPF's XAML namespace, which every XAML file loads in full. Check a change by running the
+       published exe with the perf switch: an error line in its output names a missing file. -->
+  <ItemGroup>
+    <UnusedPublishFile Include="libMonoPosixHelper.dll;MonoPosixHelper.dll;Microsoft.DiaSymReader.Native.amd64.dll" />
+    <UnusedPublishFile Include="PresentationUI.dll;ReachFramework.dll;System.Printing.dll;System.Windows.Forms.Design.dll;Microsoft.VisualBasic.Forms.dll" />
+    <UnusedPublishFile Include="PresentationFramework.Fluent.dll;PresentationFramework.Luna.dll;PresentationFramework.Royale.dll" />
+    <!-- Also never referenced or loaded (checked by walking every assembly's references from the app's roots, then
+         running the published exe through every page): the debugger's data access / debugging libraries and the
+         crash-dump writer (no debugger attaches to a released app), the designer-time editors, the Linux-only managed
+         helper of LibreHardwareMonitor, dependency-injection / logging libraries a package brings along unused, the
+         event-log message table, Active Directory, registry ACLs, and the UI Automation client side (WPF's
+         accessibility is the provider side, UIAutomationProvider / Types, which stays). -->
+    <UnusedPublishFile Include="mscordaccore.dll;mscordbi.dll;createdump.exe;System.Design.dll;System.Drawing.Design.dll;System.Windows.Forms.Design.Editors.dll;Mono.Posix.NETStandard.dll" />
+    <UnusedPublishFile Include="Microsoft.Extensions.DependencyInjection.dll;Microsoft.Extensions.DependencyInjection.Abstractions.dll;Microsoft.Extensions.Logging.dll;Microsoft.Extensions.Options.dll;Microsoft.Extensions.Primitives.dll" />
+    <UnusedPublishFile Include="System.Diagnostics.EventLog.Messages.dll;System.DirectoryServices.dll;Microsoft.Win32.Registry.AccessControl.dll;UIAutomationClient.dll;UIAutomationClientSideProviders.dll;System.Resources.Extensions.dll" />
+  </ItemGroup>
+  <!-- Framework files are taken out where the runtime pack's files are listed, so the app's deps.json doesn't list
+       files that aren't there; package files at publish. -->
+  <Target Name="DropUnusedRuntimeFiles" AfterTargets="ResolveRuntimePackAssets">
+    <PropertyGroup>
+      <_UnusedList>;@(UnusedPublishFile);</_UnusedList>
+    </PropertyGroup>
+    <ItemGroup>
+      <_UnusedRuntime Include="@(RuntimePackAsset)" Condition="$(_UnusedList.Contains(';%(RuntimePackAsset.Filename)%(RuntimePackAsset.Extension);'))" />
+      <!-- the debugger's data access library also comes as a copy named after the runtime version -->
+      <_UnusedRuntime Include="@(RuntimePackAsset)" Condition="$([System.String]::Copy('%(RuntimePackAsset.Filename)').StartsWith('mscordaccore_'))" />
+      <RuntimePackAsset Remove="@(_UnusedRuntime)" />
+    </ItemGroup>
+  </Target>
+  <Target Name="DropUnusedPublishFiles" AfterTargets="ComputeResolvedFilesToPublishList">
+    <PropertyGroup>
+      <_UnusedList>;@(UnusedPublishFile);</_UnusedList>
+    </PropertyGroup>
+    <ItemGroup>
+      <_Unused Include="@(ResolvedFileToPublish)" Condition="$(_UnusedList.Contains(';%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension);'))" />
+      <_Unused Include="@(ResolvedFileToPublish)" Condition="$([System.String]::Copy('%(ResolvedFileToPublish.Filename)').StartsWith('mscordaccore_'))" />
+      <ResolvedFileToPublish Remove="@(_Unused)" />
+    </ItemGroup>
+  </Target>
+
+</Project>

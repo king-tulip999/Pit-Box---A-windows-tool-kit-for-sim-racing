@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <Import Project="..\Apps.props" />
+
+  <PropertyGroup>
+    <ApplicationIcon>..\Core\Assets\Velocita.ico</ApplicationIcon>
+    <AssemblyName>Velocita</AssemblyName>
+    <RootNamespace>Velocita</RootNamespace>
+    <StartupObject>Velocita.Program</StartupObject>
+    <Title>Velocita</Title>
+    <AssemblyTitle>Velocita</AssemblyTitle>
+    <Product>Velocita</Product>
+  </PropertyGroup>
+
+</Project>

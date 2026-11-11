@@ -1,0 +1,23 @@
+using static Core.SimRacing.Hud.Editors.HudEditorDef;
+
+namespace Core.SimRacing.Hud.Editors;
+
+internal static class SessionEditor
+{
+    public static readonly HudEditorDef Def = new()
+    {
+        ContentTitle = "Shows",
+        Groups = new HudGroup[]
+        {
+            new("main", null, HudTab.Layout, true, O("titleRow"), O("progress")),
+            new("fields", "Shows", HudTab.Content, true, new PickerSetting("fields", new HudCategory[]
+            {
+                new("Time", "remain", "lapsleft", "elapsed", "clock", "finish"),
+                new("Race", "lap", "pos", "cpos", "phase", "inc", "irchange"),
+                new("Driving", "offtracks", "consistency"),
+                new("Track", "track", "temps", "trend"),
+            })),
+        },
+        Regions = new Dictionary<string, string> { ["progress"] = "progress" },
+    };
+}

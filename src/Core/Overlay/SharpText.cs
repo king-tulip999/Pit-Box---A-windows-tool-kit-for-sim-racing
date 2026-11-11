@@ -1,0 +1,213 @@
+using System.Drawing;
+using Vortice.DCommon;
+using Vortice.Direct2D1;
+using Vortice.DirectWrite;
+using Vortice.Mathematics;
+using Color = System.Drawing.Color;
+using Size = System.Drawing.Size;
+
+namespace Core.Overlay;
+
+internal enum TextAlign { Left, Center, Right }
+
+internal sealed class SharpText : IDisposable
+{
+    private readonly record struct Run(string Text, float Size, int Weight, Color Color, RectangleF Box, TextAlign Align, bool Crisp);
+
+    private readonly record struct LayoutKey(string Text, float Size, int Weight, TextAlign Align, float Width, float Height);
+
+    private static ID2D1Factory? _d2d;
+    private static IDWriteFactory? _dwrite;
+    private static IDWriteRenderingParams? _rendering, _crisp;
+    private static IDWriteFontCollection? _fonts;
+    private static bool _failed;
+    private static readonly Dictionary<(float, int, TextAlign), IDWriteTextFormat> Formats = new();
+    private static readonly Dictionary<(string, float, int), float> Widths = new();
+    private static readonly Dictionary<(string, float, int), InkBox> Inks = new();
+
+    public readonly record struct InkBox(float Left, float Right, float Top, float Bottom, float Baseline);
+
+    private readonly List<Run> _runs = new();
+    private readonly Dictionary<LayoutKey, (IDWriteTextLayout Layout, int Frame)> _layouts = new();
+    private readonly List<LayoutKey> _unused = new();
+    private int _frame;
+    private ID2D1DCRenderTarget? _target;
+    private ID2D1SolidColorBrush? _brush;
+    private bool _crispApplied;
+    private IntPtr _boundDc, _boundBitmap;
+    private Size _boundSize;
+
+    public static bool Available => Factories();
+
+    private static bool Factories()
+    {
+        if (_dwrite is not null) return true;
+        if (_failed) return false;
+        try
+        {
+            _d2d = D2D1.D2D1CreateFactory<ID2D1Factory>(Vortice.Direct2D1.FactoryType.SingleThreaded);
+            _dwrite = DWrite.DWriteCreateFactory<IDWriteFactory>(Vortice.DirectWrite.FactoryType.Shared);
+            _rendering = _dwrite.CreateCustomRenderingParams(1.8f, 1f, 0f, PixelGeometry.Flat, RenderingMode.Natural);
+            _crisp = _dwrite.CreateCustomRenderingParams(1.8f, 1f, 0f, PixelGeometry.Flat, RenderingMode.Natural);
+            _fonts = OverlayFonts.Collection(_dwrite);
+            return true;
+        }
+        catch (Exception ex) when (ex is SharpGen.Runtime.SharpGenException or DllNotFoundException or EntryPointNotFoundException)
+        {
+            _failed = true;
+            App.LogError(ex);
+            return false;
+        }
+    }
+
+    private static IDWriteTextFormat Format(float size, int weight, TextAlign align)
+    {
+        var key = (MathF.Round(size * 4) / 4, weight, align);
+        if (Formats.TryGetValue(key, out var f)) return f;
+        f = _fonts is null
+            ? _dwrite!.CreateTextFormat("Segoe UI", (FontWeight)weight, Vortice.DirectWrite.FontStyle.Normal, FontStretch.Normal, key.Item1)
+            : _dwrite!.CreateTextFormat(OverlayFonts.Family, _fonts, (FontWeight)weight, Vortice.DirectWrite.FontStyle.Normal, FontStretch.Normal, key.Item1, "en-us");
+        f.WordWrapping = WordWrapping.NoWrap;
+        f.ParagraphAlignment = ParagraphAlignment.Near;
+        f.TextAlignment = align switch { TextAlign.Center => TextAlignment.Center, TextAlign.Right => TextAlignment.Trailing, _ => TextAlignment.Leading };
+        return Formats[key] = f;
+    }
+
+    public static float Measure(string text, float size, int weight)
+    {
+        if (text.Length == 0 || !Factories()) return -1;
+        var key = (text, size, weight);
+        if (Widths.TryGetValue(key, out var w)) return w;
+        if (Widths.Count >= 4096) Widths.Clear();
+        using var layout = _dwrite!.CreateTextLayout(text, Format(size, weight, TextAlign.Left), float.MaxValue, float.MaxValue);
+        return Widths[key] = layout.Metrics.WidthIncludingTrailingWhitespace;
+    }
+
+    public static InkBox? Ink(string text, float size, int weight)
+    {
+        if (text.Length == 0 || !Factories()) return null;
+        var key = (text, MathF.Round(size * 4) / 4, weight);
+        if (Inks.TryGetValue(key, out var known)) return known;
+        if (Inks.Count >= 512) Inks.Clear();
+        const float Room = 4096;
+        using var layout = _dwrite!.CreateTextLayout(text, Format(key.Item2, weight, TextAlign.Left), Room, Room);
+        var over = layout.OverhangMetrics;
+        var lines = new LineMetrics[1];
+        layout.GetLineMetrics(lines, out _);
+        return Inks[key] = new InkBox(-over.Left, Room + over.Right, -over.Top, Room + over.Bottom, lines[0].Baseline);
+    }
+
+    public void Clear() => _runs.Clear();
+
+    public const int Regular = 400, Semibold = 600, Bold = 700;
+
+    public void Add(string text, float size, int weight, Color color, RectangleF box, TextAlign align, bool crisp = false)
+    {
+        if (text.Length > 0 && color.A > 0 && box.Width > 0) _runs.Add(new Run(text, size, weight, color, box, align, crisp));
+    }
+
+    public bool Render(IntPtr dc, Size size)
+    {
+        if (_runs.Count == 0) return true;
+        if (dc == IntPtr.Zero || !Factories()) return false;
+        try
+        {
+            if (_target is null)
+            {
+                var props = new RenderTargetProperties(RenderTargetType.Software, new Vortice.DCommon.PixelFormat(Vortice.DXGI.Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied), 96, 96, RenderTargetUsage.None, Vortice.Direct2D1.FeatureLevel.Default);
+                _target = _d2d!.CreateDCRenderTarget(props);
+                _target.TextAntialiasMode = Vortice.Direct2D1.TextAntialiasMode.Grayscale;
+                _target.TextRenderingParams = _rendering;
+                _crispApplied = false;
+                _brush = _target.CreateSolidColorBrush(new Color4(1f, 1f, 1f, 1f));
+            }
+            GdiFlush();
+            IntPtr bitmap = GetCurrentObject(dc, ObjBitmap);
+            if (dc != _boundDc || size != _boundSize || bitmap != _boundBitmap)
+            {
+                _target.BindDC(dc, new Vortice.RawRect(0, 0, size.Width, size.Height));
+                _boundDc = dc;
+                _boundSize = size;
+                _boundBitmap = bitmap;
+            }
+            _target.BeginDraw();
+            _frame++;
+            foreach (var r in _runs)
+            {
+                if (r.Crisp != _crispApplied)
+                {
+                    _target.TextRenderingParams = r.Crisp ? _crisp : _rendering;
+                    _crispApplied = r.Crisp;
+                }
+                float a = r.Color.A / 255f;
+                _brush!.Color = new Color4(r.Color.R / 255f, r.Color.G / 255f, r.Color.B / 255f, a);
+                float left = r.Box.X, top = r.Box.Y, right = left + r.Box.Width, bottom = top + r.Box.Height;
+                _target.DrawTextLayout(new System.Numerics.Vector2(left, top), Layout(r, right - left, bottom - top), _brush);
+            }
+            _target.EndDraw();
+            GdiFlush();
+            return true;
+        }
+        catch (SharpGen.Runtime.SharpGenException ex)
+        {
+            App.LogError(ex);
+            DisposeTarget();
+            return false;
+        }
+        finally
+        {
+            _runs.Clear();
+            DropUnused();
+        }
+    }
+
+    private IDWriteTextLayout Layout(in Run r, float width, float height)
+    {
+        var key = new LayoutKey(r.Text, MathF.Round(r.Size * 4) / 4, r.Weight, r.Align, width, height);
+        if (_layouts.TryGetValue(key, out var known))
+        {
+            if (known.Frame != _frame) _layouts[key] = (known.Layout, _frame);
+            return known.Layout;
+        }
+        var layout = _dwrite!.CreateTextLayout(r.Text, Format(r.Size, r.Weight, r.Align), width, height);
+        _layouts[key] = (layout, _frame);
+        return layout;
+    }
+
+    private void DropUnused()
+    {
+        if (_layouts.Count == 0) return;
+        _unused.Clear();
+        foreach (var (key, entry) in _layouts)
+            if (entry.Frame != _frame) _unused.Add(key);
+        foreach (var key in _unused)
+        {
+            _layouts[key].Layout.Dispose();
+            _layouts.Remove(key);
+        }
+        _unused.Clear();
+    }
+
+    private void DisposeTarget()
+    {
+        _brush?.Dispose();
+        _brush = null;
+        _target?.Dispose();
+        _target = null;
+        _boundDc = IntPtr.Zero;
+        _boundBitmap = IntPtr.Zero;
+        _boundSize = Size.Empty;
+    }
+
+    public void Dispose()
+    {
+        DisposeTarget();
+        foreach (var entry in _layouts.Values) entry.Layout.Dispose();
+        _layouts.Clear();
+    }
+
+    private const int ObjBitmap = 7;
+
+    [System.Runtime.InteropServices.DllImport("gdi32.dll")] private static extern bool GdiFlush();
+    [System.Runtime.InteropServices.DllImport("gdi32.dll")] private static extern IntPtr GetCurrentObject(IntPtr dc, int type);
+}
