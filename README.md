@@ -63,6 +63,14 @@ Two separate apps: take one or both. Neither needs the other.
 **Widget editor:** click any part of a widget to change it, drag columns into your own order, and pick when it shows.
 
 <img src="screenshots/velocita-overlay-editor.jpg" alt="Widget editor">
+
+**Alerts:** fuel, pit speed, traffic, flags, incidents, track limits and weather, each with its own threshold.
+
+<img src="screenshots/velocita-overlay-alerts.jpg" alt="Overlay alerts">
+
+**Fuel:** set your reserve, margin and pit stop time, and see exactly how every number is worked out.
+
+<img src="screenshots/velocita-overlay-fuel.jpg" alt="Fuel settings">
 </details>
 
 ### Session Stats
@@ -123,6 +131,17 @@ Setup Manager, FOV calculator, iRacing's settings and keybinds in plain language
 
 Your league's next race, standings and results, if you race with GRR. Off unless you turn it on.
 
+<details>
+<summary><b>See GRR League</b></summary>
+<br>
+
+**Every series:** a countdown to the next race, the schedule, your championship position and season form, the title fight and the latest results.
+
+<img src="screenshots/velocita-grr-cup.jpg" alt="GRR Cup Series">
+<br><br>
+<img src="screenshots/velocita-grr-gt.jpg" alt="GRR GT League">
+</details>
+
 <br>
 
 ## <img src="screenshots/tecnica-icon.png" width="28" alt=""> Tecnica
@@ -135,6 +154,10 @@ Monitors, resolution, HDR, wallpapers and audio saved as profiles. Switch from d
 <summary><b>See Displays</b></summary>
 <br>
 <img src="screenshots/tecnica-displays.jpg" alt="Displays">
+
+**Profile editor:** layout, HDR, taskbar, audio devices, volume and a wallpaper per monitor.
+
+<img src="screenshots/tecnica-display-editor.jpg" alt="Display profile editor">
 </details>
 
 ### Window Profiles
@@ -145,6 +168,10 @@ Any program at an exact size and spot, borderless, applied the moment it starts.
 <summary><b>See Window Profiles</b></summary>
 <br>
 <img src="screenshots/tecnica-window-profiles.jpg" alt="Window Profiles">
+
+**Profile editor:** size, position, borders, a start delay and a keybind, with a picture of where the window lands.
+
+<img src="screenshots/tecnica-window-editor.jpg" alt="Window profile editor">
 </details>
 
 ### Performance Overlay
