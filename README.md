@@ -65,6 +65,10 @@ Two separate apps: take one or both. Neither needs the other.
 - **Pit exit:** where a stop right now would put you, learned per track and car.
 - **Strategy:** fuel saving to skip a stop, undercut and overcut targets.
 - **Practice goals, notes per corner, track limits and a race result card.**
+
+**Widget editor:** click any part of a widget to change it, drag columns into your own order, and pick when it shows.
+
+<img src="screenshots/velocita-overlay-editor.jpg" alt="Widget editor">
 </details>
 
 ### Session Stats
@@ -75,25 +79,17 @@ Your iRacing history, kept on your PC: result cards, goals, ratings, personal be
 <summary><b>See Session Stats</b></summary>
 <br>
 
-**Overview:** your season at a glance, with every race's start and finish, rating changes and incidents.
+**Lap analysis:** compare laps on speed, throttle, brake, steering and gear, see which corners cost the most time, then replay them side by side on the track with live inputs for every car.
+
+<img src="screenshots/velocita-lap-analysis.jpg" alt="Lap analysis and replay">
+
+**Overview:** your season at a glance: race-by-race results, rating changes, recent sessions, when you drive, and your cars and tracks.
 
 <img src="screenshots/velocita-stats.jpg" alt="Session Stats overview">
 
-**Each session:** finish, pace, consistency, conditions, every lap and how much time is left in each sector.
+**Each session:** finish, pace, consistency, conditions, every lap and sector, tire wear per run, and your progress at that track.
 
 <img src="screenshots/velocita-race.jpg" alt="A race session">
-
-**Analyze:** compare laps on speed, throttle, brake, steering and gear, and see which corners cost the most time.
-
-<img src="screenshots/velocita-lap-analysis.jpg" alt="Lap analysis">
-
-**Replay:** play laps against each other on the track map, with live inputs and tips where you lost time.
-
-<img src="screenshots/velocita-lap-replay.jpg" alt="Lap replay">
-
-**When and what you drive:** your hours, weekly driving, and favorite cars and tracks.
-
-<img src="screenshots/velocita-activity.jpg" alt="Driving time, cars and tracks">
 </details>
 
 ### iRacing tools
@@ -103,9 +99,22 @@ Setup Manager, FOV calculator, iRacing's settings and keybinds in plain language
 <details>
 <summary><b>See the tools</b></summary>
 <br>
+
+**Setup Manager:** every setup sorted by car and class, with new downloads picked up.
+
 <img src="screenshots/velocita-setups.jpg" alt="Setup Manager">
-<br><br>
+
+**FOV calculator:** single or triple screens, compared side by side and written straight into iRacing.
+
 <img src="screenshots/velocita-fov.jpg" alt="FOV calculator">
+
+**iRacing keybinds:** every in-sim keybind per profile, with what's set, missing or changed.
+
+<img src="screenshots/velocita-keybinds.jpg" alt="iRacing keybinds">
+
+**Bass shakers:** engine, shifts, ABS, curbs and the rev limiter through any sound output.
+
+<img src="screenshots/velocita-shakers.jpg" alt="Bass shakers">
 </details>
 
 ### GRR League
@@ -154,6 +163,8 @@ Curves, per-fan limits, presets and a failsafe that hands the fans back to the B
 <summary><b>See Fan Control</b></summary>
 <br>
 <img src="screenshots/tecnica-fans.jpg" alt="Fan Control">
+<br><br>
+<img src="screenshots/tecnica-fan-curves.jpg" alt="Fan curves">
 </details>
 
 <br>
