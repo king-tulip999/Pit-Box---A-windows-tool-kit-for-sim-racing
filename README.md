@@ -20,34 +20,28 @@
 
 I got sick of setting everything up by hand every time I went from my desk to my sim rig, and of paying for a handful of subscriptions just to race. So I built it myself. Now you can use it too.
 
+<div align="center">
 <table>
 <tr>
-<td width="50%" valign="top">
-
-<h3><img src="screenshots/velocita-icon.png" width="22" alt=""> Velocita</h3>
-
-**For racing in iRacing.**
-
-- Overlays you set up from inside the car
-- Your whole race history and lap analysis
-- Setups, FOV, keybinds and bass shakers
-
+<td width="50%" align="center">
+<h3>Velocita</h3>
+For racing in iRacing
+<br><br>
+<sub>Overlays · Session Stats · Setups · FOV · Bass shakers</sub>
+<br><br>
 </td>
-<td width="50%" valign="top">
-
-<h3><img src="screenshots/tecnica-icon.png" width="22" alt=""> Tecnica</h3>
-
-**For setting up the PC.**
-
-- Desk ↔ rig display profiles on a keybind
-- Windows sized and placed for you
-- FPS overlay and fan control
-
+<td width="50%" align="center">
+<h3>Tecnica</h3>
+For setting up the PC
+<br><br>
+<sub>Displays · Window Profiles · FPS overlay · Fan control</sub>
+<br><br>
 </td>
 </tr>
 </table>
 
 Two separate apps: take one or both. Neither needs the other.
+</div>
 
 <br>
 
