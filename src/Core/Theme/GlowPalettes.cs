@@ -43,7 +43,7 @@ internal static class GlowPalettes
         ("Slate", "#A8E6FF"), ("SlateSoft", "#242B38"), ("SlateDeep", "#A8E6FF"), ("FocusEdge", "#A8E6FF"),
         ("Meter1", "#49C8F5"), ("Meter2", "#49C8F5"), ("Meter3", "#49C8F5"),
         ("GraphSoft", "#142D3B"), ("ScrollThumbBrushDrag", "#399CBF"),
-        ("BgGlow", "#0A1A24"));
+        ("BgGlow", "#0A1A24"), ("LogoAccent", "#49C8F5"));
 
     public static readonly IReadOnlyDictionary<string, Color> Velocita = With(Shared(),
         ("Accent", "#DB156B"), ("AccentHover", "#E03881"), ("AccentPressed", "#AB1053"), ("AccentEdge", "#DB156B"),

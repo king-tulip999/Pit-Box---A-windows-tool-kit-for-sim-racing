@@ -74,9 +74,26 @@ Your iRacing history, kept on your PC: result cards, goals, ratings, personal be
 <details>
 <summary><b>See Session Stats</b></summary>
 <br>
+
+**Overview:** your season at a glance, with every race's start and finish, rating changes and incidents.
+
 <img src="screenshots/velocita-stats.jpg" alt="Session Stats overview">
-<br><br>
+
+**Each session:** finish, pace, consistency, conditions, every lap and how much time is left in each sector.
+
+<img src="screenshots/velocita-race.jpg" alt="A race session">
+
+**Analyze:** compare laps on speed, throttle, brake, steering and gear, and see which corners cost the most time.
+
 <img src="screenshots/velocita-lap-analysis.jpg" alt="Lap analysis">
+
+**Replay:** play laps against each other on the track map, with live inputs and tips where you lost time.
+
+<img src="screenshots/velocita-lap-replay.jpg" alt="Lap replay">
+
+**When and what you drive:** your hours, weekly driving, and favorite cars and tracks.
+
+<img src="screenshots/velocita-activity.jpg" alt="Driving time, cars and tracks">
 </details>
 
 ### iRacing tools
