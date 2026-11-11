@@ -767,14 +767,14 @@ internal sealed class KeybindsBoard : StackPanel
             return b;
         }
         line.Children.Add(clash.Before is { Length: > 0 } before
-            ? Act("Swap them", $"“{clash.Other.Label}” gets {Core.Hotkeys.Hotkey.Display(before)}", () => Resolve(clash, clash.Other, before))
-            : Act("Clear the other", $"“{clash.Other.Label}” is left with no key", () => Resolve(clash, clash.Other, null)));
+            ? Act("Swap them", $"“{clash.Other.Label}” gets {Core.Hotkeys.Hotkey.Display(before)}", () => Resolve(clash.Other, before))
+            : Act("Clear the other", $"“{clash.Other.Label}” is left with no key", () => Resolve(clash.Other, null)));
         line.Children.Add(Act("Keep both", "Both do something when you press it", () => { _clash = null; Render(); }));
-        line.Children.Add(Act("Undo", "Put this keybind back", () => Resolve(clash, clash.Entry, clash.Before)));
+        line.Children.Add(Act("Undo", "Put this keybind back", () => Resolve(clash.Entry, clash.Before)));
         return line;
     }
 
-    private void Resolve(Clash clash, HotkeyEntry target, string? hotkey)
+    private void Resolve(HotkeyEntry target, string? hotkey)
     {
         _clash = null;
         if (_app.Hotkeys.Change(target, string.IsNullOrWhiteSpace(hotkey) ? null : hotkey) is { } problem)

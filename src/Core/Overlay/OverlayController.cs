@@ -143,26 +143,6 @@ internal sealed class OverlayController : IDisposable
         }
     }
 
-    public static (double W, double H) MonitorSize(OverlayLayout layout)
-    {
-        try
-        {
-            var screen = TargetScreen(layout);
-            float scale = DpiScale(screen);
-            return (screen.Bounds.Width / scale, screen.Bounds.Height / scale);
-        }
-        catch { return (1920, 1080); }
-    }
-
-    internal static (double Fx, double Fy) FractionOf(OverlayLayout layout, double monitorW, double monitorH, double width, double height)
-    {
-        double freeW = Math.Max(0, monitorW - width), freeH = Math.Max(0, monitorH - height);
-        double fx = freeW > 0 ? Math.Clamp(layout.OffsetX / freeW, 0, 1) : 0, fy = freeH > 0 ? Math.Clamp(layout.OffsetY / freeH, 0, 1) : 0;
-        bool right = layout.Corner is OverlayCorner.TopRight or OverlayCorner.BottomRight;
-        bool bottom = layout.Corner is OverlayCorner.BottomLeft or OverlayCorner.BottomRight;
-        return (right ? 1 - fx : fx, bottom ? 1 - fy : fy);
-    }
-
     public IReadOnlyList<OverlayHit> PreviewHits => _previewRenderer.Hits!;
 
     public DibSurface RenderPreview(OverlayLayout layout, FrameStats? frames, double[] frameTimes, float scale = 1f)

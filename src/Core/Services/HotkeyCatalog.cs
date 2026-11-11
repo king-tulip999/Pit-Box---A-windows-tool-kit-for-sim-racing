@@ -89,12 +89,4 @@ internal static class HotkeyCatalog
             return delta > 0 ? items[0] : items[^1];
         return items[((at + delta) % items.Count + items.Count) % items.Count];
     }
-
-    public static void SaveOrder(List<string> order, IReadOnlyList<string> siblings)
-    {
-        int at = order.FindIndex(k => siblings.Contains(k));
-        order.RemoveAll(k => siblings.Contains(k));
-        if (at < 0 || at > order.Count) at = order.Count;
-        order.InsertRange(at, siblings);
-    }
 }

@@ -19,8 +19,6 @@ internal static class Dividers
         dc.Pop();
     }
 
-    public const double HaloWidth = 11;
-
     private static readonly double[] HaloBands = [11, 9, 7, 5, 3];
 
     internal static double Center(double v) => Math.Floor(v) + Hairline.Width / 2;

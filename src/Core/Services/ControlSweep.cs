@@ -528,7 +528,7 @@ internal static class ControlSweep
             }
         }
         var radios = census.Where(f => f.Element is RadioButton { IsChecked: true }).Select(f => f.Key).ToList();
-        Inspect(window, s.Layer == "layer" ? s with { Name = s.Name + " [" + Short(LayerTitle(window)) + "]" } : s, census);
+        Inspect(s.Layer == "layer" ? s with { Name = s.Name + " [" + Short(LayerTitle(window)) + "]" } : s, census);
         await TipsAsync(window, census);
 
         var children = new List<Surface>();
@@ -810,7 +810,7 @@ internal static class ControlSweep
                     lock (Errors) Errors.Add(finding.ToString());
     }
 
-    private static void Inspect(MainWindow window, Surface s, List<Found> census)
+    private static void Inspect(Surface s, List<Found> census)
     {
         foreach (var f in census)
         {
@@ -823,7 +823,7 @@ internal static class ControlSweep
             };
             Unique[key] = row;
             Rows.Add(row);
-            Check(window, f, row);
+            Check(f, row);
         }
         CheckRows(s, census);
         CheckPrimaries(s, census);
@@ -834,7 +834,7 @@ internal static class ControlSweep
         if (!row.Issues.Contains(issue)) row.Issues.Add(issue);
     }
 
-    private static void Check(MainWindow window, Found f, Row row)
+    private static void Check(Found f, Row row)
     {
         bool labelled = f.Label.Length > 0 && !f.Label.StartsWith('#') || f.Tip.Length > 0;
         if (!labelled && f.Kind is not ("pointer surface" or "text input" or "slider" or "dropdown" or "keybind box"))

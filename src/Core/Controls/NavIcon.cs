@@ -436,14 +436,6 @@ public sealed class NavIcon : Viewbox
 
     private PointAnimationUsingKeyFrames Over(Func<double, Point> f) => SampledPoints(u => f(u * _period.TotalSeconds), 72);
 
-    private Path Accent(Geometry data, Transform transform)
-    {
-        var path = new Path { Data = data, RenderTransform = transform };
-        path.SetResourceReference(Shape.FillProperty, "Accent");
-        _canvas.Children.Add(path);
-        return path;
-    }
-
     private void Layers()
     {
         const double Period = 2.0;

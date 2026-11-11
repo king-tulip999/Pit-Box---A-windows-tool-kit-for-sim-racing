@@ -30,7 +30,6 @@ public sealed class WindowMapView : FrameworkElement, Views.IFrameStep
 
     private static Brush ScreenFill => ThemeManager.Brush("TileRaised", Brushes.WhiteSmoke);
     private static Brush ScreenStroke => ThemeManager.Brush("LineStrong", Brushes.LightGray);
-    private static Brush TextBrush => ThemeManager.Brush("Text", Brushes.Black);
     private static Brush MutedBrush => ThemeManager.Brush("TextMuted", Brushes.Gray);
     private const double LabelSize = 12, NumberSize = 13, Pad = 6, WindowInset = 4, MinLabelWidth = 22;
 

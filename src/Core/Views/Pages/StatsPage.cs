@@ -34,7 +34,6 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
     private string _reference = "session";
     private ReplayMemory _replay = new();
 
-    internal void StartReplayAt(double distance) => _replay.Distance = distance;
     private double _overviewOffset;
     private int _version;
     private bool _shown;
@@ -519,7 +518,7 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         var sessionsCard = StatsSessions.Card(sessions, traced, _filter, stats.Settings, Refresh, s => Open(s.Id), TraceSettings.Button(_app, stats, _window), races);
         var lastRace = sessions.FirstOrDefault(RaceParts.Raced);
         _telemetry = null;
-        var sections = StatsSections.Page(results, charts, stats, q, Changed, sessionsCard, lastRace is null ? null : RaceParts.Card(races.Data(lastRace) with { Driver = "", Conditions = lastConditions, Imperial = stats.Settings.Imperial }, "Last race"), () => _telemetry = new TelemetryFilesCard(_app, _window, stats), staged: !restoreOffset);
+        var sections = StatsSections.Page(results, charts, stats, q, sessionsCard, lastRace is null ? null : RaceParts.Card(races.Data(lastRace) with { Driver = "", Conditions = lastConditions, Imperial = stats.Settings.Imperial }, "Last race"), () => _telemetry = new TelemetryFilesCard(_app, _window, stats), staged: !restoreOffset);
         page.Children.Add(sections);
         bool arriving = _content.Content is null;
         _content.Content = page;
@@ -795,7 +794,7 @@ internal static class StatsUi
 
 internal static class StatsSections
 {
-    public static FrameworkElement Page(List<(StatDef Def, StatResult Result)> results, StatsCharts.Data charts, SessionStatsService service, StatQuery q, Action changed,
+    public static FrameworkElement Page(List<(StatDef Def, StatResult Result)> results, StatsCharts.Data charts, SessionStatsService service, StatQuery q,
         FrameworkElement? sessions = null, FrameworkElement? lastRace = null, Func<FrameworkElement>? telemetry = null, bool staged = false)
     {
         var settings = service.Settings;

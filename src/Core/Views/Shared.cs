@@ -135,7 +135,7 @@ internal sealed class Collapsible : StackPanel
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         _chevron.Foreground = Ui.Res<Brush>("TextMuted");
         header.Children.Add(_chevron);
-        var badge = _badge = framed ? new Tile { Width = 36, Height = 36 } : Ui.Badge(icon, colors.Soft, colors.Deep, 28, 8, 14);
+        var badge = framed ? new Tile { Width = 36, Height = 36 } : Ui.Badge(icon, colors.Soft, colors.Deep, 28, 8, 14);
         if (framed)
         {
             var glyph = new NavIcon { Glyph = icon, Width = 36, Height = 36, IsActive = true };
@@ -238,8 +238,6 @@ internal sealed class Collapsible : StackPanel
     }
 
     public bool Expanded { get; private set; }
-
-    private readonly Tile _badge;
 
     public void Toggle()
     {

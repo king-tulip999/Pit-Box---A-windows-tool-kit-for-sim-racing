@@ -80,16 +80,16 @@ internal sealed class StorageView : ContentControl
             list.Children.Add(entry);
         }
         _body.Children.Add(list);
-        _body.Children.Add(Clear("Replays", r.Replays, d => StorageCleanup.OldReplays(r.Replays, d, DateTime.UtcNow), _replayDays, d => _replayDays = d,
+        _body.Children.Add(Clear("Replays", d => StorageCleanup.OldReplays(r.Replays, d, DateTime.UtcNow), _replayDays, d => _replayDays = d,
             "The newest replay is always kept."));
         if (r.Members.Count > 0)
-            _body.Children.Add(Clear("Paints", r.Paints, d => StorageCleanup.OldPaints(r.Paints, d, DateTime.UtcNow, r.Members), _paintDays, d => _paintDays = d,
+            _body.Children.Add(Clear("Paints", d => StorageCleanup.OldPaints(r.Paints, d, DateTime.UtcNow, r.Members), _paintDays, d => _paintDays = d,
                 "Only other drivers' downloaded paints. Yours (and team paints) stay."));
         else
             _body.Children.Add(Ui.Text("Paints can be cleared once Session Stats or a telemetry file knows which driver is you, so yours are never touched.", "Caption"));
     }
 
-    private FrameworkElement Clear(string what, IReadOnlyList<FileInfo> all, Func<int, List<FileInfo>> pick, int days, Action<int> setDays, string rule)
+    private FrameworkElement Clear(string what, Func<int, List<FileInfo>> pick, int days, Action<int> setDays, string rule)
     {
         var line = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
         var label = new TextBlock { Text = $"{what} older than", Style = Ui.Res<Style>("Body"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 6) };

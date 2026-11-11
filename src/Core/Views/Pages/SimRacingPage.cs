@@ -263,8 +263,6 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, IRe
 
     internal SetupManagerSection? Setups => _setups;
 
-    internal FrameworkElement? PanelSection(string id) => _view.Host(id);
-
     private void Only(string id)
     {
         ShowSection(id);

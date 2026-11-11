@@ -186,17 +186,6 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         BuildAboutAndUpdates(Group(app, "About and updates", "settings.updates"));
     }
 
-    internal static readonly Dictionary<string, string> PartNotes = new()
-    {
-        ["setups"] = "Your car setups by car: find, rename, move, import and share.",
-        ["hud"] = "In-game widgets from iRacing's live telemetry; off stops reading it.",
-        ["shakers"] = "Engine, shifts, ABS, kerbs and the limiter through a sound output; off by default.",
-        ["fov"] = "The correct field of view for your seat and screens.",
-        ["iracing"] = "Every iRacing setting explained, a health check and backups.",
-        ["tradingpaints"] = "Starts the Trading Paints Downloader by hand or with iRacing.",
-        ["garage61"] = "Starts the Garage 61 Telemetry Agent by hand or with iRacing.",
-    };
-
     private static StackPanel Group(StackPanel section, string title, string anchor)
     {
         var group = new StackPanel { Margin = new Thickness(0, section.Children.Count > 1 ? 8 : 3, 0, 0) };

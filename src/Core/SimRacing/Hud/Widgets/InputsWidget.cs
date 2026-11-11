@@ -74,7 +74,7 @@ internal sealed class InputsWidget : HudWidget
     private long _seq = long.MinValue;
     private double _peakRpm;
     private Shows _on;
-    private bool _throttle, _brake, _clutch, _steering, _speed, _rpm, _trace, _abs;
+    private bool _throttle, _brake, _clutch, _steering, _speed, _rpm, _abs;
     private readonly GraphicsPath _path = new(), _absPath = new();
 
     public override void Dispose()
@@ -103,10 +103,8 @@ internal sealed class InputsWidget : HudWidget
     private void ReadShows(HudOptions o)
     {
         _on = Parse(o);
-        (_throttle, _brake, _clutch, _steering, _speed, _rpm, _trace, _abs) = (_on.Throttle, _on.Brake, _on.Clutch, _on.Steering, _on.Speed, _on.Rpm, _on.Trace, _on.Abs);
+        (_throttle, _brake, _clutch, _steering, _speed, _rpm, _abs) = (_on.Throttle, _on.Brake, _on.Clutch, _on.Steering, _on.Speed, _on.Rpm, _on.Abs);
     }
-
-    private bool AnyPedal => _on.AnyPedal;
 
     private int PedalCount => _on.Pedals;
 

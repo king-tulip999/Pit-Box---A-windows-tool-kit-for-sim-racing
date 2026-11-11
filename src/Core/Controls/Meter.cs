@@ -48,7 +48,7 @@ public sealed class Meter : FrameworkElement
         var track = ThemeManager.Brush("MeterTrack", Brushes.LightGray);
         double value = Math.Clamp(Value, 0, 1);
         Brush edge = Steps > 0
-            ? StepsUseFill ? Fill : ThemeManager.StepBrush(Math.Max(1, Math.Ceiling(value * Steps)) / Steps)
+            ? StepsUseFill ? Fill : ThemeManager.StepBrush()
             : Tiered ? (value < TieredWarnFrom ? ThemeManager.Brush("LineStrong", Brushes.Gray) : ThemeManager.RampBrush(value)) : Fill;
         double r = Math.Min(h / 2, ThemeManager.Round(3).TopLeft), ri = Math.Max(0, Math.Min((h - 2 * Pad) / 2, r - Pad / 2));
         var inner = new Rect(Pad, Pad, w - 2 * Pad, h - 2 * Pad);
@@ -70,7 +70,7 @@ public sealed class Meter : FrameworkElement
                 double part = Math.Clamp(done - i, 0, 1);
                 if (part <= 0.02) continue;
                 var box = new Rect(inner.X + i * (seg + gap), inner.Y, Math.Max(0, Math.Min(seg, Math.Max(inner.Height, seg * part))), inner.Height);
-                var brush = StepsUseFill ? Fill : ThemeManager.StepBrush((i + 1.0) / Steps);
+                var brush = StepsUseFill ? Fill : ThemeManager.StepBrush();
                 dc.DrawRoundedRectangle(brush, null, box, Math.Min(ri, seg / 2), Math.Min(ri, seg / 2));
             }
             return;

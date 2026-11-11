@@ -343,7 +343,7 @@ internal sealed class FuelWidget : HudWidget
                     case "gauge": Gauge(p, v, box, level, plan, status); break;
                     case "grid": Grid(p, v, box, level, plan); break;
                     case "plan": PlanBand(p, v, box, plan, measured); break;
-                    case "figures": Figures_(p, v, box, level, plan, lowLaps); break;
+                    case "figures": Figures_(p, v, box, plan, lowLaps); break;
                     case "table": TablePart(p, v, box, level, plan); break;
                     case "undercut": if (Compact(v)) UndercutLine(p, v, box); else UndercutPart(p, v, box); break;
                     case "save": SavePart(p, v, box, level, plan); break;
@@ -698,7 +698,7 @@ internal sealed class FuelWidget : HudWidget
         return (columns, (_top.Count + columns - 1) / columns, useBig ? p.Big : p.Bold);
     }
 
-    private void Figures_(HudPainter p, HudView v, RectangleF row, double level, FuelPlan? plan, double lowLaps)
+    private void Figures_(HudPainter p, HudView v, RectangleF row, FuelPlan? plan, double lowLaps)
     {
         var (columns, _, font) = FigureRows(p, v);
         if (_top.Count == 0 || columns == 0) return;

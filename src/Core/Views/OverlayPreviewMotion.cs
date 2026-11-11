@@ -56,8 +56,6 @@ internal sealed class OverlayPreviewMotion
         scene.Children.Add(_startSize);
     }
 
-    private static double Seconds(double ms) => ms / 1000;
-
     public Frame? Capture(bool keepPixels = false)
     {
         if (_preview.Source is not BitmapSource source || source.PixelWidth == 0 || _preview.ActualWidth <= 0) return null;

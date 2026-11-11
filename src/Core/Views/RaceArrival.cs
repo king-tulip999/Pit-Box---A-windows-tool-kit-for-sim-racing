@@ -59,13 +59,13 @@ internal static class RaceArrival
             double from = stripe.ActualWidth * 0.7;
             move.BeginAnimation(TranslateTransform.XProperty, Keys(CarFromMs + CarMs, Drive, (0, from), (CarFromMs, from), (CarFromMs + CarMs, 0)));
             car.BeginAnimation(UIElement.OpacityProperty, Keys(CarFromMs + CarMs * 0.3, null, (0, 0), (CarFromMs, 0), (CarFromMs + CarMs * 0.3, 1)));
-            SpeedLines(stripe, car);
+            SpeedLines(stripe);
         }
 
         laps?.BeginAnimation(LapStrip.GrowProperty, Keys(BarsFromMs + BarsMs, null, (0, 0), (BarsFromMs, 0), (BarsFromMs + BarsMs, 1)));
     }
 
-    private static void SpeedLines(Stripe stripe, FrameworkElement car)
+    private static void SpeedLines(Stripe stripe)
     {
         double[] rows = { 0.42, 0.56, 0.68 };
         var lines = new List<Border>();

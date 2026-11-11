@@ -14,8 +14,6 @@ public static class AppIdentity
 
     public static bool IsTecnica => Kind == AppKind.Tecnica;
 
-    public static bool IsVelocita => Kind == AppKind.Velocita;
-
     public static bool NeedsAdmin => IsTecnica;
 
     public const string OldDataFolder = "Pit-Box";

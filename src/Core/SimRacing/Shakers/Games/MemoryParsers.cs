@@ -79,7 +79,7 @@ internal sealed class RFactor2Parser : IMemoryParser
             if (_slot < 0 || !view.Read(0, 16 + (long)_slot * VehicleSize, _veh, VehicleSize)) return false;
         }
         if (!view.Read(0, 0, _end, 8) || Bytes.U32(_head, 0) != Bytes.U32(_end, 4)) return false;
-        return Vehicle(_veh, _inRealtime, ref _elapsed, now, out input);
+        return Vehicle(_veh, _inRealtime, ref _elapsed, out input);
     }
 
     private bool _inRealtime;
@@ -102,7 +102,7 @@ internal sealed class RFactor2Parser : IMemoryParser
         }
     }
 
-    internal static bool Vehicle(byte[] v, bool inRealtime, ref double lastElapsed, double now, out ShakerInput input)
+    internal static bool Vehicle(byte[] v, bool inRealtime, ref double lastElapsed, out ShakerInput input)
     {
         input = default;
         double elapsed = Bytes.F64(v, 12);
@@ -137,7 +137,7 @@ internal sealed class LmuParser : IMemoryParser
         if (!view.Read(0, Telemetry, _head, 3) || _head[2] == 0 || _head[1] >= 104) return false;
         if (!view.Read(0, Vehicles + (long)_head[1] * RFactor2Parser.VehicleSize, _veh, _veh.Length)) return false;
         bool realtime = view.Read(0, InRealtime, _flag, 1) && _flag[0] != 0;
-        if (!RFactor2Parser.Vehicle(_veh, realtime, ref _elapsed, now, out input)) return false;
+        if (!RFactor2Parser.Vehicle(_veh, realtime, ref _elapsed, out input)) return false;
         input.Abs = _veh[AbsActive] != 0;
         return true;
     }

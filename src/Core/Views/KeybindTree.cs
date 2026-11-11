@@ -21,7 +21,6 @@ internal sealed class KeybindTree : Tile
     private readonly Func<string, string> _label;
     private readonly bool _flat;
     private readonly StackPanel _root = new();
-    private bool _arranging;
     private string _query = "";
 
     public KeybindTree(AppServices app, Func<HotkeyEntry, bool> include, int skip = 0, Action<string>? navigate = null, Func<string, string>? label = null, bool flat = false)
@@ -39,21 +38,6 @@ internal sealed class KeybindTree : Tile
     }
 
     private UiSettings U => _app.Config.Ui;
-
-    public bool Arranging
-    {
-        get => _arranging;
-        set
-        {
-            if (_arranging == value) return;
-            _arranging = value;
-            _undo = value ? new EditUndo().Items(U.KeybindOrder) : null;
-            Rebuild();
-        }
-    }
-
-    private EditUndo? _undo;
-
 
     private readonly List<(TextBlock Count, SegmentMeter? Meter, List<HotkeyEntry> Entries)> _counts = new();
 
@@ -100,11 +84,6 @@ internal sealed class KeybindTree : Tile
             return;
         }
         string prefix = string.Join("/", entries[0].Path.Take(_skip));
-        if (_arranging)
-        {
-            Arrange(entries, prefix);
-            return;
-        }
         if (Searching) entries = entries.Where(e => Matches(e, _query)).ToList();
         if (entries.Count == 0)
         {
@@ -387,46 +366,4 @@ internal sealed class KeybindTree : Tile
         entry.Owner == HotkeyOwner.Iracing
             ? IracingKey.FromHotkey(a) is { } x && IracingKey.FromHotkey(b) is { } y && x.SameAs(y)
             : Core.Hotkeys.Hotkey.SameKey(a, b) || string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
-
-    private void Arrange(List<HotkeyEntry> entries, string prefix)
-    {
-        int depth = _skip;
-        _root.Children.Add(new TextBlock
-        {
-            Text = "Drag the categories into the order you want. The keybinds inside each one keep their default order.",
-            Style = Ui.Res<Style>("Caption"), Foreground = Ui.Res<Brush>("AccentText"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(3, 2, 0, 6),
-        });
-        var groups = GroupNames(entries, depth);
-        var list = new ReorderGrid { MaxColumns = 1, Gap = 3, Margin = new Thickness(0, 0, 0, 3) };
-        foreach (var name in groups)
-        {
-            var inside = entries.Where(e => e.Path.Count > depth && e.Path[depth] == name).ToList();
-            var head = GroupTitle(name, 0, inside, out _, HueOf(name, 0, inside, Hues.Accent), IconOf(name, inside, 0));
-            head.Margin = new Thickness(3, 6, 6, 6);
-            var cell = new Tile { Style = Ui.Res<Style>("Inset"), Padding = new Thickness(0), Child = head, Background = Ui.Res<Brush>("Surface"), ToolTip = $"Drag {name} to move it" };
-            cell.SetResourceReference(Border.BorderBrushProperty, "BtnOutline");
-            Hairline.Frame(cell);
-            if (Searching && !inside.Any(e => Matches(e, _query))) cell.Opacity = 0.4;
-            AutomationProperties.SetName(cell, name);
-            list.Children.Add(cell);
-        }
-        list.Moved += (from, to) => SaveOrder(Move(groups, from, to).Select(n => HotkeyCatalog.CategoryKey(Join(prefix, n))).ToList());
-        _root.Children.Add(list);
-    }
-
-    private static List<string> Move(List<string> items, int from, int to)
-    {
-        var moved = items.ToList();
-        var item = moved[from];
-        moved.RemoveAt(from);
-        moved.Insert(to, item);
-        return moved;
-    }
-
-    private void SaveOrder(List<string> siblings)
-    {
-        HotkeyCatalog.SaveOrder(U.KeybindOrder, siblings);
-        _app.Save();
-        Rebuild();
-    }
 }

@@ -15,18 +15,11 @@ internal static class TextBalance
     public const int MaxDescents = 8;
     public const int MemoSize = 4096;
 
-    public static readonly DependencyProperty OffProperty =
-        DependencyProperty.RegisterAttached("Off", typeof(bool), typeof(TextBalance), new PropertyMetadata(false));
-
     private static readonly DependencyProperty AddedProperty =
         DependencyProperty.RegisterAttached("Added", typeof(double), typeof(TextBalance), new PropertyMetadata(0.0));
 
     private static readonly DependencyProperty PassesProperty =
         DependencyProperty.RegisterAttached("Passes", typeof(int), typeof(TextBalance), new PropertyMetadata(0));
-
-    public static void SetOff(DependencyObject d, bool value) => d.SetValue(OffProperty, value);
-
-    public static bool GetOff(DependencyObject d) => (bool)d.GetValue(OffProperty);
 
     public static void Install() =>
         EventManager.RegisterClassHandler(typeof(TextBlock), FrameworkElement.SizeChangedEvent, new SizeChangedEventHandler(OnSizeChanged));
@@ -86,7 +79,7 @@ internal static class TextBalance
         if (sender is not TextBlock tb || !e.WidthChanged && !e.HeightChanged) return;
         double added = (double)tb.GetValue(AddedProperty);
         if (tb.TextWrapping == TextWrapping.NoWrap || tb.TextTrimming != TextTrimming.None || tb.TextAlignment != TextAlignment.Left
-            || tb.HorizontalAlignment != HorizontalAlignment.Stretch || GetOff(tb) || string.IsNullOrEmpty(tb.Text) || !SingleRun(tb))
+            || tb.HorizontalAlignment != HorizontalAlignment.Stretch || string.IsNullOrEmpty(tb.Text) || !SingleRun(tb))
         {
             if (added > 0) Apply(tb, added, 0);
             return;

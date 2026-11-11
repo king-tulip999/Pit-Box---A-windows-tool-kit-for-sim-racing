@@ -684,9 +684,6 @@ internal sealed partial class RaceHudWidgets
         return null;
     }
 
-    private bool HasMovableItems() =>
-        (_painter.Items ?? new()).GroupBy(i => i.Key).Any(g => g.Count() > 1);
-
     private const float MinPreviewScale = 0.5f;
     private (double Width, double Height, float Scale) _laidSize;
     private (string Key, string Id)? _hoverItem;

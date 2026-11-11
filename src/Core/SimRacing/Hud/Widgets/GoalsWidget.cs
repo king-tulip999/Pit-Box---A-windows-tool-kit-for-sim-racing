@@ -85,7 +85,7 @@ internal sealed class GoalsWidget : HudWidget
         var laps = v.Race.Laps.Laps;
         Collect(v.Options, laps);
         if (v.Options.Choice("look") == Counters) DrawCounters(p);
-        else DrawLedger(p, v, laps);
+        else DrawLedger(p, laps);
     }
 
     private int DoneCount()
@@ -107,7 +107,7 @@ internal sealed class GoalsWidget : HudWidget
             new RectangleF(sx, baseline - p.Ascent(slash), p.Measure(separator + g.Target, slash) + 4, p.LineHeight(slash)), HAlign.Left, VAlign.Top, false);
     }
 
-    private void DrawLedger(HudPainter p, HudView v, IReadOnlyList<LapRecord> laps)
+    private void DrawLedger(HudPainter p, IReadOnlyList<LapRecord> laps)
     {
         int done = DoneCount(), n = _goals.Count;
         var area = p.Header("Practice goals", n == 0 ? null : $"{done} / {n} done", done == n && n > 0 ? p.P.GoodText : null);

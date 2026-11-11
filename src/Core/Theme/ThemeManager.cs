@@ -263,7 +263,7 @@ internal static class ThemeManager
 
     private static readonly string[] MeterKeys = { "Meter1", "Meter2", "Meter3", "Meter4", "Meter5" };
 
-    public static Brush StepBrush(double position) => Brush("Mono", Brushes.Orange);
+    public static Brush StepBrush() => Brush("Mono", Brushes.Orange);
 
     private static Typeface? _ui, _uiBold, _display;
 

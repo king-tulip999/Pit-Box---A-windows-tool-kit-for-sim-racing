@@ -62,7 +62,7 @@ internal sealed class EtwSession : IDisposable
 
     private int StartTrace(uint extraMode, uint flushTimer)
     {
-        var props = Properties(_name, extraMode, flushTimer);
+        var props = Properties(extraMode, flushTimer);
         try { return NativeStartTrace(out _session, _name, props); }
         finally { Marshal.FreeHGlobal(props); }
     }
@@ -140,7 +140,7 @@ internal sealed class EtwSession : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        var props = Properties(_name, 0, 0);
+        var props = Properties(0, 0);
         try { ControlTrace(_session, null, props, ControlStop); }
         finally { Marshal.FreeHGlobal(props); }
         if (_trace != InvalidTrace) CloseTrace(_trace);
@@ -150,12 +150,12 @@ internal sealed class EtwSession : IDisposable
 
     private static void StopNamed(string name)
     {
-        var props = Properties(name, 0, 0);
+        var props = Properties(0, 0);
         try { ControlTrace(0, name, props, ControlStop); }
         finally { Marshal.FreeHGlobal(props); }
     }
 
-    private static IntPtr Properties(string name, uint extraMode, uint flushTimer)
+    private static IntPtr Properties(uint extraMode, uint flushTimer)
     {
         int size = Marshal.SizeOf<TraceProperties>() + NameRoom * 2;
         var props = new TraceProperties

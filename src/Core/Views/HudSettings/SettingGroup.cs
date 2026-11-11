@@ -53,6 +53,4 @@ internal sealed class SettingGroup : StackPanel
     }
 
     public void Add(UIElement row) => _rows.Children.Add(row);
-
-    public bool HasVisibleRows => _rows.Children.OfType<UIElement>().Any(r => r.Visibility == Visibility.Visible);
 }
