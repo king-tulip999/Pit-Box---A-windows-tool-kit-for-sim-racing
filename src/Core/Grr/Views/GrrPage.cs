@@ -159,6 +159,7 @@ internal sealed class GrrPage : UserControl, IPage, IScreenshotStates, ISectione
             yield return (state.Name, async () => { await state.Enter(); if (Signature() != _signature) Changed(); });
         yield return ("grr-sidebar-gt", () =>
         {
+            if (!_app.Config.Grr.Leagues.Contains("gt", StringComparer.OrdinalIgnoreCase)) _app.Config.Grr.Leagues.Add("gt");
             ShowSection("gt");
             if (CurrentSection != "gt") throw new InvalidOperationException("Picking GT League in the GRR menu didn't show it.");
             return Task.CompletedTask;

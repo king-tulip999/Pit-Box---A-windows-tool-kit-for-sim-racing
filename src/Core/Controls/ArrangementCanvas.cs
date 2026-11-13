@@ -195,7 +195,7 @@ public sealed class ArrangementCanvas : Canvas
         });
         stack.Children.Add(TextFit.TipWhenTrimmed(new TextBlock { Text = tile.Name, FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(5, 0, 5, 0) }));
         stack.Children.Add(new TextBlock { Text = tile.Detail, FontSize = 12, Opacity = 0.8, HorizontalAlignment = HorizontalAlignment.Center });
-        grid.Children.Add(stack);
+        grid.Children.Add(new Viewbox { Child = stack, StretchDirection = StretchDirection.DownOnly, Margin = new Thickness(2) });
         if (tile.Primary)
         {
             grid.Children.Add(new Tile

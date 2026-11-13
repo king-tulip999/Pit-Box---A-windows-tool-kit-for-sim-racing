@@ -49,13 +49,14 @@ internal static class StatsSessions
             }
             table.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             var shown = list.Take(filter.Shown).ToList();
-            bool strips = shown.Any(s => RaceParts.Raced(s) && races.LapsOf(s.Id).Count > 1);
-            string[] heads = { "Time", "Session", "Track and car", "Map", strips ? "Lap times" : "", "Laps", "Best lap", "Incidents", "Awards", "Traces" };
+            bool strips = shown.Any(s => races.LapsOf(s.Id).Count > 1);
+            string[] heads = { "Time", "Session", "Track and car", "",strips ? "Lap times" : "", "Laps", "Best lap", "Incidents", "Awards", "Traces" };
             int span = table.ColumnDefinitions.Count;
             for (int c = 0; c < heads.Length; c++)
             {
                 var head = Ui.TableHead(heads[c], c == 9 ? "Pink: lap traces kept, lap analysis available. Gray: times only." : null);
-                if (c == 2 && shown.Any(s => CarPictures.For(s.Car) is not null)) head.Padding = new Thickness(21 * CarPictures.SlotAspect + 8, 0, 0, 0);
+                if (c == 3) continue;
+                if (c == 2) head.Padding = new Thickness(CarHeight * CarPictures.SlotAspect + 10 + MapWidth + 10, 0, 0, 0);
                 Cell(table, 0, c, head, c is >= 5 and <= 8);
             }
             int row = 0, index = 0, cascadeRow = int.MaxValue;
@@ -67,6 +68,23 @@ internal static class StatsSessions
                 var local = s.StartUtc.ToLocalTime();
                 bool newDay = day != local.Date;
                 day = local.Date;
+                if (newDay)
+                {
+                    row++;
+                    table.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                    var dayText = new TextBlock { Text = Dates.Weekday(local) + " " + Dates.Short(local), Style = Ui.Res<Style>("Eyebrow"), Margin = new Thickness(6, row > 1 ? 14 : 6, 0, 4) };
+                    Grid.SetRow(dayText, row);
+                    Grid.SetColumnSpan(dayText, span);
+                    table.Children.Add(dayText);
+                    if (row > 1)
+                    {
+                        var dayRule = Hairline.Rule(new Border { VerticalAlignment = VerticalAlignment.Top, IsHitTestVisible = false });
+                        dayRule.SetResourceReference(Border.BackgroundProperty, "LineStrong");
+                        Grid.SetRow(dayRule, row);
+                        Grid.SetColumnSpan(dayRule, span);
+                        table.Children.Add(dayRule);
+                    }
+                }
                 row++;
                 table.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto, MinHeight = RowHeight });
                 bool raced = RaceParts.Raced(s);
@@ -85,30 +103,32 @@ internal static class StatsSessions
                 Ui.HoverHighlight(hit);
                 var session = s;
                 hit.MouseLeftButtonUp += (_, e) => { e.Handled = true; open(session); };
-                var rule = Hairline.Rule(new Border { VerticalAlignment = VerticalAlignment.Top, IsHitTestVisible = false });
-                rule.SetResourceReference(Border.BackgroundProperty, newDay && row > 1 ? "LineStrong" : "Line");
-                Grid.SetRow(rule, row);
-                Grid.SetColumnSpan(rule, span);
                 table.Children.Add(hit);
-                table.Children.Add(rule);
-                if (newDay)
+                if (!newDay)
                 {
-                    var dayText = new TextBlock { Text = Dates.Weekday(local) + " " + Dates.Short(local), Style = Ui.Res<Style>("Caption"), FontSize = StatSize, FontWeight = FontWeights.Bold };
-                    dayText.SetResourceReference(TextBlock.ForegroundProperty, "Heading");
-                    Cell(table, row, 0, new StackPanel { Children = { dayText, Stat(Dates.Time(local)) } });
+                    var rule = Hairline.Rule(new Border { VerticalAlignment = VerticalAlignment.Top, IsHitTestVisible = false });
+                    rule.SetResourceReference(Border.BackgroundProperty, "Line");
+                    Grid.SetRow(rule, row);
+                    Grid.SetColumnSpan(rule, span);
+                    table.Children.Add(rule);
                 }
-                else Cell(table, row, 0, Stat(Dates.Time(local)));
+                Cell(table, row, 0, Stat(Dates.Time(local)));
                 Cell(table, row, 1, raced ? Finish(s, place) : TypeMark(s.Type, true));
                 var config = StatFormat.Config(s.Config);
                 var names = new StackPanel { Children = { Body(s.Track, "Heading", 13), Body(config.Length > 0 ? $"{config} · {s.Car}" : s.Car, "TextMuted", 12) } };
-                var carPicture = CarPictures.Beside(names, s.Car, 21, 8);
-                if (CarPictures.For(s.Car) is null) names.Margin = new Thickness(21 * CarPictures.SlotAspect + 8, 0, 0, 0);
+                var sketch = new TrackSketch(s.Track, s.Config, "TextMuted", 1.6) { Width = MapWidth, Height = 36, TrackId = s.TrackId, TrackName = s.TrackName, Margin = new Thickness(0, 0, 10, 0) };
+                var mapAndNames = new DockPanel { LastChildFill = true };
+                DockPanel.SetDock(sketch, Dock.Left);
+                mapAndNames.Children.Add(sketch);
+                mapAndNames.Children.Add(names);
+                names.VerticalAlignment = VerticalAlignment.Center;
+                var carPicture = CarPictures.Beside(mapAndNames, s.Car, CarHeight, 10, tallest: 32);
+                if (CarPictures.For(s.Car) is null) mapAndNames.Margin = new Thickness(CarHeight * CarPictures.SlotAspect + 10, 0, 0, 0);
                 Cell(table, row, 2, carPicture);
-                Cell(table, row, 3, new TrackSketch(s.Track, s.Config, "TextMuted", 1.6) { Width = 56, Height = 36, TrackId = s.TrackId, TrackName = s.TrackName });
                 var lapTimes = races.LapsOf(s.Id);
-                if (raced && lapTimes.Count > 1)
+                if (lapTimes.Count > 1)
                 {
-                    var strip = new LapStrip(lapTimes, place) { Width = StripWidth, Height = 22, ToolTip = "Lap times: taller = faster" };
+                    var strip = new LapStrip(lapTimes, place) { Width = StripWidth, Height = 28, ToolTip = "Lap times: taller = faster" };
                     Cell(table, row, 4, strip);
                 }
                 Cell(table, row, 5, Stat(s.Laps.ToString(CultureInfo.CurrentCulture)), true);
@@ -146,7 +166,7 @@ internal static class StatsSessions
     }
 
     private const int Columns = 10;
-    private const double RowHeight = 44, CascadeStepMs = 22, MaxCascadeMs = 420, NamesMaxWidth = 380, StatSize = 13;
+    private const double RowHeight = 44, CascadeStepMs = 22, MaxCascadeMs = 420, NamesMaxWidth = 460, CarHeight = 21, MapWidth = 56,StatSize = 13;
 
     internal static string NoTraceReason(SessionSummary s, Config.SessionStatsSettings settings, DateTime nowUtc)
     {
@@ -173,7 +193,7 @@ internal static class StatsSessions
         return row;
     }
 
-    private const double StripWidth = 84;
+    private const double StripWidth = 200;
 
     private static FrameworkElement Finish(SessionSummary s, string place)
     {
@@ -223,9 +243,9 @@ internal static class StatsSessions
         table.Children.Add(element);
     }
 
-    private static bool Spaced(int col) => col is >= 2 and < Columns - 1;
+    private static bool Spaced(int col) => col is 2 or 4;
 
-    private static int GridColumn(int col) => col <= 2 ? col : 2 * col - 2;
+    private static int GridColumn(int col) => col <= 2 ? col : col <= 4 ? col + 1 : col + 2;
 
     private static TextBlock Caption(string text) => new() { Text = text, Style = Ui.Res<Style>("Caption") };
 

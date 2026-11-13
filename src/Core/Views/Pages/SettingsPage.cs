@@ -1059,11 +1059,13 @@ internal sealed class SettingsPage : UserControl, IPage, IScreenshotStates, ISec
         }
     }
 
-    private void InstallPawnIo()
+    private void InstallPawnIo() => InstallPawnIo(_app);
+
+    internal static void InstallPawnIo(AppServices app)
     {
-        if (_app.Demo)
+        if (app.Demo)
         {
-            _app.Notify("Demo mode", "Nothing is installed in demo mode.", NoticeKind.Info);
+            app.Notify("Demo mode", "Nothing is installed in demo mode.", NoticeKind.Info);
             return;
         }
         try

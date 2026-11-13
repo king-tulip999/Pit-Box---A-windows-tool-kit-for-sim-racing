@@ -78,7 +78,7 @@ internal sealed class LapStrip : FrameworkElement
         _laps = laps;
         _scale = scale;
         _lo = laps.Count > 0 ? laps.Min(l => l.Time) : 0;
-        _hi = laps.Count > 0 ? Math.Min(laps.Max(l => l.Time), _lo * ScaleTop) : 1;
+        _hi = laps.Count > 0 ? ScaleHigh(laps.Select(l => l.Time).ToList()) : 1;
         SetResourceReference(BarProperty, place);
         SetResourceReference(BestProperty, "Heading");
         SetResourceReference(DirtyProperty, "Danger");
@@ -87,6 +87,14 @@ internal sealed class LapStrip : FrameworkElement
         SetResourceReference(TickProperty, "TextFaint");
         SnapsToDevicePixels = true;
         ToolTip = "Lap times: taller = faster";
+    }
+
+    public static double ScaleHigh(IReadOnlyList<double> times)
+    {
+        var sorted = times.OrderBy(t => t).ToList();
+        double lo = sorted[0], max = sorted[^1];
+        double typical = sorted[(int)Math.Floor((sorted.Count - 1) * 0.8)];
+        return Math.Min(max, Math.Max(lo * ScaleTop, typical * 1.01));
     }
 
     public static string ScaleLabel(double seconds)

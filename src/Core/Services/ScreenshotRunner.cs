@@ -59,7 +59,7 @@ internal static class ScreenshotRunner
                 AppServices.Current?.SetTheme(theme.Id);
                 await Task.Delay(1200);
                 Capture(window, Path.Combine(folder, $"{n}-{theme.Id}.png"));
-                if (window.FindName("SetupContent") is System.Windows.Controls.ContentControl { Content: System.Windows.Controls.UserControl { Content: System.Windows.Controls.ScrollViewer sv } })
+                if (window.FindName("SetupContent") is System.Windows.Controls.ContentControl { Content: System.Windows.Controls.UserControl { Content: System.Windows.Controls.Grid { Children: [.., System.Windows.Controls.ScrollViewer sv] } } })
                 {
                     sv.ScrollToEnd();
                     await Task.Delay(500);
@@ -81,7 +81,7 @@ internal static class ScreenshotRunner
                 app.SetTheme(Grr.GrrTheme.Id);
                 await Task.Delay(1200);
                 Capture(window, Path.Combine(folder, $"{n}-Grr.png"));
-                if (window.FindName("SetupContent") is System.Windows.Controls.ContentControl { Content: System.Windows.Controls.UserControl { Content: System.Windows.Controls.ScrollViewer sv } })
+                if (window.FindName("SetupContent") is System.Windows.Controls.ContentControl { Content: System.Windows.Controls.UserControl { Content: System.Windows.Controls.Grid { Children: [.., System.Windows.Controls.ScrollViewer sv] } } })
                 {
                     sv.ScrollToEnd();
                     await Task.Delay(500);
@@ -100,7 +100,7 @@ internal static class ScreenshotRunner
         try
         {
             Capture(window, Path.Combine(folder, "00-setup.png"));
-            if (window.FindName("SetupContent") is System.Windows.Controls.ContentControl { Content: System.Windows.Controls.UserControl { Content: System.Windows.Controls.ScrollViewer sv } })
+            if (window.FindName("SetupContent") is System.Windows.Controls.ContentControl { Content: System.Windows.Controls.UserControl { Content: System.Windows.Controls.Grid { Children: [.., System.Windows.Controls.ScrollViewer sv] } } })
             {
                 sv.ScrollToEnd();
                 await Task.Delay(500);
@@ -187,7 +187,7 @@ internal static class ScreenshotRunner
                     Capture(window, Path.Combine(folder, $"{n:00}-{page}.png"));
                     Lint(window, page);
                     CaptureFullPage(window, page, Path.Combine(folder, $"{n:00}-{page}-full.png"));
-                    if (window.PageFor(page) is System.Windows.Controls.UserControl { Content: System.Windows.Controls.ScrollViewer sv } && sv.ScrollableHeight > 40)
+                    if (window.PageFor(page) is System.Windows.Controls.UserControl { Content: System.Windows.Controls.Grid { Children: [.., System.Windows.Controls.ScrollViewer sv] } } && sv.ScrollableHeight > 40)
                     {
                         sv.ScrollToEnd();
                         await Task.Delay(Wait(500));

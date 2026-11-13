@@ -500,7 +500,7 @@ internal sealed class StatsPage : UserControl, IPage, IScreenshotStates, IPageHi
         {
             var list = store.Sessions(q.From, q.To);
             var conditions = list.FirstOrDefault(RaceParts.Raced) is { } raced ? store.Conditions(raced.Id) : null;
-            return (list, traces?.SessionsWithTraces(list.Select(s => s.Id)) ?? new HashSet<long>(), RaceInfo.Read(store, driver), conditions);
+            return (list, traces?.SessionsWithTraces(list.Select(s => s.Id)) ?? new HashSet<long>(), RaceInfo.Read(store, driver, list.Select(s => s.Id)), conditions);
         });
         await Motion.PageSettled(Dispatcher);
         if (version != _version || !_shown || _sessionId is not null) return;

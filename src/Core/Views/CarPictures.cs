@@ -69,9 +69,14 @@ internal static class CarPictures
         return picture;
     }
 
-    public static FrameworkElement Beside(FrameworkElement content, string? car, double height, double gap = 8, bool slot = true)
+    public static FrameworkElement Beside(FrameworkElement content, string? car, double height, double gap = 8, bool slot = true, double tallest = 0)
     {
         if ((slot ? Slotted(car, height) : Picture(car, height, height * 4)) is not { } picture) return content;
+        if (slot && tallest > height)
+        {
+            picture.Height = tallest;
+            picture.HorizontalAlignment = HorizontalAlignment.Center;
+        }
         picture.Margin = new Thickness(0, 0, gap, 0);
         content.VerticalAlignment = VerticalAlignment.Center;
         var row = new DockPanel { LastChildFill = true };

@@ -108,11 +108,12 @@ internal static class Themes
 
     private static ThemeSpec SetSpec(ThemeSet set, string? name)
     {
-        string pick = set.Known(name) ?? set.First;
+        string? chosen = set.Known(name);
+        string pick = chosen ?? set.First;
         var colors = set.Preset(pick)!;
         return new ThemeSpec
         {
-            Id = set.Id, Name = set.Name, Variant = pick, Dark = CustomPalette.IsDark(colors), Colors = CustomPalette.BuildBrand(colors),
+            Id = set.Id, Name = set.Name, Variant = chosen, Dark = CustomPalette.IsDark(colors), Colors = CustomPalette.BuildBrand(colors),
             CardEdge = Hairline, Outline = "InputEdge", Glow = true, GlowStrength = 1.0, CornerGlow = true,
         };
     }

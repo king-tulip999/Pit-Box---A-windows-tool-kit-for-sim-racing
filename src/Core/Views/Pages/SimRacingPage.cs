@@ -332,8 +332,8 @@ internal sealed class SimRacingPage : UserControl, IPage, IScreenshotStates, IRe
         yield return ("companions", () => { Only("companions"); return Task.CompletedTask; });
         yield return ("reordered", () =>
         {
-            MoveSections(Visible().AsEnumerable().Reverse().ToList());
-            if (Sections[0].Id != "companions") throw new InvalidOperationException("Moving the tools didn't change their order.");
+            MoveSections(DefaultPanelOrder.Reverse().ToList());
+            if (Sections[0].Id != DefaultPanelOrder[^1]) throw new InvalidOperationException("Moving the tools didn't change their order.");
             return Task.CompletedTask;
         });
         yield return ("default-order", () =>

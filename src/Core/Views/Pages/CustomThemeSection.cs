@@ -37,7 +37,7 @@ internal sealed class CustomThemeSection : StackPanel
             foreach (var (name, _, colors) in presets.Where(p => p.Family == shown[index]))
                 chips.Children.Add(ChipButton(name, palette(colors), picked(name), use));
         }
-        Children.Add(Ui.PageTabs(shown, Math.Max(0, pickedFamily), index => { Show(index); Motion.FadeIn(chips); }, "theme-family"));
+        Children.Add(Ui.PageTabs(shown, Math.Max(0, pickedFamily), index => { Show(index); Motion.FadeIn(chips); }, "theme-family", compact: true));
         Show(Math.Max(0, pickedFamily));
         Children.Add(chips);
         Children.Add(new Border { Height = 3 });

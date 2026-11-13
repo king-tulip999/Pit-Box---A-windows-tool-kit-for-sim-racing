@@ -14,7 +14,7 @@ namespace Core.Views.Pages;
 
 internal sealed partial class RaceHudWidgets
 {
-    private const double PanelNarrow = 400, PanelWide = 860, PanelWideMin = 560, WellPad = 13, PanelGap = 12;
+    private const double PanelNarrow = 400, PanelWide = 860, PanelWideMin = 560, WideSlack = 24, WellPad = 13, PanelGap = 12;
     private const double TwoColumnMin = PanelNarrow * 2 + 18;
     private const double WellMinHeight = 120, CategoryWidth = 96;
 
@@ -34,6 +34,9 @@ internal sealed partial class RaceHudWidgets
     private readonly List<(FrameworkElement Head, List<FrameworkElement> Rows)> _groupHeads = new();
     private readonly HashSet<string> _addsOpen = new(StringComparer.OrdinalIgnoreCase);
     private double _laidWidth, _laidHeight;
+    private Grid? _previewHost;
+    private ScrollViewer? _pageScroll;
+    private readonly TranslateTransform _previewFollow = new();
 
     private FrameworkElement PreviewArea(HudWidgetConfig w, HudWidgetDef def)
     {
@@ -50,7 +53,9 @@ internal sealed partial class RaceHudWidgets
         {
             HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(WellPad),
             Background = Brushes.Transparent, Children = { _preview, _previewHighlight, _previewMarks },
+            RenderTransform = _previewFollow,
         };
+        _previewHost = previewHost;
         HookPreviewDrag(previewHost, w);
         _panelLayer = new Canvas();
         _well = new Grid { ClipToBounds = true, MinHeight = WellMinHeight, Background = Brushes.Transparent, Children = { previewHost, _panelLayer } };
@@ -59,7 +64,10 @@ internal sealed partial class RaceHudWidgets
         {
             if (Math.Abs(e.NewSize.Width - e.PreviousSize.Width) > 1) DrawPreview(w);
             PlacePanel();
+            FollowScroll();
         };
+        _well.Loaded += (_, _) => HookPageScroll();
+        _well.Unloaded += (_, _) => UnhookPageScroll();
         _previewWell = Hairline.Frame(new Tile { Child = _well });
         _previewWell.SetResourceReference(Border.BackgroundProperty, "Bg");
         _previewWell.SetResourceReference(Border.BorderBrushProperty, "Line");
@@ -80,7 +88,40 @@ internal sealed partial class RaceHudWidgets
         return new StackPanel { Children = { head, _previewWell, _previewHidden, _previewNote } };
     }
 
+    private void HookPageScroll()
+    {
+        UnhookPageScroll();
+        DependencyObject? node = _well;
+        while (node is not null && node is not ScrollViewer) node = VisualTreeHelper.GetParent(node);
+        _pageScroll = node as ScrollViewer;
+        if (_pageScroll is not null) _pageScroll.ScrollChanged += OnPageScroll;
+        FollowScroll();
+    }
+
+    private void UnhookPageScroll()
+    {
+        if (_pageScroll is not null) _pageScroll.ScrollChanged -= OnPageScroll;
+        _pageScroll = null;
+    }
+
+    private void OnPageScroll(object sender, ScrollChangedEventArgs e) => FollowScroll();
+
+    private void FollowScroll()
+    {
+        if (_well is null || _previewHost is null) return;
+        double shift = 0;
+        if (_pageScroll is not null && _well.IsVisible && _pageScroll.IsAncestorOf(_well))
+        {
+            double above = -_well.TranslatePoint(new Point(0, 0), _pageScroll).Y;
+            double room = _well.ActualHeight - WellPad * 2 - _laidHeight * _previewScale;
+            shift = Math.Round(Math.Clamp(above, 0, Math.Max(0, room)));
+        }
+        if (Math.Abs(_previewFollow.Y - shift) > 0.1) _previewFollow.Y = shift;
+    }
+
     private double WellHeight() => Math.Max(WellMinHeight, Math.Ceiling(_laidHeight * _previewScale + WellPad * 2));
+
+    private bool WideFor(double room, bool settled) => room >= PanelWideMin + (settled && !_panelWide ? WideSlack : 0);
 
     private double RoomRight() => _well is null ? 0 : _well.ActualWidth - (WellPad + _laidWidth * _previewScale + PanelGap) - 6;
 
@@ -103,12 +144,13 @@ internal sealed partial class RaceHudWidgets
     private void OpenPanel(PanelTarget target)
     {
         if (Selected() is not { } w || HudCatalog.Find(w.Kind) is not { } def || _panelLayer is null || _well is null || _context is null) return;
-        double keep = _openPanel == target && _panelScroll is not null ? _panelScroll.VerticalOffset : 0;
+        bool again = _openPanel == target && _panelScroll is not null;
+        double keep = again ? _panelScroll!.VerticalOffset : 0;
         _openPanel = target;
         _rows.Clear();
         _groupHeads.Clear();
         double room = RoomRight();
-        _panelWide = room >= PanelWideMin;
+        _panelWide = WideFor(room, again);
         _panelWidth = _panelWide ? Math.Floor(Math.Min(room, PanelWide)) : Math.Min(PanelNarrow, Math.Max(280, _well.ActualWidth - WellPad * 2));
         var editor = def.EditorDef;
         var setting = target.SettingId is { } sid ? editor.Setting(sid) : null;
@@ -148,6 +190,7 @@ internal sealed partial class RaceHudWidgets
         _panel.SetResourceReference(Border.BackgroundProperty, "Panel");
         _panel.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
         _panel.MouseLeftButtonDown += (_, e) => e.Handled = true;
+        _panel.SizeChanged += (_, e) => { if (e.HeightChanged) PlacePanel(); };
         _panel.PreviewKeyDown += (_, e) =>
         {
             if (e.Key != Key.Escape || Keyboard.FocusedElement is HotkeyBox) return;
@@ -167,7 +210,7 @@ internal sealed partial class RaceHudWidgets
         if (_panel is null || _panelScroll is null || _well is null || _openPanel is null) return;
         double room = RoomRight();
         if (_well.ActualWidth <= 0) return;
-        if (_panelWide != room >= PanelWideMin)
+        if (_panelWide != WideFor(room, true))
         {
             _well.Dispatcher.BeginInvoke(RebuildPanel, System.Windows.Threading.DispatcherPriority.Background);
             return;
@@ -193,6 +236,7 @@ internal sealed partial class RaceHudWidgets
         if (Math.Abs(_well.Height - height) > 0.5 || double.IsNaN(_well.Height)) _well.Height = height;
         Canvas.SetLeft(_panel, Math.Round(left));
         Canvas.SetTop(_panel, Math.Round(top));
+        FollowScroll();
     }
 
     private static bool IsList(HudWidgetDef def, HudSetting s) =>
@@ -413,22 +457,35 @@ internal sealed partial class RaceHudWidgets
             else root.Children.Add(TwoColumns(laneViews[0], addBox, 1, 1.15));
             return root;
         }
-        foreach (var view in laneViews) root.Children.Add(view);
-        bool open = _addsOpen.Contains(setting.Id) || model.Lanes.All(l => l.Count == 0);
-        add.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
-        add.Margin = new Thickness(0, 8, 0, 0);
-        var toggle = Ui.LabeledButton("I.Plus", lanes.Count > 1 ? addLabel : "Add more", () => { });
-        toggle.HorizontalAlignment = HorizontalAlignment.Stretch;
-        toggle.Margin = new Thickness(0, 8, 0, 0);
-        toggle.Click += (_, _) =>
+        for (int i = 0; i < laneViews.Count; i++)
         {
-            bool now = add.Visibility != Visibility.Visible;
-            add.Visibility = now ? Visibility.Visible : Visibility.Collapsed;
-            if (now) _addsOpen.Add(setting.Id); else _addsOpen.Remove(setting.Id);
-            PlacePanel();
-        };
-        root.Children.Add(toggle);
-        root.Children.Add(add);
+            root.Children.Add(laneViews[i]);
+            var laneAdd = i == targetLane ? add : AddChips(model, categories, choices, i, Save);
+            string openKey = lanes.Count > 1 ? setting.Id + ":" + lanes[i].Key : setting.Id;
+            bool nothingLeft = !categories.Any(c => c.Ids.Any(id => !model.IsAdded(id) && choices.Any(ch => ch.Id == id)));
+            bool open = !nothingLeft && (_addsOpen.Contains(openKey) || (i == 0 && model.Lanes.All(l => l.Count == 0)));
+            laneAdd.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+            laneAdd.Margin = new Thickness(0, 8, 0, 0);
+            string label = lanes.Count > 1 ? $"Add to the {(lanes[i].Lane ?? "").ToLowerInvariant()} bar" : "Add more";
+            var toggle = Ui.LabeledButton("I.Plus", label, () => { });
+            toggle.HorizontalAlignment = HorizontalAlignment.Stretch;
+            toggle.Margin = new Thickness(0, 8, 0, 0);
+            if (nothingLeft)
+            {
+                toggle.IsEnabled = false;
+                toggle.ToolTip = "Everything is shown";
+                ToolTipService.SetShowOnDisabled(toggle, true);
+            }
+            toggle.Click += (_, _) =>
+            {
+                bool now = laneAdd.Visibility != Visibility.Visible;
+                laneAdd.Visibility = now ? Visibility.Visible : Visibility.Collapsed;
+                if (now) _addsOpen.Add(openKey); else _addsOpen.Remove(openKey);
+                _well?.Dispatcher.BeginInvoke(PlacePanel, System.Windows.Threading.DispatcherPriority.Loaded);
+            };
+            root.Children.Add(toggle);
+            root.Children.Add(laneAdd);
+        }
         return root;
     }
 
@@ -771,6 +828,8 @@ internal sealed partial class RaceHudWidgets
                 await Task.Delay(30);
                 if (_openPanel != target) OpenPanel(target);
                 await Task.Delay(10);
+                if (_well is { } settle) await settle.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+                _panel?.UpdateLayout();
                 if (_panel is not null)
                     foreach (var finding in Services.LayoutLint.Inspect(_panel, $"hud {kind} {name}")) Report(finding.ToString());
             }

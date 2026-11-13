@@ -66,6 +66,7 @@ internal static class ControlSweep
     private static readonly HashSet<string> TipsSeen = new(StringComparer.Ordinal);
     private static readonly List<string> TipFindings = new();
     private static readonly List<string> Blocked = new();
+    private static readonly HashSet<string> SpillsSeen = new(StringComparer.Ordinal);
     private static Dictionary<Style, string>? _styleNames;
     private static StreamWriter? _log;
     private static string _folder = "";
@@ -578,6 +579,7 @@ internal static class ControlSweep
                 }
             }
             if (target is null) { row.Outcome = "unreachable: gone after resetting the surface"; dirty = true; continue; }
+            if (!target.Element.IsEnabled) { row.Outcome = "skipped: disabled"; continue; }
             try { target.Element.BringIntoView(); } catch (InvalidOperationException) { }
             int errors = ErrorCount;
             int blocked = Blocked.Count;
@@ -602,6 +604,17 @@ internal static class ControlSweep
             if (window.CurrentPage != page) effects.Add("went to page " + window.CurrentPage);
             if (Blocked.Count > blocked) effects.Add("asked to leave the app (refused): " + string.Join(", ", Blocked.Skip(blocked)));
             if (effects.Count == 0 && after != before) effects.Add("changed the view");
+            if (after != before && !modal && !popup)
+            {
+                await Settle(150);
+                foreach (var (root, where) in Roots(window, s))
+                    foreach (var finding in LayoutLint.InspectSpill(root, $"{s.Name} after “{Short(item.Label.Length > 0 ? item.Label : item.Tip)}” ({where})"))
+                        if (SpillsSeen.Add(finding.Rule + finding.Text + finding.Detail))
+                        {
+                            AddIssue(row, "cuts off content: " + finding.Text);
+                            lock (Errors) Errors.Add(finding.ToString());
+                        }
+            }
             if (effects.Count == 0 && outcome is "pressed" or "clicked") AddIssue(row, "no visible effect");
             if (ErrorCount > errors) AddIssue(row, $"error ({ErrorCount - errors})");
             if (AppServices.Current is { } saving && SaveWatch.Unsaved(saving) is { } unsaved) AddIssue(row, "changed a setting without saving: " + unsaved);

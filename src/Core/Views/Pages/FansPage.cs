@@ -130,6 +130,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
     }
 
     private bool _presetBarQueued;
+    private Action? _fitPresets;
     private string? _bannerSignature, _presetSignature;
 
     private FanSettings Fans => _app.Config.Fans;
@@ -165,6 +166,7 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         presetLine.SetResourceReference(Border.BackgroundProperty, "Line");
         _presetBar.VerticalAlignment = VerticalAlignment.Center;
         var masterRow = new Grid { Height = 46 };
+        masterRow.SizeChanged += (_, e) => { if (e.WidthChanged) _fitPresets?.Invoke(); };
         masterRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         masterRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         masterRow.ColumnDefinitions.Add(new ColumnDefinition());
@@ -288,32 +290,59 @@ internal sealed class FansPage : UserControl, IPage, IScreenshotStates, ICancelE
         if (signature == _presetSignature)
             return;
         _presetSignature = signature;
-        var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        var row = new Grid { VerticalAlignment = VerticalAlignment.Center };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition());
         var label = Ui.Text("Preset", "H3");
         label.VerticalAlignment = VerticalAlignment.Center;
         label.Margin = new Thickness(0, 0, 13, 0);
         Ui.AddInfo(label, "Which curve or speed each fan uses. Switch presets here, from the tray or with a keybind.");
         row.Children.Add(label);
 
-        int active = Math.Max(0, Fans.Presets.FindIndex(p => p.Name == Fans.ActivePreset));
-        var seg = Ui.Segmented(Fans.Presets.Select(p => p.Name).ToList(), active, i =>
+        void Pick(int i)
         {
+            if (i < 0 || i >= Fans.Presets.Count || Fans.Presets[i].Name == Fans.ActivePreset) return;
             _app.SetFanPreset(Fans.Presets[i].Name);
             _fanSignature = "";
             _presetSignature = "";
             BuildPresetBar();
             Tick();
-        }, "fanpreset");
+        }
+        int active = Math.Max(0, Fans.Presets.FindIndex(p => p.Name == Fans.ActivePreset));
+        var seg = Ui.Segmented(Fans.Presets.Select(p => p.Name).ToList(), active, Pick, "fanpreset");
         seg.VerticalAlignment = VerticalAlignment.Center;
-        seg.Margin = new Thickness(0, 0, 10, 0);
-        row.Children.Add(seg);
+        var combo = Ui.Combo(Fans.Presets.Select(p => new Choice(p.Name, p.Name)), Fans.ActivePreset, c => Pick(Fans.Presets.FindIndex(p => p.Name == c.Id)));
+        combo.VerticalAlignment = VerticalAlignment.Center;
+        combo.HorizontalAlignment = HorizontalAlignment.Left;
+        System.Windows.Automation.AutomationProperties.SetName(combo, "Preset");
+        var presets = new Border { Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center, Child = seg };
+        Grid.SetColumn(presets, 1);
+        row.Children.Add(presets);
 
         var presetTools = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         var newPreset = Ui.LabeledButton("I.Plus", "New preset", () => _ = NewPresetAsync(), "GhostButton");
         newPreset.Margin = new Thickness(0, 0, 3, 0);
         presetTools.Children.Add(newPreset);
         presetTools.Children.Add(Ui.IconButton("I.Pencil", $"Edit “{Fans.ActivePreset}”", () => _ = EditPresetAsync()));
+        Grid.SetColumn(presetTools, 2);
         row.Children.Add(presetTools);
+        _fitPresets = () =>
+        {
+            if (_presetBar.Parent is not Grid bar || bar.ColumnDefinitions.Count <= Grid.GetColumn(_presetBar)) return;
+            double width = bar.ColumnDefinitions[Grid.GetColumn(_presetBar)].ActualWidth;
+            if (width <= 0) return;
+            label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            presetTools.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            seg.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            double room = Math.Max(0, width - label.DesiredSize.Width - presetTools.DesiredSize.Width - presets.Margin.Right);
+            FrameworkElement fit = seg.DesiredSize.Width <= room + 0.5 ? seg : combo;
+            combo.MaxWidth = room;
+            presets.MaxWidth = room;
+            if (presets.Child != fit) presets.Child = fit;
+        };
+        _fitPresets();
 
         _presetBar.Padding = new Thickness(0);
         _presetBar.Child = row;

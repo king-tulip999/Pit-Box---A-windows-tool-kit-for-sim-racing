@@ -22,10 +22,10 @@ internal sealed class RaceInfo
 
     public static readonly RaceInfo None = new(new(), new(), new(), "");
 
-    public static RaceInfo Read(StatsStore store, string driver)
+    public static RaceInfo Read(StatsStore store, string driver, IEnumerable<long>? alsoLapsOf = null)
     {
         var facts = RaceHistory.Read(store);
-        var laps = store.LapTimes(facts.Where(f => f.Raced).Select(f => f.Id));
+        var laps = store.LapTimes(facts.Where(f => f.Raced).Select(f => f.Id).Concat(alsoLapsOf ?? Enumerable.Empty<long>()));
         return new RaceInfo(RaceResult.AwardsByRace(facts), facts.ToDictionary(f => f.Id, f => f.Consistency), laps, driver);
     }
 

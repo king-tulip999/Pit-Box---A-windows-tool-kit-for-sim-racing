@@ -47,11 +47,7 @@ internal static class GrrTheme
     public static ThemeSpec Spec => _spec ??= new()
     {
         Id = Id, Name = "GRR", Dark = true, Colors = Palette,
-        HeadingWeight = FontWeights.ExtraBold,
-        Radius = 0, ChipRadius = 0,
-        CardEdge = new Thickness(1),
-        RacingDecor = true, FocusOffset = 2,
-        Glow = true, CornerGlow = true,
+        CardEdge = new Thickness(1), Outline = "InputEdge", Glow = true, GlowStrength = 1.0, CornerGlow = true,
         WindowIcon = new Uri("pack://application:,,,/Core;component/Assets/Themes/Velocita-Grr.ico"),
         Link = new ThemeLink(new Uri("pack://application:,,,/Core;component/Assets/GrrLogo.png"), GrrLeagues.Site, "GRR Website", "Take me to the GRR website") { Name = "GRR theme" },
     };

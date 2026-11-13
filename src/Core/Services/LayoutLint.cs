@@ -26,7 +26,8 @@ internal static class LayoutLint
 
     private static List<Allowed> ReadAllowList()
     {
-        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
+        foreach (string start in new[] { AppContext.BaseDirectory, Environment.CurrentDirectory })
+        for (var dir = new DirectoryInfo(start); dir is not null; dir = dir.Parent)
         {
             string file = Path.Combine(dir.FullName, "devtools", "tools", "layout-lint.allow.txt");
             if (!File.Exists(file)) continue;
@@ -49,7 +50,53 @@ internal static class LayoutLint
     {
         var found = new List<Finding>();
         Walk(root, root, where, found);
+        SpillWalk(root, where, found);
         return found.Where(f => !IsAllowed(f)).DistinctBy(f => (f.Rule, f.Text)).ToList();
+    }
+
+    public static List<Finding> InspectSpill(Visual root, string where)
+    {
+        var found = new List<Finding>();
+        SpillWalk(root, where, found);
+        return found.Where(f => !IsAllowed(f)).DistinctBy(f => (f.Rule, f.Text)).ToList();
+    }
+
+    private static void SpillWalk(Visual node, string where, List<Finding> found)
+    {
+        if (node is UIElement { IsVisible: false } or UIElement { Opacity: < 0.05 }) return;
+        if (node is FrameworkElement { ClipToBounds: true } clipper && clipper is not (ScrollViewer or ScrollContentPresenter) && clipper.TemplatedParent is null
+            && clipper.ActualWidth > 0 && clipper.ActualHeight > 0)
+            CheckSpill(clipper, clipper, where, found);
+        int count = VisualTreeHelper.GetChildrenCount(node);
+        for (int i = 0; i < count; i++)
+            if (VisualTreeHelper.GetChild(node, i) is Visual child)
+                SpillWalk(child, where, found);
+    }
+
+    private static void CheckSpill(FrameworkElement clipper, DependencyObject node, string where, List<Finding> found)
+    {
+        int count = VisualTreeHelper.GetChildrenCount(node);
+        for (int i = 0; i < count; i++)
+        {
+            if (VisualTreeHelper.GetChild(node, i) is not FrameworkElement child || !child.IsVisible || child.Opacity < 0.05) continue;
+            if (child is ScrollViewer or ScrollContentPresenter || child.ClipToBounds) continue;
+            if (child.RenderTransform is { } t && !t.Value.IsIdentity) continue;
+            if (child.ActualWidth >= 2 && child.ActualHeight >= 2)
+            {
+                Rect r;
+                try { r = child.TransformToAncestor(clipper).TransformBounds(new Rect(child.RenderSize)); }
+                catch (InvalidOperationException) { continue; }
+                bool inside = r.Top < clipper.ActualHeight - Slack && r.Left < clipper.ActualWidth - Slack && r.Bottom > Slack && r.Right > Slack;
+                double below = r.Bottom - clipper.ActualHeight, right = r.Right - clipper.ActualWidth;
+                if (inside && (below > Slack + 1 || right > Slack + 1 || r.Top < -Slack - 1 || r.Left < -Slack - 1) && FirstText(child) is { } text)
+                {
+                    string side = below > Slack + 1 ? $"{below:0} px below" : right > Slack + 1 ? $"{right:0} px to the right" : "above / left";
+                    found.Add(new Finding("spill", where, Short(Describe(child)), $"cut off {side} the edge of {Name(clipper)} ({clipper.ActualWidth:0}×{clipper.ActualHeight:0}) in {Ancestry(clipper)}"));
+                    continue;
+                }
+            }
+            CheckSpill(clipper, child, where, found);
+        }
     }
 
     private static void Walk(Visual node, Visual root, string where, List<Finding> found)

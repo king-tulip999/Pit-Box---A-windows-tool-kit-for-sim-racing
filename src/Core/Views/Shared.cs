@@ -894,7 +894,7 @@ internal static class Ui
 
     internal static readonly Thickness SegmentRowMargin = new(-2);
 
-    public static Border PageTabs(IReadOnlyList<string> options, int selected, Action<int> onChange, string group)
+    public static Border PageTabs(IReadOnlyList<string> options, int selected, Action<int> onChange, string group, bool compact = false)
     {
         string name = group + "-" + Guid.NewGuid().ToString("N");
         var panel = new WrapPanel();
@@ -902,6 +902,11 @@ internal static class Ui
         {
             int index = i;
             var rb = new RadioButton { Content = options[i], Style = Res<Style>("PageTab"), GroupName = name, IsChecked = i == selected };
+            if (compact)
+            {
+                rb.Padding = new Thickness(9, 0, 9, 0);
+                rb.Height = 28;
+            }
             AutomationProperties.SetName(rb, options[i] + " tab");
             rb.Checked += (_, _) => onChange(index);
             panel.Children.Add(rb);

@@ -187,9 +187,9 @@ internal static class SettingRows
         return new Tile { Style = Ui.Res<Style>("Segmented"), Child = panel };
     }
 
-    public static System.Windows.Controls.Primitives.UniformGrid Toggles(IReadOnlyList<(string Id, string Label, string? Help)> items, Func<string, bool> isOn, Action<string, bool> changed)
+    public static FitColumns Toggles(IReadOnlyList<(string Id, string Label, string? Help)> items, Func<string, bool> isOn, Action<string, bool> changed)
     {
-        var panel = new System.Windows.Controls.Primitives.UniformGrid { Columns = Math.Clamp(items.Count, 1, 2), Margin = new Thickness(0, 2, 0, 2), HorizontalAlignment = HorizontalAlignment.Left };
+        var panel = new FitColumns { MaxColumns = 2, Margin = new Thickness(0, 2, 0, 2), HorizontalAlignment = HorizontalAlignment.Left };
         foreach (var (id, label, help) in items)
         {
             var box = new CheckBox { Content = label, IsChecked = isOn(id), Margin = new Thickness(0, 5, 18, 5), ToolTip = help };
@@ -242,7 +242,7 @@ internal static class SettingRows
             empty.Visibility = shown.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             c.SetOne(HudClassFilter.ListKey, string.Join(",", shown));
         }
-        System.Windows.Controls.Primitives.UniformGrid Chips(IEnumerable<string> names) => Toggles(
+        FitColumns Chips(IEnumerable<string> names) => Toggles(
             names.Select(n => (n, n, string.Equals(n, mine, StringComparison.OrdinalIgnoreCase) ? "Your class" : (string?)null)).ToList(),
             n => shown.Contains(n, StringComparer.OrdinalIgnoreCase),
             (n, on) =>
